@@ -1,0 +1,262 @@
+[
+  {
+    "id": "talent_01",
+    "name": "夜灯苦读",
+    "rarity": "common",
+    "description": "漫长而稳定的学习耐受力。",
+    "modifiers": { "intelligence": 2 },
+    "tags": ["learning", "discipline"],
+    "promptHooks": {
+      "narrativeBias": "把难题拆解成可执行步骤，偏理性叙事。",
+      "eventAffinity": ["训练", "研究", "复盘"],
+      "riskTone": "谨慎评估后再投入"
+    }
+  },
+  {
+    "id": "talent_02",
+    "name": "众人之眼",
+    "rarity": "common",
+    "description": "更容易感知群体情绪变化。",
+    "modifiers": { "charisma": 2 },
+    "tags": ["social", "perception"],
+    "promptHooks": {
+      "narrativeBias": "优先描写人际互动与话术回旋。",
+      "eventAffinity": ["谈判", "调停", "演说"],
+      "riskTone": "先稳情绪再决策"
+    }
+  },
+  {
+    "id": "talent_03",
+    "name": "旧宅余荫",
+    "rarity": "common",
+    "description": "家族仍有可调用的基础资源。",
+    "modifiers": { "family": 2 },
+    "tags": ["resource", "legacy"],
+    "promptHooks": {
+      "narrativeBias": "强调家族资源与责任捆绑。",
+      "eventAffinity": ["守成", "调度", "背书"],
+      "riskTone": "偏向保本"
+    }
+  },
+  {
+    "id": "talent_04",
+    "name": "转角之运",
+    "rarity": "common",
+    "description": "普通局面中偶尔出现意外转机。",
+    "modifiers": { "fortune": 2 },
+    "tags": ["luck", "timing"],
+    "promptHooks": {
+      "narrativeBias": "在关键句加入小概率幸运回环。",
+      "eventAffinity": ["偶遇", "补位", "临场"],
+      "riskTone": "可适度试探"
+    }
+  },
+  {
+    "id": "talent_05",
+    "name": "冷静账本",
+    "rarity": "common",
+    "description": "面对资源波动时更能维持秩序。",
+    "modifiers": { "family": 1, "intelligence": 1 },
+    "tags": ["finance", "control"],
+    "promptHooks": {
+      "narrativeBias": "突出成本意识和缓冲策略。",
+      "eventAffinity": ["预算", "取舍", "止损"],
+      "riskTone": "低波动偏好"
+    }
+  },
+  {
+    "id": "talent_06",
+    "name": "街巷耳目",
+    "rarity": "rare",
+    "description": "你能更快获得一线消息。",
+    "modifiers": { "charisma": 1, "fortune": 1 },
+    "tags": ["intel", "social"],
+    "promptHooks": {
+      "narrativeBias": "信息差驱动情节推进。",
+      "eventAffinity": ["情报", "试探", "截胡"],
+      "riskTone": "可中等冒进"
+    }
+  },
+  {
+    "id": "talent_07",
+    "name": "硬骨耐压",
+    "rarity": "rare",
+    "description": "高压场景下你更不易崩盘。",
+    "modifiers": { "intelligence": 1, "fortune": 1 },
+    "tags": ["resilience", "pressure"],
+    "promptHooks": {
+      "narrativeBias": "危机叙事中保持行动连续性。",
+      "eventAffinity": ["逆境", "补救", "坚守"],
+      "riskTone": "逆风可扛"
+    }
+  },
+  {
+    "id": "talent_08",
+    "name": "门客三千",
+    "rarity": "rare",
+    "description": "你周围更容易形成协作网络。",
+    "modifiers": { "charisma": 1, "family": 1 },
+    "tags": ["network", "organization"],
+    "promptHooks": {
+      "narrativeBias": "多人协作与关系代价并重。",
+      "eventAffinity": ["结盟", "分工", "协调"],
+      "riskTone": "偏中庸"
+    }
+  },
+  {
+    "id": "talent_09",
+    "name": "长线耐心",
+    "rarity": "rare",
+    "description": "愿意为慢变量持续投入。",
+    "modifiers": { "intelligence": 1, "family": 1 },
+    "tags": ["longterm", "discipline"],
+    "promptHooks": {
+      "narrativeBias": "强调阶段收益与复利。",
+      "eventAffinity": ["培养", "迭代", "积累"],
+      "riskTone": "低风险稳收益"
+    }
+  },
+  {
+    "id": "talent_10",
+    "name": "临门直觉",
+    "rarity": "rare",
+    "description": "你常在最后时刻捕捉正确方向。",
+    "modifiers": { "fortune": 2 },
+    "tags": ["timing", "decision"],
+    "promptHooks": {
+      "narrativeBias": "临界点反转更自然。",
+      "eventAffinity": ["抉择", "抢点", "反击"],
+      "riskTone": "可控冒险"
+    }
+  },
+  {
+    "id": "talent_11",
+    "name": "远见图谱",
+    "rarity": "epic",
+    "description": "你能把零散信息拼成趋势。",
+    "modifiers": { "intelligence": 2, "fortune": 1 },
+    "tags": ["strategy", "forecast"],
+    "promptHooks": {
+      "narrativeBias": "趋势判断与提前布局占主导。",
+      "eventAffinity": ["布局", "预判", "转向"],
+      "riskTone": "中风险换高回报"
+    }
+  },
+  {
+    "id": "talent_12",
+    "name": "王庭礼节",
+    "rarity": "epic",
+    "description": "高阶场合中你更易获得信任。",
+    "modifiers": { "charisma": 2, "family": 1 },
+    "tags": ["prestige", "protocol"],
+    "promptHooks": {
+      "narrativeBias": "正式场景与权力关系更清晰。",
+      "eventAffinity": ["觐见", "议事", "担保"],
+      "riskTone": "先稳后攻"
+    }
+  },
+  {
+    "id": "talent_13",
+    "name": "秘境记忆",
+    "rarity": "epic",
+    "description": "你对未知环境有异常适应力。",
+    "modifiers": { "intelligence": 1, "fortune": 2 },
+    "tags": ["exploration", "adaptation"],
+    "promptHooks": {
+      "narrativeBias": "陌生环境中的学习速度被强调。",
+      "eventAffinity": ["探索", "试炼", "开荒"],
+      "riskTone": "高风险可承受"
+    }
+  },
+  {
+    "id": "talent_14",
+    "name": "众望所归",
+    "rarity": "epic",
+    "description": "群体更愿意把关键决策交给你。",
+    "modifiers": { "charisma": 2, "fortune": 1 },
+    "tags": ["leadership", "influence"],
+    "promptHooks": {
+      "narrativeBias": "集体命运与个人抉择绑定。",
+      "eventAffinity": ["带队", "动员", "承诺"],
+      "riskTone": "高压责任型"
+    }
+  },
+  {
+    "id": "talent_15",
+    "name": "遗产编织",
+    "rarity": "epic",
+    "description": "你能把旧资源重组出新价值。",
+    "modifiers": { "family": 2, "intelligence": 1 },
+    "tags": ["resource", "innovation"],
+    "promptHooks": {
+      "narrativeBias": "旧势力与新规则碰撞明显。",
+      "eventAffinity": ["改制", "重组", "接盘"],
+      "riskTone": "中高风险"
+    }
+  },
+  {
+    "id": "talent_16",
+    "name": "星环庇护",
+    "rarity": "legendary",
+    "description": "你在灾厄年份更容易找到生路。",
+    "modifiers": { "fortune": 3, "intelligence": 1 },
+    "tags": ["destiny", "survival"],
+    "promptHooks": {
+      "narrativeBias": "绝境中仍保留反制空间。",
+      "eventAffinity": ["灾变", "脱困", "逆转"],
+      "riskTone": "高风险高回报"
+    }
+  },
+  {
+    "id": "talent_17",
+    "name": "冠冕威仪",
+    "rarity": "legendary",
+    "description": "你的出现会改变现场权力重心。",
+    "modifiers": { "charisma": 3, "family": 1 },
+    "tags": ["authority", "presence"],
+    "promptHooks": {
+      "narrativeBias": "权力场叙事显著增强。",
+      "eventAffinity": ["震慑", "裁断", "统合"],
+      "riskTone": "高压但可控"
+    }
+  },
+  {
+    "id": "talent_18",
+    "name": "命运复写",
+    "rarity": "legendary",
+    "description": "你在失败边缘拥有二次博弈窗口。",
+    "modifiers": { "fortune": 2, "intelligence": 2 },
+    "tags": ["rewrite", "turnaround"],
+    "promptHooks": {
+      "narrativeBias": "失败后的重启与补偿更常见。",
+      "eventAffinity": ["翻盘", "回收", "重构"],
+      "riskTone": "容错高"
+    }
+  },
+  {
+    "id": "talent_19",
+    "name": "万卷骨血",
+    "rarity": "legendary",
+    "description": "你的认知成长会跨越常规边界。",
+    "modifiers": { "intelligence": 3, "charisma": 1 },
+    "tags": ["cognition", "mastery"],
+    "promptHooks": {
+      "narrativeBias": "复杂系统理解与统御并进。",
+      "eventAffinity": ["破局", "立法", "传承"],
+      "riskTone": "高收益导向"
+    }
+  },
+  {
+    "id": "talent_20",
+    "name": "世代灯塔",
+    "rarity": "legendary",
+    "description": "你更容易成为跨阶段的精神锚点。",
+    "modifiers": { "charisma": 2, "family": 1, "fortune": 1 },
+    "tags": ["legacy", "faith"],
+    "promptHooks": {
+      "narrativeBias": "个人选择影响群体长期命运。",
+      "eventAffinity": ["守望", "引导", "续命"],
+      "riskTone": "长线豪赌"
+    }
+  }
+]

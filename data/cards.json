@@ -1,0 +1,278 @@
+[
+  {
+    "id": "talent_01",
+    "name": "夜灯苦读",
+    "rarity": "common",
+    "description": "漫长而稳定的学习耐受力。",
+    "modifiers": {
+      "intelligence": 2
+    },
+    "tags": [
+      "learning",
+      "discipline"
+    ]
+  },
+  {
+    "id": "talent_02",
+    "name": "众人之眼",
+    "rarity": "common",
+    "description": "更容易感知群体情绪变化。",
+    "modifiers": {
+      "charisma": 2
+    },
+    "tags": [
+      "social",
+      "perception"
+    ]
+  },
+  {
+    "id": "talent_03",
+    "name": "旧宅余荫",
+    "rarity": "common",
+    "description": "家族仍有可调用的基础资源。",
+    "modifiers": {
+      "family": 2
+    },
+    "tags": [
+      "resource",
+      "legacy"
+    ]
+  },
+  {
+    "id": "talent_04",
+    "name": "转角之运",
+    "rarity": "common",
+    "description": "普通局面中偶尔出现意外转机。",
+    "modifiers": {
+      "fortune": 2
+    },
+    "tags": [
+      "luck",
+      "timing"
+    ]
+  },
+  {
+    "id": "talent_05",
+    "name": "冷静账本",
+    "rarity": "common",
+    "description": "面对资源波动时更能维持秩序。",
+    "modifiers": {
+      "family": 1,
+      "intelligence": 1
+    },
+    "tags": [
+      "finance",
+      "control"
+    ]
+  },
+  {
+    "id": "talent_06",
+    "name": "街巷耳目",
+    "rarity": "rare",
+    "description": "你能更快获得一线消息。",
+    "modifiers": {
+      "charisma": 1,
+      "fortune": 1
+    },
+    "tags": [
+      "intel",
+      "social"
+    ]
+  },
+  {
+    "id": "talent_07",
+    "name": "硬骨耐压",
+    "rarity": "rare",
+    "description": "高压场景下你更不易崩盘。",
+    "modifiers": {
+      "intelligence": 1,
+      "fortune": 1
+    },
+    "tags": [
+      "resilience",
+      "pressure"
+    ]
+  },
+  {
+    "id": "talent_08",
+    "name": "门客三千",
+    "rarity": "rare",
+    "description": "你周围更容易形成协作网络。",
+    "modifiers": {
+      "charisma": 1,
+      "family": 1
+    },
+    "tags": [
+      "network",
+      "organization"
+    ]
+  },
+  {
+    "id": "talent_09",
+    "name": "长线耐心",
+    "rarity": "rare",
+    "description": "愿意为慢变量持续投入。",
+    "modifiers": {
+      "intelligence": 1,
+      "family": 1
+    },
+    "tags": [
+      "longterm",
+      "discipline"
+    ]
+  },
+  {
+    "id": "talent_10",
+    "name": "临门直觉",
+    "rarity": "rare",
+    "description": "你常在最后时刻捕捉正确方向。",
+    "modifiers": {
+      "fortune": 2
+    },
+    "tags": [
+      "timing",
+      "decision"
+    ]
+  },
+  {
+    "id": "talent_11",
+    "name": "远见图谱",
+    "rarity": "epic",
+    "description": "你能把零散信息拼成趋势。",
+    "modifiers": {
+      "intelligence": 2,
+      "fortune": 1
+    },
+    "tags": [
+      "strategy",
+      "forecast"
+    ]
+  },
+  {
+    "id": "talent_12",
+    "name": "王庭礼节",
+    "rarity": "epic",
+    "description": "高阶场合中你更易获得信任。",
+    "modifiers": {
+      "charisma": 2,
+      "family": 1
+    },
+    "tags": [
+      "prestige",
+      "protocol"
+    ]
+  },
+  {
+    "id": "talent_13",
+    "name": "秘境记忆",
+    "rarity": "epic",
+    "description": "你对未知环境有异常适应力。",
+    "modifiers": {
+      "intelligence": 1,
+      "fortune": 2
+    },
+    "tags": [
+      "exploration",
+      "adaptation"
+    ]
+  },
+  {
+    "id": "talent_14",
+    "name": "众望所归",
+    "rarity": "epic",
+    "description": "群体更愿意把关键决策交给你。",
+    "modifiers": {
+      "charisma": 2,
+      "fortune": 1
+    },
+    "tags": [
+      "leadership",
+      "influence"
+    ]
+  },
+  {
+    "id": "talent_15",
+    "name": "遗产编织",
+    "rarity": "epic",
+    "description": "你能把旧资源重组出新价值。",
+    "modifiers": {
+      "family": 2,
+      "intelligence": 1
+    },
+    "tags": [
+      "resource",
+      "innovation"
+    ]
+  },
+  {
+    "id": "talent_16",
+    "name": "星环庇护",
+    "rarity": "legendary",
+    "description": "你在灾厄年份更容易找到生路。",
+    "modifiers": {
+      "fortune": 3,
+      "intelligence": 1
+    },
+    "tags": [
+      "destiny",
+      "survival"
+    ]
+  },
+  {
+    "id": "talent_17",
+    "name": "冠冕威仪",
+    "rarity": "legendary",
+    "description": "你的出现会改变现场权力重心。",
+    "modifiers": {
+      "charisma": 3,
+      "family": 1
+    },
+    "tags": [
+      "authority",
+      "presence"
+    ]
+  },
+  {
+    "id": "talent_18",
+    "name": "命运复写",
+    "rarity": "legendary",
+    "description": "你在失败边缘拥有二次博弈窗口。",
+    "modifiers": {
+      "fortune": 2,
+      "intelligence": 2
+    },
+    "tags": [
+      "rewrite",
+      "turnaround"
+    ]
+  },
+  {
+    "id": "talent_19",
+    "name": "万卷骨血",
+    "rarity": "legendary",
+    "description": "你的认知成长会跨越常规边界。",
+    "modifiers": {
+      "intelligence": 3,
+      "charisma": 1
+    },
+    "tags": [
+      "cognition",
+      "mastery"
+    ]
+  },
+  {
+    "id": "talent_20",
+    "name": "世代灯塔",
+    "rarity": "legendary",
+    "description": "你更容易成为跨阶段的精神锚点。",
+    "modifiers": {
+      "charisma": 2,
+      "family": 1,
+      "fortune": 1
+    },
+    "tags": [
+      "legacy",
+      "faith"
+    ]
+  }
+]

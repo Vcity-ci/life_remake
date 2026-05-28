@@ -1,0 +1,17 @@
+[
+  {
+    "id": "ancient",
+    "eraName": "王朝旧世",
+    "timeframe": "架空王朝四百年中后段",
+    "coreConflict": "礼法秩序与权力私欲的结构性撕裂",
+    "socialOrder": "宗族、门第、官僚体系相互制衡，流动依附于名望与推荐",
+    "taboos": ["私铸军械", "篡改赈灾簿册", "联外叛国"],
+    "mainlineStages": [
+      { "stage": "启蒙期", "ageRange": "0-14", "goal": "在家学与门风中定性" },
+      { "stage": "入局期", "ageRange": "15-28", "goal": "通过科举、军功或商道进入权力视野" },
+      { "stage": "制衡期", "ageRange": "29-45", "goal": "在朝堂、边地、家族责任中平衡代价" },
+      { "stage": "余响期", "ageRange": "46+", "goal": "守成或清算，决定历史评价" }
+    ],
+    "factionTone": "文风凝练、带历史质感，强调名节、因果与代价"
+  }
+]

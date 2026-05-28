@@ -1,0 +1,21 @@
+[
+  {
+    "id": "ancient",
+    "name": "古代王朝",
+    "intro": "门第、礼法与权势交织的古典时代。",
+    "stylePrompt": "文风克制，重礼制、仕途、家国责任与名节。",
+    "milestoneAges": [15, 20, 30, 40],
+    "endAgeRange": {
+      "min": 50,
+      "max": 78
+    },
+    "yearlyEventHints": ["科举与仕途", "家族联姻", "边地战事", "朝堂倾轧", "田产收成"],
+    "ageThresholds": [
+      { "id": "child", "label": "幼年", "min": 0, "max": 12 },
+      { "id": "youth", "label": "青年", "min": 13, "max": 27 },
+      { "id": "prime", "label": "壮年", "min": 28, "max": 42 },
+      { "id": "middle", "label": "中年", "min": 43, "max": 57 },
+      { "id": "elder", "label": "老年", "min": 58, "max": 120 }
+    ]
+  }
+]

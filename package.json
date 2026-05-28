@@ -1,0 +1,25 @@
+{
+  "name": "ai-reroll-trpg",
+  "version": "0.1.0",
+  "private": true,
+  "description": "AI 人生重开器 + 跑团（前后端分离，可扩展）",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm-run-all -p dev:backend dev:frontend",
+    "dev:oneclick": "start.bat",
+    "dev:local": "start-local.bat",
+    "dev:cloud": "start-cloud.bat",
+    "dev:backend": "npm run dev -w @reroll/backend",
+    "dev:frontend": "npm run dev -w @reroll/frontend",
+    "build": "npm-run-all build:shared build:backend build:frontend",
+    "build:shared": "npm run build -w @reroll/shared",
+    "build:backend": "npm run build -w @reroll/backend",
+    "build:frontend": "npm run build -w @reroll/frontend"
+  },
+  "devDependencies": {
+    "npm-run-all": "^4.1.5"
+  }
+}

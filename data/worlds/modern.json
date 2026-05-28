@@ -1,0 +1,21 @@
+[
+  {
+    "id": "modern",
+    "name": "现代都市",
+    "intro": "高楼、社交网络与快节奏竞争并存的现实世界。",
+    "stylePrompt": "写实、细节生活化、职业竞争与人际互动并重。",
+    "milestoneAges": [18, 25, 33, 45],
+    "endAgeRange": {
+      "min": 68,
+      "max": 88
+    },
+    "yearlyEventHints": ["升学抉择", "求职赛道", "情感关系", "家庭责任", "财富波动"],
+    "ageThresholds": [
+      { "id": "child", "label": "幼年", "min": 0, "max": 12 },
+      { "id": "youth", "label": "青年", "min": 13, "max": 29 },
+      { "id": "prime", "label": "壮年", "min": 30, "max": 44 },
+      { "id": "middle", "label": "中年", "min": 45, "max": 59 },
+      { "id": "elder", "label": "老年", "min": 60, "max": 120 }
+    ]
+  }
+]

@@ -1,0 +1,21 @@
+[
+  {
+    "id": "fantasy",
+    "name": "奇幻大陆",
+    "intro": "魔法、异族与古代遗迹并存的冒险世界。",
+    "stylePrompt": "高幻想叙事，具象描写魔法代价、冒险收益与势力冲突。",
+    "milestoneAges": [16, 22, 30, 42],
+    "endAgeRange": {
+      "min": 55,
+      "max": 95
+    },
+    "yearlyEventHints": ["秘境探索", "公会晋升", "王都风云", "灾厄入侵", "古神低语"],
+    "ageThresholds": [
+      { "id": "child", "label": "幼年", "min": 0, "max": 14 },
+      { "id": "youth", "label": "青年", "min": 15, "max": 35 },
+      { "id": "prime", "label": "壮年", "min": 36, "max": 58 },
+      { "id": "middle", "label": "中年", "min": 59, "max": 79 },
+      { "id": "elder", "label": "老年", "min": 80, "max": 140 }
+    ]
+  }
+]

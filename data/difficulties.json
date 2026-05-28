@@ -1,0 +1,29 @@
+[
+  {
+    "id": "casual",
+    "name": "轻松",
+    "yearlyVolatility": 0.18,
+    "growthBias": 0.14,
+    "riskRewardMultiplier": 1.1,
+    "failurePenaltyMultiplier": 0.8,
+    "description": "成长更稳定，惩罚较轻，适合体验剧情。"
+  },
+  {
+    "id": "standard",
+    "name": "标准",
+    "yearlyVolatility": 0.35,
+    "growthBias": 0.05,
+    "riskRewardMultiplier": 1,
+    "failurePenaltyMultiplier": 1,
+    "description": "风险收益平衡，适合常规跑团。"
+  },
+  {
+    "id": "hardcore",
+    "name": "硬核",
+    "yearlyVolatility": 0.5,
+    "growthBias": -0.06,
+    "riskRewardMultiplier": 1.2,
+    "failurePenaltyMultiplier": 1.25,
+    "description": "环境更苛刻，决策代价更高，适合高压挑战。"
+  }
+]

@@ -18,6 +18,8 @@ const debugModel = process.env.DEBUG_MODEL_CALLS === "1";
 const promptCache = new Map<string, { text: string; ts: number }>();
 const PROMPT_CACHE_TTL_MS = 10 * 60 * 1000;
 const PROMPT_CACHE_MAX = 600;
+const clientCache = new Map<string, OpenAI>();
+const CLIENT_CACHE_MAX = 64;
 
 function buildPromptCacheKey(
   provider: ProviderConfig,
@@ -27,6 +29,31 @@ function buildPromptCacheKey(
   return createHash("sha256")
     .update(`${provider.baseUrl}|${provider.model}|${provider.apiPath}\n${systemPrompt}\n${userPrompt}`)
     .digest("hex");
+}
+
+function buildClientCacheKey(ctx: NarrativeContext): string {
+  return createHash("sha256")
+    .update(`${ctx.providerConfig.baseUrl}|${ctx.providerConfig.timeoutMs}|${ctx.apiKey}`)
+    .digest("hex");
+}
+
+function getOpenAIClient(ctx: NarrativeContext): OpenAI {
+  const key = buildClientCacheKey(ctx);
+  const cached = clientCache.get(key);
+  if (cached) return cached;
+
+  if (clientCache.size >= CLIENT_CACHE_MAX) {
+    const first = clientCache.keys().next().value;
+    if (first) clientCache.delete(first);
+  }
+
+  const client = new OpenAI({
+    apiKey: ctx.apiKey,
+    baseURL: ctx.providerConfig.baseUrl,
+    timeout: ctx.providerConfig.timeoutMs
+  });
+  clientCache.set(key, client);
+  return client;
 }
 
 function readPromptCache(key: string): string | null {
@@ -364,11 +391,7 @@ async function callModel(
     return cached;
   }
 
-  const client = new OpenAI({
-    apiKey: ctx.apiKey,
-    baseURL: ctx.providerConfig.baseUrl,
-    timeout: ctx.providerConfig.timeoutMs
-  });
+  const client = getOpenAIClient(ctx);
 
   const attempt = async (): Promise<string> => {
     if (ctx.providerConfig.apiPath === "/responses") {

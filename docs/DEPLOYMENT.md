@@ -23,6 +23,8 @@
 - 行为：
   - 直接按云端链路启动（后续可对接正式部署脚本）
 - 模式：`DEPLOY_MODE=cloud`
+- 规划：
+  - 队列化编排（Redis/BullMQ）与响应优化在云端链路统一落地
 
 ### 2.3 兼容入口
 - `start.bat` 默认重定向到 `start-local.bat`
@@ -31,6 +33,7 @@
 - 模式由启动链路决定，不再在 Setting 中切换。
 - 后端通过 `DEPLOY_MODE` 固定当前链路。
 - `/api/meta/bootstrap` 会返回 `deployMode` 给前端展示。
+- 本地链路默认不依赖 Redis；云端链路可扩展 Redis 队列与多实例调度。
 
 ## 4. 密钥安全边界
 ### 4.1 云端链路
@@ -54,6 +57,10 @@
 - 本地发布：仅使用 local 链路文件，不携带云端密钥。
 - 云端发布：密钥通过部署平台 Secret 注入，不写入仓库。
 - 强制检查：发布前确认 `.env` 与 `storage/*` 未纳入提交。
+- 云端性能阶段建议新增：
+  - `REDIS_URL`
+  - 队列并发与重试参数（如 `QUEUE_CONCURRENCY`、`QUEUE_ATTEMPTS`）
+  - 事件流通道配置（用于前端增量接收）
 
 ## 7. 故障排查
 - 前端无法连后端：确认 `PORT` 与 `CORS_ORIGIN`。

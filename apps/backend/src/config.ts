@@ -29,7 +29,7 @@ export function getDefaultRuntimeConfig(): RuntimeConfig {
       model: model && /[A-Za-z]/.test(model) ? model : "gpt-4.1-mini",
       apiPath: process.env.DEFAULT_PROVIDER_API_PATH ?? "/chat/completions",
       temperature: parseNum(process.env.DEFAULT_PROVIDER_TEMPERATURE, 0.9),
-      maxTokens: parseNum(process.env.DEFAULT_PROVIDER_MAX_TOKENS, 700),
+      maxTokens: parseNum(process.env.DEFAULT_PROVIDER_MAX_TOKENS, 420),
       timeoutMs: parseNum(process.env.DEFAULT_PROVIDER_TIMEOUT_MS, 45000)
     }
   };
@@ -73,3 +73,4 @@ export async function writeRuntimeConfig(payload: AdminConfigPayload): Promise<R
 export function getCloudApiKey(): string {
   return process.env.CLOUD_MODEL_API_KEY?.trim() ?? "";
 }
+

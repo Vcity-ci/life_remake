@@ -8,6 +8,42 @@ export interface BootstrapPayload {
     runtime: AdminConfigPayload["runtime"];
     limits: ProviderLimits;
 }
+export type GameStreamEvent = {
+    type: "meta";
+    data: {
+        branch: "start" | "step";
+        runId: string;
+        rawChunkCount: number;
+        fromAge: number;
+        toAge: number;
+    };
+} | {
+    type: "started";
+    data: {
+        run: RunState;
+    };
+} | {
+    type: "timeline";
+    data: {
+        index: number;
+        total: number;
+        entry: RunState["timelineChunk"] extends Array<infer T> ? T : never;
+    };
+} | {
+    type: "milestone";
+    data: NonNullable<RunState["nextMilestoneChoice"]>;
+} | {
+    type: "done";
+    data: {
+        run: RunState;
+        timelineChunk: NonNullable<RunState["timelineChunk"]>;
+    };
+} | {
+    type: "error";
+    data: {
+        message: string;
+    };
+};
 export declare function fetchBootstrap(): Promise<BootstrapPayload>;
 export declare function fetchAdminConfig(): Promise<{
     runtime: AdminConfigPayload["runtime"];
@@ -37,3 +73,16 @@ export declare function stepRun(payload: {
     runId: string;
     decision: DecisionType;
 }): Promise<StepRunResponse>;
+export declare function startRunStream(payload: {
+    clientId: string;
+    worldId: string;
+    difficultyId: string;
+    personaPrompt: string;
+    talentPointTotal: number;
+    stats: RunState["stats"];
+    selectedCardIds: string[];
+}, onEvent: (event: GameStreamEvent) => void | Promise<void>): Promise<void>;
+export declare function stepRunStream(payload: {
+    runId: string;
+    decision: DecisionType;
+}, onEvent: (event: GameStreamEvent) => void | Promise<void>): Promise<void>;

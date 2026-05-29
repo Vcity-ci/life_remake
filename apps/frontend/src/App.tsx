@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import type { BackgroundCard, DecisionType, ProviderConfig, ProviderLimits, RunState, StatKey, Stats, TimelineEntry } from "@reroll/shared";
 import { AdminPanel } from "./components/AdminPanel";
-import { fetchBootstrap, saveGameEnvironment, startRun, stepRun } from "./lib/api";
+import { fetchBootstrap, saveGameEnvironment, startRunStream, stepRunStream, type GameStreamEvent } from "./lib/api";
 import { getOrCreateClientId, readLocalProviderConfig, writeLocalProviderConfig } from "./lib/localConfig";
 
 interface BootstrapState {
@@ -92,6 +92,7 @@ export default function App(): React.JSX.Element {
   const [envReady, setEnvReady] = useState(false);
   const [timeline, setTimeline] = useState<TimelineEntry[]>([]);
   const [showEndingModal, setShowEndingModal] = useState(false);
+  const [isStreaming, setIsStreaming] = useState(false);
   const timelineRef = useRef<HTMLDivElement | null>(null);
   const [flippedCards, setFlippedCards] = useState<Record<string, boolean>>({});
 
@@ -219,9 +220,11 @@ export default function App(): React.JSX.Element {
 
   async function onStart(): Promise<void> {
     if (!bootstrap) return;
+    if (isStreaming) return;
     try {
-      setStatus("人生推进中...");
-      const res = await startRun({
+      setIsStreaming(true);
+      setStatus("人生推进中（流式生成）...");
+      await startRunStream({
         clientId,
         worldId,
         difficultyId,
@@ -229,80 +232,117 @@ export default function App(): React.JSX.Element {
         talentPointTotal: bootstrap.talentPointTotal,
         stats,
         selectedCardIds: selectedCards
+      }, async (event: GameStreamEvent) => {
+        if (event.type === "started") {
+          setRun(event.data.run);
+          setTimeline([]);
+          setStatus("角色已开局，正在生成年份叙事...");
+          return;
+        }
+        if (event.type === "timeline") {
+          setTimeline((prev) => [...prev, event.data.entry]);
+          setStatus(`生成年份叙事中...(${event.data.index + 1}/${event.data.total})`);
+          return;
+        }
+        if (event.type === "milestone") {
+          setRun((prev) => prev ? { ...prev, nextMilestoneChoice: event.data } : prev);
+          setStatus("新的抉择出现。");
+          return;
+        }
+        if (event.type === "done") {
+          setRun(event.data.run);
+          if (event.data.run.ended) {
+            setStatus("本局结束。");
+            setShowEndingModal(true);
+          } else if (event.data.run.nextMilestoneChoice) {
+            setStatus("岁月流逝中，新的抉择正在逼近。");
+          } else {
+            setStatus("年份推进完成，继续推进。");
+          }
+          return;
+        }
+        if (event.type === "error") {
+          throw new Error(event.data.message);
+        }
       });
-      const chunk = res.run.timelineChunk ?? [];
-      const responseChunk = res.timelineChunk ?? [];
-      const finalChunk = responseChunk.length > 0 ? responseChunk : chunk;
-      if (finalChunk.length === 0) {
-        setStatus("年份已推进，新的事件正在酝酿。");
-        setRun(res.run);
-        if (res.run.ended) setShowEndingModal(true);
-        return;
-      }
-      setRun(res.run);
-      setTimeline((prev) => [...prev, ...finalChunk]);
-      if (res.run.ended) {
-        setStatus("本局结束。");
-        setShowEndingModal(true);
-      } else if (res.run.nextMilestoneChoice) {
-        setStatus("岁月流逝中，新的抉择正在逼近。");
-      } else {
-        setStatus("年份推进完成，继续推进。");
-      }
     } catch (error) {
       setStatus(`开局失败：${String(error)}`);
+    } finally {
+      setIsStreaming(false);
     }
   }
 
   async function onAdvance(): Promise<void> {
     if (!run) return;
+    if (isStreaming) return;
     try {
-      setStatus("继续推进年份中...");
-      const res = await stepRun({ runId: run.runId, decision: "balanced" });
-      const chunk = res.run.timelineChunk ?? [];
-      const responseChunk = res.timelineChunk ?? [];
-      const finalChunk = responseChunk.length > 0 ? responseChunk : chunk;
-      if (finalChunk.length === 0) {
-        setRun(res.run);
-        setStatus("年份已推进，请继续前行。");
-        if (res.run.ended) setShowEndingModal(true);
-        return;
-      }
-      setRun(res.run);
-      setTimeline((prev) => [...prev, ...finalChunk]);
-      if (res.run.ended) {
-        setStatus("本局结束。");
-        setShowEndingModal(true);
-      } else if (res.run.nextMilestoneChoice) {
-        setStatus("新的抉择出现。");
-      } else {
-        setStatus("年份推进完成，继续推进。");
-      }
+      setIsStreaming(true);
+      setStatus("继续推进年份中（流式生成）...");
+      await stepRunStream({ runId: run.runId, decision: "balanced" }, async (event: GameStreamEvent) => {
+        if (event.type === "timeline") {
+          setTimeline((prev) => [...prev, event.data.entry]);
+          setStatus(`生成年份叙事中...(${event.data.index + 1}/${event.data.total})`);
+          return;
+        }
+        if (event.type === "milestone") {
+          setRun((prev) => prev ? { ...prev, nextMilestoneChoice: event.data } : prev);
+          setStatus("新的抉择出现。");
+          return;
+        }
+        if (event.type === "done") {
+          setRun(event.data.run);
+          if (event.data.run.ended) {
+            setStatus("本局结束。");
+            setShowEndingModal(true);
+          } else if (event.data.run.nextMilestoneChoice) {
+            setStatus("新的抉择出现。");
+          } else {
+            setStatus("年份推进完成，继续推进。");
+          }
+          return;
+        }
+        if (event.type === "error") {
+          throw new Error(event.data.message);
+        }
+      });
     } catch (error) {
       setStatus(`推进失败：${String(error)}`);
+    } finally {
+      setIsStreaming(false);
     }
   }
 
   async function onDecision(decision: DecisionType): Promise<void> {
     if (!run) return;
+    if (isStreaming) return;
     try {
-      setStatus("命运流转中...");
-      const res = await stepRun({ runId: run.runId, decision });
-      const chunk = res.run.timelineChunk ?? [];
-      const responseChunk = res.timelineChunk ?? [];
-      const finalChunk = responseChunk.length > 0 ? responseChunk : chunk;
-      if (finalChunk.length === 0) {
-        setRun(res.run);
-        setStatus("决策已生效，后续影响正在展开。");
-        if (res.run.ended) setShowEndingModal(true);
-        return;
-      }
-      setRun(res.run);
-      setTimeline((prev) => [...prev, ...finalChunk]);
-      setStatus(res.run.ended ? "本局结束。" : "时间继续向前，等待下一个分岔点。");
-      if (res.run.ended) setShowEndingModal(true);
+      setIsStreaming(true);
+      setStatus("命运流转中（流式生成）...");
+      await stepRunStream({ runId: run.runId, decision }, async (event: GameStreamEvent) => {
+        if (event.type === "timeline") {
+          setTimeline((prev) => [...prev, event.data.entry]);
+          setStatus(`生成年份叙事中...(${event.data.index + 1}/${event.data.total})`);
+          return;
+        }
+        if (event.type === "milestone") {
+          setRun((prev) => prev ? { ...prev, nextMilestoneChoice: event.data } : prev);
+          setStatus("新的抉择出现。");
+          return;
+        }
+        if (event.type === "done") {
+          setRun(event.data.run);
+          setStatus(event.data.run.ended ? "本局结束。" : "时间继续向前，等待下一个分岔点。");
+          if (event.data.run.ended) setShowEndingModal(true);
+          return;
+        }
+        if (event.type === "error") {
+          throw new Error(event.data.message);
+        }
+      });
     } catch (error) {
       setStatus(`推进失败：${String(error)}`);
+    } finally {
+      setIsStreaming(false);
     }
   }
 
@@ -393,7 +433,7 @@ export default function App(): React.JSX.Element {
             </div>
           </div>
 
-          <button disabled={!canStart} onClick={() => void onStart()}>
+          <button disabled={!canStart || isStreaming} onClick={() => void onStart()}>
             开始游戏
           </button>
           <p className="status">{status}</p>
@@ -432,7 +472,7 @@ export default function App(): React.JSX.Element {
               <p>{run.nextMilestoneChoice.background ?? "你来到抉择时刻："}</p>
               <div className="row">
                 {run.nextMilestoneChoice.options.map((opt) => (
-                  <button key={opt.id} onClick={() => void onDecision(opt.id)}>
+                  <button key={opt.id} disabled={isStreaming} onClick={() => void onDecision(opt.id)}>
                     {opt.label}
                   </button>
                 ))}
@@ -447,7 +487,7 @@ export default function App(): React.JSX.Element {
 
           {!run.nextMilestoneChoice && !run.ended ? (
             <div className="row">
-              <button onClick={() => void onAdvance()}>继续推进年份</button>
+              <button disabled={isStreaming} onClick={() => void onAdvance()}>继续推进年份</button>
             </div>
           ) : null}
 

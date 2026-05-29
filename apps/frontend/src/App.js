@@ -1,7 +1,7 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AdminPanel } from "./components/AdminPanel";
-import { fetchBootstrap, saveGameEnvironment, startRun, stepRun } from "./lib/api";
+import { fetchBootstrap, saveGameEnvironment, startRunStream, stepRunStream } from "./lib/api";
 import { getOrCreateClientId, readLocalProviderConfig, writeLocalProviderConfig } from "./lib/localConfig";
 const statLabels = {
     intelligence: "智力",
@@ -71,6 +71,7 @@ export default function App() {
     const [envReady, setEnvReady] = useState(false);
     const [timeline, setTimeline] = useState([]);
     const [showEndingModal, setShowEndingModal] = useState(false);
+    const [isStreaming, setIsStreaming] = useState(false);
     const timelineRef = useRef(null);
     const [flippedCards, setFlippedCards] = useState({});
     const [localApiKey, setLocalApiKey] = useState("");
@@ -193,9 +194,12 @@ export default function App() {
     async function onStart() {
         if (!bootstrap)
             return;
+        if (isStreaming)
+            return;
         try {
-            setStatus("人生推进中...");
-            const res = await startRun({
+            setIsStreaming(true);
+            setStatus("人生推进中（流式生成）...");
+            await startRunStream({
                 clientId,
                 worldId,
                 difficultyId,
@@ -203,91 +207,130 @@ export default function App() {
                 talentPointTotal: bootstrap.talentPointTotal,
                 stats,
                 selectedCardIds: selectedCards
+            }, async (event) => {
+                if (event.type === "started") {
+                    setRun(event.data.run);
+                    setTimeline([]);
+                    setStatus("角色已开局，正在生成年份叙事...");
+                    return;
+                }
+                if (event.type === "timeline") {
+                    setTimeline((prev) => [...prev, event.data.entry]);
+                    setStatus(`生成年份叙事中...(${event.data.index + 1}/${event.data.total})`);
+                    return;
+                }
+                if (event.type === "milestone") {
+                    setRun((prev) => prev ? { ...prev, nextMilestoneChoice: event.data } : prev);
+                    setStatus("新的抉择出现。");
+                    return;
+                }
+                if (event.type === "done") {
+                    setRun(event.data.run);
+                    if (event.data.run.ended) {
+                        setStatus("本局结束。");
+                        setShowEndingModal(true);
+                    }
+                    else if (event.data.run.nextMilestoneChoice) {
+                        setStatus("岁月流逝中，新的抉择正在逼近。");
+                    }
+                    else {
+                        setStatus("年份推进完成，继续推进。");
+                    }
+                    return;
+                }
+                if (event.type === "error") {
+                    throw new Error(event.data.message);
+                }
             });
-            const chunk = res.run.timelineChunk ?? [];
-            const responseChunk = res.timelineChunk ?? [];
-            const finalChunk = responseChunk.length > 0 ? responseChunk : chunk;
-            if (finalChunk.length === 0) {
-                setStatus("年份已推进，新的事件正在酝酿。");
-                setRun(res.run);
-                if (res.run.ended)
-                    setShowEndingModal(true);
-                return;
-            }
-            setRun(res.run);
-            setTimeline((prev) => [...prev, ...finalChunk]);
-            if (res.run.ended) {
-                setStatus("本局结束。");
-                setShowEndingModal(true);
-            }
-            else if (res.run.nextMilestoneChoice) {
-                setStatus("岁月流逝中，新的抉择正在逼近。");
-            }
-            else {
-                setStatus("年份推进完成，继续推进。");
-            }
         }
         catch (error) {
             setStatus(`开局失败：${String(error)}`);
+        }
+        finally {
+            setIsStreaming(false);
         }
     }
     async function onAdvance() {
         if (!run)
             return;
+        if (isStreaming)
+            return;
         try {
-            setStatus("继续推进年份中...");
-            const res = await stepRun({ runId: run.runId, decision: "balanced" });
-            const chunk = res.run.timelineChunk ?? [];
-            const responseChunk = res.timelineChunk ?? [];
-            const finalChunk = responseChunk.length > 0 ? responseChunk : chunk;
-            if (finalChunk.length === 0) {
-                setRun(res.run);
-                setStatus("年份已推进，请继续前行。");
-                if (res.run.ended)
-                    setShowEndingModal(true);
-                return;
-            }
-            setRun(res.run);
-            setTimeline((prev) => [...prev, ...finalChunk]);
-            if (res.run.ended) {
-                setStatus("本局结束。");
-                setShowEndingModal(true);
-            }
-            else if (res.run.nextMilestoneChoice) {
-                setStatus("新的抉择出现。");
-            }
-            else {
-                setStatus("年份推进完成，继续推进。");
-            }
+            setIsStreaming(true);
+            setStatus("继续推进年份中（流式生成）...");
+            await stepRunStream({ runId: run.runId, decision: "balanced" }, async (event) => {
+                if (event.type === "timeline") {
+                    setTimeline((prev) => [...prev, event.data.entry]);
+                    setStatus(`生成年份叙事中...(${event.data.index + 1}/${event.data.total})`);
+                    return;
+                }
+                if (event.type === "milestone") {
+                    setRun((prev) => prev ? { ...prev, nextMilestoneChoice: event.data } : prev);
+                    setStatus("新的抉择出现。");
+                    return;
+                }
+                if (event.type === "done") {
+                    setRun(event.data.run);
+                    if (event.data.run.ended) {
+                        setStatus("本局结束。");
+                        setShowEndingModal(true);
+                    }
+                    else if (event.data.run.nextMilestoneChoice) {
+                        setStatus("新的抉择出现。");
+                    }
+                    else {
+                        setStatus("年份推进完成，继续推进。");
+                    }
+                    return;
+                }
+                if (event.type === "error") {
+                    throw new Error(event.data.message);
+                }
+            });
         }
         catch (error) {
             setStatus(`推进失败：${String(error)}`);
+        }
+        finally {
+            setIsStreaming(false);
         }
     }
     async function onDecision(decision) {
         if (!run)
             return;
+        if (isStreaming)
+            return;
         try {
-            setStatus("命运流转中...");
-            const res = await stepRun({ runId: run.runId, decision });
-            const chunk = res.run.timelineChunk ?? [];
-            const responseChunk = res.timelineChunk ?? [];
-            const finalChunk = responseChunk.length > 0 ? responseChunk : chunk;
-            if (finalChunk.length === 0) {
-                setRun(res.run);
-                setStatus("决策已生效，后续影响正在展开。");
-                if (res.run.ended)
-                    setShowEndingModal(true);
-                return;
-            }
-            setRun(res.run);
-            setTimeline((prev) => [...prev, ...finalChunk]);
-            setStatus(res.run.ended ? "本局结束。" : "时间继续向前，等待下一个分岔点。");
-            if (res.run.ended)
-                setShowEndingModal(true);
+            setIsStreaming(true);
+            setStatus("命运流转中（流式生成）...");
+            await stepRunStream({ runId: run.runId, decision }, async (event) => {
+                if (event.type === "timeline") {
+                    setTimeline((prev) => [...prev, event.data.entry]);
+                    setStatus(`生成年份叙事中...(${event.data.index + 1}/${event.data.total})`);
+                    return;
+                }
+                if (event.type === "milestone") {
+                    setRun((prev) => prev ? { ...prev, nextMilestoneChoice: event.data } : prev);
+                    setStatus("新的抉择出现。");
+                    return;
+                }
+                if (event.type === "done") {
+                    setRun(event.data.run);
+                    setStatus(event.data.run.ended ? "本局结束。" : "时间继续向前，等待下一个分岔点。");
+                    if (event.data.run.ended)
+                        setShowEndingModal(true);
+                    return;
+                }
+                if (event.type === "error") {
+                    throw new Error(event.data.message);
+                }
+            });
         }
         catch (error) {
             setStatus(`推进失败：${String(error)}`);
+        }
+        finally {
+            setIsStreaming(false);
         }
     }
     function resetRun() {
@@ -311,5 +354,5 @@ export default function App() {
                                     const selected = selectedCards.includes(card.id);
                                     const flipped = Boolean(flippedCards[card.id]);
                                     return (_jsx("div", { className: "flip-wrap", children: !flipped ? (_jsxs("button", { className: "card card-back", onClick: () => flipCard(card.id), children: [_jsx("strong", { children: "???" }), _jsx("small", { children: "\u70B9\u51FB\u7FFB\u724C" })] })) : (_jsxs("button", { className: `card ${selected ? "picked" : ""} ${rarityClass(card.rarity)}`, onClick: () => toggleCard(card.id), children: [_jsx("strong", { children: card.name }), _jsx("small", { children: card.rarity }), _jsx("p", { children: card.description })] })) }, card.id));
-                                }) })] }), _jsx("button", { disabled: !canStart, onClick: () => void onStart(), children: "\u5F00\u59CB\u6E38\u620F" }), _jsx("p", { className: "status", children: status })] })) : (_jsxs("section", { className: "panel run-panel", children: [_jsxs("h2", { children: [run.age, " \u5C81 \u00B7 ", run.ageStage.label] }), _jsxs("p", { children: [statIcons.intelligence, "\u667A\u529B ", run.stats.intelligence, " \u00B7 ", statIcons.charisma, "\u9B45\u529B ", run.stats.charisma, " \u00B7 ", statIcons.family, "\u5BB6\u5883 ", run.stats.family, " \u00B7 ", statIcons.fortune, "\u6C14\u8FD0 ", run.stats.fortune, "\u00B7 ", statIcons.physique, "\u4F53\u9B44 ", run.stats.physique] }), _jsxs("p", { children: ["\u540D\u671B\uFF1A", run.fame, " \u00B7 \u7ED3\u5C40\u72B6\u6001\uFF1A", run.outcome === "ongoing" ? "进行中" : run.outcome === "dead" ? "死亡" : "飞升"] }), _jsx("div", { className: "timeline-scroll", ref: timelineRef, children: timeline.slice(-14).map((item) => (_jsxs("article", { className: "narrative", children: [_jsxs("strong", { children: [item.age, "\u5C81 \u00B7 ", item.ageStage.label, " \u00B7 ", item.title] }), _jsx("div", { className: "delta-row", children: extractDeltaLabels(item).length === 0 ? (_jsx("small", { children: "\u5C5E\u6027\u53D8\u5316\uFF1A\u65E0" })) : (extractDeltaLabels(item).map((label, idx) => (_jsx("small", { children: label }, `${timelineKey(item)}-${idx}`)))) }), _jsx("p", { children: item.narrative })] }, timelineKey(item)))) }), run.nextMilestoneChoice ? (_jsxs("div", { children: [_jsx("p", { children: run.nextMilestoneChoice.background ?? "你来到抉择时刻：" }), _jsx("div", { className: "row", children: run.nextMilestoneChoice.options.map((opt) => (_jsx("button", { onClick: () => void onDecision(opt.id), children: opt.label }, opt.id))) }), _jsx("div", { className: "row", children: run.nextMilestoneChoice.options.map((opt) => (_jsxs("small", { children: [opt.label, "\uFF1A", opt.description] }, `${opt.id}-desc`))) })] })) : null, !run.nextMilestoneChoice && !run.ended ? (_jsx("div", { className: "row", children: _jsx("button", { onClick: () => void onAdvance(), children: "\u7EE7\u7EED\u63A8\u8FDB\u5E74\u4EFD" }) })) : null, run.ended ? (_jsxs("div", { className: "ending", children: [_jsx("h3", { children: "\u7ED3\u5C40" }), _jsx("p", { children: run.endingSummary })] })) : null, _jsx("p", { className: "status", children: status })] })), showSettings ? (_jsx(AdminPanel, { onClose: () => setShowSettings(false), bootstrap: bootstrap, localApiKey: localApiKey, setLocalApiKey: setLocalApiKey, localProvider: localProvider, setLocalProvider: setLocalProvider, onConfirmEnvironment: onConfirmEnvironment, canConfirmEnv: canConfirmEnv, envReady: envReady, worldId: worldId, setWorldId: setWorldId, difficultyId: difficultyId, setDifficultyId: setDifficultyId })) : null, run?.ended && showEndingModal ? (_jsx("div", { className: "modal-mask", children: _jsxs("div", { className: "modal ending-modal", children: [_jsx("h2", { children: "\u672C\u5C40\u7ED3\u7B97" }), _jsxs("p", { children: ["\u7ED3\u5C40\uFF1A", run.outcome === "dead" ? "死亡" : run.outcome === "ascended" ? "飞升" : "终局"] }), _jsxs("p", { children: ["\u540D\u671B\u5F97\u5206\uFF1A", run.fame] }), _jsxs("p", { children: ["\u79F0\u53F7\uFF1A", fameTitle(run.fame)] }), _jsxs("p", { children: ["\u7EC8\u5C40\u603B\u7ED3\uFF1A", run.endingSummary ?? "命运已暂告一段落。"] }), _jsxs("div", { className: "row", children: [_jsx("button", { onClick: playAgain, children: "\u518D\u6765\u4E00\u628A" }), _jsx("button", { className: "ghost", onClick: () => setShowEndingModal(false), children: "\u5173\u95ED" })] })] }) })) : null] }));
+                                }) })] }), _jsx("button", { disabled: !canStart || isStreaming, onClick: () => void onStart(), children: "\u5F00\u59CB\u6E38\u620F" }), _jsx("p", { className: "status", children: status })] })) : (_jsxs("section", { className: "panel run-panel", children: [_jsxs("h2", { children: [run.age, " \u5C81 \u00B7 ", run.ageStage.label] }), _jsxs("p", { children: [statIcons.intelligence, "\u667A\u529B ", run.stats.intelligence, " \u00B7 ", statIcons.charisma, "\u9B45\u529B ", run.stats.charisma, " \u00B7 ", statIcons.family, "\u5BB6\u5883 ", run.stats.family, " \u00B7 ", statIcons.fortune, "\u6C14\u8FD0 ", run.stats.fortune, "\u00B7 ", statIcons.physique, "\u4F53\u9B44 ", run.stats.physique] }), _jsxs("p", { children: ["\u540D\u671B\uFF1A", run.fame, " \u00B7 \u7ED3\u5C40\u72B6\u6001\uFF1A", run.outcome === "ongoing" ? "进行中" : run.outcome === "dead" ? "死亡" : "飞升"] }), _jsx("div", { className: "timeline-scroll", ref: timelineRef, children: timeline.slice(-14).map((item) => (_jsxs("article", { className: "narrative", children: [_jsxs("strong", { children: [item.age, "\u5C81 \u00B7 ", item.ageStage.label, " \u00B7 ", item.title] }), _jsx("div", { className: "delta-row", children: extractDeltaLabels(item).length === 0 ? (_jsx("small", { children: "\u5C5E\u6027\u53D8\u5316\uFF1A\u65E0" })) : (extractDeltaLabels(item).map((label, idx) => (_jsx("small", { children: label }, `${timelineKey(item)}-${idx}`)))) }), _jsx("p", { children: item.narrative })] }, timelineKey(item)))) }), run.nextMilestoneChoice ? (_jsxs("div", { children: [_jsx("p", { children: run.nextMilestoneChoice.background ?? "你来到抉择时刻：" }), _jsx("div", { className: "row", children: run.nextMilestoneChoice.options.map((opt) => (_jsx("button", { disabled: isStreaming, onClick: () => void onDecision(opt.id), children: opt.label }, opt.id))) }), _jsx("div", { className: "row", children: run.nextMilestoneChoice.options.map((opt) => (_jsxs("small", { children: [opt.label, "\uFF1A", opt.description] }, `${opt.id}-desc`))) })] })) : null, !run.nextMilestoneChoice && !run.ended ? (_jsx("div", { className: "row", children: _jsx("button", { disabled: isStreaming, onClick: () => void onAdvance(), children: "\u7EE7\u7EED\u63A8\u8FDB\u5E74\u4EFD" }) })) : null, run.ended ? (_jsxs("div", { className: "ending", children: [_jsx("h3", { children: "\u7ED3\u5C40" }), _jsx("p", { children: run.endingSummary })] })) : null, _jsx("p", { className: "status", children: status })] })), showSettings ? (_jsx(AdminPanel, { onClose: () => setShowSettings(false), bootstrap: bootstrap, localApiKey: localApiKey, setLocalApiKey: setLocalApiKey, localProvider: localProvider, setLocalProvider: setLocalProvider, onConfirmEnvironment: onConfirmEnvironment, canConfirmEnv: canConfirmEnv, envReady: envReady, worldId: worldId, setWorldId: setWorldId, difficultyId: difficultyId, setDifficultyId: setDifficultyId })) : null, run?.ended && showEndingModal ? (_jsx("div", { className: "modal-mask", children: _jsxs("div", { className: "modal ending-modal", children: [_jsx("h2", { children: "\u672C\u5C40\u7ED3\u7B97" }), _jsxs("p", { children: ["\u7ED3\u5C40\uFF1A", run.outcome === "dead" ? "死亡" : run.outcome === "ascended" ? "飞升" : "终局"] }), _jsxs("p", { children: ["\u540D\u671B\u5F97\u5206\uFF1A", run.fame] }), _jsxs("p", { children: ["\u79F0\u53F7\uFF1A", fameTitle(run.fame)] }), _jsxs("p", { children: ["\u7EC8\u5C40\u603B\u7ED3\uFF1A", run.endingSummary ?? "命运已暂告一段落。"] }), _jsxs("div", { className: "row", children: [_jsx("button", { onClick: playAgain, children: "\u518D\u6765\u4E00\u628A" }), _jsx("button", { className: "ghost", onClick: () => setShowEndingModal(false), children: "\u5173\u95ED" })] })] }) })) : null] }));
 }

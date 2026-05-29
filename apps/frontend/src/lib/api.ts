@@ -25,6 +25,33 @@ export interface BootstrapPayload {
   limits: ProviderLimits;
 }
 
+export type GameStreamEvent =
+  | {
+      type: "meta";
+      data: { branch: "start" | "step"; runId: string; rawChunkCount: number; fromAge: number; toAge: number };
+    }
+  | {
+      type: "started";
+      data: { run: RunState };
+    }
+  | {
+      type: "timeline";
+      data: {
+        index: number;
+        total: number;
+        entry: RunState["timelineChunk"] extends Array<infer T> ? T : never;
+      };
+    }
+  | {
+      type: "milestone";
+      data: NonNullable<RunState["nextMilestoneChoice"]>;
+    }
+  | {
+      type: "done";
+      data: { run: RunState; timelineChunk: NonNullable<RunState["timelineChunk"]> };
+    }
+  | { type: "error"; data: { message: string } };
+
 async function parseJson<T>(res: Response): Promise<T> {
   if (!res.ok) {
     const body = await res.text();
@@ -106,4 +133,75 @@ export async function stepRun(payload: {
     body: JSON.stringify(payload)
   });
   return parseJson<StepRunResponse>(res);
+}
+
+async function readNdjsonStream(
+  res: Response,
+  onEvent: (event: GameStreamEvent) => void | Promise<void>
+): Promise<void> {
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(body || `HTTP ${res.status}`);
+  }
+  if (!res.body) {
+    throw new Error("stream_body_missing");
+  }
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    while (true) {
+      const newline = buffer.indexOf("\n");
+      if (newline < 0) break;
+      const line = buffer.slice(0, newline).trim();
+      buffer = buffer.slice(newline + 1);
+      if (!line) continue;
+      const event = JSON.parse(line) as GameStreamEvent;
+      await onEvent(event);
+    }
+  }
+  const tail = buffer.trim();
+  if (tail) {
+    const event = JSON.parse(tail) as GameStreamEvent;
+    await onEvent(event);
+  }
+}
+
+export async function startRunStream(
+  payload: {
+    clientId: string;
+    worldId: string;
+    difficultyId: string;
+    personaPrompt: string;
+    talentPointTotal: number;
+    stats: RunState["stats"];
+    selectedCardIds: string[];
+  },
+  onEvent: (event: GameStreamEvent) => void | Promise<void>
+): Promise<void> {
+  const res = await fetch(`${API_BASE}/api/game/start/stream`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+  await readNdjsonStream(res, onEvent);
+}
+
+export async function stepRunStream(
+  payload: {
+    runId: string;
+    decision: DecisionType;
+  },
+  onEvent: (event: GameStreamEvent) => void | Promise<void>
+): Promise<void> {
+  const res = await fetch(`${API_BASE}/api/game/step/stream`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+  await readNdjsonStream(res, onEvent);
 }

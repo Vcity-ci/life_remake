@@ -78,6 +78,14 @@ skills/ai-gm/     # 提示词规则包（种子）
   - 入参：`runId/decision?`
   - 返回：`run + timelineChunk`
   - 当存在 `nextMilestoneChoice` 且缺少 `decision` 时会报错
+- `POST /api/game/start/stream`
+  - 入参同 `start`
+  - 响应：`application/x-ndjson`
+  - 事件：`started -> timeline* -> milestone? -> done`（失败时 `error`）
+- `POST /api/game/step/stream`
+  - 入参同 `step`
+  - 响应：`application/x-ndjson`
+  - 事件：`timeline* -> milestone? -> done`（失败时 `error`）
 
 ### 6.4 管理面板
 - `GET /api/admin/config`
@@ -125,7 +133,20 @@ skills/ai-gm/     # 提示词规则包（种子）
 - 稳定性：
   - 429/503 自动重试（退避）
   - 10 分钟 Prompt 缓存（上限 600）
+  - OpenAI client 按 `provider+key` 池化复用
   - 失败时回退空文本/默认选项
+
+## 9.1 叙事输出链路（当前实现）
+- 服务端使用分块并发（`NARRATIVE_CONCURRENCY`）生成叙事，并按时间线顺序输出。
+- 前端使用 NDJSON 流式读取，收到 `timeline` 即增量渲染，不等待整块返回。
+- 开局流式会先发 `started` 事件，确保“先进入局内，再推进年份”。
+
+## 9.2 性能优化分层决策（2026-05-29）
+- 已确认：重型排队系统（Redis/BullMQ）放在云端链路，不进入本地开发默认链路。
+- 原因：
+  - 本地链路目标是低依赖、快速调试。
+  - 云端链路更需要跨实例调度、削峰、重试、可观测与公平队列。
+- 结论：响应速度问题与排队策略在云端开发阶段统一推进。
 
 ## 10. 内容与配置存储
 - 内容主文件：`storage/custom-content.json`

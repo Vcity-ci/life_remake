@@ -658,12 +658,12 @@ export function autoAdvanceToCheckpoint(
       break;
     }
 
-    if (chunk.length >= MAX_YEARS_PER_CHUNK) {
+    if (world.milestoneAges.includes(run.age)) {
+      run.nextMilestoneChoice = generateMilestoneChoice(run.age);
       break;
     }
 
-    if (world.milestoneAges.includes(run.age)) {
-      run.nextMilestoneChoice = generateMilestoneChoice(run.age);
+    if (chunk.length >= MAX_YEARS_PER_CHUNK) {
       break;
     }
 

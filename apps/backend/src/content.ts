@@ -57,6 +57,18 @@ const factionPath = path.resolve(dataRoot, "settings", "factions", "factions.jso
 const factionEventPath = path.resolve(dataRoot, "events", "faction-events.json");
 const talentPromptPath = path.resolve(dataRoot, "talents", "talent-cards.json");
 
+let ensureStorageSeedPromise: Promise<void> | null = null;
+let contentBundleCache: ContentBundle | null = null;
+let contentBundleLoadPromise: Promise<ContentBundle> | null = null;
+let worldlineIndexCache: Map<string, WorldlineSetting> | null = null;
+let worldlineIndexLoadPromise: Promise<Map<string, WorldlineSetting>> | null = null;
+let factionsCache: FactionSetting[] | null = null;
+let factionsLoadPromise: Promise<FactionSetting[]> | null = null;
+let factionEventsAllCache: FactionEventSetting[] | null = null;
+let factionEventsLoadPromise: Promise<FactionEventSetting[]> | null = null;
+let talentHooksCache: TalentPromptHook[] | null = null;
+let talentHooksLoadPromise: Promise<TalentPromptHook[]> | null = null;
+
 async function readJsonFile<T>(targetPath: string): Promise<T> {
   const raw = await fs.readFile(targetPath, "utf8");
   return JSON.parse(raw) as T;
@@ -89,13 +101,24 @@ async function loadSeedBundle(): Promise<ContentBundle> {
 }
 
 async function ensureStorageSeed(): Promise<void> {
-  await fs.mkdir(storageRoot, { recursive: true });
+  if (ensureStorageSeedPromise) return ensureStorageSeedPromise;
+  ensureStorageSeedPromise = (async () => {
+    await fs.mkdir(storageRoot, { recursive: true });
+    try {
+      await fs.access(contentPath);
+    } catch {
+      const seed = await loadSeedBundle();
+      await fs.writeFile(contentPath, JSON.stringify(seed, null, 2), "utf8");
+      await writeBackup(seed, "seed");
+      contentBundleCache = seed;
+    }
+  })();
+
   try {
-    await fs.access(contentPath);
-  } catch {
-    const seed = await loadSeedBundle();
-    await fs.writeFile(contentPath, JSON.stringify(seed, null, 2), "utf8");
-    await writeBackup(seed, "seed");
+    await ensureStorageSeedPromise;
+  } catch (error) {
+    ensureStorageSeedPromise = null;
+    throw error;
   }
 }
 
@@ -108,10 +131,27 @@ async function writeBackup(bundle: ContentBundle, reason: string): Promise<void>
 
 export async function readContentBundle(): Promise<ContentBundle> {
   await ensureStorageSeed();
-  const raw = await fs.readFile(contentPath, "utf8");
-  const parsed = JSON.parse(raw) as ContentBundle;
-  parsed.worlds = [...parsed.worlds].sort((a, b) => a.id.localeCompare(b.id));
-  return parsed;
+  if (contentBundleCache) return contentBundleCache;
+  if (contentBundleLoadPromise) return contentBundleLoadPromise;
+
+  contentBundleLoadPromise = (async () => {
+    const raw = await fs.readFile(contentPath, "utf8");
+    const parsed = JSON.parse(raw) as ContentBundle;
+    const normalized: ContentBundle = {
+      worlds: [...parsed.worlds].sort((a, b) => a.id.localeCompare(b.id)),
+      cards: parsed.cards,
+      difficulties: parsed.difficulties,
+      promptPack: parsed.promptPack
+    };
+    contentBundleCache = normalized;
+    return normalized;
+  })();
+
+  try {
+    return await contentBundleLoadPromise;
+  } finally {
+    contentBundleLoadPromise = null;
+  }
 }
 
 export async function writeContentBundle(next: ContentBundle): Promise<ContentBundle> {
@@ -124,6 +164,8 @@ export async function writeContentBundle(next: ContentBundle): Promise<ContentBu
   };
   await fs.writeFile(contentPath, JSON.stringify(normalized, null, 2), "utf8");
   await writeBackup(normalized, "update");
+  contentBundleCache = normalized;
+  contentBundleLoadPromise = null;
   return normalized;
 }
 
@@ -149,40 +191,84 @@ export async function loadPromptPack(): Promise<Record<string, string>> {
 
 export async function loadWorldlineSetting(worldId: string): Promise<WorldlineSetting | null> {
   try {
-    const files = await fs.readdir(worldlineDir);
-    const targets = files.filter((f) => f.endsWith(".json"));
-    for (const name of targets) {
-      const items = await readJsonFile<WorldlineSetting[]>(path.resolve(worldlineDir, name));
-      const found = items.find((x) => x.id === worldId);
-      if (found) return found;
+    if (worldlineIndexCache) return worldlineIndexCache.get(worldId) ?? null;
+    if (!worldlineIndexLoadPromise) {
+      worldlineIndexLoadPromise = (async () => {
+        const files = await fs.readdir(worldlineDir);
+        const targets = files.filter((f) => f.endsWith(".json"));
+        const chunks = await Promise.all(
+          targets.map((name) => readJsonFile<WorldlineSetting[]>(path.resolve(worldlineDir, name)))
+        );
+        const index = new Map<string, WorldlineSetting>();
+        for (const list of chunks) {
+          for (const item of list) {
+            index.set(item.id, item);
+          }
+        }
+        worldlineIndexCache = index;
+        return index;
+      })();
     }
-    return null;
+    const index = await worldlineIndexLoadPromise;
+    return index.get(worldId) ?? null;
   } catch {
+    worldlineIndexCache = null;
     return null;
+  } finally {
+    worldlineIndexLoadPromise = null;
   }
 }
 
 export async function loadFactions(): Promise<FactionSetting[]> {
   try {
-    return await readJsonFile<FactionSetting[]>(factionPath);
+    if (factionsCache) return factionsCache;
+    if (!factionsLoadPromise) {
+      factionsLoadPromise = readJsonFile<FactionSetting[]>(factionPath).then((items) => {
+        factionsCache = items;
+        return items;
+      });
+    }
+    return await factionsLoadPromise;
   } catch {
     return [];
+  } finally {
+    factionsLoadPromise = null;
   }
 }
 
 export async function loadFactionEvents(worldId: string): Promise<FactionEventSetting[]> {
   try {
-    const all = await readJsonFile<FactionEventSetting[]>(factionEventPath);
+    if (factionEventsAllCache) {
+      return factionEventsAllCache.filter((x) => x.worldId === worldId);
+    }
+    if (!factionEventsLoadPromise) {
+      factionEventsLoadPromise = readJsonFile<FactionEventSetting[]>(factionEventPath).then((items) => {
+        factionEventsAllCache = items;
+        return items;
+      });
+    }
+    const all = await factionEventsLoadPromise;
     return all.filter((x) => x.worldId === worldId);
   } catch {
     return [];
+  } finally {
+    factionEventsLoadPromise = null;
   }
 }
 
 export async function loadTalentPromptHooks(): Promise<TalentPromptHook[]> {
   try {
-    return await readJsonFile<TalentPromptHook[]>(talentPromptPath);
+    if (talentHooksCache) return talentHooksCache;
+    if (!talentHooksLoadPromise) {
+      talentHooksLoadPromise = readJsonFile<TalentPromptHook[]>(talentPromptPath).then((items) => {
+        talentHooksCache = items;
+        return items;
+      });
+    }
+    return await talentHooksLoadPromise;
   } catch {
     return [];
+  } finally {
+    talentHooksLoadPromise = null;
   }
 }

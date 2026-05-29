@@ -28,6 +28,8 @@
   - 以 `DEPLOY_MODE` 固定链路
   - 通过 `zod` 做输入校验
   - 通过 store 维持进程内运行状态
+  - 同时提供 JSON 接口与 NDJSON 流式接口（`/start`、`/step`、`/start/stream`、`/step/stream`）
+  - 本地链路保持进程内编排，队列化编排预留给云端链路
 
 ### 2.3 领域层（`apps/backend/src/engine.ts`）
 - 职责：
@@ -63,22 +65,28 @@
 2. 前端调用 `POST /api/game/env`
 3. 后端校验链路与 key 规则，并把 env 绑定到 `clientId`
 
-### 3.3 开局流程
-1. 前端调用 `POST /api/game/start`
+### 3.3 开局流程（流式优先）
+1. 前端优先调用 `POST /api/game/start/stream`（兼容 `POST /api/game/start`）
 2. 后端执行：
    - 参数校验、world/difficulty 解析
    - 创建 run（叠加卡牌、初始化名望）
    - `autoAdvanceToCheckpoint` 生成 raw chunk
    - AI 生成年份叙事并替换 summary
    - 如遇里程碑，AI 生成 A/B/C 文案
-3. 返回 `run + timelineChunk`
+3. 流式事件顺序：
+   - `started`：先返回 run 基础状态，前端先跳转到局内
+   - `timeline`：逐条推送年份结果
+   - `milestone`：推送决策点
+   - `done`：返回最终 run
+4. 非流式接口返回 `run + timelineChunk`
 
-### 3.4 推进流程
-1. 前端调用 `POST /api/game/step`
+### 3.4 推进流程（流式优先）
+1. 前端优先调用 `POST /api/game/step/stream`（兼容 `POST /api/game/step`）
 2. 后端分支：
    - 有 milestone：执行 `applyMilestoneDecisionAndAdvance`
    - 无 milestone：执行 `autoAdvanceToCheckpoint`
-3. 对新增 chunk 做 AI 叙事增强，返回结果
+3. 对新增 chunk 做 AI 叙事增强，并按顺序流式推送 timeline/milestone/done
+4. 非流式接口返回 `run + timelineChunk`
 
 ## 4. 关键规则边界
 - 开局点数：`20~30`（bootstrap 随机）
@@ -121,3 +129,9 @@
 - 增加卡牌：编辑 cards + talent hooks
 - 增强叙事：编辑 promptPack 与设定摘要源
 - 替换模型：修改 ProviderConfig（baseUrl/model/apiPath）
+
+## 8. 云端性能路线（已确认）
+- 队列化编排（Redis/BullMQ）优先放在云端链路实施。
+- 本地链路继续使用进程内 store + 轻量并发，不强依赖 Redis。
+- 响应速度相关改造（排队、限流、公平调度、失败重放）在云端阶段统一上线。
+- 目标行为：生成一条显示一条；推进到决策点暂停；完成决策后恢复队列推进。

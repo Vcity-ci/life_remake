@@ -82,9 +82,14 @@ export function AdminPanel(props: Props): React.JSX.Element {
   const [content, setContent] = useState<ContentBundle>(defaultContent());
   const [status, setStatus] = useState<string>("");
   const [loading, setLoading] = useState(true);
+  const cloudLocked = bootstrap.deployMode === "cloud";
 
   useEffect(() => {
     async function init() {
+      if (cloudLocked) {
+        setLoading(false);
+        return;
+      }
       try {
         const [runtimeRsp, loadedContent] = await Promise.all([fetchAdminConfig(), fetchAdminContent()]);
         setCloudProvider(runtimeRsp.runtime.cloud);
@@ -110,7 +115,13 @@ export function AdminPanel(props: Props): React.JSX.Element {
       }
     }
     void init();
-  }, []);
+  }, [cloudLocked]);
+
+  useEffect(() => {
+    if (cloudLocked && tab !== "session") {
+      setTab("session");
+    }
+  }, [cloudLocked, tab]);
 
   const runtimePayload: AdminConfigPayload = useMemo(
     () => ({
@@ -256,8 +267,12 @@ export function AdminPanel(props: Props): React.JSX.Element {
 
         <div className="row admin-tabs">
           <button className={tab === "session" ? "selected" : "ghost"} onClick={() => setTab("session")}>会话配置</button>
-          <button className={tab === "model" ? "selected" : "ghost"} onClick={() => setTab("model")}>模型配置</button>
-          <button className={tab === "content" ? "selected" : "ghost"} onClick={() => setTab("content")}>内容配置</button>
+          {!cloudLocked ? (
+            <button className={tab === "model" ? "selected" : "ghost"} onClick={() => setTab("model")}>模型配置</button>
+          ) : null}
+          {!cloudLocked ? (
+            <button className={tab === "content" ? "selected" : "ghost"} onClick={() => setTab("content")}>内容配置</button>
+          ) : null}
         </div>
 
         {tab === "session" ? (
@@ -310,7 +325,7 @@ export function AdminPanel(props: Props): React.JSX.Element {
           </section>
         ) : null}
 
-        {tab === "model" ? (
+        {!cloudLocked && tab === "model" ? (
           <section>
             <p>全局云端模型参数（部署级）</p>
             <ProviderConfigForm value={cloudProvider} onChange={setCloudProvider} limits={limits} />
@@ -320,7 +335,7 @@ export function AdminPanel(props: Props): React.JSX.Element {
           </section>
         ) : null}
 
-        {tab === "content" ? (
+        {!cloudLocked && tab === "content" ? (
           <section>
             <details open>
               <summary>世界观</summary>

@@ -108,6 +108,11 @@
 - `data/cards.json`
 - `data/difficulties.json`
 - `skills/ai-gm/prompt-pack.json`
+- 运行时解析根目录：基于后端源码目录向上定位项目根（`apps/backend/src -> ../../..`）
+- 后端固定读取：
+  - `<projectRoot>/data/*`
+  - `<projectRoot>/skills/ai-gm/prompt-pack.json`
+- 结论：生产环境不需要复制 `data/`、`skills/` 到 `apps/backend/dist/`
 
 ### 5.2 运行期可编辑数据
 - `storage/custom-content.json`
@@ -128,6 +133,11 @@
   - `clientId`
   - `localProviderConfig`
 - 管理配置接口全部走后端 schema 校验。
+
+## 6.1 前端 API 基址规则
+- `apps/frontend/src/lib/api.ts` 使用 `VITE_API_BASE_URL || ""`
+- 开发环境：`apps/frontend/.env.development` 配置 `VITE_API_BASE_URL=http://localhost:4000`
+- 生产环境：`apps/frontend/.env.production` 设为空，前端请求走同域 `/api/*`，由 IIS/Nginx 反代到后端
 
 ## 7. 扩展点
 - 增加世界观：编辑 content worlds 或种子数据

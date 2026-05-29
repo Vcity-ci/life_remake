@@ -48,10 +48,11 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const projectRoot = path.resolve(__dirname, "../../..");
 const dataRoot = path.resolve(projectRoot, "data");
+const skillsRoot = path.resolve(projectRoot, "skills");
 const storageRoot = path.resolve(projectRoot, "storage");
 const contentPath = path.resolve(storageRoot, "custom-content.json");
 const backupDir = path.resolve(storageRoot, "backups");
-const skillPromptPath = path.resolve(projectRoot, "skills", "ai-gm", "prompt-pack.json");
+const skillPromptPath = path.resolve(skillsRoot, "ai-gm", "prompt-pack.json");
 
 const worldlineDir = path.resolve(dataRoot, "settings", "worldlines");
 const factionPath = path.resolve(dataRoot, "settings", "factions", "factions.json");

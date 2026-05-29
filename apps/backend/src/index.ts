@@ -1,8 +1,9 @@
-import "dotenv/config";
+import dotenv from "dotenv";
 import cors from "cors";
 import express from "express";
 import seedrandom from "seedrandom";
 import { once } from "node:events";
+import path from "node:path";
 import type {
   AgeThreshold,
   AdminConfigPayload,
@@ -45,6 +46,10 @@ import {
   stepRunSchema
 } from "./schema.js";
 import { getGameEnv, getRun, getRunClientId, saveGameEnv, saveRun } from "./store.js";
+
+dotenv.config({
+  path: path.join(process.cwd(), ".env")
+});
 
 const app = express();
 const port = Number(process.env.PORT ?? "4000");
@@ -710,11 +715,17 @@ app.post("/api/game/env", async (req, res) => {
 });
 
 app.get("/api/admin/content", async (_req, res) => {
+  if (deployMode === "cloud") {
+    return res.status(403).json({ error: "cloud_mode_admin_locked" });
+  }
   const content = await readContentBundle();
   res.json(content);
 });
 
 app.post("/api/admin/content", async (req, res) => {
+  if (deployMode === "cloud") {
+    return res.status(403).json({ error: "cloud_mode_admin_locked" });
+  }
   const parsed = contentBundleSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: parsed.error.flatten() });
@@ -725,11 +736,17 @@ app.post("/api/admin/content", async (req, res) => {
 });
 
 app.get("/api/admin/config", async (_req, res) => {
+  if (deployMode === "cloud") {
+    return res.status(403).json({ error: "cloud_mode_admin_locked" });
+  }
   const runtime = await readRuntimeConfig();
   res.json({ runtime, limits: providerLimits });
 });
 
 app.post("/api/admin/config", async (req, res) => {
+  if (deployMode === "cloud") {
+    return res.status(403).json({ error: "cloud_mode_admin_locked" });
+  }
   const parsed = adminConfigSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: parsed.error.flatten() });

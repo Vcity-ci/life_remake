@@ -503,6 +503,17 @@ function defaultOptions(): AiMilestoneOptions {
   };
 }
 
+function fallbackFromChoice(choice: NonNullable<InternalRunState["nextMilestoneChoice"]>): AiMilestoneOptions {
+  return {
+    background: (choice.background ?? "").trim() || "命运的岔路在你面前展开。",
+    optionOverrides: choice.options.map((opt) => ({
+      id: opt.id,
+      label: (opt.label ?? "").trim() || (opt.id === "safe" ? "A" : opt.id === "balanced" ? "B" : "C"),
+      description: (opt.description ?? "").trim() || "请谨慎抉择。"
+    }))
+  };
+}
+
 function stripCodeFence(text: string): string {
   const trimmed = text.trim();
   if (trimmed.startsWith("```")) {
@@ -594,6 +605,29 @@ function parseMilestonePayload(text: string): AiMilestoneOptions | null {
   return parseOptionsFromText(cleaned);
 }
 
+function mergeMilestoneOptions(
+  base: NonNullable<InternalRunState["nextMilestoneChoice"]>,
+  parsed: AiMilestoneOptions | null
+): AiMilestoneOptions {
+  const fallback = fallbackFromChoice(base);
+  if (!parsed || !parsed.optionOverrides || parsed.optionOverrides.length !== 3) return fallback;
+
+  const sourceById = new Map(parsed.optionOverrides.map((o) => [o.id, o]));
+  return {
+    background: parsed.background?.trim() ? parsed.background.trim() : fallback.background,
+    optionOverrides: fallback.optionOverrides.map((baseOption) => {
+      const fromModel = sourceById.get(baseOption.id);
+      const nextLabel = fromModel?.label?.trim() ? fromModel.label.trim() : baseOption.label;
+      const nextDescription = fromModel?.description?.trim() ? fromModel.description.trim() : baseOption.description;
+      return {
+        id: baseOption.id,
+        label: nextLabel,
+        description: nextDescription
+      };
+    })
+  };
+}
+
 function isDecisionId(value: string): value is DecisionType {
   return value === "safe" || value === "balanced" || value === "risky";
 }
@@ -604,7 +638,12 @@ export async function generateMilestoneOptions(
   recent: YearEvent[],
   ctx: NarrativeContext
 ): Promise<AiMilestoneOptions> {
-  if (!ctx.apiKey.trim()) return defaultOptions();
+  if (!ctx.apiKey.trim()) {
+    return run.nextMilestoneChoice ? fallbackFromChoice(run.nextMilestoneChoice) : defaultOptions();
+  }
+
+  const baseChoice = run.nextMilestoneChoice;
+  const fallback = baseChoice ? fallbackFromChoice(baseChoice) : defaultOptions();
 
   const systemPrompt = buildSystemPrompt(ctx.promptPack, world, ctx);
   const userPrompt = buildMilestoneOptionsPrompt(run, recent, ctx.promptPack);
@@ -628,34 +667,39 @@ export async function generateMilestoneOptions(
         preview: text?.slice(0, 120) ?? ""
       });
     }
-    const parsed = parseMilestonePayload(text);
+    let parsed = parseMilestonePayload(text);
     if (!parsed) {
-      return defaultOptions();
+      const retryPrompt = [
+        userPrompt,
+        "【重试要求】上次输出不可解析。请只输出合法 JSON，不要 markdown，不要解释。",
+        "【JSON模板】{\"background\":\"...\",\"optionOverrides\":[{\"id\":\"safe\",\"label\":\"A\",\"description\":\"...\"},{\"id\":\"balanced\",\"label\":\"B\",\"description\":\"...\"},{\"id\":\"risky\",\"label\":\"C\",\"description\":\"...\"}]}"
+      ].join("\n");
+      const retriedText = await callModel(ctx, systemPrompt, retryPrompt);
+      parsed = parseMilestonePayload(retriedText);
     }
-    if (!parsed.optionOverrides || parsed.optionOverrides.length !== 3) {
-      return defaultOptions();
-    }
-    const safe = parsed.optionOverrides.find((o) => o.id === "safe");
-    const balanced = parsed.optionOverrides.find((o) => o.id === "balanced");
-    const risky = parsed.optionOverrides.find((o) => o.id === "risky");
-    if (!safe || !balanced || !risky) return defaultOptions();
 
-    const normalized = parsed.optionOverrides
-      .filter((o) => isDecisionId(o.id))
-      .map((o) => ({
-        id: o.id,
-        label: o.label || "A",
-        description: (o.description || "").trim()
-      }));
-    return {
-      background: (parsed.background || "命运在你面前摊开新赌局。").trim(),
-      optionOverrides: normalized
-    };
+    if (!baseChoice) {
+      if (!parsed) return defaultOptions();
+      const normalized = parsed.optionOverrides
+        .filter((o) => isDecisionId(o.id))
+        .map((o) => ({
+          id: o.id,
+          label: (o.label || "").trim() || "A",
+          description: (o.description || "").trim()
+        }));
+      if (normalized.length !== 3) return defaultOptions();
+      return {
+        background: (parsed.background || "命运在你面前摊开新赌局。").trim(),
+        optionOverrides: normalized
+      };
+    }
+
+    return mergeMilestoneOptions(baseChoice, parsed);
   } catch (error) {
     debugError("milestone-options", error);
     if (debugModel) {
       console.log("[model-debug:milestone-options]", { hasText: false, parseFailed: true, fallback: true });
     }
-    return defaultOptions();
+    return fallback;
   }
 }

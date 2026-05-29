@@ -1,10 +1,11 @@
-import type { AdminConfigPayload, ContentBundle, DecisionType, DifficultyConfig, GameEnvConfigResponse, ProviderConfig, ProviderLimits, RunState, StartRunResponse, StepRunResponse, WorldConfig, BackgroundCard } from "@reroll/shared";
+import type { AdminConfigPayload, ContentBundle, DecisionType, DifficultyConfig, GameEnvConfigResponse, ProviderConfig, ProviderLimits, RunState, StartAllocationConfig, StartRunResponse, StepRunResponse, WorldConfig, BackgroundCard } from "@reroll/shared";
 export interface BootstrapPayload {
     deployMode: "local" | "cloud";
     worlds: WorldConfig[];
     difficulties: DifficultyConfig[];
     cardPool: BackgroundCard[];
     talentPointTotal: number;
+    startAllocation: StartAllocationConfig;
     runtime: AdminConfigPayload["runtime"];
     limits: ProviderLimits;
 }
@@ -16,6 +17,7 @@ export type GameStreamEvent = {
         rawChunkCount: number;
         fromAge: number;
         toAge: number;
+        tuning: StartAllocationConfig;
     };
 } | {
     type: "started";

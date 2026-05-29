@@ -8,13 +8,16 @@ import type {
   AdminConfigPayload,
   ContentBundle,
   DifficultyConfig,
+  GameplayTuning,
   GameEnvConfigRequest,
   ProviderConfig,
+  StartAllocationConfig,
   StartRunRequest,
   StepRunRequest,
   WorldConfig,
   YearEvent
 } from "@reroll/shared";
+import { createDefaultGameplayTuning } from "@reroll/shared";
 import { generateMilestoneOptions, generateYearNarrative } from "./ai.js";
 import { providerLimits } from "./constants.js";
 import { getCloudApiKey, getDeployMode, readRuntimeConfig, writeRuntimeConfig } from "./config.js";
@@ -55,7 +58,14 @@ type StreamDonePayload = { run: ReturnType<typeof toClientRun>; timelineChunk: T
 type GameStreamEvent =
   | {
       type: "meta";
-      data: { branch: "start" | "step"; runId: string; rawChunkCount: number; fromAge: number; toAge: number };
+      data: {
+        branch: "start" | "step";
+        runId: string;
+        rawChunkCount: number;
+        fromAge: number;
+        toAge: number;
+        tuning: StartAllocationConfig;
+      };
     }
   | { type: "started"; data: { run: ReturnType<typeof toClientRun> } }
   | { type: "timeline"; data: { index: number; total: number; entry: TimelineEntryItem } }
@@ -67,6 +77,10 @@ const narrativeConcurrency = (() => {
   if (!Number.isFinite(parsed)) return 2;
   return Math.max(1, Math.min(4, Math.floor(parsed)));
 })();
+
+function randomInt(min: number, max: number): number {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
 
 function initNdjsonResponse(res: express.Response): void {
   res.setHeader("Content-Type", "application/x-ndjson; charset=utf-8");
@@ -191,6 +205,13 @@ function summarizeFactionEvents(events: Array<{ factionId: string; events: strin
     .join(" | ");
 }
 
+function flattenMilestoneEventPool(events: Array<{ events: string[] }>): string[] {
+  return events
+    .flatMap((x) => x.events ?? [])
+    .map((x) => x.trim())
+    .filter((x) => x.length > 0);
+}
+
 function summarizeTalentHooks(
   selectedCardIds: string[],
   hooks: Array<{ id: string; name: string; promptHooks: { narrativeBias: string; eventAffinity: string[]; riskTone: string } }>
@@ -226,6 +247,19 @@ async function loadGameResources(worldId: string): Promise<GameResources> {
     factions,
     factionEvents,
     talentHooks
+  };
+}
+
+function resolveGameplayTuning(content: ContentBundle): GameplayTuning {
+  return content.gameplayTuning ?? createDefaultGameplayTuning();
+}
+
+function toStartAllocationConfig(tuning: GameplayTuning): StartAllocationConfig {
+  return {
+    talentPointMin: tuning.bootstrap.talentPointMin,
+    talentPointMax: tuning.bootstrap.talentPointMax,
+    selectedCardMin: tuning.bootstrap.selectedCardMin,
+    selectedCardMax: tuning.bootstrap.selectedCardMax
   };
 }
 
@@ -294,6 +328,7 @@ interface StartFlowResult {
   rawChunkCount: number;
   fromAge: number;
   toAge: number;
+  tuning: StartAllocationConfig;
 }
 
 interface RunYearFlowOptions {
@@ -422,19 +457,23 @@ async function runStartFlow(
 
   const resources = await loadGameResources(body.worldId);
   const { content, runtime, worldline, factions, factionEvents, talentHooks } = resources;
+  const tuning = resolveGameplayTuning(content);
+  const allocation = toStartAllocationConfig(tuning);
   const world = resolveWorld(content.worlds, body.worldId);
   const difficulty = resolveDifficulty(content.difficulties, body.difficultyId);
+  const milestoneEventPool = flattenMilestoneEventPool(factionEvents);
 
   const run = createRun(
     {
       world,
       difficulty,
-      cards: content.cards
+      cards: content.cards,
+      tuning
     },
     body
   );
 
-  const advanced = autoAdvanceToCheckpoint(run, world, difficulty);
+  const advanced = autoAdvanceToCheckpoint(run, world, difficulty, { milestoneEventPool });
   const preNarrationRun = JSON.parse(JSON.stringify(advanced.updated)) as InternalRunState;
   const providerConfig = resolveProviderConfig(env, runtime.cloud);
   const apiKey = resolveApiKey(env);
@@ -455,7 +494,11 @@ async function runStartFlow(
   const talentHookSummary = summarizeTalentHooks(body.selectedCardIds, talentHooks);
 
   if (hooks?.onStarted) {
-    await hooks.onStarted(toClientRun(preNarrationRun));
+    const startedRun = toClientRun(preNarrationRun);
+    await hooks.onStarted({
+      ...startedRun,
+      nextMilestoneChoice: undefined
+    });
   }
 
   const { updatedRun, timelineChunk } = await runYearFlow({
@@ -479,7 +522,8 @@ async function runStartFlow(
     timelineChunk,
     rawChunkCount: advanced.chunk.length,
     fromAge: advanced.fromAge,
-    toAge: advanced.toAge
+    toAge: advanced.toAge,
+    tuning: allocation
   };
 }
 
@@ -489,6 +533,7 @@ interface StepFlowResult {
   rawChunkCount: number;
   fromAge: number;
   toAge: number;
+  tuning: StartAllocationConfig;
 }
 
 async function runStepFlow(
@@ -498,9 +543,6 @@ async function runStepFlow(
   const run = getRun(body.runId) as InternalRunState | undefined;
   if (!run) {
     throw new Error("run_not_found");
-  }
-  if (run.ended) {
-    return { updatedRun: run, timelineChunk: [], rawChunkCount: 0, fromAge: run.age, toAge: run.age };
   }
 
   const clientId = getRunClientId(body.runId);
@@ -520,8 +562,14 @@ async function runStepFlow(
 
   const resources = await loadGameResources(run.worldId);
   const { content, runtime, worldline, factions, factionEvents, talentHooks } = resources;
+  const tuning = resolveGameplayTuning(content);
+  const allocation = toStartAllocationConfig(tuning);
+  if (run.ended) {
+    return { updatedRun: run, timelineChunk: [], rawChunkCount: 0, fromAge: run.age, toAge: run.age, tuning: allocation };
+  }
   const world = resolveWorld(content.worlds, run.worldId);
   const difficulty = resolveDifficulty(content.difficulties, run.difficultyId);
+  const milestoneEventPool = flattenMilestoneEventPool(factionEvents);
 
   let updatedRun: InternalRunState;
   let rawChunk: YearEvent[] = [];
@@ -533,7 +581,8 @@ async function runStepFlow(
       run,
       world,
       difficulty,
-      body.decision as "safe" | "balanced" | "risky"
+      body.decision as "safe" | "balanced" | "risky",
+      { milestoneEventPool }
     );
     updatedRun = stepped.updated;
     rawChunk = stepped.chunk;
@@ -543,7 +592,7 @@ async function runStepFlow(
       console.log("[model-debug:step-branch]", { branch: "decision", chunkCount: rawChunk.length });
     }
   } else {
-    const advanced = autoAdvanceToCheckpoint(run, world, difficulty);
+    const advanced = autoAdvanceToCheckpoint(run, world, difficulty, { milestoneEventPool });
     updatedRun = advanced.updated;
     rawChunk = advanced.chunk;
     fromAge = advanced.fromAge;
@@ -593,17 +642,20 @@ async function runStepFlow(
     timelineChunk: flow.timelineChunk,
     rawChunkCount: rawChunk.length,
     fromAge,
-    toAge
+    toAge,
+    tuning: allocation
   };
 }
 
 app.get("/api/meta/bootstrap", async (_req, res) => {
   const [content, runtime] = await Promise.all([readContentBundle(), readRuntimeConfig()]);
   const { worlds, cards, difficulties } = content;
+  const tuning = resolveGameplayTuning(content);
+  const allocation = toStartAllocationConfig(tuning);
 
   const shuffled = [...cards].sort(() => Math.random() - 0.5);
   const cardPool = shuffled.slice(0, 6);
-  const talentPointTotal = 20 + Math.floor(Math.random() * 11);
+  const talentPointTotal = randomInt(tuning.bootstrap.talentPointMin, tuning.bootstrap.talentPointMax);
 
   res.json({
     deployMode,
@@ -611,6 +663,7 @@ app.get("/api/meta/bootstrap", async (_req, res) => {
     difficulties,
     cardPool,
     talentPointTotal,
+    startAllocation: allocation,
     runtime,
     limits: providerLimits
   });
@@ -696,7 +749,11 @@ app.post("/api/game/start", async (req, res) => {
   const body = parsed.data as StartRunRequest;
   try {
     const result = await runStartFlow(body);
-    return res.json({ run: toClientRun(result.updatedRun), timelineChunk: result.timelineChunk });
+    return res.json({
+      run: toClientRun(result.updatedRun),
+      timelineChunk: result.timelineChunk,
+      startAllocation: result.tuning
+    });
   } catch (error) {
     return res.status(400).json({ error: (error as Error).message || String(error) });
   }
@@ -711,7 +768,11 @@ app.post("/api/game/step", async (req, res) => {
   const body = parsed.data as StepRunRequest;
   try {
     const result = await runStepFlow(body);
-    return res.json({ run: toClientRun(result.updatedRun), timelineChunk: result.timelineChunk });
+    return res.json({
+      run: toClientRun(result.updatedRun),
+      timelineChunk: result.timelineChunk,
+      startAllocation: result.tuning
+    });
   } catch (error) {
     const msg = (error as Error).message || String(error);
     if (msg === "run_not_found") return res.status(404).json({ error: msg });
@@ -750,7 +811,8 @@ app.post("/api/game/start/stream", async (req, res) => {
         runId: result.updatedRun.runId,
         rawChunkCount: result.rawChunkCount,
         fromAge: result.fromAge,
-        toAge: result.toAge
+        toAge: result.toAge,
+        tuning: result.tuning
       }
     });
 
@@ -798,7 +860,8 @@ app.post("/api/game/step/stream", async (req, res) => {
         runId: result.updatedRun.runId,
         rawChunkCount: result.rawChunkCount,
         fromAge: result.fromAge,
-        toAge: result.toAge
+        toAge: result.toAge,
+        tuning: result.tuning
       }
     });
 

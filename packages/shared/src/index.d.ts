@@ -3,6 +3,8 @@ export type StatKey = "intelligence" | "charisma" | "family" | "fortune" | "phys
 export type DecisionType = "safe" | "balanced" | "risky";
 export type CardRarity = "common" | "rare" | "epic" | "legendary";
 export type AgeStageId = "child" | "youth" | "prime" | "middle" | "elder";
+export type AgeStageRateMap = Record<AgeStageId, number>;
+export type AgeStageIntMap = Record<AgeStageId, number>;
 export interface Stats {
     intelligence: number;
     charisma: number;
@@ -29,7 +31,7 @@ export interface WorldConfig {
     name: string;
     intro: string;
     stylePrompt: string;
-    milestoneAges: number[];
+    milestoneAges?: number[];
     endAgeRange: {
         min: number;
         max: number;
@@ -37,6 +39,111 @@ export interface WorldConfig {
     yearlyEventHints: string[];
     ageThresholds?: AgeThreshold[];
 }
+export interface GameplayTuning {
+    bootstrap: {
+        talentPointMin: number;
+        talentPointMax: number;
+        selectedCardMin: number;
+        selectedCardMax: number;
+    };
+    pacing: {
+        maxYearsPerChunk: number;
+        specialYearChance: number;
+        blankYearChance: number;
+    };
+    milestone: {
+        minEligibleAge: number;
+        guaranteeYears: number;
+        triggerRateByStage: AgeStageRateMap;
+    };
+    stage: {
+        deltaCapByStage: AgeStageIntMap;
+        lightBandRatio: number;
+        mediumBandRatio: number;
+        overallExtremeRatio: number;
+    };
+    growth: {
+        baseGrowthChance: number;
+        baseDecayChance: number;
+        decayVolatilityFactor: number;
+        growthChanceClampMin: number;
+        growthChanceClampMax: number;
+        decayChanceClampMin: number;
+        decayChanceClampMax: number;
+        decayBranchFactor: number;
+        specialPositiveBaseChance: number;
+        specialPositiveGrowthBiasFactor: number;
+    };
+    decision: {
+        profiles: Record<DecisionType, {
+            successRate: number;
+            gain: number;
+            loss: number;
+            deathBonus: number;
+            risk: number;
+            reward: number;
+        }>;
+        successRateVolatilityFactor: number;
+        successRateClampMin: number;
+        successRateClampMax: number;
+        gainClampMin: number;
+        gainClampMax: number;
+        lossClampMin: number;
+        lossClampMax: number;
+        secondarySuccessDelta: number;
+        secondaryFailureDelta: number;
+    };
+    death: {
+        minAge: number;
+        negativeStreakTrigger: number;
+        lowPhysiqueThreshold: number;
+        physiqueBaseRisk: number;
+        physiqueMissingRiskFactor: number;
+        physiqueRiskClampMin: number;
+        physiqueRiskClampMax: number;
+        longNegativeBaseRisk: number;
+        longNegativeValueFactor: number;
+        longNegativeStreakDivisor: number;
+        longNegativeStreakFactor: number;
+        longNegativeRiskClampMin: number;
+        longNegativeRiskClampMax: number;
+        finalRiskClampMin: number;
+        finalRiskClampMax: number;
+    };
+    ascension: {
+        deterministicStatThreshold: number;
+        chanceA: number;
+        chanceB: number;
+        chanceC: number;
+        highStatsThresholdA: number;
+        highStatsThresholdC: number;
+        fortuneThresholdA: number;
+        legendaryCountThresholdB: number;
+        intelligenceThresholdB: number;
+    };
+    fame: {
+        intelligenceWeight: number;
+        charismaWeight: number;
+        familyWeight: number;
+        fortuneWeight: number;
+        physiqueWeight: number;
+        maxStatValue: number;
+        min: number;
+        max: number;
+    };
+    ending: {
+        greatScore: number;
+        goodScore: number;
+        normalScore: number;
+    };
+}
+export interface StartAllocationConfig {
+    talentPointMin: number;
+    talentPointMax: number;
+    selectedCardMin: number;
+    selectedCardMax: number;
+}
+export declare function createDefaultGameplayTuning(): GameplayTuning;
 export interface DifficultyConfig {
     id: string;
     name: string;
@@ -156,6 +263,7 @@ export interface ContentBundle {
     cards: BackgroundCard[];
     difficulties: DifficultyConfig[];
     promptPack: Record<string, string>;
+    gameplayTuning?: GameplayTuning;
 }
 export interface GameEnvConfigRequest {
     clientId: string;

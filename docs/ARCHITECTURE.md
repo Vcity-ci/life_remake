@@ -1,4 +1,4 @@
-# 项目架构（v0.8.0）
+# 项目架构（v0.9.0）
 
 ## 1. 架构目标
 - 保持“玩法主流程”与“运维配置”解耦。
@@ -40,6 +40,7 @@
 - 特征：
   - 纯规则计算，不依赖网络
   - 规则结果先生成，再交给 AI 润色
+  - 所有关键玩法参数由 `gameplayTuning` 驱动，并在开局时冻结为 `tuningSnapshot`（保证同一局内规则一致）
 
 ### 2.4 AI 适配层（`apps/backend/src/ai.ts`）
 - 职责：
@@ -74,9 +75,9 @@
    - AI 生成年份叙事并替换 summary
    - 如遇里程碑，AI 生成 A/B/C 文案
 3. 流式事件顺序：
-   - `started`：先返回 run 基础状态，前端先跳转到局内
+   - `started`：先返回 run 基础状态（不包含 milestone），前端先跳转到局内
    - `timeline`：逐条推送年份结果
-   - `milestone`：推送决策点
+   - `milestone`：在 AI 完成抉择背景与 A/B/C 文案后推送决策点
    - `done`：返回最终 run
 4. 非流式接口返回 `run + timelineChunk`
 
@@ -89,12 +90,16 @@
 4. 非流式接口返回 `run + timelineChunk`
 
 ## 4. 关键规则边界
-- 开局点数：`20~30`（bootstrap 随机）
-- 开局属性：每项 `0~10`，总和必须等于本局点数
-- 抽卡：`1~3` 张
-- 年份分块：每次最多推进 2 年
+- 开局属性：每项 `0~10`，总和必须等于本局 `talentPointTotal`
+- 开局点数/抽卡数量/推进节奏/抉择触发/死亡飞升判定等，统一由 `gameplayTuning` 决定
+- 默认值（未配置时）：
+  - 开局点数：`gameplayTuning.bootstrap.talentPointMin~talentPointMax`（bootstrap 随机）
+  - 抽卡：`gameplayTuning.bootstrap.selectedCardMin~selectedCardMax`
+  - 年份分块：每次最多推进 `2` 年
+  - 抉择触发：`5` 岁后；幼年 `10%`、青年 `20%`、壮年及以上 `30%`；连续 `20` 年保底
+  - 触发时从当前 world 阵营事件池随机抽取一条作为抉择背景种子
 - 结局：仅 `dead` 或 `ascended`
-- 名望：`(智力+魅力+气运+体魄)/4` 映射到 `0~100`
+- 名望：由 `gameplayTuning.fame` 的权重与上下界配置映射
 
 ## 5. 配置与数据边界
 
@@ -108,6 +113,7 @@
 - `storage/custom-content.json`
 - `storage/runtime-config.json`
 - 备份目录：`storage/backups/*`
+- `storage/custom-content.json` 中 `gameplayTuning` 为玩法参数主配置
 
 ### 5.3 扩展设定数据
 - 世界线：`data/settings/worldlines/*.timeline.json`
@@ -129,6 +135,7 @@
 - 增加卡牌：编辑 cards + talent hooks
 - 增强叙事：编辑 promptPack 与设定摘要源
 - 替换模型：修改 ProviderConfig（baseUrl/model/apiPath）
+- 调整玩法：编辑 content 的 `gameplayTuning`（参数与边界见 `docs/CONFIG_GUIDE.md`）
 
 ## 8. 云端性能路线（已确认）
 - 队列化编排（Redis/BullMQ）优先放在云端链路实施。

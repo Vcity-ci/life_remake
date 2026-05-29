@@ -5,6 +5,7 @@ import type {
   BackgroundCard,
   DecisionType,
   DifficultyConfig,
+  GameplayTuning,
   MilestoneChoice,
   RunState,
   StartRunRequest,
@@ -14,11 +15,13 @@ import type {
   WorldConfig,
   YearEvent
 } from "@reroll/shared";
+import { createDefaultGameplayTuning } from "@reroll/shared";
 
 interface EngineContext {
   world: WorldConfig;
   difficulty: DifficultyConfig;
   cards: BackgroundCard[];
+  tuning: GameplayTuning;
 }
 
 type Rng = () => number;
@@ -31,12 +34,13 @@ const negativeStatLabel: Record<CoreStatKey, string> = {
   family: "家境",
   fortune: "气运"
 };
-const NEGATIVE_STREAK_TRIGGER = 4;
 
 export interface InternalRunState extends RunState {
   seed: number;
   endAge: number;
   negativeStreaks: Record<CoreStatKey, number>;
+  yearsSinceLastMilestone: number;
+  tuningSnapshot: GameplayTuning;
 }
 
 const defaultAgeThresholds: AgeThreshold[] = [
@@ -69,6 +73,16 @@ function pickOne<T>(rng: Rng, list: T[]): T {
   return list[Math.floor(rng() * list.length)];
 }
 
+function milestoneTriggerRate(stageId: AgeThreshold["id"], tuning: GameplayTuning): number {
+  const rate = tuning.milestone.triggerRateByStage[stageId];
+  return clamp(rate, 0, 1);
+}
+
+function pickMilestoneSeedEvent(rng: Rng, pool: string[]): string {
+  if (pool.length === 0) return "你被卷入一场无法回避的关键事件。";
+  return pickOne(rng, pool);
+}
+
 function resolveAgeThresholds(world: WorldConfig): AgeThreshold[] {
   if (world.ageThresholds && world.ageThresholds.length > 0) {
     return [...world.ageThresholds].sort((a, b) => a.min - b.min);
@@ -98,23 +112,19 @@ interface StatBinEffect {
   extraDecayChance: number;
 }
 
-function resolveStageDeltaCap(stageId: AgeThreshold["id"]): number {
-  if (stageId === "child") return 2;
-  if (stageId === "youth") return 4;
-  if (stageId === "prime") return 6;
-  if (stageId === "middle") return 8;
-  return 8;
+function resolveStageDeltaCap(stageId: AgeThreshold["id"], tuning: GameplayTuning): number {
+  return tuning.stage.deltaCapByStage[stageId];
 }
 
-function resolveDeltaBand(absDelta: number, stageCap: number): "light" | "medium" | "heavy" {
-  const lightMax = Math.max(1, Math.ceil(stageCap * 0.34));
-  const mediumMax = Math.max(2, Math.ceil(stageCap * 0.67));
+function resolveDeltaBand(absDelta: number, stageCap: number, tuning: GameplayTuning): "light" | "medium" | "heavy" {
+  const lightMax = Math.max(1, Math.ceil(stageCap * tuning.stage.lightBandRatio));
+  const mediumMax = Math.max(2, Math.ceil(stageCap * tuning.stage.mediumBandRatio));
   if (absDelta <= lightMax) return "light";
   if (absDelta <= mediumMax) return "medium";
   return "heavy";
 }
 
-function buildDeltaBinTags(changes: Partial<Record<StatKey, number>>, stageCap: number): string[] {
+function buildDeltaBinTags(changes: Partial<Record<StatKey, number>>, stageCap: number, tuning: GameplayTuning): string[] {
   const tags: string[] = [];
   let total = 0;
   let positiveCount = 0;
@@ -128,7 +138,7 @@ function buildDeltaBinTags(changes: Partial<Record<StatKey, number>>, stageCap: 
       continue;
     }
     const absDelta = Math.abs(delta);
-    const band = resolveDeltaBand(absDelta, stageCap);
+    const band = resolveDeltaBand(absDelta, stageCap, tuning);
     const direction = delta > 0 ? "up" : "down";
     tags.push(`delta_${key}_${direction}_${band}`);
     total += delta;
@@ -149,14 +159,14 @@ function buildDeltaBinTags(changes: Partial<Record<StatKey, number>>, stageCap: 
     tags.push("delta_overall_negative");
   }
 
-  if (total >= Math.ceil(stageCap * 0.75)) tags.push("delta_overall_surge");
-  if (total <= -Math.ceil(stageCap * 0.75)) tags.push("delta_overall_crash");
-  if (maxLoss >= Math.ceil(stageCap * 0.75)) tags.push("delta_overall_shock");
+  if (total >= Math.ceil(stageCap * tuning.stage.overallExtremeRatio)) tags.push("delta_overall_surge");
+  if (total <= -Math.ceil(stageCap * tuning.stage.overallExtremeRatio)) tags.push("delta_overall_crash");
+  if (maxLoss >= Math.ceil(stageCap * tuning.stage.overallExtremeRatio)) tags.push("delta_overall_shock");
 
   return tags;
 }
 
-function classifyEventTone(changes: Partial<Record<StatKey, number>>, stageCap: number): "positive" | "negative" | "mixed" | "flat" | "critical" {
+function classifyEventTone(changes: Partial<Record<StatKey, number>>, stageCap: number, tuning: GameplayTuning): "positive" | "negative" | "mixed" | "flat" | "critical" {
   let total = 0;
   let pos = 0;
   let neg = 0;
@@ -173,7 +183,10 @@ function classifyEventTone(changes: Partial<Record<StatKey, number>>, stageCap: 
   }
 
   if (pos === 0 && neg === 0) return "flat";
-  if (maxLoss >= Math.ceil(stageCap * 0.75) || total <= -Math.ceil(stageCap * 0.75)) return "critical";
+  if (
+    maxLoss >= Math.ceil(stageCap * tuning.stage.overallExtremeRatio) ||
+    total <= -Math.ceil(stageCap * tuning.stage.overallExtremeRatio)
+  ) return "critical";
   if (pos > 0 && neg > 0) return "mixed";
   return total >= 0 ? "positive" : "negative";
 }
@@ -226,7 +239,12 @@ function resolvePhysiqueBinEffect(value: number): StatBinEffect {
   return { growthBias: 0.14, decayBias: -0.08, growthBonusChance: 0.2, extraDecayChance: 0.05 };
 }
 
-function calcBaseGrowth(stats: Stats, diff: DifficultyConfig, rng: Rng): Partial<Record<StatKey, number>> {
+function calcBaseGrowth(
+  stats: Stats,
+  diff: DifficultyConfig,
+  rng: Rng,
+  tuning: GameplayTuning
+): Partial<Record<StatKey, number>> {
   const result: Partial<Record<StatKey, number>> = {};
   for (const key of allStatKeys) {
     const now = stats[key];
@@ -234,20 +252,20 @@ function calcBaseGrowth(stats: Stats, diff: DifficultyConfig, rng: Rng): Partial
       ? resolvePhysiqueBinEffect(now)
       : resolveCoreStatBinEffect(now);
     const growthChance = clamp(
-      0.28 + diff.growthBias + effect.growthBias,
-      0.06,
-      0.86
+      tuning.growth.baseGrowthChance + diff.growthBias + effect.growthBias,
+      tuning.growth.growthChanceClampMin,
+      tuning.growth.growthChanceClampMax
     );
     const decayChance = clamp(
-      0.15 + diff.yearlyVolatility * 0.85 + effect.decayBias,
-      0.05,
-      0.82
+      tuning.growth.baseDecayChance + diff.yearlyVolatility * tuning.growth.decayVolatilityFactor + effect.decayBias,
+      tuning.growth.decayChanceClampMin,
+      tuning.growth.decayChanceClampMax
     );
     const roll = rng();
     if (roll < growthChance) {
       const bonus = rng() < effect.growthBonusChance ? 1 : 0;
       result[key] = 1 + bonus;
-    } else if (roll < growthChance + decayChance * 0.6) {
+    } else if (roll < growthChance + decayChance * tuning.growth.decayBranchFactor) {
       const penalty = rng() < effect.extraDecayChance ? 1 : 0;
       result[key] = -1 - penalty;
     } else {
@@ -269,10 +287,15 @@ function clampYearlyChangesByStage(
   return next;
 }
 
-function calcSpecialEventChanges(stats: Stats, difficulty: DifficultyConfig, rng: Rng): Partial<Record<StatKey, number>> {
+function calcSpecialEventChanges(
+  _stats: Stats,
+  difficulty: DifficultyConfig,
+  rng: Rng,
+  tuning: GameplayTuning
+): Partial<Record<StatKey, number>> {
   const focus = pickOne(rng, allStatKeys);
   const mirror = pickOne(rng, allStatKeys.filter((k) => k !== focus));
-  const positive = rng() < 0.55 + difficulty.growthBias * 0.5;
+  const positive = rng() < tuning.growth.specialPositiveBaseChance + difficulty.growthBias * tuning.growth.specialPositiveGrowthBiasFactor;
 
   if (positive) {
     return {
@@ -296,30 +319,30 @@ function applyChanges(stats: Stats, changes: Partial<Record<StatKey, number>>): 
   return next;
 }
 
-function generateMilestoneChoice(age: number): MilestoneChoice {
+function generateMilestoneChoice(age: number, seedEvent: string, tuning: GameplayTuning): MilestoneChoice {
   return {
     age,
-    background: "命运的岔路在你面前展开。",
+    background: seedEvent.trim() || "命运的岔路在你面前展开。",
     options: [
       {
         id: "safe",
         label: "稳健",
-        risk: 0.2,
-        reward: 0.4,
+        risk: tuning.decision.profiles.safe.risk,
+        reward: tuning.decision.profiles.safe.reward,
         description: "优先保底，收益稳定但上限偏低。"
       },
       {
         id: "balanced",
         label: "适中",
-        risk: 0.45,
-        reward: 0.65,
+        risk: tuning.decision.profiles.balanced.risk,
+        reward: tuning.decision.profiles.balanced.reward,
         description: "平衡风险与成长，容易获得中等收益。"
       },
       {
         id: "risky",
         label: "冒险",
-        risk: 0.75,
-        reward: 0.95,
+        risk: tuning.decision.profiles.risky.risk,
+        reward: tuning.decision.profiles.risky.reward,
         description: "高风险高收益，失败惩罚也更显著。"
       }
     ]
@@ -330,19 +353,19 @@ function applyDecision(
   stats: Stats,
   decision: DecisionType,
   difficulty: DifficultyConfig,
-  rng: Rng
+  rng: Rng,
+  tuning: GameplayTuning
 ): { statChanges: Partial<Record<StatKey, number>>; deathRollBonus: number } {
   const primary = pickOne(rng, allStatKeys);
   const secondary = pickOne(rng, allStatKeys.filter((k) => k !== primary));
 
-  const setup =
-    decision === "safe"
-      ? { successRate: 0.86, gain: 2, loss: -1, deathBonus: 0 }
-      : decision === "balanced"
-        ? { successRate: 0.66, gain: 4, loss: -2, deathBonus: 0.05 }
-        : { successRate: 0.48, gain: 7, loss: -4, deathBonus: 0.12 };
+  const setup = tuning.decision.profiles[decision];
 
-  const successRate = clamp(setup.successRate - difficulty.yearlyVolatility * 0.2, 0.2, 0.9);
+  const successRate = clamp(
+    setup.successRate - difficulty.yearlyVolatility * tuning.decision.successRateVolatilityFactor,
+    tuning.decision.successRateClampMin,
+    tuning.decision.successRateClampMax
+  );
   const success = rng() < successRate;
   const baseGain = Math.round(setup.gain * difficulty.riskRewardMultiplier);
   const baseLoss = Math.round(setup.loss * difficulty.failurePenaltyMultiplier);
@@ -350,8 +373,8 @@ function applyDecision(
   if (success) {
     return {
       statChanges: {
-      [primary]: clamp(baseGain, 1, 4),
-      [secondary]: 1
+      [primary]: clamp(baseGain, tuning.decision.gainClampMin, tuning.decision.gainClampMax),
+      [secondary]: tuning.decision.secondarySuccessDelta
       },
       deathRollBonus: setup.deathBonus
     };
@@ -359,16 +382,16 @@ function applyDecision(
 
   return {
     statChanges: {
-    [primary]: clamp(baseLoss, -4, -1),
-    [secondary]: -1
+    [primary]: clamp(baseLoss, tuning.decision.lossClampMin, tuning.decision.lossClampMax),
+    [secondary]: tuning.decision.secondaryFailureDelta
     },
     deathRollBonus: setup.deathBonus
   };
 }
 
-function buildEventTitle(world: WorldConfig, age: number, rng: Rng, special: boolean): string {
+function buildEventTitle(world: WorldConfig, age: number, rng: Rng, special: boolean, tuning: GameplayTuning): string {
   const topic = pickOne(rng, world.yearlyEventHints);
-  const blankYear = rng() < 0.22;
+  const blankYear = rng() < tuning.pacing.blankYearChance;
   if (blankYear) {
     return `${age}岁·平年·${topic}`;
   }
@@ -396,13 +419,33 @@ function summarizeStatDelta(changes: Partial<Record<StatKey, number>>): string {
 }
 
 function computeFame(stats: Stats): number {
-  const weighted = (stats.intelligence + stats.charisma + stats.fortune + stats.physique) / 4;
-  const fame = (weighted / 30) * 100;
-  return Math.max(0, Math.min(100, Number(fame.toFixed(1))));
+  return computeFameWithTuning(stats, createDefaultGameplayTuning());
+}
+
+function computeFameWithTuning(stats: Stats, tuning: GameplayTuning): number {
+  const weight = tuning.fame;
+  const denominator =
+    weight.intelligenceWeight +
+    weight.charismaWeight +
+    weight.familyWeight +
+    weight.fortuneWeight +
+    weight.physiqueWeight;
+  if (denominator <= 0) {
+    return weight.min;
+  }
+  const weighted =
+    stats.intelligence * weight.intelligenceWeight +
+    stats.charisma * weight.charismaWeight +
+    stats.family * weight.familyWeight +
+    stats.fortune * weight.fortuneWeight +
+    stats.physique * weight.physiqueWeight;
+  const normalized = weighted / denominator;
+  const fame = (normalized / weight.maxStatValue) * (weight.max - weight.min) + weight.min;
+  return Math.max(weight.min, Math.min(weight.max, Number(fame.toFixed(1))));
 }
 
 function updateNegativeStreaks(run: InternalRunState): void {
-  if (run.age < 14) {
+  if (run.age < run.tuningSnapshot.death.minAge) {
     for (const key of coreStatKeys) {
       run.negativeStreaks[key] = 0;
     }
@@ -418,23 +461,35 @@ function calcDeathRisk(
   _world: WorldConfig,
   extraBonus = 0
 ): { risk: number; cause?: string } {
-  if (run.age < 14) {
+  const deathTuning = run.tuningSnapshot.death;
+  if (run.age < deathTuning.minAge) {
     return { risk: 0 };
   }
 
-  const lowPhysique = run.stats.physique < 3;
+  const lowPhysique = run.stats.physique < deathTuning.lowPhysiqueThreshold;
   const physiqueRisk = lowPhysique
-    ? clamp(0.08 + ((3 - run.stats.physique) / 3) * 0.22, 0.08, 0.7)
+    ? clamp(
+      deathTuning.physiqueBaseRisk +
+      ((deathTuning.lowPhysiqueThreshold - run.stats.physique) / deathTuning.lowPhysiqueThreshold) * deathTuning.physiqueMissingRiskFactor,
+      deathTuning.physiqueRiskClampMin,
+      deathTuning.physiqueRiskClampMax
+    )
     : 0;
 
   let longNegativeRisk = 0;
   let longNegativeCause: string | undefined;
   for (const key of coreStatKeys) {
     const streak = run.negativeStreaks[key];
-    if (run.stats[key] >= 0 || streak < NEGATIVE_STREAK_TRIGGER) continue;
+    if (run.stats[key] >= 0 || streak < deathTuning.negativeStreakTrigger) continue;
     const valueSeverity = clamp(Math.abs(run.stats[key]) / 30, 0, 1);
-    const streakSeverity = clamp((streak - NEGATIVE_STREAK_TRIGGER + 1) / 6, 0, 1);
-    const risk = clamp(0.03 + valueSeverity * 0.2 + streakSeverity * 0.16, 0.03, 0.72);
+    const streakSeverity = clamp((streak - deathTuning.negativeStreakTrigger + 1) / deathTuning.longNegativeStreakDivisor, 0, 1);
+    const risk = clamp(
+      deathTuning.longNegativeBaseRisk +
+      valueSeverity * deathTuning.longNegativeValueFactor +
+      streakSeverity * deathTuning.longNegativeStreakFactor,
+      deathTuning.longNegativeRiskClampMin,
+      deathTuning.longNegativeRiskClampMax
+    );
     if (risk > longNegativeRisk) {
       longNegativeRisk = risk;
       longNegativeCause = `${negativeStatLabel[key]}长期低迷反噬`;
@@ -445,11 +500,16 @@ function calcDeathRisk(
   if (!hasTrigger) return { risk: 0 };
 
   const cause = physiqueRisk >= longNegativeRisk ? "体魄衰竭" : longNegativeCause;
-  const risk = clamp(Math.max(physiqueRisk, longNegativeRisk) + extraBonus, 0.01, 0.85);
+  const risk = clamp(
+    Math.max(physiqueRisk, longNegativeRisk) + extraBonus,
+    deathTuning.finalRiskClampMin,
+    deathTuning.finalRiskClampMax
+  );
   return { risk, cause };
 }
 
 function checkAscension(run: InternalRunState): AscensionState {
+  const threshold = run.tuningSnapshot.ascension.deterministicStatThreshold;
   const byStat: Array<{ key: keyof Stats; title: string; desc: string; type: AscensionState["type"] }> = [
     { key: "intelligence", title: "智识飞升", desc: "你的思维突破了凡人的认知边界。", type: "eternal_youth" },
     { key: "charisma", title: "众望飞升", desc: "你的意志可聚拢时代人心。", type: "immortality" },
@@ -457,7 +517,7 @@ function checkAscension(run: InternalRunState): AscensionState {
     { key: "physique", title: "体魄飞升", desc: "你的躯体抵达超凡阈值。", type: "immortality" }
   ];
   for (const item of byStat) {
-    if (run.stats[item.key] >= 30) {
+    if (run.stats[item.key] >= threshold) {
       return {
         unlocked: true,
         type: item.type,
@@ -475,12 +535,18 @@ function maybeUnlockAscension(run: InternalRunState, rng: Rng): AscensionState {
   const deterministic = checkAscension(run);
   if (deterministic.unlocked) return deterministic;
 
+  const ascensionTuning = run.tuningSnapshot.ascension;
   const stats = run.stats;
-  const highStats = [stats.intelligence, stats.charisma, stats.family, stats.fortune].filter((v) => v >= 9).length;
+  const highThreshold = Math.min(ascensionTuning.fortuneThresholdA, ascensionTuning.intelligenceThresholdB);
+  const highStats = [stats.intelligence, stats.charisma, stats.family, stats.fortune].filter((v) => v >= highThreshold).length;
   const legendaryCount = run.cards.filter((c) => c.rarity === "legendary").length;
   const ascensionRoll = rng();
 
-  if (highStats >= 2 && stats.fortune >= 9 && ascensionRoll < 0.06) {
+  if (
+    highStats >= ascensionTuning.highStatsThresholdA &&
+    stats.fortune >= ascensionTuning.fortuneThresholdA &&
+    ascensionRoll < ascensionTuning.chanceA
+  ) {
     return {
       unlocked: true,
       type: "immortality",
@@ -489,7 +555,11 @@ function maybeUnlockAscension(run: InternalRunState, rng: Rng): AscensionState {
       unlockedAge: run.age
     };
   }
-  if (legendaryCount >= 1 && stats.intelligence >= 9 && ascensionRoll < 0.05) {
+  if (
+    legendaryCount >= ascensionTuning.legendaryCountThresholdB &&
+    stats.intelligence >= ascensionTuning.intelligenceThresholdB &&
+    ascensionRoll < ascensionTuning.chanceB
+  ) {
     return {
       unlocked: true,
       type: "rejuvenation",
@@ -498,7 +568,7 @@ function maybeUnlockAscension(run: InternalRunState, rng: Rng): AscensionState {
       unlockedAge: run.age
     };
   }
-  if (highStats >= 3 && ascensionRoll < 0.04) {
+  if (highStats >= ascensionTuning.highStatsThresholdC && ascensionRoll < ascensionTuning.chanceC) {
     return {
       unlocked: true,
       type: "eternal_youth",
@@ -515,15 +585,16 @@ function calcEnding(run: InternalRunState): string {
   if (run.outcome === "dead") {
     return `你在${run.age}岁因${run.deathCause ?? "意外"}离世。最终名望：${run.fame}。`;
   }
+  const endingTuning = run.tuningSnapshot.ending;
   const { intelligence, charisma, family, fortune } = run.stats;
   const score = intelligence * 1.1 + charisma + family * 0.95 + fortune * 1.2;
 
   if (run.ascension.unlocked) {
     return `你触发了“${run.ascension.title}”，在人世规则之外延展了命运。`;
   }
-  if (score >= 34) return "你的人生在多个领域达到了高峰，留下了跨时代的影响力。";
-  if (score >= 27) return "你拥有稳固而体面的结局，在时代中留下了清晰的足迹。";
-  if (score >= 20) return "你的人生起伏并存，虽未登顶，但也活出了自己的厚度。";
+  if (score >= endingTuning.greatScore) return "你的人生在多个领域达到了高峰，留下了跨时代的影响力。";
+  if (score >= endingTuning.goodScore) return "你拥有稳固而体面的结局，在时代中留下了清晰的足迹。";
+  if (score >= endingTuning.normalScore) return "你的人生起伏并存，虽未登顶，但也活出了自己的厚度。";
   return "你的人生历经坎坷，最终以平凡甚至艰难收场，但故事依然完整。";
 }
 
@@ -544,6 +615,15 @@ function toTimelineEntry(event: YearEvent, stage: AgeThreshold): TimelineEntry {
 
 export function createRun(ctx: EngineContext, req: StartRunRequest): InternalRunState {
   validateStats(req.stats);
+  if (req.talentPointTotal < ctx.tuning.bootstrap.talentPointMin || req.talentPointTotal > ctx.tuning.bootstrap.talentPointMax) {
+    throw new Error("天赋点超出当前配置允许范围");
+  }
+  if (
+    req.selectedCardIds.length < ctx.tuning.bootstrap.selectedCardMin ||
+    req.selectedCardIds.length > ctx.tuning.bootstrap.selectedCardMax
+  ) {
+    throw new Error("选卡数量超出当前配置允许范围");
+  }
   const allocated =
     req.stats.intelligence + req.stats.charisma + req.stats.family + req.stats.fortune + req.stats.physique;
   if (allocated !== req.talentPointTotal) {
@@ -574,7 +654,7 @@ export function createRun(ctx: EngineContext, req: StartRunRequest): InternalRun
     timelineChunk: [],
     ended: false,
     ascension: { unlocked: false },
-    fame: computeFame(stats),
+    fame: computeFameWithTuning(stats, ctx.tuning),
     outcome: "ongoing",
     negativeStreaks: {
       intelligence: 0,
@@ -582,6 +662,8 @@ export function createRun(ctx: EngineContext, req: StartRunRequest): InternalRun
       family: 0,
       fortune: 0
     },
+    yearsSinceLastMilestone: 0,
+    tuningSnapshot: ctx.tuning,
     seed,
     endAge
   };
@@ -590,7 +672,8 @@ export function createRun(ctx: EngineContext, req: StartRunRequest): InternalRun
 export function autoAdvanceToCheckpoint(
   run: InternalRunState,
   world: WorldConfig,
-  difficulty: DifficultyConfig
+  difficulty: DifficultyConfig,
+  options?: { milestoneEventPool?: string[] }
 ): { updated: InternalRunState; fromAge: number; toAge: number; chunk: YearEvent[] } {
   if (run.ended || run.nextMilestoneChoice) {
     return { updated: run, fromAge: run.age, toAge: run.age, chunk: [] };
@@ -598,31 +681,33 @@ export function autoAdvanceToCheckpoint(
 
   const fromAge = run.age;
   const chunk: YearEvent[] = [];
+  const milestoneEventPool = options?.milestoneEventPool ?? [];
+  const tuning = run.tuningSnapshot ?? createDefaultGameplayTuning();
 
-  const MAX_YEARS_PER_CHUNK = 2;
+  const MAX_YEARS_PER_CHUNK = tuning.pacing.maxYearsPerChunk;
   while (!run.ended && !run.nextMilestoneChoice) {
     run.age += 1;
     const rng = seedrandom(`${run.seed}:${run.age}:${run.history.length}`);
     const currentStage = resolveAgeStage(run.age, world);
-    const stageCap = resolveStageDeltaCap(currentStage.id);
+    const stageCap = resolveStageDeltaCap(currentStage.id, tuning);
 
-    const special = rng() < 0.18;
+    const special = rng() < tuning.pacing.specialYearChance;
     const rawChanges = special
-      ? calcSpecialEventChanges(run.stats, difficulty, rng)
-      : calcBaseGrowth(run.stats, difficulty, rng);
+      ? calcSpecialEventChanges(run.stats, difficulty, rng, tuning)
+      : calcBaseGrowth(run.stats, difficulty, rng, tuning);
     const changes = clampYearlyChangesByStage(rawChanges, stageCap);
-    const tone = classifyEventTone(changes, stageCap);
-    const deltaTags = buildDeltaBinTags(changes, stageCap);
+    const tone = classifyEventTone(changes, stageCap, tuning);
+    const deltaTags = buildDeltaBinTags(changes, stageCap, tuning);
     const worldGuides = worldNegativeGuideTags(world.id, tone, rng);
 
     run.stats = applyChanges(run.stats, changes);
     run.ageStage = resolveAgeStage(run.age, world);
-    run.fame = computeFame(run.stats);
+    run.fame = computeFameWithTuning(run.stats, tuning);
     updateNegativeStreaks(run);
 
     const yearlyEvent: YearEvent = {
       age: run.age,
-      title: buildEventTitle(world, run.age, rng, special),
+      title: buildEventTitle(world, run.age, rng, special, tuning),
       summary: special
         ? `这一年出现了超出常态的突发事件：${summarizeStatDelta(changes)}。`
         : `这一年里你经历了许多变化：${summarizeStatDelta(changes)}。`,
@@ -658,10 +743,17 @@ export function autoAdvanceToCheckpoint(
       break;
     }
 
-    if (world.milestoneAges.includes(run.age)) {
-      run.nextMilestoneChoice = generateMilestoneChoice(run.age);
+    const yearsWithoutMilestone = run.yearsSinceLastMilestone + 1;
+    const milestoneEligible = run.age >= tuning.milestone.minEligibleAge;
+    const forceMilestone = milestoneEligible && yearsWithoutMilestone >= tuning.milestone.guaranteeYears;
+    const milestoneByChance = milestoneEligible && rng() < milestoneTriggerRate(run.ageStage.id, tuning);
+    if (forceMilestone || milestoneByChance) {
+      const seedEvent = pickMilestoneSeedEvent(rng, milestoneEventPool);
+      run.nextMilestoneChoice = generateMilestoneChoice(run.age, seedEvent, tuning);
+      run.yearsSinceLastMilestone = 0;
       break;
     }
+    run.yearsSinceLastMilestone = yearsWithoutMilestone;
 
     if (chunk.length >= MAX_YEARS_PER_CHUNK) {
       break;
@@ -681,21 +773,23 @@ export function applyMilestoneDecisionAndAdvance(
   run: InternalRunState,
   world: WorldConfig,
   difficulty: DifficultyConfig,
-  decision: DecisionType
+  decision: DecisionType,
+  options?: { milestoneEventPool?: string[] }
 ): { updated: InternalRunState; fromAge: number; toAge: number; chunk: YearEvent[]; decisionEvent: YearEvent } {
   if (!run.nextMilestoneChoice) {
     throw new Error("当前没有可用的关键抉择");
   }
 
+  const tuning = run.tuningSnapshot ?? createDefaultGameplayTuning();
   const rng = seedrandom(`${run.seed}:decision:${run.age}:${run.history.length}`);
-  const decisionResult = applyDecision(run.stats, decision, difficulty, rng);
-  const stageCap = resolveStageDeltaCap(run.ageStage.id);
+  const decisionResult = applyDecision(run.stats, decision, difficulty, rng, tuning);
+  const stageCap = resolveStageDeltaCap(run.ageStage.id, tuning);
   const decisionChanges = clampYearlyChangesByStage(decisionResult.statChanges, stageCap);
-  const tone = classifyEventTone(decisionChanges, stageCap);
-  const deltaTags = buildDeltaBinTags(decisionChanges, stageCap);
+  const tone = classifyEventTone(decisionChanges, stageCap, tuning);
+  const deltaTags = buildDeltaBinTags(decisionChanges, stageCap, tuning);
   const worldGuides = worldNegativeGuideTags(world.id, tone, rng);
   run.stats = applyChanges(run.stats, decisionChanges);
-  run.fame = computeFame(run.stats);
+  run.fame = computeFameWithTuning(run.stats, tuning);
   updateNegativeStreaks(run);
 
   const decisionEvent: YearEvent = {
@@ -744,7 +838,7 @@ export function applyMilestoneDecisionAndAdvance(
     };
   }
 
-  const advanced = autoAdvanceToCheckpoint(run, world, difficulty);
+  const advanced = autoAdvanceToCheckpoint(run, world, difficulty, options);
   return {
     updated: advanced.updated,
     fromAge: decisionEvent.age,
@@ -755,7 +849,14 @@ export function applyMilestoneDecisionAndAdvance(
 }
 
 export function toClientRun(run: InternalRunState): RunState {
-  const { seed: _seed, endAge: _endAge, negativeStreaks: _negativeStreaks, ...clientRun } = run;
+  const {
+    seed: _seed,
+    endAge: _endAge,
+    negativeStreaks: _negativeStreaks,
+    yearsSinceLastMilestone: _yearsSinceLastMilestone,
+    tuningSnapshot: _tuningSnapshot,
+    ...clientRun
+  } = run;
   return clientRun;
 }
 

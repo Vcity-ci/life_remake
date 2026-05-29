@@ -7,6 +7,7 @@ import type {
   ProviderConfig,
   ProviderLimits,
   RunState,
+  StartAllocationConfig,
   StartRunResponse,
   StepRunResponse,
   WorldConfig,
@@ -21,6 +22,7 @@ export interface BootstrapPayload {
   difficulties: DifficultyConfig[];
   cardPool: BackgroundCard[];
   talentPointTotal: number;
+  startAllocation: StartAllocationConfig;
   runtime: AdminConfigPayload["runtime"];
   limits: ProviderLimits;
 }
@@ -28,7 +30,14 @@ export interface BootstrapPayload {
 export type GameStreamEvent =
   | {
       type: "meta";
-      data: { branch: "start" | "step"; runId: string; rawChunkCount: number; fromAge: number; toAge: number };
+      data: {
+        branch: "start" | "step";
+        runId: string;
+        rawChunkCount: number;
+        fromAge: number;
+        toAge: number;
+        tuning: StartAllocationConfig;
+      };
     }
   | {
       type: "started";

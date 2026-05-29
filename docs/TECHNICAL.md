@@ -1,4 +1,4 @@
-# 技术文档（v0.8.0）
+# 技术文档（v0.9.0）
 
 ## 1. 项目定位
 - 项目：AI 人生重开器 + 跑团
@@ -59,7 +59,7 @@ skills/ai-gm/     # 提示词规则包（种子）
 
 ### 6.1 元数据与健康
 - `GET /api/meta/bootstrap`
-  - 返回：`deployMode/worlds/difficulties/cardPool/talentPointTotal/runtime/limits`
+  - 返回：`deployMode/worlds/difficulties/cardPool/talentPointTotal/startAllocation/runtime/limits`
 - `GET /health`
   - 返回：`{ ok: true }`
 
@@ -73,19 +73,20 @@ skills/ai-gm/     # 提示词规则包（种子）
 ### 6.3 游戏流程
 - `POST /api/game/start`
   - 入参：`clientId/worldId/difficultyId/personaPrompt/talentPointTotal/stats/selectedCardIds`
-  - 返回：`run + timelineChunk`
+  - 返回：`run + timelineChunk + startAllocation`
 - `POST /api/game/step`
   - 入参：`runId/decision?`
-  - 返回：`run + timelineChunk`
+  - 返回：`run + timelineChunk + startAllocation`
   - 当存在 `nextMilestoneChoice` 且缺少 `decision` 时会报错
 - `POST /api/game/start/stream`
   - 入参同 `start`
   - 响应：`application/x-ndjson`
-  - 事件：`started -> timeline* -> milestone? -> done`（失败时 `error`）
+  - 事件：`started -> timeline* -> meta -> milestone? -> done`（失败时 `error`）
+  - `started` 阶段不会下发 milestone，避免前端先挂载 fallback 抉择文案
 - `POST /api/game/step/stream`
   - 入参同 `step`
   - 响应：`application/x-ndjson`
-  - 事件：`timeline* -> milestone? -> done`（失败时 `error`）
+  - 事件：`timeline* -> meta -> milestone? -> done`（失败时 `error`）
 
 ### 6.4 管理面板
 - `GET /api/admin/config`
@@ -106,18 +107,27 @@ skills/ai-gm/     # 提示词规则包（种子）
 实现：`apps/backend/src/engine.ts`
 - 开局：
   - 属性输入每项 `0~10`
-  - 总点必须等于 `talentPointTotal(20~30)`
+  - 总点必须等于 `talentPointTotal`
+  - `talentPointTotal` 必须落在 `gameplayTuning.bootstrap.talentPointMin~talentPointMax`
+  - 选卡数量必须落在 `gameplayTuning.bootstrap.selectedCardMin~selectedCardMax`
   - 叠加已选卡牌 modifiers
+  - 创建 run 时冻结 `tuningSnapshot`，本局后续统一按该快照计算
 - 年份推进（`autoAdvanceToCheckpoint`）：
-  - 每次最多推进 2 年（`MAX_YEARS_PER_CHUNK=2`）
+  - 每次最多推进 `gameplayTuning.pacing.maxYearsPerChunk` 年
+  - 小事件概率：`gameplayTuning.pacing.specialYearChance`
+  - 平年概率：`gameplayTuning.pacing.blankYearChance`
   - 普通年与小事件年分别计算属性变化
+  - 关键抉择按阶段概率触发：`gameplayTuning.milestone.triggerRateByStage`
+  - `minEligibleAge` 前不触发（默认 `5` 岁前禁触发）
+  - 连续 `guaranteeYears` 未触发时保底触发（默认 `20` 年）
+  - 触发时从 `data/events/faction-events.json`（当前 world）随机抽取事件作为抉择背景种子
   - 每年更新 `fame`
   - 依次判定：死亡 -> 飞升 -> 里程碑 -> 自然终局
 - 关键抉择（`applyMilestoneDecisionAndAdvance`）：
-  - A/B/C 分别对应低/中/高风险收益
+  - A/B/C 的成功率、收益、惩罚、死亡加成、risk/reward 元数据来自 `gameplayTuning.decision.profiles`
   - 决策后可直接死亡/飞升，或继续自动推进
 - 名望：
-  - 由 `智力/魅力/气运/体魄` 四维映射到 `0~100`
+  - 由 `gameplayTuning.fame` 的权重与上下界映射计算
 
 ## 9. AI 叙事链路
 实现：`apps/backend/src/ai.ts`
@@ -134,12 +144,15 @@ skills/ai-gm/     # 提示词规则包（种子）
   - 429/503 自动重试（退避）
   - 10 分钟 Prompt 缓存（上限 600）
   - OpenAI client 按 `provider+key` 池化复用
-  - 失败时回退空文本/默认选项
+  - milestone 选项文本支持一次强约束重试（JSON-only）
+  - milestone 在 AI options ready 后才下发，避免 started 阶段提前显示 fallback
+  - 年度叙事空文本时会在 API 层使用种子随机 fallback（`平平无奇的一年` / `平凡但充实的一年`）
 
 ## 9.1 叙事输出链路（当前实现）
 - 服务端使用分块并发（`NARRATIVE_CONCURRENCY`）生成叙事，并按时间线顺序输出。
 - 前端使用 NDJSON 流式读取，收到 `timeline` 即增量渲染，不等待整块返回。
 - 开局流式会先发 `started` 事件，确保“先进入局内，再推进年份”。
+- 命中抉择时：先完成 milestone AI 文案装配，再发 `milestone` 事件。
 
 ## 9.2 性能优化分层决策（2026-05-29）
 - 已确认：重型排队系统（Redis/BullMQ）放在云端链路，不进入本地开发默认链路。
@@ -176,9 +189,11 @@ skills/ai-gm/     # 提示词规则包（种子）
 ## 12. 校验与约束
 - `zod` 统一校验请求与内容结构
 - 关键约束：
-  - `selectedCardIds`：`1~3`
+  - `selectedCardIds`（请求壳层）：`1~12`
   - `personaPrompt`：`4~500`
   - `stats`：各项 `0~10`
-  - `talentPointTotal`：`20~30`
+  - `talentPointTotal`（请求壳层）：`1~200`
+  - 实际开局约束由 `gameplayTuning.bootstrap` 再次校验（防止绕过前端）
+  - `gameplayTuning` 全量边界和交叉约束见 `docs/CONFIG_GUIDE.md`
   - world/card/difficulty id 必须唯一
   - worlds 必须保留 `modern/ancient/fantasy`

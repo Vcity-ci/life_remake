@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import type { BackgroundCard, DecisionType, ProviderConfig, ProviderLimits, RunState, StatKey, Stats, TimelineEntry } from "@reroll/shared";
+import type { BackgroundCard, DecisionType, ProviderConfig, ProviderLimits, RunState, StartAllocationConfig, StatKey, Stats, TimelineEntry } from "@reroll/shared";
 import { AdminPanel } from "./components/AdminPanel";
 import { fetchBootstrap, saveGameEnvironment, startRunStream, stepRunStream, type GameStreamEvent } from "./lib/api";
 import { getOrCreateClientId, readLocalProviderConfig, writeLocalProviderConfig } from "./lib/localConfig";
@@ -10,6 +10,7 @@ interface BootstrapState {
   difficulties: Array<{ id: string; name: string; description: string }>;
   cardPool: BackgroundCard[];
   talentPointTotal: number;
+  startAllocation: StartAllocationConfig;
   runtime: {
     runtimeMode: "cloud" | "local";
     cloud: ProviderConfig;
@@ -158,8 +159,12 @@ export default function App(): React.JSX.Element {
     if (personaPrompt.trim().length < 4) return false;
     const allocated =
       stats.intelligence + stats.charisma + stats.physique + stats.family + stats.fortune;
+    if (allocated < bootstrap.startAllocation.talentPointMin || allocated > bootstrap.startAllocation.talentPointMax) return false;
     if (allocated !== bootstrap.talentPointTotal) return false;
-    if (selectedCards.length === 0 || selectedCards.length > 3) return false;
+    if (
+      selectedCards.length < bootstrap.startAllocation.selectedCardMin ||
+      selectedCards.length > bootstrap.startAllocation.selectedCardMax
+    ) return false;
     return true;
   }, [bootstrap, envReady, personaPrompt, selectedCards, stats]);
 
@@ -190,8 +195,9 @@ export default function App(): React.JSX.Element {
 
   function toggleCard(id: string): void {
     setSelectedCards((prev) => {
+      const maxCards = bootstrap?.startAllocation.selectedCardMax ?? 3;
       if (prev.includes(id)) return prev.filter((x) => x !== id);
-      if (prev.length >= 3) return prev;
+      if (prev.length >= maxCards) return prev;
       return [...prev, id];
     });
   }
@@ -233,6 +239,10 @@ export default function App(): React.JSX.Element {
         stats,
         selectedCardIds: selectedCards
       }, async (event: GameStreamEvent) => {
+        if (event.type === "meta") {
+          setStatus("本局调参已同步，继续推进叙事...");
+          return;
+        }
         if (event.type === "started") {
           setRun(event.data.run);
           setTimeline([]);
@@ -279,6 +289,9 @@ export default function App(): React.JSX.Element {
       setIsStreaming(true);
       setStatus("继续推进年份中（流式生成）...");
       await stepRunStream({ runId: run.runId, decision: "balanced" }, async (event: GameStreamEvent) => {
+        if (event.type === "meta") {
+          return;
+        }
         if (event.type === "timeline") {
           setTimeline((prev) => [...prev, event.data.entry]);
           setStatus(`生成年份叙事中...(${event.data.index + 1}/${event.data.total})`);
@@ -319,6 +332,9 @@ export default function App(): React.JSX.Element {
       setIsStreaming(true);
       setStatus("命运流转中（流式生成）...");
       await stepRunStream({ runId: run.runId, decision }, async (event: GameStreamEvent) => {
+        if (event.type === "meta") {
+          return;
+        }
         if (event.type === "timeline") {
           setTimeline((prev) => [...prev, event.data.entry]);
           setStatus(`生成年份叙事中...(${event.data.index + 1}/${event.data.total})`);
@@ -405,7 +421,7 @@ export default function App(): React.JSX.Element {
           </div>
 
           <div>
-            <p>抽卡翻牌（可选 1-3）</p>
+            <p>抽卡翻牌（可选 {bootstrap.startAllocation.selectedCardMin}-{bootstrap.startAllocation.selectedCardMax}）</p>
             <div className="cards">
               {bootstrap.cardPool.map((card) => {
                 const selected = selectedCards.includes(card.id);

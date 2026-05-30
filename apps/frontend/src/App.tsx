@@ -18,6 +18,26 @@ interface BootstrapState {
   limits: ProviderLimits;
 }
 
+interface DecisionHistoryItem {
+  id: string;
+  age: number;
+  ageStageLabel: string;
+  background: string;
+  choiceId: DecisionType;
+  choiceLabel: string;
+  choiceDescription: string;
+  rollLabels: string[];
+}
+
+interface PendingDecisionItem {
+  age: number;
+  ageStageLabel: string;
+  background: string;
+  choiceId: DecisionType;
+  choiceLabel: string;
+  choiceDescription: string;
+}
+
 const statLabels: Record<StatKey, string> = {
   intelligence: "智力",
   charisma: "魅力",
@@ -79,6 +99,18 @@ function fameTitle(fame: number): string {
   return "举世传奇";
 }
 
+function outcomeLabel(outcome: RunState["outcome"]): string {
+  if (outcome === "dead") return "死亡";
+  if (outcome === "ascended") return "飞升";
+  return "终局";
+}
+
+function endingBadgeText(run: RunState): string {
+  if (run.outcome === "dead") return "命数已尽";
+  if (run.outcome === "ascended") return run.ascension.title?.trim() || "超凡飞升";
+  return "尘世落幕";
+}
+
 export default function App(): React.JSX.Element {
   const [bootstrap, setBootstrap] = useState<BootstrapState | null>(null);
   const [runtimeMode, setRuntimeMode] = useState<"cloud" | "local">("local");
@@ -92,9 +124,11 @@ export default function App(): React.JSX.Element {
   const [showSettings, setShowSettings] = useState(false);
   const [envReady, setEnvReady] = useState(false);
   const [timeline, setTimeline] = useState<TimelineEntry[]>([]);
+  const [decisionHistory, setDecisionHistory] = useState<DecisionHistoryItem[]>([]);
   const [showEndingModal, setShowEndingModal] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
   const timelineRef = useRef<HTMLDivElement | null>(null);
+  const pendingDecisionRef = useRef<PendingDecisionItem | null>(null);
   const [flippedCards, setFlippedCards] = useState<Record<string, boolean>>({});
 
   const [localApiKey, setLocalApiKey] = useState("");
@@ -104,7 +138,7 @@ export default function App(): React.JSX.Element {
     model: "",
     apiPath: "/chat/completions",
     temperature: 0.9,
-    maxTokens: 700,
+    maxTokens: 1024,
     timeoutMs: 45000
   });
 
@@ -216,7 +250,7 @@ export default function App(): React.JSX.Element {
         localProviderConfig: runtimeMode === "local" ? localProvider : undefined
       });
       setEnvReady(true);
-      setStatus(`本局环境已确认。Token范围 ${rsp.limits.maxTokens.min}-${rsp.limits.maxTokens.max}。`);
+      setStatus(`本局环境已确认。`);
       setShowSettings(false);
     } catch (error) {
       setEnvReady(false);
@@ -229,7 +263,7 @@ export default function App(): React.JSX.Element {
     if (isStreaming) return;
     try {
       setIsStreaming(true);
-      setStatus("人生推进中（流式生成）...");
+      setStatus("人生推进中...");
       await startRunStream({
         clientId,
         worldId,
@@ -246,6 +280,8 @@ export default function App(): React.JSX.Element {
         if (event.type === "started") {
           setRun(event.data.run);
           setTimeline([]);
+          setDecisionHistory([]);
+          pendingDecisionRef.current = null;
           setStatus("角色已开局，正在生成年份叙事...");
           return;
         }
@@ -287,7 +323,7 @@ export default function App(): React.JSX.Element {
     if (isStreaming) return;
     try {
       setIsStreaming(true);
-      setStatus("继续推进年份中（流式生成）...");
+      setStatus("继续推进年份中...");
       await stepRunStream({ runId: run.runId, decision: "balanced" }, async (event: GameStreamEvent) => {
         if (event.type === "meta") {
           return;
@@ -328,15 +364,45 @@ export default function App(): React.JSX.Element {
   async function onDecision(decision: DecisionType): Promise<void> {
     if (!run) return;
     if (isStreaming) return;
+    const choice = run.nextMilestoneChoice?.options.find((opt) => opt.id === decision);
+    if (run.nextMilestoneChoice && choice) {
+      pendingDecisionRef.current = {
+        age: run.age,
+        ageStageLabel: run.ageStage.label,
+        background: run.nextMilestoneChoice?.background ?? "",
+        choiceId: decision,
+        choiceLabel: choice.label,
+        choiceDescription: choice.description
+      };
+    } else {
+      pendingDecisionRef.current = null;
+    }
     try {
       setIsStreaming(true);
-      setStatus("命运流转中（流式生成）...");
+      setStatus("命运流转中...");
       await stepRunStream({ runId: run.runId, decision }, async (event: GameStreamEvent) => {
         if (event.type === "meta") {
           return;
         }
         if (event.type === "timeline") {
           setTimeline((prev) => [...prev, event.data.entry]);
+          const pending = pendingDecisionRef.current;
+          if (pending && event.data.entry.tags.includes("milestone")) {
+            setDecisionHistory((prev) => ([
+              ...prev,
+              {
+                id: `${run.runId}-${pending.age}-${pending.choiceId}-${prev.length}`,
+                age: pending.age,
+                ageStageLabel: pending.ageStageLabel,
+                background: pending.background,
+                choiceId: pending.choiceId,
+                choiceLabel: pending.choiceLabel,
+                choiceDescription: pending.choiceDescription,
+                rollLabels: extractDeltaLabels(event.data.entry)
+              }
+            ]));
+            pendingDecisionRef.current = null;
+          }
           setStatus(`生成年份叙事中...(${event.data.index + 1}/${event.data.total})`);
           return;
         }
@@ -347,6 +413,7 @@ export default function App(): React.JSX.Element {
         }
         if (event.type === "done") {
           setRun(event.data.run);
+          pendingDecisionRef.current = null;
           setStatus(event.data.run.ended ? "本局结束。" : "时间继续向前，等待下一个分岔点。");
           if (event.data.run.ended) setShowEndingModal(true);
           return;
@@ -356,6 +423,7 @@ export default function App(): React.JSX.Element {
         }
       });
     } catch (error) {
+      pendingDecisionRef.current = null;
       setStatus(`推进失败：${String(error)}`);
     } finally {
       setIsStreaming(false);
@@ -368,6 +436,8 @@ export default function App(): React.JSX.Element {
     setFlippedCards({});
     setStats(defaultStats);
     setTimeline([]);
+    setDecisionHistory([]);
+    pendingDecisionRef.current = null;
     setShowEndingModal(false);
     setEnvReady(false);
     setStatus("已重置，请重新确认 Setting 并开局。");
@@ -390,8 +460,9 @@ export default function App(): React.JSX.Element {
         <button className="ghost" onClick={resetRun}>重开</button>
       </header>
 
-      {!run ? (
-        <section className="panel start-panel">
+      <div className="game-content">
+        {!run ? (
+          <section className="panel start-panel">
           <h2>创建角色</h2>
 
           <label>
@@ -453,16 +524,16 @@ export default function App(): React.JSX.Element {
             开始游戏
           </button>
           <p className="status">{status}</p>
-        </section>
-      ) : (
-        <section className="panel run-panel">
+          </section>
+        ) : (
+          <section className="panel run-panel">
           <h2>{run.age} 岁 · {run.ageStage.label}</h2>
           <p>
             {statIcons.intelligence}智力 {run.stats.intelligence} · {statIcons.charisma}魅力 {run.stats.charisma} · {statIcons.family}家境 {run.stats.family} · {statIcons.fortune}气运 {run.stats.fortune}
             · {statIcons.physique}体魄 {run.stats.physique}
           </p>
           <p>
-            名望：{run.fame} · 结局状态：{run.outcome === "ongoing" ? "进行中" : run.outcome === "dead" ? "死亡" : "飞升"}
+            名望：{run.fame} · 结局状态：{run.outcome === "ongoing" ? "进行中" : outcomeLabel(run.outcome)}
           </p>
 
           <div className="timeline-scroll" ref={timelineRef}>
@@ -482,6 +553,42 @@ export default function App(): React.JSX.Element {
               </article>
             ))}
           </div>
+
+          <section className="decision-history">
+            <div className="decision-history-head">
+              <h3>抉择历史</h3>
+              <small></small>
+            </div>
+            {decisionHistory.length === 0 ? (
+              <p className="decision-history-empty">暂无抉择记录。</p>
+            ) : (
+              <div className="decision-history-list">
+                {decisionHistory.map((entry) => (
+                  <article className="decision-history-item" key={entry.id}>
+                    <p className="decision-history-meta">
+                      {entry.age}岁 · {entry.ageStageLabel}
+                    </p>
+                    <p className="decision-history-bg">
+                      {entry.background || "你走到了命运分岔口。"}
+                    </p>
+                    <p className="decision-history-choice">
+                      <span className="decision-choice-pill">{entry.choiceLabel}</span>
+                      {entry.choiceDescription}
+                    </p>
+                    <div className="decision-history-rolls">
+                      {entry.rollLabels.length === 0 ? (
+                        <small className="decision-roll-pill">掷点：无明显变化</small>
+                      ) : (
+                        entry.rollLabels.map((label, idx) => (
+                          <small className="decision-roll-pill" key={`${entry.id}-roll-${idx}`}>{label}</small>
+                        ))
+                      )}
+                    </div>
+                  </article>
+                ))}
+              </div>
+            )}
+          </section>
 
           {run.nextMilestoneChoice ? (
             <div>
@@ -509,14 +616,25 @@ export default function App(): React.JSX.Element {
 
           {run.ended ? (
             <div className="ending">
-              <h3>结局</h3>
-              <p>{run.endingSummary}</p>
+              <div className="ending-head">
+                <h3>结局</h3>
+                <span className={`ending-pill ${run.outcome === "dead" ? "is-dead" : "is-ascended"}`}>
+                  {endingBadgeText(run)}
+                </span>
+              </div>
+              <p className="ending-meta">
+                名望 {run.fame} · {fameTitle(run.fame)}
+              </p>
+              <blockquote className="ending-quote">
+                {run.endingSummary ?? "命运已暂告一段落。"}
+              </blockquote>
             </div>
           ) : null}
 
           <p className="status">{status}</p>
-        </section>
-      )}
+          </section>
+        )}
+      </div>
 
       {showSettings ? (
         <AdminPanel
@@ -540,10 +658,17 @@ export default function App(): React.JSX.Element {
         <div className="modal-mask">
           <div className="modal ending-modal">
             <h2>本局结算</h2>
-            <p>结局：{run.outcome === "dead" ? "死亡" : run.outcome === "ascended" ? "飞升" : "终局"}</p>
+            <div className="ending-summary-top">
+              <span className={`ending-pill ${run.outcome === "dead" ? "is-dead" : "is-ascended"}`}>
+                {outcomeLabel(run.outcome)}
+              </span>
+              <small>{endingBadgeText(run)}</small>
+            </div>
             <p>名望得分：{run.fame}</p>
             <p>称号：{fameTitle(run.fame)}</p>
-            <p>终局总结：{run.endingSummary ?? "命运已暂告一段落。"}</p>
+            <blockquote className="ending-quote ending-quote-modal">
+              {run.endingSummary ?? "命运已暂告一段落。"}
+            </blockquote>
             <div className="row">
               <button onClick={playAgain}>再来一把</button>
               <button className="ghost" onClick={() => setShowEndingModal(false)}>关闭</button>
@@ -551,6 +676,20 @@ export default function App(): React.JSX.Element {
           </div>
         </div>
       ) : null}
+
+      <footer className="site-footer">
+        <a
+          className="repo-link"
+          href="https://github.com/Vcity-ci/life_remake"
+          target="_blank"
+          rel="noreferrer"
+        >
+          <svg className="repo-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+            <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.5-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z" />
+          </svg>
+          <span>Vcity-ci/life_remake</span>
+        </a>
+      </footer>
     </main>
   );
 }

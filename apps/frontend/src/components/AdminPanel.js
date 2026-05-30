@@ -8,7 +8,7 @@ const defaultProvider = {
     model: "",
     apiPath: "/chat/completions",
     temperature: 0.9,
-    maxTokens: 700,
+    maxTokens: 1024,
     timeoutMs: 45000
 };
 function defaultContent() {

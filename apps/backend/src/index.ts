@@ -19,7 +19,7 @@ import type {
   YearEvent
 } from "@reroll/shared";
 import { createDefaultGameplayTuning } from "@reroll/shared";
-import { generateMilestoneOptions, generateYearNarrative } from "./ai.js";
+import { generateEndingNarrative, generateMilestoneOptions, generateYearNarrative } from "./ai.js";
 import { providerLimits } from "./constants.js";
 import { getCloudApiKey, getDeployMode, readRuntimeConfig, writeRuntimeConfig } from "./config.js";
 import {
@@ -198,15 +198,24 @@ function summarizeWorldline(worldline: unknown): string {
   ].filter(Boolean).join(" | ");
 }
 
-function summarizeFactions(factions: Array<{ name: string; values: string[]; behavior: string }>): string {
+function summarizeFactions(
+  factions: Array<{ name: string; values: string[]; behavior: string; eventBias?: string[]; intelStyle?: string }>
+): string {
   return factions
-    .map((f) => `${f.name}[${f.values.join("/")}]${f.behavior}`)
+    .slice(0, 6)
+    .map((f) => {
+      const values = f.values?.join("/") ?? "无";
+      const bias = f.eventBias && f.eventBias.length > 0 ? f.eventBias.join("/") : "无";
+      const intel = f.intelStyle?.trim() || "未知";
+      return `${f.name}[价值观:${values};行为:${f.behavior};偏好:${bias};情报风格:${intel}]`;
+    })
     .join(" | ");
 }
 
 function summarizeFactionEvents(events: Array<{ factionId: string; events: string[] }>): string {
   return events
-    .map((x) => `${x.factionId}:${x.events.slice(0, 2).join("；")}`)
+    .slice(0, 8)
+    .map((x) => `${x.factionId}:${x.events.slice(0, 3).join("；")}`)
     .join(" | ");
 }
 
@@ -270,13 +279,26 @@ function toStartAllocationConfig(tuning: GameplayTuning): StartAllocationConfig 
 
 const emptyNarrativeFallbacks = ["平平无奇的一年", "平凡但充实的一年"] as const;
 
+function isLikelyBlankYearEvent(event: YearEvent): boolean {
+  return event.title.includes("平年");
+}
+
+function isLikelyLowQualityNarrative(text: string): boolean {
+  const normalized = text.trim();
+  if (!normalized) return true;
+  if (normalized.length < 18) return true;
+  if (!/[。！？!?…】）)」』]$/.test(normalized)) return true;
+  return false;
+}
+
 function resolveNarrativeWithFallback(
   run: InternalRunState,
-  event: { age: number },
+  event: YearEvent,
   narrative: string
 ): string {
   const trimmed = narrative.trim();
-  if (trimmed.length > 0) return trimmed;
+  const shouldForceBlankYearFallback = isLikelyBlankYearEvent(event) && isLikelyLowQualityNarrative(trimmed);
+  if (trimmed.length > 0 && !shouldForceBlankYearFallback) return trimmed;
   const rng = seedrandom(`${run.seed}:narrative-fallback:${event.age}`);
   return emptyNarrativeFallbacks[rng() < 0.5 ? 0 : 1];
 }
@@ -439,6 +461,17 @@ async function runYearFlow(options: RunYearFlowOptions): Promise<{ updatedRun: I
     ...currentRun.history.slice(0, currentRun.history.length - cutCount),
     ...narratedChunk
   ];
+
+  if (currentRun.ended) {
+    try {
+      const endingNarrative = await generateEndingNarrative(currentRun, world, narrativeCtx);
+      if (endingNarrative.trim()) {
+        currentRun.endingSummary = endingNarrative.trim();
+      }
+    } catch {
+      // keep engine fallback ending summary
+    }
+  }
 
   attachTimelineChunk(currentRun, world, narratedChunk);
   const timelineChunk = currentRun.timelineChunk ?? [];

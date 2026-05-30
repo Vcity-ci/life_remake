@@ -48,7 +48,7 @@ export type GameStreamEvent =
       data: {
         index: number;
         total: number;
-        entry: RunState["timelineChunk"] extends Array<infer T> ? T : never;
+        entry: NonNullable<RunState["timelineChunk"]>[number];
       };
     }
   | {

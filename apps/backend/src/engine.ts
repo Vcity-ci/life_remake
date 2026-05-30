@@ -313,7 +313,7 @@ function applyChanges(stats: Stats, changes: Partial<Record<StatKey, number>>): 
   const next = cloneStats(stats);
   for (const key of coreStatKeys) {
     const delta = changes[key] ?? 0;
-    next[key] = clamp(next[key] + delta, -30, 30);
+    next[key] = clamp(next[key] + delta, -30, 40);
   }
   next.physique = clamp(next.physique + (changes.physique ?? 0), 0, 30);
   return next;

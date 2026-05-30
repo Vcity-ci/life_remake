@@ -1,154 +1,92 @@
-# 项目架构（v0.9.0）
+# 项目架构（v1.0.0）
 
 ## 1. 架构目标
-- 保持“玩法主流程”与“运维配置”解耦。
-- 保持“部署模式”与“会话运行”边界清晰。
-- 保持“状态机计算”与“AI 文本生成”分层，支持可控回退。
+- 玩法计算与 AI 文本生成解耦
+- 本地部署与云端体验站复用同一核心逻辑
+- 配置可统一调参且具备边界校验
 
-## 2. 系统分层
+## 2. 分层设计
 
 ### 2.1 前端层（`apps/frontend`）
-- 职责：
-  - 游戏主流程 UI（开局、推进、抉择、结算）
-  - Setting 控制台（会话配置/模型配置/内容配置）
-  - 时间线渲染与状态提示
-- 关键模块：
-  - `App.tsx`：用户流程状态机
-  - `components/AdminPanel.tsx`：配置中心
-  - `lib/api.ts`：后端 API 访问
-  - `lib/localConfig.ts`：浏览器本地存储（clientId 与 provider）
+- `App.tsx`：开局、推进、抉择、结算主流程
+- `components/AdminPanel.tsx`：Setting 管理页
+- `lib/api.ts`：HTTP + NDJSON 流式事件消费
 
-### 2.2 API 层（`apps/backend/src/index.ts`）
-- 职责：
-  - 请求校验与错误响应
-  - 游戏流程编排（start/step）
-  - 配置读写与内容读写
-  - 统一注入 AI 上下文
-- 特征：
-  - 以 `DEPLOY_MODE` 固定链路
-  - 通过 `zod` 做输入校验
-  - 通过 store 维持进程内运行状态
-  - 同时提供 JSON 接口与 NDJSON 流式接口（`/start`、`/step`、`/start/stream`、`/step/stream`）
-  - 本地链路保持进程内编排，队列化编排预留给云端链路
+### 2.2 API 编排层（`apps/backend/src/index.ts`）
+- 请求校验、错误处理
+- 启动/推进流程编排（含 stream）
+- 游戏资源加载（content/runtime/worldline/faction/talentHooks）
+- AI 调用上下文拼装与事件下发
 
-### 2.3 领域层（`apps/backend/src/engine.ts`）
-- 职责：
-  - 角色创建与属性校验
-  - 年份推进、里程碑决策、结局判定
-  - 名望与死亡/飞升逻辑
-  - timelineChunk 映射
-- 特征：
-  - 纯规则计算，不依赖网络
-  - 规则结果先生成，再交给 AI 润色
-  - 所有关键玩法参数由 `gameplayTuning` 驱动，并在开局时冻结为 `tuningSnapshot`（保证同一局内规则一致）
+### 2.3 规则引擎层（`apps/backend/src/engine.ts`）
+- `createRun`
+- `autoAdvanceToCheckpoint`
+- `applyMilestoneDecisionAndAdvance`
+- `attachTimelineChunk`
+- 规则参数来自 `run.tuningSnapshot`
 
 ### 2.4 AI 适配层（`apps/backend/src/ai.ts`）
-- 职责：
-  - 构造 System/User Prompt
-  - 调用 OpenAI Compatible 接口
-  - 重试、缓存、截断续写
-  - milestone A/B/C 文案解析与回退
+- Prompt 组装
+- OpenAI Compatible 调用
+- 缓存与重试
+- milestone 结构化输出与 fallback
 
-### 2.5 共享契约层（`packages/shared`）
-- 职责：
-  - 统一前后端类型协议
-  - 固化 RunState、ProviderConfig、ContentBundle 等接口
+### 2.5 配置与存储层
+- `content.ts`：读取/写入 `storage/custom-content.json`
+- `config.ts`：读取/写入 `storage/runtime-config.json`
+- `store.ts`：进程内会话与 run 状态
 
-## 3. 运行时序
+### 2.6 共享契约层（`packages/shared`）
+- `RunState / GameplayTuning / ProviderConfig` 等共享类型
 
-### 3.1 启动阶段
-1. `start-local.bat` 或 `start-cloud.bat` 设定 `DEPLOY_MODE`
-2. 前端调用 `GET /api/meta/bootstrap`
-3. 前端初始化世界观、难度、抽卡池、天赋总点、运行限制
+## 3. 核心时序（流式）
 
-### 3.2 会话环境确认
-1. 用户在 Setting 点击“确认本局环境”
-2. 前端调用 `POST /api/game/env`
-3. 后端校验链路与 key 规则，并把 env 绑定到 `clientId`
+### 3.1 开局
+1. `POST /api/game/start/stream`
+2. 后端创建 run，先推进 raw chunk
+3. `started` 事件先下发（无 milestone）
+4. 年份叙事 AI 完成后逐条 `timeline`
+5. milestone 文案 AI 就绪后再发 `milestone`
+6. 最后 `done`
 
-### 3.3 开局流程（流式优先）
-1. 前端优先调用 `POST /api/game/start/stream`（兼容 `POST /api/game/start`）
-2. 后端执行：
-   - 参数校验、world/difficulty 解析
-   - 创建 run（叠加卡牌、初始化名望）
-   - `autoAdvanceToCheckpoint` 生成 raw chunk
-   - AI 生成年份叙事并替换 summary
-   - 如遇里程碑，AI 生成 A/B/C 文案
-3. 流式事件顺序：
-   - `started`：先返回 run 基础状态（不包含 milestone），前端先跳转到局内
-   - `timeline`：逐条推送年份结果
-   - `milestone`：在 AI 完成抉择背景与 A/B/C 文案后推送决策点
-   - `done`：返回最终 run
-4. 非流式接口返回 `run + timelineChunk`
+### 3.2 推进
+1. `POST /api/game/step/stream`
+2. 无抉择则自动推进；有抉择则先结算抉择再推进
+3. 逐条 `timeline`
+4. 有新抉择再发 `milestone`
+5. `done`
 
-### 3.4 推进流程（流式优先）
-1. 前端优先调用 `POST /api/game/step/stream`（兼容 `POST /api/game/step`）
-2. 后端分支：
-   - 有 milestone：执行 `applyMilestoneDecisionAndAdvance`
-   - 无 milestone：执行 `autoAdvanceToCheckpoint`
-3. 对新增 chunk 做 AI 叙事增强，并按顺序流式推送 timeline/milestone/done
-4. 非流式接口返回 `run + timelineChunk`
+## 4. 抉择链路要点
+- 触发：阶段概率 + 保底年数
+- 最低触发年龄：`minEligibleAge`
+- 背景种子：`data/events/faction-events.json`
+- 文案：AI 生成抉择背景与选项
+- 数值：引擎计算
+- 幼年阶段仍受 `deltaCapByStage.child` 限制
 
-## 4. 关键规则边界
-- 开局属性：每项 `0~10`，总和必须等于本局 `talentPointTotal`
-- 开局点数/抽卡数量/推进节奏/抉择触发/死亡飞升判定等，统一由 `gameplayTuning` 决定
-- 默认值（未配置时）：
-  - 开局点数：`gameplayTuning.bootstrap.talentPointMin~talentPointMax`（bootstrap 随机）
-  - 抽卡：`gameplayTuning.bootstrap.selectedCardMin~selectedCardMax`
-  - 年份分块：每次最多推进 `2` 年
-  - 抉择触发：`5` 岁后；幼年 `10%`、青年 `20%`、壮年及以上 `30%`；连续 `20` 年保底
-  - 触发时从当前 world 阵营事件池随机抽取一条作为抉择背景种子
-- 结局：仅 `dead` 或 `ascended`
-- 名望：由 `gameplayTuning.fame` 的权重与上下界配置映射
+## 5. 前端抉择历史时序
+- 用户点击 A/B/C 后仅记录 pending 决策
+- 收到该 milestone 年份的 `timeline`（AI 文本）后才落地到“抉择历史”
+- 历史项同时展示掷点胶囊（来自该年 `statChanges`）
 
-## 5. 配置与数据边界
+## 6. 配置与数据边界
+- 根目录固定资源：
+  - `data/*`
+  - `skills/ai-gm/prompt-pack.json`
+  - `.env`（根目录）
+- 运行期可编辑：
+  - `storage/custom-content.json`
+  - `storage/runtime-config.json`
+- 备份目录：
+  - `storage/backups/*`
 
-### 5.1 静态/种子数据
-- `data/worlds/*.json`
-- `data/cards.json`
-- `data/difficulties.json`
-- `skills/ai-gm/prompt-pack.json`
-- 运行时解析根目录：基于后端源码目录向上定位项目根（`apps/backend/src -> ../../..`）
-- 后端固定读取：
-  - `<projectRoot>/data/*`
-  - `<projectRoot>/skills/ai-gm/prompt-pack.json`
-- 结论：生产环境不需要复制 `data/`、`skills/` 到 `apps/backend/dist/`
+## 7. 部署模式边界
+- `DEPLOY_MODE=local`
+  - 用户在会话内提供本地 key
+- `DEPLOY_MODE=cloud`
+  - 仅使用服务器 `CLOUD_MODEL_API_KEY`
+  - 管理接口锁定（`/api/admin/*` 返回 403）
 
-### 5.2 运行期可编辑数据
-- `storage/custom-content.json`
-- `storage/runtime-config.json`
-- 备份目录：`storage/backups/*`
-- `storage/custom-content.json` 中 `gameplayTuning` 为玩法参数主配置
-
-### 5.3 扩展设定数据
-- 世界线：`data/settings/worldlines/*.timeline.json`
-- 阵营：`data/settings/factions/factions.json`
-- 阵营事件：`data/events/faction-events.json`
-- 天赋叙事钩子：`data/talents/talent-cards.json`
-
-## 6. 安全设计
-- 云端模式：只读后端 `CLOUD_MODEL_API_KEY`，不下发前端。
-- 本地模式：本地 key 仅会话提交，不写盘。
-- 前端本地存储仅保存：
-  - `clientId`
-  - `localProviderConfig`
-- 管理配置接口全部走后端 schema 校验。
-
-## 6.1 前端 API 基址规则
-- `apps/frontend/src/lib/api.ts` 使用 `VITE_API_BASE_URL || ""`
-- 开发环境：`apps/frontend/.env.development` 配置 `VITE_API_BASE_URL=http://localhost:4000`
-- 生产环境：`apps/frontend/.env.production` 设为空，前端请求走同域 `/api/*`，由 IIS/Nginx 反代到后端
-
-## 7. 扩展点
-- 增加世界观：编辑 content worlds 或种子数据
-- 增加难度：编辑 difficulties
-- 增加卡牌：编辑 cards + talent hooks
-- 增强叙事：编辑 promptPack 与设定摘要源
-- 替换模型：修改 ProviderConfig（baseUrl/model/apiPath）
-- 调整玩法：编辑 content 的 `gameplayTuning`（参数与边界见 `docs/CONFIG_GUIDE.md`）
-
-## 8. 云端性能路线（已确认）
-- 队列化编排（Redis/BullMQ）优先放在云端链路实施。
-- 本地链路继续使用进程内 store + 轻量并发，不强依赖 Redis。
-- 响应速度相关改造（排队、限流、公平调度、失败重放）在云端阶段统一上线。
-- 目标行为：生成一条显示一条；推进到决策点暂停；完成决策后恢复队列推进。
+## 8. 后续扩展方向
+- 云端队列化（Redis/BullMQ）用于多实例调度与削峰
+- 本地链路继续保持轻依赖、可单机运行

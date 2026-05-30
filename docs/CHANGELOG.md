@@ -1,5 +1,20 @@
 # 更新日志
 
+## v1.0.0 - 2026-05-30
+- 文档全面对齐当前版本实现：
+  - 重写 `docs/USAGE_FLOW.md`
+  - 重写 `docs/CONFIG_GUIDE.md`
+  - 重写 `docs/ARCHITECTURE.md`
+  - 重写 `docs/TECHNICAL.md`
+  - 重写 `docs/DEPLOYMENT.md`
+- 关键对齐点：
+  - 根目录 `.env` 读取路径（后端以 `process.cwd()` 为准）
+  - 后端固定读取根目录 `data/*` 与 `skills/ai-gm/prompt-pack.json`
+  - 抉择触发逻辑：阶段概率 + 保底 + 最低年龄门槛
+  - 流式事件顺序：`started -> timeline -> meta -> milestone -> done`
+  - `started` 阶段不下发 milestone（避免前端先挂 fallback 文案）
+  - 前端“抉择历史”改为在收到 milestone 年份 AI 文本后再挂载，并展示掷点胶囊
+
 ## v0.8.1 - 2026-05-28
 - 新增 GitHub 发布准备文档：
   - `docs/GITHUB_RELEASE_CHECKLIST.md`

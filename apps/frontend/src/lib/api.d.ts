@@ -1,4 +1,9 @@
 import type { AdminConfigPayload, ContentBundle, DecisionType, DifficultyConfig, GameEnvConfigResponse, ProviderConfig, ProviderLimits, RunState, StartAllocationConfig, StartRunResponse, StepRunResponse, WorldConfig, BackgroundCard } from "@reroll/shared";
+export declare class ApiError extends Error {
+    status: number;
+    code?: string;
+    constructor(message: string, status: number, code?: string);
+}
 export interface BootstrapPayload {
     deployMode: "local" | "cloud";
     worlds: WorldConfig[];

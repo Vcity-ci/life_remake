@@ -16,6 +16,17 @@ import type {
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "";
 
+export class ApiError extends Error {
+  status: number;
+  code?: string;
+  constructor(message: string, status: number, code?: string) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+    this.code = code;
+  }
+}
+
 export interface BootstrapPayload {
   deployMode: "local" | "cloud";
   worlds: WorldConfig[];
@@ -64,7 +75,21 @@ export type GameStreamEvent =
 async function parseJson<T>(res: Response): Promise<T> {
   if (!res.ok) {
     const body = await res.text();
-    throw new Error(body || `HTTP ${res.status}`);
+    let parsed: { error?: string; message?: string } | null = null;
+    try {
+      parsed = JSON.parse(body) as { error?: string; message?: string };
+    } catch {
+      parsed = null;
+    }
+    if (parsed) {
+      const message = parsed.message?.trim() || parsed.error?.trim() || `HTTP ${res.status}`;
+      throw new ApiError(message, res.status, parsed.error);
+    }
+    const fallback = body || `HTTP ${res.status}`;
+    if (fallback.includes("\"error\":\"server_busy\"") || fallback.includes("服务器繁忙")) {
+      throw new ApiError("服务器繁忙，请稍后重试", res.status, "server_busy");
+    }
+    throw new ApiError(fallback, res.status);
   }
   return (await res.json()) as T;
 }
@@ -150,7 +175,21 @@ async function readNdjsonStream(
 ): Promise<void> {
   if (!res.ok) {
     const body = await res.text();
-    throw new Error(body || `HTTP ${res.status}`);
+    let parsed: { error?: string; message?: string } | null = null;
+    try {
+      parsed = JSON.parse(body) as { error?: string; message?: string };
+    } catch {
+      parsed = null;
+    }
+    if (parsed) {
+      const message = parsed.message?.trim() || parsed.error?.trim() || `HTTP ${res.status}`;
+      throw new ApiError(message, res.status, parsed.error);
+    }
+    const fallback = body || `HTTP ${res.status}`;
+    if (fallback.includes("\"error\":\"server_busy\"") || fallback.includes("服务器繁忙")) {
+      throw new ApiError("服务器繁忙，请稍后重试", res.status, "server_busy");
+    }
+    throw new ApiError(fallback, res.status);
   }
   if (!res.body) {
     throw new Error("stream_body_missing");

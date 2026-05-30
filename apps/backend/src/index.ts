@@ -77,8 +77,97 @@ type GameStreamEvent =
   | { type: "milestone"; data: MilestoneChoicePayload }
   | { type: "done"; data: StreamDonePayload }
   | { type: "error"; data: { message: string } };
+
+class ServerBusyError extends Error {
+  constructor(message = "服务器繁忙，请稍后重试") {
+    super(message);
+    this.name = "ServerBusyError";
+  }
+}
+
+interface QueueTicket {
+  resolve: () => void;
+  reject: (error: Error) => void;
+}
+
+const globalFlowConcurrency = 1;
+const globalFlowQueueWaitMs = 20_000;
+let activeGlobalFlows = 0;
+const globalFlowQueue: QueueTicket[] = [];
+
+function pumpGlobalFlowQueue(): void {
+  while (activeGlobalFlows < globalFlowConcurrency && globalFlowQueue.length > 0) {
+    const next = globalFlowQueue.shift();
+    if (!next) break;
+    activeGlobalFlows += 1;
+    next.resolve();
+  }
+}
+
+async function acquireGlobalFlowSlot(): Promise<() => void> {
+  if (activeGlobalFlows < globalFlowConcurrency) {
+    activeGlobalFlows += 1;
+    let released = false;
+    return () => {
+      if (released) return;
+      released = true;
+      activeGlobalFlows = Math.max(0, activeGlobalFlows - 1);
+      pumpGlobalFlowQueue();
+    };
+  }
+
+  let timeoutHandle: NodeJS.Timeout | null = null;
+  let ticketRef: QueueTicket | null = null;
+  await new Promise<void>((resolve, reject) => {
+    let settled = false;
+    const ticket: QueueTicket = {
+      resolve: () => {
+        if (settled) return;
+        settled = true;
+        if (timeoutHandle) clearTimeout(timeoutHandle);
+        resolve();
+      },
+      reject: (error) => {
+        if (settled) return;
+        settled = true;
+        if (timeoutHandle) clearTimeout(timeoutHandle);
+        reject(error);
+      }
+    };
+    ticketRef = ticket;
+    globalFlowQueue.push(ticket);
+    timeoutHandle = setTimeout(() => {
+      const index = globalFlowQueue.indexOf(ticket);
+      if (index >= 0) {
+        globalFlowQueue.splice(index, 1);
+      }
+      ticket.reject(new ServerBusyError());
+    }, globalFlowQueueWaitMs);
+    pumpGlobalFlowQueue();
+  });
+
+  let released = false;
+  return () => {
+    if (released) return;
+    released = true;
+    activeGlobalFlows = Math.max(0, activeGlobalFlows - 1);
+    pumpGlobalFlowQueue();
+    ticketRef = null;
+  };
+}
+
+function isServerBusyError(error: unknown): error is ServerBusyError {
+  return error instanceof ServerBusyError || (error as Error | undefined)?.name === "ServerBusyError";
+}
+
+function toBusyPayload(): { error: string; message: string } {
+  return {
+    error: "server_busy",
+    message: "服务器繁忙，请稍后重试"
+  };
+}
 const narrativeConcurrency = (() => {
-  const parsed = Number(process.env.NARRATIVE_CONCURRENCY ?? "2");
+  const parsed = Number(process.env.NARRATIVE_CONCURRENCY ?? "1");
   if (!Number.isFinite(parsed)) return 2;
   return Math.max(1, Math.min(4, Math.floor(parsed)));
 })();
@@ -810,7 +899,9 @@ app.post("/api/game/start", async (req, res) => {
   }
 
   const body = parsed.data as StartRunRequest;
+  let release: (() => void) | null = null;
   try {
+    release = await acquireGlobalFlowSlot();
     const result = await runStartFlow(body);
     return res.json({
       run: toClientRun(result.updatedRun),
@@ -818,7 +909,12 @@ app.post("/api/game/start", async (req, res) => {
       startAllocation: result.tuning
     });
   } catch (error) {
+    if (isServerBusyError(error)) {
+      return res.status(503).json(toBusyPayload());
+    }
     return res.status(400).json({ error: (error as Error).message || String(error) });
+  } finally {
+    release?.();
   }
 });
 
@@ -829,7 +925,9 @@ app.post("/api/game/step", async (req, res) => {
   }
 
   const body = parsed.data as StepRunRequest;
+  let release: (() => void) | null = null;
   try {
+    release = await acquireGlobalFlowSlot();
     const result = await runStepFlow(body);
     return res.json({
       run: toClientRun(result.updatedRun),
@@ -837,9 +935,14 @@ app.post("/api/game/step", async (req, res) => {
       startAllocation: result.tuning
     });
   } catch (error) {
+    if (isServerBusyError(error)) {
+      return res.status(503).json(toBusyPayload());
+    }
     const msg = (error as Error).message || String(error);
     if (msg === "run_not_found") return res.status(404).json({ error: msg });
     return res.status(400).json({ error: msg });
+  } finally {
+    release?.();
   }
 });
 
@@ -850,6 +953,15 @@ app.post("/api/game/start/stream", async (req, res) => {
   }
 
   const body = parsed.data as StartRunRequest;
+  let release: (() => void) | null = null;
+  try {
+    release = await acquireGlobalFlowSlot();
+  } catch (error) {
+    if (isServerBusyError(error)) {
+      return res.status(503).json(toBusyPayload());
+    }
+    return res.status(500).json({ error: (error as Error).message || String(error) });
+  }
   initNdjsonResponse(res);
   try {
     const result = await runStartFlow(body, {
@@ -891,11 +1003,19 @@ app.post("/api/game/start/stream", async (req, res) => {
       data: { run: toClientRun(result.updatedRun), timelineChunk: result.timelineChunk }
     });
   } catch (error) {
+    if (isServerBusyError(error)) {
+      await writeNdjsonEvent(res, {
+        type: "error",
+        data: { message: "server_busy" }
+      });
+      return;
+    }
     await writeNdjsonEvent(res, {
       type: "error",
       data: { message: (error as Error).message || String(error) }
     });
   } finally {
+    release?.();
     res.end();
   }
 });
@@ -907,6 +1027,15 @@ app.post("/api/game/step/stream", async (req, res) => {
   }
 
   const body = parsed.data as StepRunRequest;
+  let release: (() => void) | null = null;
+  try {
+    release = await acquireGlobalFlowSlot();
+  } catch (error) {
+    if (isServerBusyError(error)) {
+      return res.status(503).json(toBusyPayload());
+    }
+    return res.status(500).json({ error: (error as Error).message || String(error) });
+  }
   initNdjsonResponse(res);
   try {
     const result = await runStepFlow(body, async (entry, index, total) => {
@@ -940,11 +1069,19 @@ app.post("/api/game/step/stream", async (req, res) => {
       data: { run: toClientRun(result.updatedRun), timelineChunk: result.timelineChunk }
     });
   } catch (error) {
+    if (isServerBusyError(error)) {
+      await writeNdjsonEvent(res, {
+        type: "error",
+        data: { message: "server_busy" }
+      });
+      return;
+    }
     await writeNdjsonEvent(res, {
       type: "error",
       data: { message: (error as Error).message || String(error) }
     });
   } finally {
+    release?.();
     res.end();
   }
 });

@@ -1,8 +1,33 @@
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "";
+export class ApiError extends Error {
+    status;
+    code;
+    constructor(message, status, code) {
+        super(message);
+        this.name = "ApiError";
+        this.status = status;
+        this.code = code;
+    }
+}
 async function parseJson(res) {
     if (!res.ok) {
         const body = await res.text();
-        throw new Error(body || `HTTP ${res.status}`);
+        let parsed = null;
+        try {
+            parsed = JSON.parse(body);
+        }
+        catch {
+            parsed = null;
+        }
+        if (parsed) {
+            const message = parsed.message?.trim() || parsed.error?.trim() || `HTTP ${res.status}`;
+            throw new ApiError(message, res.status, parsed.error);
+        }
+        const fallback = body || `HTTP ${res.status}`;
+        if (fallback.includes("\"error\":\"server_busy\"") || fallback.includes("服务器繁忙")) {
+            throw new ApiError("服务器繁忙，请稍后重试", res.status, "server_busy");
+        }
+        throw new ApiError(fallback, res.status);
     }
     return (await res.json());
 }
@@ -61,7 +86,22 @@ export async function stepRun(payload) {
 async function readNdjsonStream(res, onEvent) {
     if (!res.ok) {
         const body = await res.text();
-        throw new Error(body || `HTTP ${res.status}`);
+        let parsed = null;
+        try {
+            parsed = JSON.parse(body);
+        }
+        catch {
+            parsed = null;
+        }
+        if (parsed) {
+            const message = parsed.message?.trim() || parsed.error?.trim() || `HTTP ${res.status}`;
+            throw new ApiError(message, res.status, parsed.error);
+        }
+        const fallback = body || `HTTP ${res.status}`;
+        if (fallback.includes("\"error\":\"server_busy\"") || fallback.includes("服务器繁忙")) {
+            throw new ApiError("服务器繁忙，请稍后重试", res.status, "server_busy");
+        }
+        throw new ApiError(fallback, res.status);
     }
     if (!res.body) {
         throw new Error("stream_body_missing");

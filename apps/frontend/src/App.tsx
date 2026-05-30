@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import type { BackgroundCard, DecisionType, ProviderConfig, ProviderLimits, RunState, StartAllocationConfig, StatKey, Stats, TimelineEntry } from "@reroll/shared";
 import { AdminPanel } from "./components/AdminPanel";
-import { fetchBootstrap, saveGameEnvironment, startRunStream, stepRunStream, type GameStreamEvent } from "./lib/api";
+import { ApiError, fetchBootstrap, saveGameEnvironment, startRunStream, stepRunStream, type GameStreamEvent } from "./lib/api";
 import { getOrCreateClientId, readLocalProviderConfig, writeLocalProviderConfig } from "./lib/localConfig";
 
 interface BootstrapState {
@@ -126,6 +126,7 @@ export default function App(): React.JSX.Element {
   const [timeline, setTimeline] = useState<TimelineEntry[]>([]);
   const [decisionHistory, setDecisionHistory] = useState<DecisionHistoryItem[]>([]);
   const [showEndingModal, setShowEndingModal] = useState(false);
+  const [showBusyModal, setShowBusyModal] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
   const timelineRef = useRef<HTMLDivElement | null>(null);
   const pendingDecisionRef = useRef<PendingDecisionItem | null>(null);
@@ -143,6 +144,11 @@ export default function App(): React.JSX.Element {
   });
 
   const clientId = useMemo(() => getOrCreateClientId(), []);
+
+  function isServerBusyError(error: unknown): boolean {
+    if (!(error instanceof ApiError)) return false;
+    return error.status === 503 || error.code === "server_busy" || error.message.includes("服务器繁忙");
+  }
 
   useEffect(() => {
     async function init() {
@@ -312,7 +318,12 @@ export default function App(): React.JSX.Element {
         }
       });
     } catch (error) {
-      setStatus(`开局失败：${String(error)}`);
+      if (isServerBusyError(error)) {
+        setShowBusyModal(true);
+        setStatus("服务器繁忙，请稍后重试。");
+      } else {
+        setStatus(`开局失败：${String(error)}`);
+      }
     } finally {
       setIsStreaming(false);
     }
@@ -355,7 +366,12 @@ export default function App(): React.JSX.Element {
         }
       });
     } catch (error) {
-      setStatus(`推进失败：${String(error)}`);
+      if (isServerBusyError(error)) {
+        setShowBusyModal(true);
+        setStatus("服务器繁忙，请稍后重试。");
+      } else {
+        setStatus(`推进失败：${String(error)}`);
+      }
     } finally {
       setIsStreaming(false);
     }
@@ -424,7 +440,12 @@ export default function App(): React.JSX.Element {
       });
     } catch (error) {
       pendingDecisionRef.current = null;
-      setStatus(`推进失败：${String(error)}`);
+      if (isServerBusyError(error)) {
+        setShowBusyModal(true);
+        setStatus("服务器繁忙，请稍后重试。");
+      } else {
+        setStatus(`推进失败：${String(error)}`);
+      }
     } finally {
       setIsStreaming(false);
     }
@@ -672,6 +693,18 @@ export default function App(): React.JSX.Element {
             <div className="row">
               <button onClick={playAgain}>再来一把</button>
               <button className="ghost" onClick={() => setShowEndingModal(false)}>关闭</button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {showBusyModal ? (
+        <div className="modal-mask">
+          <div className="modal ending-modal">
+            <h2>提示</h2>
+            <p>服务器繁忙，请稍后重试。</p>
+            <div className="row">
+              <button onClick={() => setShowBusyModal(false)}>我知道了</button>
             </div>
           </div>
         </div>

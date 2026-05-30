@@ -157,8 +157,8 @@ export interface StartAllocationConfig {
 export function createDefaultGameplayTuning(): GameplayTuning {
   return {
     bootstrap: {
-      talentPointMin: 20,
-      talentPointMax: 30,
+      talentPointMin: 25,
+      talentPointMax: 35,
       selectedCardMin: 1,
       selectedCardMax: 3
     },
@@ -257,15 +257,15 @@ export function createDefaultGameplayTuning(): GameplayTuning {
       finalRiskClampMax: 0.85
     },
     ascension: {
-      deterministicStatThreshold: 30,
-      chanceA: 0.06,
-      chanceB: 0.05,
-      chanceC: 0.04,
-      highStatsThresholdA: 2,
-      highStatsThresholdC: 3,
-      fortuneThresholdA: 9,
+      deterministicStatThreshold: 35,
+      chanceA: 0.02,
+      chanceB: 0.02,
+      chanceC: 0.02,
+      highStatsThresholdA: 20,
+      highStatsThresholdC: 20,
+      fortuneThresholdA: 25,
       legendaryCountThresholdB: 1,
-      intelligenceThresholdB: 9
+      intelligenceThresholdB: 20
     },
     fame: {
       intelligenceWeight: 1,
@@ -273,7 +273,7 @@ export function createDefaultGameplayTuning(): GameplayTuning {
       familyWeight: 0,
       fortuneWeight: 1,
       physiqueWeight: 1,
-      maxStatValue: 30,
+      maxStatValue: 60,
       min: 0,
       max: 100
     },

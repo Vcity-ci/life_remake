@@ -316,6 +316,12 @@ async function narrateChunkWithConcurrency(
   let nextIndex = 0;
   let nextEmitIndex = 0;
   const workerCount = Math.min(narrativeConcurrency, chunk.length);
+  const baseRecentNarratives = run.history
+    .slice(0, Math.max(0, run.history.length - chunk.length))
+    .slice(-6)
+    .map((item) => item.summary?.trim() ?? "")
+    .filter(Boolean);
+  const seenNarratives = new Set<string>(baseRecentNarratives);
 
   const worker = async (): Promise<void> => {
     while (true) {
@@ -326,14 +332,21 @@ async function narrateChunkWithConcurrency(
       const event = chunk[index];
       let narrative = "";
       try {
-        narrative = await generateYearNarrative(run, world, event, narrativeCtx);
+        const avoidNarratives = Array.from(seenNarratives).slice(-8);
+        narrative = await generateYearNarrative(run, world, event, narrativeCtx, {
+          avoidNarratives
+        });
       } catch {
         narrative = "";
       }
+      const resolvedSummary = resolveNarrativeWithFallback(run, event, narrative);
       narratedChunk[index] = {
         ...event,
-        summary: resolveNarrativeWithFallback(run, event, narrative)
+        summary: resolvedSummary
       };
+      if (resolvedSummary.trim()) {
+        seenNarratives.add(resolvedSummary.trim());
+      }
 
       if (onNarrated) {
         while (nextEmitIndex < chunk.length && narratedChunk[nextEmitIndex]) {

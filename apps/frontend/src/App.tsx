@@ -138,7 +138,7 @@ export default function App(): React.JSX.Element {
     model: "",
     apiPath: "/chat/completions",
     temperature: 0.9,
-    maxTokens: 1024,
+    maxTokens: 1824,
     timeoutMs: 45000
   });
 
@@ -471,7 +471,7 @@ export default function App(): React.JSX.Element {
               rows={4}
               value={personaPrompt}
               onChange={(e) => setPersonaPrompt(e.target.value)}
-              placeholder="例如：孤独但强韧，执着追求被认可，希望改变家族命运。"
+              placeholder="例如：孤独但强韧，执着追求被认可，希望改变家族命运(至少四个字)。"
             />
           </label>
 

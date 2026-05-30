@@ -11,6 +11,7 @@ interface NarrativeContext {
   factionSummary?: string;
   eventPoolSummary?: string;
   talentHookSummary?: string;
+  recentNarratives?: string[];
 }
 
 type ChatContentPart = { type?: string; text?: string };
@@ -27,6 +28,9 @@ interface ModelCallResult {
   truncated: boolean;
   truncateReason?: string;
 }
+interface YearNarrativeOptions {
+  avoidNarratives?: string[];
+}
 interface PromptPackResolved {
   systemCore: string;
   immersionRules: string;
@@ -42,7 +46,7 @@ interface PromptPackResolved {
 type SystemPromptMode = "year" | "milestone" | "ending";
 const debugModel = process.env.DEBUG_MODEL_CALLS === "1";
 const promptCache = new Map<string, { text: string; ts: number }>();
-const PROMPT_CACHE_TTL_MS = 10 * 60 * 1000;
+const PROMPT_CACHE_TTL_MS = 60 * 1000;
 const PROMPT_CACHE_MAX = 600;
 const clientCache = new Map<string, OpenAI>();
 const CLIENT_CACHE_MAX = 64;
@@ -145,6 +149,56 @@ function compactPipeSummary(
     .map((x) => compactText(x, options.maxSegmentLen))
     .filter(Boolean);
   return compactText(parts.join(" | "), options.maxTotalLen);
+}
+
+function normalizeNarrativeForCompare(text: string): string {
+  return text
+    .replace(/[\s\p{P}\p{S}]+/gu, "")
+    .trim();
+}
+
+function stripMilestoneOptionArtifacts(text: string): string {
+  const normalized = text.replace(/\s+/g, " ").trim();
+  if (!normalized) return "";
+  if (!/选项\s*[ABC]|选项[：:]\s*[ABC]|^[ABC][：:、.]\s*/i.test(normalized)) {
+    return normalized;
+  }
+
+  const markers = [
+    "选项A",
+    "选项B",
+    "选项C",
+    "A：",
+    "A:",
+    "B：",
+    "B:",
+    "C：",
+    "C:"
+  ];
+  let cutAt = -1;
+  for (const marker of markers) {
+    const idx = normalized.indexOf(marker);
+    if (idx >= 0 && (cutAt < 0 || idx < cutAt)) {
+      cutAt = idx;
+    }
+  }
+  if (cutAt < 0) return normalized;
+  return normalized.slice(0, cutAt).trim().replace(/[，、；：,:;]+$/, "。");
+}
+
+function isNarrativeNearDuplicate(text: string, candidates: string[]): boolean {
+  const normalized = normalizeNarrativeForCompare(text);
+  if (!normalized || normalized.length < 24) return false;
+  for (const candidate of candidates) {
+    const other = normalizeNarrativeForCompare(candidate);
+    if (!other || other.length < 24) continue;
+    if (normalized === other) return true;
+    const minLen = Math.min(normalized.length, other.length);
+    if (minLen >= 24 && (normalized.includes(other) || other.includes(normalized))) {
+      return true;
+    }
+  }
+  return false;
 }
 
 function buildPromptCacheKey(
@@ -535,12 +589,13 @@ function stageCapPrompt(event: YearEvent): string {
 
 function buildYearPrompt(run: InternalRunState, event: YearEvent, promptPack: PromptPackResolved): string {
   const cards = run.cards.map((c) => `${c.name}(${c.rarity})`).join("、") || "无";
-  const rule = event.tags.includes("milestone")
-    ? promptPack.milestoneRule
-    : event.tags.includes("special")
-      ? promptPack.yearMinorRule
-      : promptPack.yearNormalRule;
+  const rule = event.tags.includes("special")
+    ? promptPack.yearMinorRule
+    : promptPack.yearNormalRule;
   const statInsight = buildStatInsightPrompt(run.stats);
+  const milestoneGuard = event.tags.includes("milestone")
+    ? "【关键限制】这是关键抉择年份的“年度叙事”阶段：禁止输出A/B/C选项、禁止出现“选项A/选项B/选项C”等字样。只写当年经历与后果。"
+    : "";
 
   return [
     `【目标】按节点类型生成文本，并以“本年份属性变化”作为叙事主轴。`,
@@ -560,10 +615,29 @@ function buildYearPrompt(run: InternalRunState, event: YearEvent, promptPack: Pr
     `【本年事件】${event.title}；${event.summary}`,
     `【空过年份记录】${summarizeBlankYears(run.history.slice(-12))}`,
     `【节点类型规则】${rule}`,
+    milestoneGuard,
     `【硬性长度】年度/事件背景必须在80-150字；如出现对话，单句对话不超过20字；必须体现当年属性变化。`,
     `【主轴约束】开头或前两句必须先交代当年属性变化带来的直接后果，再展开事件细节。`,
+    `【去重约束】不得复用完整句，尤其避免与近年叙事出现相同开头或相同收束句。`,
     `【输出限制】只输出文本内容，不加解释。`
   ].join("\n");
+}
+
+function buildYearDedupeRetryPrompt(
+  basePrompt: string,
+  duplicatedText: string,
+  avoidNarratives: string[]
+): string {
+  const avoidLines = avoidNarratives
+    .slice(-4)
+    .map((line, idx) => `${idx + 1}. ${compactText(line, 80)}`);
+  return [
+    basePrompt,
+    "【去重纠偏】上一版文本与近年叙事重复，请完整重写。",
+    avoidLines.length > 0 ? `【禁止复用句】\n${avoidLines.join("\n")}` : "",
+    `【上一版（禁止复用）】${compactText(duplicatedText, 120)}`,
+    "【强制要求】必须保留当年事件与属性变化语义；更换场景动作与句式；80-150字；只输出重写后的最终文本。"
+  ].filter(Boolean).join("\n");
 }
 
 function buildMilestoneOptionsPrompt(run: InternalRunState, recent: YearEvent[], promptPack: PromptPackResolved): string {
@@ -798,12 +872,14 @@ export async function generateYearNarrative(
   run: InternalRunState,
   world: WorldConfig,
   event: YearEvent,
-  ctx: NarrativeContext
+  ctx: NarrativeContext,
+  options?: YearNarrativeOptions
 ): Promise<string> {
   if (!ctx.apiKey.trim()) return "";
   const promptPack = normalizePromptPackForModel(ctx.promptPack);
   const systemPrompt = buildSystemPrompt(promptPack, world, ctx, "year");
   const userPrompt = buildYearPrompt(run, event, promptPack);
+  const avoidNarratives = options?.avoidNarratives ?? [];
   if (debugModel) {
     console.log("[model-debug:prompt-shape:year]", {
       systemPromptLen: systemPrompt.length,
@@ -817,14 +893,14 @@ export async function generateYearNarrative(
 
   try {
     let callResult = await callModel(ctx, systemPrompt, userPrompt);
-    let text = callResult.text.trim();
+    let text = stripMilestoneOptionArtifacts(callResult.text);
 
     let continuationCount = 0;
     while (continuationCount < 2) {
       const likelyTruncated = callResult.truncated || isLikelyTruncated(text);
       if (!likelyTruncated) break;
       const tailResult = await continueNarrative(ctx, systemPrompt, text.slice(-180));
-      const tail = tailResult.text.trim();
+      const tail = stripMilestoneOptionArtifacts(tailResult.text);
       if (!tail) break;
       text = `${text}${tail}`.trim();
       callResult = {
@@ -836,6 +912,17 @@ export async function generateYearNarrative(
     }
     if (callResult.truncated || isLikelyTruncated(text)) {
       text = forceNarrativeClosure(text);
+    }
+    if (text && isNarrativeNearDuplicate(text, avoidNarratives)) {
+      const retryPrompt = buildYearDedupeRetryPrompt(userPrompt, text, avoidNarratives);
+      const retried = await callModel(ctx, systemPrompt, retryPrompt);
+      let rewritten = stripMilestoneOptionArtifacts(retried.text);
+      if (retried.truncated || isLikelyTruncated(rewritten)) {
+        rewritten = forceNarrativeClosure(rewritten);
+      }
+      if (rewritten) {
+        text = rewritten;
+      }
     }
     if (debugModel) {
       console.log("[model-debug:year-narrative]", {

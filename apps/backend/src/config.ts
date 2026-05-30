@@ -29,7 +29,7 @@ export function getDefaultRuntimeConfig(): RuntimeConfig {
       model: model && /[A-Za-z]/.test(model) ? model : "gpt-4.1-mini",
       apiPath: process.env.DEFAULT_PROVIDER_API_PATH ?? "/chat/completions",
       temperature: parseNum(process.env.DEFAULT_PROVIDER_TEMPERATURE, 0.9),
-      maxTokens: parseNum(process.env.DEFAULT_PROVIDER_MAX_TOKENS, 1024),
+      maxTokens: parseNum(process.env.DEFAULT_PROVIDER_MAX_TOKENS, 1824),
       timeoutMs: parseNum(process.env.DEFAULT_PROVIDER_TIMEOUT_MS, 45000)
     }
   };

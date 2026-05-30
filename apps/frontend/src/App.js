@@ -97,7 +97,7 @@ export default function App() {
         model: "",
         apiPath: "/chat/completions",
         temperature: 0.9,
-        maxTokens: 1024,
+        maxTokens: 1824,
         timeoutMs: 45000
     });
     const clientId = useMemo(() => getOrCreateClientId(), []);

@@ -1,4 +1,4 @@
-# 技术文档（v1.0.0）
+# 技术文档（v1.0.1）
 
 ## 1. 技术栈
 - 前端：React 18 + Vite 5 + TypeScript
@@ -102,6 +102,10 @@ docs/
   - 点击选项先缓存 pending
   - 收到对应 milestone 年份 `timeline` 后写入历史
   - 同步展示掷点胶囊
+- 推进状态机关键点（2026-06-01）：
+  - `runStepGeneration` 的 `finally` 统一释放 `pendingAdvanceCountRef`
+  - 不再依赖“是否收到 timeline”来决定释放，避免计数悬挂
+  - `enqueueTimelineEntry` 使用 `timelineBufferRef` 做同步去重入队，减少 `setState` 异步竞态导致的卡住
 
 ## 8. 配置校验
 - `schema.ts` 对 `startRun/gameEnv/contentBundle/gameplayTuning` 做边界校验

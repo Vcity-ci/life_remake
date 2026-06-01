@@ -1,5 +1,17 @@
 # 更新日志
 
+## v1.0.1 - 2026-06-01
+- 修复“第二个抉择后卡死”问题（前端推进状态机）：
+  - `pendingAdvanceCountRef` 在 `runStepGeneration` 结束时统一释放，避免等待计数悬挂
+  - 时间线缓冲改为基于 `timelineBufferRef` 的同步去重入队，减少异步 `setState` 竞态
+- 抉择链路稳定性增强：
+  - 抉择请求年龄透传与前端乐观态切换保持一致，降低 `waiting_decision` 残留导致的阻塞概率
+- 文档同步更新：
+  - `README.md`
+  - `docs/USAGE_FLOW.md`
+  - `docs/TECHNICAL.md`
+  - `docs/ARCHITECTURE.md`
+
 ## v1.0.0 - 2026-05-30
 - 文档全面对齐当前版本实现：
   - 重写 `docs/USAGE_FLOW.md`

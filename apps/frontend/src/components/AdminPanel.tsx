@@ -39,7 +39,8 @@ const defaultProvider: ProviderConfig = {
   apiPath: "/chat/completions",
   temperature: 0.9,
   maxTokens: 1824,
-  timeoutMs: 45000
+  timeoutMs: 45000,
+  reasoningEffort: "minimal"
 };
 
 function defaultContent(): ContentBundle {

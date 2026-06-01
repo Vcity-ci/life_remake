@@ -3,6 +3,8 @@ export type StatKey = "intelligence" | "charisma" | "family" | "fortune" | "phys
 export type DecisionType = "safe" | "balanced" | "risky";
 export type CardRarity = "common" | "rare" | "epic" | "legendary";
 export type AgeStageId = "child" | "youth" | "prime" | "middle" | "elder";
+export type StepAction = "consume" | "decide";
+export type RunPhase = "generating" | "ready" | "waiting_decision" | "ended";
 export type AgeStageRateMap = Record<AgeStageId, number>;
 export type AgeStageIntMap = Record<AgeStageId, number>;
 export interface Stats {
@@ -164,7 +166,10 @@ export interface StartRunRequest {
 }
 export interface StepRunRequest {
     runId: string;
+    action?: StepAction;
     decision?: DecisionType;
+    decisionAge?: number;
+    requestId?: string;
 }
 export interface YearEvent {
     age: number;
@@ -217,6 +222,10 @@ export interface RunState {
     fame: number;
     outcome: "ongoing" | "dead" | "ascended";
     deathCause?: string;
+    phase?: RunPhase;
+    bufferSize?: number;
+    revealedAge?: number;
+    revealedCount?: number;
 }
 export interface StartRunResponse {
     run: RunState;
@@ -234,6 +243,7 @@ export interface ProviderConfig {
     temperature: number;
     maxTokens: number;
     timeoutMs: number;
+    reasoningEffort?: "minimal" | "low" | "medium" | "high";
 }
 export interface ProviderLimits {
     temperature: {

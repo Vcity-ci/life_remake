@@ -21,7 +21,8 @@ const providerSchema: z.ZodType<ProviderConfig> = z.object({
   apiPath: z.enum(["/chat/completions", "/responses"]),
   temperature: z.number().min(providerLimits.temperature.min).max(providerLimits.temperature.max),
   maxTokens: z.number().int().min(providerLimits.maxTokens.min).max(providerLimits.maxTokens.max),
-  timeoutMs: z.number().int().min(providerLimits.timeoutMs.min).max(providerLimits.timeoutMs.max)
+  timeoutMs: z.number().int().min(providerLimits.timeoutMs.min).max(providerLimits.timeoutMs.max),
+  reasoningEffort: z.enum(["minimal", "low", "medium", "high"]).optional()
 });
 
 export const adminConfigSchema: z.ZodType<AdminConfigPayload> = z.object({
@@ -49,7 +50,10 @@ export const startRunSchema = z.object({
 
 export const stepRunSchema = z.object({
   runId: z.string().min(1),
-  decision: z.enum(["safe", "balanced", "risky"]).optional()
+  action: z.enum(["consume", "decide"]).optional(),
+  decision: z.enum(["safe", "balanced", "risky"]).optional(),
+  decisionAge: z.number().int().min(0).max(160).optional(),
+  requestId: z.string().max(128).optional()
 });
 
 const ageThresholdSchema = z.object({

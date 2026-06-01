@@ -8,10 +8,12 @@ import type {
   AgeThreshold,
   AdminConfigPayload,
   ContentBundle,
+  DecisionType,
   DifficultyConfig,
   GameplayTuning,
   GameEnvConfigRequest,
   ProviderConfig,
+  StepAction,
   StartAllocationConfig,
   StartRunRequest,
   StepRunRequest,
@@ -35,6 +37,11 @@ import {
   autoAdvanceToCheckpoint,
   applyMilestoneDecisionAndAdvance,
   createRun,
+  hasPendingRequestId,
+  markRunPhase,
+  queueTimelineEntries,
+  rememberRequestId,
+  revealNextTimelineEntry,
   toClientRun,
   type InternalRunState
 } from "./engine.js";
@@ -90,7 +97,11 @@ interface QueueTicket {
   reject: (error: Error) => void;
 }
 
-const globalFlowConcurrency = 1;
+const globalFlowConcurrency = (() => {
+  const parsed = Number(process.env.GLOBAL_FLOW_CONCURRENCY ?? "10");
+  if (!Number.isFinite(parsed)) return 10;
+  return Math.max(1, Math.min(32, Math.floor(parsed)));
+})();
 const globalFlowQueueWaitMs = 20_000;
 let activeGlobalFlows = 0;
 const globalFlowQueue: QueueTicket[] = [];
@@ -367,6 +378,10 @@ function toStartAllocationConfig(tuning: GameplayTuning): StartAllocationConfig 
 }
 
 const emptyNarrativeFallbacks = ["平平无奇的一年", "平凡但充实的一年"] as const;
+const shortNarrativeFallbacks = [
+  "这一年起伏虽小，却在反复试探与收束中让你更稳，许多变化都悄悄落在了来年的起点上。",
+  "这一年看似平缓，实则在琐碎与波折间慢慢塑形，你学会了克制、判断，也为下一步蓄了力。"
+] as const;
 
 function isLikelyBlankYearEvent(event: YearEvent): boolean {
   return event.title.includes("平年");
@@ -375,7 +390,7 @@ function isLikelyBlankYearEvent(event: YearEvent): boolean {
 function isLikelyLowQualityNarrative(text: string): boolean {
   const normalized = text.trim();
   if (!normalized) return true;
-  if (normalized.length < 18) return true;
+  if (normalized.length < 10) return true;
   if (!/[。！？!?…】）)」』]$/.test(normalized)) return true;
   return false;
 }
@@ -387,9 +402,14 @@ function resolveNarrativeWithFallback(
 ): string {
   const trimmed = narrative.trim();
   const shouldForceBlankYearFallback = isLikelyBlankYearEvent(event) && isLikelyLowQualityNarrative(trimmed);
-  if (trimmed.length > 0 && !shouldForceBlankYearFallback) return trimmed;
+  if (trimmed.length > 0 && !shouldForceBlankYearFallback) {
+    return trimmed;
+  }
   const rng = seedrandom(`${run.seed}:narrative-fallback:${event.age}`);
-  return emptyNarrativeFallbacks[rng() < 0.5 ? 0 : 1];
+  if (event.tags.includes("milestone")) {
+    return emptyNarrativeFallbacks[rng() < 0.5 ? 0 : 1];
+  }
+  return shortNarrativeFallbacks[rng() < 0.5 ? 0 : 1];
 }
 
 async function narrateChunkWithConcurrency(
@@ -405,8 +425,10 @@ async function narrateChunkWithConcurrency(
   let nextIndex = 0;
   let nextEmitIndex = 0;
   const workerCount = Math.min(narrativeConcurrency, chunk.length);
-  const baseRecentNarratives = run.history
+  const historyBeforeChunk = run.history
     .slice(0, Math.max(0, run.history.length - chunk.length))
+    ;
+  const baseRecentNarratives = historyBeforeChunk
     .slice(-6)
     .map((item) => item.summary?.trim() ?? "")
     .filter(Boolean);
@@ -422,7 +444,22 @@ async function narrateChunkWithConcurrency(
       let narrative = "";
       try {
         const avoidNarratives = Array.from(seenNarratives).slice(-8);
-        narrative = await generateYearNarrative(run, world, event, narrativeCtx, {
+        const chunkHistoryForPrompt = chunk
+          .slice(0, index + 1)
+          .map((item, idx) => (idx < index ? narratedChunk[idx] ?? item : item));
+        const promptRun: InternalRunState = {
+          ...run,
+          age: event.age,
+          ageStage: resolveAgeStageForStream(event.age, world),
+          history: [...historyBeforeChunk, ...chunkHistoryForPrompt]
+        };
+        const callCtx: NarrativeCallContext = narrativeCtx.conversation
+          ? narrativeCtx
+          : {
+              ...narrativeCtx,
+              conversation: undefined
+            };
+        narrative = await generateYearNarrative(promptRun, world, event, callCtx, {
           avoidNarratives
         });
       } catch {
@@ -458,6 +495,14 @@ interface StartFlowResult {
   fromAge: number;
   toAge: number;
   tuning: StartAllocationConfig;
+}
+
+interface GenerationOutput {
+  run: InternalRunState;
+  generatedChunk: TimelineEntryChunk;
+  fromAge: number;
+  toAge: number;
+  rawChunkCount: number;
 }
 
 interface RunYearFlowOptions {
@@ -498,8 +543,13 @@ async function runYearFlow(options: RunYearFlowOptions): Promise<{ updatedRun: I
     worldlineSummary,
     factionSummary,
     eventPoolSummary,
-    talentHookSummary
+    talentHookSummary,
+    conversation: currentRun.aiConversation?.year
   };
+  const useConversationChain = narrativeConcurrency === 1;
+  if (!useConversationChain) {
+    narrativeCtx.conversation = undefined;
+  }
   if (debugModel) {
     console.log(`[model-debug:${branch}-chunk-before-ai]`, {
       rawChunkCount: rawChunk.length,
@@ -537,15 +587,22 @@ async function runYearFlow(options: RunYearFlowOptions): Promise<{ updatedRun: I
       ]
     };
     try {
-      aiOptions = await generateMilestoneOptions(currentRun, world, narratedChunk, {
+      const milestoneCtx: NarrativeCallContext = {
         providerConfig,
         apiKey,
         promptPack,
         worldlineSummary,
         factionSummary,
         eventPoolSummary,
-        talentHookSummary
-      });
+        talentHookSummary,
+        conversation: currentRun.aiConversation?.milestone
+      };
+      if (!useConversationChain) {
+        milestoneCtx.conversation = undefined;
+      }
+      aiOptions = await generateMilestoneOptions(currentRun, world, narratedChunk, milestoneCtx);
+      currentRun.aiConversation = currentRun.aiConversation ?? {};
+      currentRun.aiConversation.milestone = milestoneCtx.conversation;
     } catch {
       // fallback above
     }
@@ -566,7 +623,16 @@ async function runYearFlow(options: RunYearFlowOptions): Promise<{ updatedRun: I
 
   if (currentRun.ended) {
     try {
-      const endingNarrative = await generateEndingNarrative(currentRun, world, narrativeCtx);
+      const endingCtx: NarrativeCallContext = {
+        ...narrativeCtx,
+        conversation: currentRun.aiConversation?.ending
+      };
+      if (!useConversationChain) {
+        endingCtx.conversation = undefined;
+      }
+      const endingNarrative = await generateEndingNarrative(currentRun, world, endingCtx);
+      currentRun.aiConversation = currentRun.aiConversation ?? {};
+      currentRun.aiConversation.ending = endingCtx.conversation;
       if (endingNarrative.trim()) {
         currentRun.endingSummary = endingNarrative.trim();
       }
@@ -575,9 +641,116 @@ async function runYearFlow(options: RunYearFlowOptions): Promise<{ updatedRun: I
     }
   }
 
+  currentRun.aiConversation = currentRun.aiConversation ?? {};
+  currentRun.aiConversation.year = narrativeCtx.conversation;
+
   attachTimelineChunk(currentRun, world, narratedChunk);
   const timelineChunk = currentRun.timelineChunk ?? [];
   return { updatedRun: currentRun, timelineChunk };
+}
+
+function buildVisibleTimelineEntry(world: WorldConfig, event: YearEvent): TimelineEntryItem {
+  return toTimelineEntryForStream(event, world);
+}
+
+function revealOneEntryFromReservoir(
+  run: InternalRunState,
+  world: WorldConfig
+): TimelineEntryItem | null {
+  const queued = revealNextTimelineEntry(run);
+  if (queued) return queued;
+  const nextEvent = run.history[run.narrativeReservoir.revealedCount];
+  if (!nextEvent) return null;
+  const mapped = buildVisibleTimelineEntry(world, nextEvent);
+  run.narrativeReservoir.revealedCount += 1;
+  run.narrativeReservoir.revealedAge = mapped.age;
+  run.narrativeReservoir.revealedAgeStage = mapped.ageStage;
+  return mapped;
+}
+
+function syncRunPhase(run: InternalRunState): void {
+  if (run.narrativeReservoir.queued.length > 0) {
+    markRunPhase(run, "ready");
+    return;
+  }
+  if (run.nextMilestoneChoice) {
+    markRunPhase(run, "waiting_decision");
+    return;
+  }
+  if (run.ended) {
+    markRunPhase(run, "ended");
+    return;
+  }
+  markRunPhase(run, "ready");
+}
+
+async function generateSegmentForRun(
+  run: InternalRunState,
+  world: WorldConfig,
+  difficulty: DifficultyConfig,
+  providerConfig: ProviderConfig,
+  apiKey: string,
+  promptPack: Record<string, string>,
+  worldlineSummary: string,
+  factionSummary: string,
+  eventPoolSummary: string,
+  talentHookSummary: string,
+  milestoneEventPool: string[]
+): Promise<GenerationOutput> {
+  if (run.ended) {
+    markRunPhase(run, "ended");
+    return {
+      run,
+      generatedChunk: [],
+      fromAge: run.age,
+      toAge: run.age,
+      rawChunkCount: 0
+    };
+  }
+
+  let rawChunk: YearEvent[] = [];
+  let fromAge = run.age;
+  let toAge = run.age;
+  if (run.nextMilestoneChoice) {
+    markRunPhase(run, "waiting_decision");
+    return {
+      run,
+      generatedChunk: [],
+      fromAge,
+      toAge,
+      rawChunkCount: 0
+    };
+  }
+
+  markRunPhase(run, "generating");
+  const advanced = autoAdvanceToCheckpoint(run, world, difficulty, { milestoneEventPool });
+  rawChunk = advanced.chunk;
+  fromAge = advanced.fromAge;
+  toAge = advanced.toAge;
+
+  const flow = await runYearFlow({
+    branch: "start",
+    rawChunk,
+    currentRun: advanced.updated,
+    world,
+    providerConfig,
+    apiKey,
+    promptPack,
+    worldlineSummary,
+    factionSummary,
+    eventPoolSummary,
+    talentHookSummary
+  });
+
+  queueTimelineEntries(flow.updatedRun, flow.timelineChunk);
+  syncRunPhase(flow.updatedRun);
+  return {
+    run: flow.updatedRun,
+    generatedChunk: flow.timelineChunk,
+    fromAge,
+    toAge,
+    rawChunkCount: rawChunk.length
+  };
 }
 
 async function runStartFlow(
@@ -612,9 +785,6 @@ async function runStartFlow(
     },
     body
   );
-
-  const advanced = autoAdvanceToCheckpoint(run, world, difficulty, { milestoneEventPool });
-  const preNarrationRun = JSON.parse(JSON.stringify(advanced.updated)) as InternalRunState;
   const providerConfig = resolveProviderConfig(env, runtime.cloud);
   const apiKey = resolveApiKey(env);
   if (debugModel) {
@@ -633,36 +803,23 @@ async function runStartFlow(
   const eventPoolSummary = summarizeFactionEvents(factionEvents);
   const talentHookSummary = summarizeTalentHooks(body.selectedCardIds, talentHooks);
 
+  const startedRun = toClientRun(run);
   if (hooks?.onStarted) {
-    const startedRun = toClientRun(preNarrationRun);
     await hooks.onStarted({
       ...startedRun,
       nextMilestoneChoice: undefined
     });
   }
-
-  const { updatedRun, timelineChunk } = await runYearFlow({
-    branch: "start",
-    rawChunk: advanced.chunk,
-    currentRun: advanced.updated,
-    world,
-    providerConfig,
-    apiKey,
-    promptPack: content.promptPack,
-    worldlineSummary,
-    factionSummary,
-    eventPoolSummary,
-    talentHookSummary,
-    onTimeline: hooks?.onTimeline
-  });
-
-  saveRun(updatedRun, body.clientId);
+  const timelineChunk: TimelineEntryChunk = [];
+  markRunPhase(run, "ready");
+  syncRunPhase(run);
+  saveRun(run, body.clientId);
   return {
-    updatedRun,
+    updatedRun: run,
     timelineChunk,
-    rawChunkCount: advanced.chunk.length,
-    fromAge: advanced.fromAge,
-    toAge: advanced.toAge,
+    rawChunkCount: 0,
+    fromAge: run.age,
+    toAge: run.age,
     tuning: allocation
   };
 }
@@ -674,6 +831,7 @@ interface StepFlowResult {
   fromAge: number;
   toAge: number;
   tuning: StartAllocationConfig;
+  action: StepAction;
 }
 
 async function runStepFlow(
@@ -696,51 +854,33 @@ async function runStepFlow(
   if (env.runtimeMode !== deployMode) {
     throw new Error("deploy_mode_env_mismatch");
   }
-  if (run.nextMilestoneChoice && !body.decision) {
-    throw new Error("decision_required");
+
+  const action: StepAction = body.decision ? "decide" : (body.action ?? "consume");
+  if (hasPendingRequestId(run, body.requestId)) {
+    const tuning = resolveGameplayTuning((await loadGameResources(run.worldId)).content);
+    return {
+      updatedRun: run,
+      timelineChunk: [],
+      rawChunkCount: 0,
+      fromAge: run.age,
+      toAge: run.age,
+      tuning: toStartAllocationConfig(tuning),
+      action
+    };
   }
+  rememberRequestId(run, body.requestId);
 
   const resources = await loadGameResources(run.worldId);
   const { content, runtime, worldline, factions, factionEvents, talentHooks } = resources;
   const tuning = resolveGameplayTuning(content);
   const allocation = toStartAllocationConfig(tuning);
-  if (run.ended) {
-    return { updatedRun: run, timelineChunk: [], rawChunkCount: 0, fromAge: run.age, toAge: run.age, tuning: allocation };
+  if (run.ended && run.narrativeReservoir.queued.length === 0) {
+    markRunPhase(run, "ended");
+    return { updatedRun: run, timelineChunk: [], rawChunkCount: 0, fromAge: run.age, toAge: run.age, tuning: allocation, action };
   }
   const world = resolveWorld(content.worlds, run.worldId);
   const difficulty = resolveDifficulty(content.difficulties, run.difficultyId);
   const milestoneEventPool = flattenMilestoneEventPool(factionEvents);
-
-  let updatedRun: InternalRunState;
-  let rawChunk: YearEvent[] = [];
-  let fromAge = run.age;
-  let toAge = run.age;
-
-  if (run.nextMilestoneChoice) {
-    const stepped = applyMilestoneDecisionAndAdvance(
-      run,
-      world,
-      difficulty,
-      body.decision as "safe" | "balanced" | "risky",
-      { milestoneEventPool }
-    );
-    updatedRun = stepped.updated;
-    rawChunk = stepped.chunk;
-    fromAge = stepped.fromAge;
-    toAge = stepped.toAge;
-    if (debugModel) {
-      console.log("[model-debug:step-branch]", { branch: "decision", chunkCount: rawChunk.length });
-    }
-  } else {
-    const advanced = autoAdvanceToCheckpoint(run, world, difficulty, { milestoneEventPool });
-    updatedRun = advanced.updated;
-    rawChunk = advanced.chunk;
-    fromAge = advanced.fromAge;
-    toAge = advanced.toAge;
-    if (debugModel) {
-      console.log("[model-debug:step-branch]", { branch: "advance", chunkCount: rawChunk.length });
-    }
-  }
 
   const providerConfig = resolveProviderConfig(env, runtime.cloud);
   const apiKey = resolveApiKey(env);
@@ -758,32 +898,115 @@ async function runStepFlow(
   const worldlineSummary = summarizeWorldline(worldline);
   const factionSummary = summarizeFactions(factions);
   const eventPoolSummary = summarizeFactionEvents(factionEvents);
-  const selectedCardIds = updatedRun.cards.map((c) => c.id);
+  const selectedCardIds = run.cards.map((c) => c.id);
   const talentHookSummary = summarizeTalentHooks(selectedCardIds, talentHooks);
+  let generatedChunk: TimelineEntryChunk = [];
+  let fromAge = run.age;
+  let toAge = run.age;
+  let rawChunkCount = 0;
 
-  const flow = await runYearFlow({
-    branch: "step",
-    rawChunk,
-    currentRun: updatedRun,
-    world,
-    providerConfig,
-    apiKey,
-    promptPack: content.promptPack,
-    worldlineSummary,
-    factionSummary,
-    eventPoolSummary,
-    talentHookSummary,
-    onTimeline
-  });
+  if (action === "decide") {
+    if (run.narrativeReservoir.queued.length > 0) {
+      // Decision flow should render immediately; stale queued entries would block reveal order.
+      run.narrativeReservoir.queued = [];
+    }
+    const decisionChoice = run.nextMilestoneChoice;
+    if (!decisionChoice) {
+      syncRunPhase(run);
+      saveRun(run, clientId);
+      return {
+        updatedRun: run,
+        timelineChunk: [],
+        rawChunkCount: 0,
+        fromAge: run.age,
+        toAge: run.age,
+        tuning: allocation,
+        action
+      };
+    }
+    if (typeof body.decisionAge === "number" && body.decisionAge !== decisionChoice.age) {
+      syncRunPhase(run);
+      saveRun(run, clientId);
+      return {
+        updatedRun: run,
+        timelineChunk: [],
+        rawChunkCount: 0,
+        fromAge: run.age,
+        toAge: run.age,
+        tuning: allocation,
+        action
+      };
+    }
+    if (!body.decision) {
+      throw new Error("decision_required");
+    }
+    const stepped = applyMilestoneDecisionAndAdvance(
+      run,
+      world,
+      difficulty,
+      body.decision as DecisionType,
+      { milestoneEventPool }
+    );
+    if (debugModel) {
+      console.log("[model-debug:step-branch]", { branch: "decision", chunkCount: stepped.chunk.length });
+    }
+    const flow = await runYearFlow({
+      branch: "step",
+      rawChunk: stepped.chunk,
+      currentRun: stepped.updated,
+      world,
+      providerConfig,
+      apiKey,
+      promptPack: content.promptPack,
+      worldlineSummary,
+      factionSummary,
+      eventPoolSummary,
+      talentHookSummary
+    });
+    generatedChunk = flow.timelineChunk;
+    fromAge = stepped.fromAge;
+    toAge = stepped.toAge;
+    rawChunkCount = stepped.chunk.length;
+  } else if (run.narrativeReservoir.queued.length === 0 && !run.nextMilestoneChoice && !run.ended) {
+    const generated = await generateSegmentForRun(
+      run,
+      world,
+      difficulty,
+      providerConfig,
+      apiKey,
+      content.promptPack,
+      worldlineSummary,
+      factionSummary,
+      eventPoolSummary,
+      talentHookSummary,
+      milestoneEventPool
+    );
+    generatedChunk = generated.generatedChunk;
+    fromAge = generated.fromAge;
+    toAge = generated.toAge;
+    rawChunkCount = generated.rawChunkCount;
+  }
 
-  saveRun(flow.updatedRun, clientId);
+  const timelineChunk: TimelineEntryChunk = [];
+  const revealed = revealOneEntryFromReservoir(run, world);
+  if (revealed) {
+    timelineChunk.push(revealed);
+    if (onTimeline) {
+      await onTimeline(revealed, 0, 1);
+    }
+  }
+
+  syncRunPhase(run);
+
+  saveRun(run, clientId);
   return {
-    updatedRun: flow.updatedRun,
-    timelineChunk: flow.timelineChunk,
-    rawChunkCount: rawChunk.length,
+    updatedRun: run,
+    timelineChunk,
+    rawChunkCount: rawChunkCount || generatedChunk.length,
     fromAge,
     toAge,
-    tuning: allocation
+    tuning: allocation,
+    action
   };
 }
 

@@ -30,7 +30,8 @@ export function getDefaultRuntimeConfig(): RuntimeConfig {
       apiPath: process.env.DEFAULT_PROVIDER_API_PATH ?? "/chat/completions",
       temperature: parseNum(process.env.DEFAULT_PROVIDER_TEMPERATURE, 0.9),
       maxTokens: parseNum(process.env.DEFAULT_PROVIDER_MAX_TOKENS, 1824),
-      timeoutMs: parseNum(process.env.DEFAULT_PROVIDER_TIMEOUT_MS, 45000)
+      timeoutMs: parseNum(process.env.DEFAULT_PROVIDER_TIMEOUT_MS, 45000),
+      reasoningEffort: (process.env.DEFAULT_PROVIDER_REASONING_EFFORT?.trim().toLowerCase() as "minimal" | "low" | "medium" | "high" | undefined) ?? "minimal"
     }
   };
 }
@@ -56,7 +57,8 @@ export async function writeRuntimeConfig(payload: AdminConfigPayload): Promise<R
       apiPath: payload.runtime.cloud.apiPath.trim() || "/chat/completions",
       temperature: payload.runtime.cloud.temperature,
       maxTokens: payload.runtime.cloud.maxTokens,
-      timeoutMs: payload.runtime.cloud.timeoutMs
+      timeoutMs: payload.runtime.cloud.timeoutMs,
+      reasoningEffort: payload.runtime.cloud.reasoningEffort ?? "minimal"
     }
   };
   await fs.writeFile(configPath, JSON.stringify(normalized, null, 2), "utf8");

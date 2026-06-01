@@ -7,6 +7,7 @@ import type {
   ProviderConfig,
   ProviderLimits,
   RunState,
+  StepAction,
   StartAllocationConfig,
   StartRunResponse,
   StepRunResponse,
@@ -159,7 +160,10 @@ export async function startRun(payload: {
 
 export async function stepRun(payload: {
   runId: string;
-  decision: DecisionType;
+  action?: StepAction;
+  decision?: DecisionType;
+  decisionAge?: number;
+  requestId?: string;
 }): Promise<StepRunResponse> {
   const res = await fetch(`${API_BASE}/api/game/step`, {
     method: "POST",
@@ -242,7 +246,10 @@ export async function startRunStream(
 export async function stepRunStream(
   payload: {
     runId: string;
-    decision: DecisionType;
+    action?: StepAction;
+    decision?: DecisionType;
+    decisionAge?: number;
+    requestId?: string;
   },
   onEvent: (event: GameStreamEvent) => void | Promise<void>
 ): Promise<void> {

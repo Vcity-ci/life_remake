@@ -7,6 +7,7 @@ import type {
   DifficultyConfig,
   GameplayTuning,
   MilestoneChoice,
+  RunPhase,
   RunState,
   StartRunRequest,
   StatKey,
@@ -26,6 +27,14 @@ interface EngineContext {
 
 type Rng = () => number;
 type CoreStatKey = "intelligence" | "charisma" | "family" | "fortune";
+interface NarrativeReservoirState {
+  queued: TimelineEntry[];
+  revealedCount: number;
+  revealedAge: number;
+  revealedAgeStage: AgeThreshold;
+  phase: RunPhase;
+  pendingRequestIds: string[];
+}
 const coreStatKeys: CoreStatKey[] = ["intelligence", "charisma", "family", "fortune"];
 const allStatKeys: StatKey[] = [...coreStatKeys, "physique"];
 const negativeStatLabel: Record<CoreStatKey, string> = {
@@ -41,6 +50,30 @@ export interface InternalRunState extends RunState {
   negativeStreaks: Record<CoreStatKey, number>;
   yearsSinceLastMilestone: number;
   tuningSnapshot: GameplayTuning;
+  aiConversation?: {
+    year?: {
+      systemHash: string;
+      headCore: string;
+      headMemory: string;
+      history: Array<{ role: "user" | "assistant"; content: string }>;
+      archive: Array<{ user: string; assistant: string }>;
+    };
+    milestone?: {
+      systemHash: string;
+      headCore: string;
+      headMemory: string;
+      history: Array<{ role: "user" | "assistant"; content: string }>;
+      archive: Array<{ user: string; assistant: string }>;
+    };
+    ending?: {
+      systemHash: string;
+      headCore: string;
+      headMemory: string;
+      history: Array<{ role: "user" | "assistant"; content: string }>;
+      archive: Array<{ user: string; assistant: string }>;
+    };
+  };
+  narrativeReservoir: NarrativeReservoirState;
 }
 
 const defaultAgeThresholds: AgeThreshold[] = [
@@ -83,6 +116,13 @@ function pickMilestoneSeedEvent(rng: Rng, pool: string[]): string {
   return pickOne(rng, pool);
 }
 
+function shouldTriggerRandomMilestone(run: InternalRunState, tuning: GameplayTuning, rng: Rng): boolean {
+  if (run.age < tuning.milestone.minEligibleAge) return false;
+  const rate = milestoneTriggerRate(run.ageStage.id, tuning);
+  const guaranteed = run.yearsSinceLastMilestone >= tuning.milestone.guaranteeYears;
+  return guaranteed || rng() < rate;
+}
+
 function resolveAgeThresholds(world: WorldConfig): AgeThreshold[] {
   if (world.ageThresholds && world.ageThresholds.length > 0) {
     return [...world.ageThresholds].sort((a, b) => a.min - b.min);
@@ -94,6 +134,10 @@ function resolveAgeStage(age: number, world: WorldConfig): AgeThreshold {
   const thresholds = resolveAgeThresholds(world);
   const found = thresholds.find((t) => age >= t.min && age <= t.max);
   return found ?? thresholds[thresholds.length - 1];
+}
+
+export function resolveAgeStageByWorld(world: WorldConfig, age: number): AgeThreshold {
+  return resolveAgeStage(age, world);
 }
 
 function validateStats(stats: Stats): void {
@@ -664,6 +708,15 @@ export function createRun(ctx: EngineContext, req: StartRunRequest): InternalRun
     },
     yearsSinceLastMilestone: 0,
     tuningSnapshot: ctx.tuning,
+    aiConversation: {},
+    narrativeReservoir: {
+      queued: [],
+      revealedCount: 0,
+      revealedAge: 0,
+      revealedAgeStage: resolveAgeStage(0, ctx.world),
+      phase: "generating",
+      pendingRequestIds: []
+    },
     seed,
     endAge
   };
@@ -684,7 +737,7 @@ export function autoAdvanceToCheckpoint(
   const milestoneEventPool = options?.milestoneEventPool ?? [];
   const tuning = run.tuningSnapshot ?? createDefaultGameplayTuning();
 
-  const MAX_YEARS_PER_CHUNK = tuning.pacing.maxYearsPerChunk;
+  const SEGMENT_TARGET_YEARS = 1;
   while (!run.ended && !run.nextMilestoneChoice) {
     run.age += 1;
     const rng = seedrandom(`${run.seed}:${run.age}:${run.history.length}`);
@@ -743,19 +796,16 @@ export function autoAdvanceToCheckpoint(
       break;
     }
 
-    const yearsWithoutMilestone = run.yearsSinceLastMilestone + 1;
-    const milestoneEligible = run.age >= tuning.milestone.minEligibleAge;
-    const forceMilestone = milestoneEligible && yearsWithoutMilestone >= tuning.milestone.guaranteeYears;
-    const milestoneByChance = milestoneEligible && rng() < milestoneTriggerRate(run.ageStage.id, tuning);
-    if (forceMilestone || milestoneByChance) {
+    const milestoneByRandom = shouldTriggerRandomMilestone(run, tuning, rng);
+    if (milestoneByRandom) {
       const seedEvent = pickMilestoneSeedEvent(rng, milestoneEventPool);
       run.nextMilestoneChoice = generateMilestoneChoice(run.age, seedEvent, tuning);
       run.yearsSinceLastMilestone = 0;
       break;
     }
-    run.yearsSinceLastMilestone = yearsWithoutMilestone;
+    run.yearsSinceLastMilestone += 1;
 
-    if (chunk.length >= MAX_YEARS_PER_CHUNK) {
+    if (chunk.length >= SEGMENT_TARGET_YEARS) {
       break;
     }
 
@@ -774,7 +824,7 @@ export function applyMilestoneDecisionAndAdvance(
   world: WorldConfig,
   difficulty: DifficultyConfig,
   decision: DecisionType,
-  options?: { milestoneEventPool?: string[] }
+  _options?: { milestoneEventPool?: string[] }
 ): { updated: InternalRunState; fromAge: number; toAge: number; chunk: YearEvent[]; decisionEvent: YearEvent } {
   if (!run.nextMilestoneChoice) {
     throw new Error("当前没有可用的关键抉择");
@@ -838,12 +888,11 @@ export function applyMilestoneDecisionAndAdvance(
     };
   }
 
-  const advanced = autoAdvanceToCheckpoint(run, world, difficulty, options);
   return {
-    updated: advanced.updated,
+    updated: run,
     fromAge: decisionEvent.age,
-    toAge: advanced.toAge,
-    chunk: [decisionEvent, ...advanced.chunk],
+    toAge: run.age,
+    chunk: [decisionEvent],
     decisionEvent
   };
 }
@@ -855,13 +904,68 @@ export function toClientRun(run: InternalRunState): RunState {
     negativeStreaks: _negativeStreaks,
     yearsSinceLastMilestone: _yearsSinceLastMilestone,
     tuningSnapshot: _tuningSnapshot,
+    aiConversation: _aiConversation,
+    narrativeReservoir: _narrativeReservoir,
     ...clientRun
   } = run;
-  return clientRun;
+  const shown = _narrativeReservoir.revealedCount;
+  const revealed = run.history.slice(0, shown);
+  const visibleAge = _narrativeReservoir.revealedAge;
+  const visibleStage = _narrativeReservoir.revealedAgeStage;
+  return {
+    ...clientRun,
+    history: revealed,
+    age: visibleAge,
+    ageStage: visibleStage,
+    phase: run.narrativeReservoir.phase,
+    bufferSize: run.narrativeReservoir.queued.length,
+    revealedAge: visibleAge,
+    revealedCount: shown
+  };
 }
 
 export function attachTimelineChunk(run: InternalRunState, world: WorldConfig, chunk: YearEvent[]): InternalRunState {
   const mapped = chunk.map((event) => toTimelineEntry(event, resolveAgeStage(event.age, world)));
   run.timelineChunk = mapped.filter((item) => item.narrative.trim().length > 0);
   return run;
+}
+
+export function queueTimelineEntries(run: InternalRunState, entries: TimelineEntry[]): void {
+  if (entries.length === 0) return;
+  if (run.narrativeReservoir.revealedCount === 0) {
+    const first = entries[0];
+    if (first) {
+      run.narrativeReservoir.revealedAge = first.age - 1;
+      run.narrativeReservoir.revealedAgeStage = first.ageStage;
+    }
+  }
+  run.narrativeReservoir.queued.push(...entries);
+}
+
+export function revealNextTimelineEntry(run: InternalRunState): TimelineEntry | null {
+  const next = run.narrativeReservoir.queued.shift();
+  if (!next) return null;
+  run.narrativeReservoir.revealedCount = Math.min(run.history.length, run.narrativeReservoir.revealedCount + 1);
+  run.narrativeReservoir.revealedAge = next.age;
+  run.narrativeReservoir.revealedAgeStage = next.ageStage;
+  return next;
+}
+
+export function markRunPhase(run: InternalRunState, phase: RunPhase): void {
+  run.narrativeReservoir.phase = phase;
+}
+
+export function hasPendingRequestId(run: InternalRunState, requestId?: string): boolean {
+  if (!requestId?.trim()) return false;
+  return run.narrativeReservoir.pendingRequestIds.includes(requestId.trim());
+}
+
+export function rememberRequestId(run: InternalRunState, requestId?: string): void {
+  if (!requestId?.trim()) return;
+  const normalized = requestId.trim();
+  if (run.narrativeReservoir.pendingRequestIds.includes(normalized)) return;
+  run.narrativeReservoir.pendingRequestIds.push(normalized);
+  if (run.narrativeReservoir.pendingRequestIds.length > 20) {
+    run.narrativeReservoir.pendingRequestIds = run.narrativeReservoir.pendingRequestIds.slice(-20);
+  }
 }

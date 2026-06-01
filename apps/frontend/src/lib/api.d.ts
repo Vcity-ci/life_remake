@@ -1,4 +1,4 @@
-import type { AdminConfigPayload, ContentBundle, DecisionType, DifficultyConfig, GameEnvConfigResponse, ProviderConfig, ProviderLimits, RunState, StartAllocationConfig, StartRunResponse, StepRunResponse, WorldConfig, BackgroundCard } from "@reroll/shared";
+import type { AdminConfigPayload, ContentBundle, DecisionType, DifficultyConfig, GameEnvConfigResponse, ProviderConfig, ProviderLimits, RunState, StepAction, StartAllocationConfig, StartRunResponse, StepRunResponse, WorldConfig, BackgroundCard } from "@reroll/shared";
 export declare class ApiError extends Error {
     status: number;
     code?: string;
@@ -78,7 +78,10 @@ export declare function startRun(payload: {
 }): Promise<StartRunResponse>;
 export declare function stepRun(payload: {
     runId: string;
-    decision: DecisionType;
+    action?: StepAction;
+    decision?: DecisionType;
+    decisionAge?: number;
+    requestId?: string;
 }): Promise<StepRunResponse>;
 export declare function startRunStream(payload: {
     clientId: string;
@@ -91,5 +94,8 @@ export declare function startRunStream(payload: {
 }, onEvent: (event: GameStreamEvent) => void | Promise<void>): Promise<void>;
 export declare function stepRunStream(payload: {
     runId: string;
-    decision: DecisionType;
+    action?: StepAction;
+    decision?: DecisionType;
+    decisionAge?: number;
+    requestId?: string;
 }, onEvent: (event: GameStreamEvent) => void | Promise<void>): Promise<void>;

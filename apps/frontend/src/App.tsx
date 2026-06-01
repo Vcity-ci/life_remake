@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import type { BackgroundCard, DecisionType, ProviderConfig, ProviderLimits, RunState, StartAllocationConfig, StatKey, Stats, TimelineEntry } from "@reroll/shared";
+import type { BackgroundCard, DecisionType, ProviderConfig, ProviderLimits, RunPhase, RunState, StartAllocationConfig, StatKey, Stats, StepAction, TimelineEntry } from "@reroll/shared";
 import { AdminPanel } from "./components/AdminPanel";
 import { ApiError, fetchBootstrap, saveGameEnvironment, startRunStream, stepRunStream, type GameStreamEvent } from "./lib/api";
 import { getOrCreateClientId, readLocalProviderConfig, writeLocalProviderConfig } from "./lib/localConfig";
@@ -37,6 +37,8 @@ interface PendingDecisionItem {
   choiceLabel: string;
   choiceDescription: string;
 }
+
+type MilestoneChoice = NonNullable<RunState["nextMilestoneChoice"]>;
 
 const statLabels: Record<StatKey, string> = {
   intelligence: "智力",
@@ -111,6 +113,11 @@ function endingBadgeText(run: RunState): string {
   return "尘世落幕";
 }
 
+function makeStepRequestId(runId: string, action: StepAction, nonce: number, decision?: DecisionType): string {
+  const decisionPart = decision ?? "none";
+  return `${runId}:${action}:${decisionPart}:${nonce}`;
+}
+
 export default function App(): React.JSX.Element {
   const [bootstrap, setBootstrap] = useState<BootstrapState | null>(null);
   const [runtimeMode, setRuntimeMode] = useState<"cloud" | "local">("local");
@@ -124,12 +131,21 @@ export default function App(): React.JSX.Element {
   const [showSettings, setShowSettings] = useState(false);
   const [envReady, setEnvReady] = useState(false);
   const [timeline, setTimeline] = useState<TimelineEntry[]>([]);
+  const [timelineBuffer, setTimelineBuffer] = useState<TimelineEntry[]>([]);
   const [decisionHistory, setDecisionHistory] = useState<DecisionHistoryItem[]>([]);
   const [showEndingModal, setShowEndingModal] = useState(false);
   const [showBusyModal, setShowBusyModal] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
   const timelineRef = useRef<HTMLDivElement | null>(null);
   const pendingDecisionRef = useRef<PendingDecisionItem | null>(null);
+  const timelineBufferRef = useRef<TimelineEntry[]>([]);
+  const pendingAdvanceCountRef = useRef(0);
+  const pendingRunAfterBufferRef = useRef<RunState | null>(null);
+  const pendingMilestoneRef = useRef<MilestoneChoice | null>(null);
+  const isGeneratingRef = useRef(false);
+  const runRef = useRef<RunState | null>(null);
+  const requestNonceRef = useRef(0);
   const [flippedCards, setFlippedCards] = useState<Record<string, boolean>>({});
 
   const [localApiKey, setLocalApiKey] = useState("");
@@ -140,7 +156,8 @@ export default function App(): React.JSX.Element {
     apiPath: "/chat/completions",
     temperature: 0.9,
     maxTokens: 1824,
-    timeoutMs: 45000
+    timeoutMs: 45000,
+    reasoningEffort: "minimal"
   });
 
   const clientId = useMemo(() => getOrCreateClientId(), []);
@@ -180,6 +197,18 @@ export default function App(): React.JSX.Element {
     timelineRef.current.scrollTop = timelineRef.current.scrollHeight;
   }, [timeline]);
 
+  useEffect(() => {
+    timelineBufferRef.current = timelineBuffer;
+  }, [timelineBuffer]);
+
+  useEffect(() => {
+    isGeneratingRef.current = isGenerating;
+  }, [isGenerating]);
+
+  useEffect(() => {
+    runRef.current = run;
+  }, [run]);
+
   const canConfirmEnv = useMemo(() => {
     if (!bootstrap) return false;
     if (bootstrap.deployMode === "local") {
@@ -216,6 +245,197 @@ export default function App(): React.JSX.Element {
     () => (bootstrap ? Math.max(0, bootstrap.talentPointTotal - usedTalentPoints) : 0),
     [bootstrap, usedTalentPoints]
   );
+
+  function resetPendingFlowState(): void {
+    pendingAdvanceCountRef.current = 0;
+    pendingRunAfterBufferRef.current = null;
+    pendingMilestoneRef.current = null;
+  }
+
+  function enqueueTimelineEntry(entry: TimelineEntry): void {
+    setTimelineBuffer((prev) => {
+      if (prev.some((item) => timelineKey(item) === timelineKey(entry))) return prev;
+      return [...prev, entry];
+    });
+  }
+
+  function commitRunWithBufferedMilestone(baseRun: RunState): void {
+    const mergedPhase = phaseOf(baseRun);
+    setRun(baseRun);
+    pendingRunAfterBufferRef.current = null;
+    pendingMilestoneRef.current = null;
+    if (mergedPhase === "ended") {
+      setStatus("本局结束。");
+      setShowEndingModal(true);
+    } else if (baseRun.nextMilestoneChoice && mergedPhase === "waiting_decision") {
+      setStatus("新的抉择出现。");
+    } else {
+      setStatus("命运已揭露，继续推进。");
+    }
+  }
+
+  function phaseOf(runState: RunState | null): RunPhase {
+    if (!runState) return "ready";
+    return (runState.phase ?? (runState.ended ? "ended" : "ready")) as RunPhase;
+  }
+
+  function currentDisplayedAge(runState: RunState | null): number {
+    const lastTimelineAge = timeline.length > 0 ? timeline[timeline.length - 1]?.age : undefined;
+    if (typeof lastTimelineAge === "number") return lastTimelineAge;
+    return runState?.revealedAge ?? runState?.age ?? 0;
+  }
+
+  function isAdvanceEntryForAge(entry: TimelineEntry | undefined, age: number): boolean {
+    if (!entry) return false;
+    if (entry.age === age + 1) return true;
+    if (entry.age === age && entry.tags.includes("milestone")) return true;
+    return false;
+  }
+
+  function canAdvance(runState: RunState | null): boolean {
+    if (!runState) return false;
+    const runPhase = phaseOf(runState);
+    if (runPhase !== "ready") return false;
+    const nextEntry = timelineBufferRef.current[0];
+    const age = currentDisplayedAge(runState);
+    if (isAdvanceEntryForAge(nextEntry, age)) return true;
+    return timelineBufferRef.current.length === 0;
+  }
+
+  function recordPendingDecisionFromDisplayedYears(displayed: TimelineEntry[]): void {
+    const pending = pendingDecisionRef.current;
+    if (!pending) return;
+    const milestoneEntry = displayed.find((item) => item.tags.includes("milestone"));
+    if (!milestoneEntry) return;
+    const runId = runRef.current?.runId ?? "run";
+    setDecisionHistory((prev) => ([
+      ...prev,
+      {
+        id: `${runId}-${pending.age}-${pending.choiceId}-${prev.length}`,
+        age: pending.age,
+        ageStageLabel: pending.ageStageLabel,
+        background: pending.background,
+        choiceId: pending.choiceId,
+        choiceLabel: pending.choiceLabel,
+        choiceDescription: pending.choiceDescription,
+        rollLabels: extractDeltaLabels(milestoneEntry)
+      }
+    ]));
+    pendingDecisionRef.current = null;
+  }
+
+  function consumeBufferedYears(count: number): number {
+    if (count <= 0) return 0;
+    const current = timelineBufferRef.current;
+    if (current.length === 0) return 0;
+    const takeCount = Math.min(count, current.length);
+    const take = current.slice(0, takeCount);
+    const remaining = current.slice(takeCount);
+    timelineBufferRef.current = remaining;
+    setTimelineBuffer(remaining);
+    if (take.length > 0) {
+      setTimeline((prev) => [...prev, ...take]);
+      recordPendingDecisionFromDisplayedYears(take);
+    }
+    return take.length;
+  }
+
+  function flushBufferedYears(): void {
+    if (pendingAdvanceCountRef.current <= 0) {
+      if (timelineBufferRef.current.length > 0) {
+        setStatus("命运已抵达，点击“推进年份”揭露。");
+        return;
+      }
+      if (!isGeneratingRef.current) {
+        const pendingRun = pendingRunAfterBufferRef.current;
+        if (pendingRun) {
+          commitRunWithBufferedMilestone(pendingRun);
+        }
+      }
+      return;
+    }
+    const consumed = consumeBufferedYears(pendingAdvanceCountRef.current);
+    if (consumed > 0) {
+      pendingAdvanceCountRef.current = Math.max(0, pendingAdvanceCountRef.current - consumed);
+    }
+    if (pendingAdvanceCountRef.current > 0) {
+      setStatus("等待命运流转中...");
+      return;
+    }
+    if (timelineBufferRef.current.length > 0) {
+      setStatus("命运已抵达，点击“推进年份”揭露。");
+    } else if (isGeneratingRef.current) {
+      setStatus("揭露命运中...");
+    } else {
+      const pendingRun = pendingRunAfterBufferRef.current;
+      if (pendingRun) {
+        commitRunWithBufferedMilestone(pendingRun);
+      }
+    }
+  }
+
+  async function runStepGeneration(decision?: DecisionType): Promise<void> {
+    const currentRun = runRef.current;
+    if (!currentRun) return;
+    if (isGeneratingRef.current) return;
+    isGeneratingRef.current = true;
+    setIsGenerating(true);
+    let timelineEmitted = false;
+    try {
+      await stepRunStream(
+        decision
+          ? {
+              runId: currentRun.runId,
+              action: "decide",
+              decision,
+              decisionAge: currentRun.nextMilestoneChoice?.age ?? currentRun.age,
+              requestId: makeStepRequestId(
+                currentRun.runId,
+                "decide",
+                ++requestNonceRef.current,
+                decision
+              )
+            }
+          : {
+              runId: currentRun.runId,
+              action: "consume",
+              requestId: makeStepRequestId(
+                currentRun.runId,
+                "consume",
+                ++requestNonceRef.current
+              )
+            },
+        async (event: GameStreamEvent) => {
+          if (event.type === "timeline") {
+            timelineEmitted = true;
+            enqueueTimelineEntry(event.data.entry);
+            setStatus(`揭露命运中...(${event.data.index + 1}/${event.data.total})`);
+            flushBufferedYears();
+            return;
+          }
+          if (event.type === "milestone") {
+            pendingMilestoneRef.current = event.data;
+            return;
+          }
+          if (event.type === "done") {
+            pendingRunAfterBufferRef.current = event.data.run;
+            flushBufferedYears();
+            return;
+          }
+          if (event.type === "error") {
+            throw new Error(event.data.message);
+          }
+        }
+      );
+    } finally {
+      if (!timelineEmitted && pendingAdvanceCountRef.current > 0) {
+        pendingAdvanceCountRef.current = Math.max(0, pendingAdvanceCountRef.current - 1);
+      }
+      isGeneratingRef.current = false;
+      setIsGenerating(false);
+      flushBufferedYears();
+    }
+  }
 
   function changeStat(key: StatKey, delta: number): void {
     setStats((prev) => {
@@ -266,9 +486,12 @@ export default function App(): React.JSX.Element {
 
   async function onStart(): Promise<void> {
     if (!bootstrap) return;
-    if (isStreaming) return;
+    if (isStreaming || isGenerating) return;
     try {
       setIsStreaming(true);
+      resetPendingFlowState();
+      setTimelineBuffer([]);
+      timelineBufferRef.current = [];
       setStatus("人生推进中...");
       await startRunStream({
         clientId,
@@ -285,32 +508,42 @@ export default function App(): React.JSX.Element {
         }
         if (event.type === "started") {
           setRun(event.data.run);
+          runRef.current = event.data.run;
           setTimeline([]);
+          setTimelineBuffer([]);
+          timelineBufferRef.current = [];
           setDecisionHistory([]);
           pendingDecisionRef.current = null;
-          setStatus("角色已开局，正在生成年份叙事...");
+          setStatus("角色已开局，点击“推进年份”开始流转。");
           return;
         }
         if (event.type === "timeline") {
-          setTimeline((prev) => [...prev, event.data.entry]);
-          setStatus(`生成年份叙事中...(${event.data.index + 1}/${event.data.total})`);
+          enqueueTimelineEntry(event.data.entry);
+          setStatus(`揭露命运中...(${event.data.index + 1}/${event.data.total})`);
+          flushBufferedYears();
           return;
         }
         if (event.type === "milestone") {
-          setRun((prev) => prev ? { ...prev, nextMilestoneChoice: event.data } : prev);
-          setStatus("新的抉择出现。");
+          pendingMilestoneRef.current = event.data;
           return;
         }
         if (event.type === "done") {
-          setRun(event.data.run);
-          if (event.data.run.ended) {
+          const mergedRun = event.data.run;
+          const mergedPhase = phaseOf(mergedRun);
+          setRun(mergedRun);
+          runRef.current = mergedRun;
+          if (timelineBufferRef.current.length > 0) {
+            setStatus("命运已抵达，点击“推进年份”揭露。");
+          } else if (mergedPhase === "ended") {
             setStatus("本局结束。");
             setShowEndingModal(true);
-          } else if (event.data.run.nextMilestoneChoice) {
-            setStatus("岁月流逝中，新的抉择正在逼近。");
+          } else if (mergedRun.nextMilestoneChoice && mergedPhase === "waiting_decision") {
+            setStatus("新的抉择出现。");
           } else {
-            setStatus("年份推进完成，继续推进。");
+            setStatus("已就绪，点击“推进年份”。");
           }
+          pendingRunAfterBufferRef.current = null;
+          pendingMilestoneRef.current = null;
           return;
         }
         if (event.type === "error") {
@@ -332,58 +565,44 @@ export default function App(): React.JSX.Element {
   async function onAdvance(): Promise<void> {
     if (!run) return;
     if (isStreaming) return;
+    if (!canAdvance(run)) return;
+    const runPhase = phaseOf(run);
+    if (runPhase === "ended") {
+      setStatus("本局已结束。");
+      return;
+    }
+    if (run.nextMilestoneChoice && runPhase === "waiting_decision" && timelineBufferRef.current.length === 0) {
+      setStatus("请先完成当前抉择。");
+      return;
+    }
     try {
-      setIsStreaming(true);
-      setStatus("继续推进年份中...");
-      await stepRunStream({ runId: run.runId, decision: "balanced" }, async (event: GameStreamEvent) => {
-        if (event.type === "meta") {
-          return;
-        }
-        if (event.type === "timeline") {
-          setTimeline((prev) => [...prev, event.data.entry]);
-          setStatus(`生成年份叙事中...(${event.data.index + 1}/${event.data.total})`);
-          return;
-        }
-        if (event.type === "milestone") {
-          setRun((prev) => prev ? { ...prev, nextMilestoneChoice: event.data } : prev);
-          setStatus("新的抉择出现。");
-          return;
-        }
-        if (event.type === "done") {
-          setRun(event.data.run);
-          if (event.data.run.ended) {
-            setStatus("本局结束。");
-            setShowEndingModal(true);
-          } else if (event.data.run.nextMilestoneChoice) {
-            setStatus("新的抉择出现。");
-          } else {
-            setStatus("年份推进完成，继续推进。");
-          }
-          return;
-        }
-        if (event.type === "error") {
-          throw new Error(event.data.message);
-        }
-      });
+      setStatus("推进年份中...");
+      pendingAdvanceCountRef.current += 1;
+      flushBufferedYears();
+      if (pendingAdvanceCountRef.current === 0) return;
+      if (isGeneratingRef.current) {
+        setStatus("等待命运流转中...");
+        return;
+      }
+      await runStepGeneration();
     } catch (error) {
+      pendingAdvanceCountRef.current = Math.max(0, pendingAdvanceCountRef.current - 1);
       if (isServerBusyError(error)) {
         setShowBusyModal(true);
         setStatus("服务器繁忙，请稍后重试。");
       } else {
         setStatus(`推进失败：${String(error)}`);
       }
-    } finally {
-      setIsStreaming(false);
     }
   }
 
   async function onDecision(decision: DecisionType): Promise<void> {
     if (!run) return;
-    if (isStreaming) return;
+    if (isStreaming || isGeneratingRef.current) return;
     const choice = run.nextMilestoneChoice?.options.find((opt) => opt.id === decision);
     if (run.nextMilestoneChoice && choice) {
       pendingDecisionRef.current = {
-        age: run.age,
+        age: run.nextMilestoneChoice.age ?? run.age,
         ageStageLabel: run.ageStage.label,
         background: run.nextMilestoneChoice?.background ?? "",
         choiceId: decision,
@@ -394,60 +613,21 @@ export default function App(): React.JSX.Element {
       pendingDecisionRef.current = null;
     }
     try {
-      setIsStreaming(true);
+      resetPendingFlowState();
       setStatus("命运流转中...");
-      await stepRunStream({ runId: run.runId, decision }, async (event: GameStreamEvent) => {
-        if (event.type === "meta") {
-          return;
-        }
-        if (event.type === "timeline") {
-          setTimeline((prev) => [...prev, event.data.entry]);
-          const pending = pendingDecisionRef.current;
-          if (pending && event.data.entry.tags.includes("milestone")) {
-            setDecisionHistory((prev) => ([
-              ...prev,
-              {
-                id: `${run.runId}-${pending.age}-${pending.choiceId}-${prev.length}`,
-                age: pending.age,
-                ageStageLabel: pending.ageStageLabel,
-                background: pending.background,
-                choiceId: pending.choiceId,
-                choiceLabel: pending.choiceLabel,
-                choiceDescription: pending.choiceDescription,
-                rollLabels: extractDeltaLabels(event.data.entry)
-              }
-            ]));
-            pendingDecisionRef.current = null;
-          }
-          setStatus(`生成年份叙事中...(${event.data.index + 1}/${event.data.total})`);
-          return;
-        }
-        if (event.type === "milestone") {
-          setRun((prev) => prev ? { ...prev, nextMilestoneChoice: event.data } : prev);
-          setStatus("新的抉择出现。");
-          return;
-        }
-        if (event.type === "done") {
-          setRun(event.data.run);
-          pendingDecisionRef.current = null;
-          setStatus(event.data.run.ended ? "本局结束。" : "时间继续向前，等待下一个分岔点。");
-          if (event.data.run.ended) setShowEndingModal(true);
-          return;
-        }
-        if (event.type === "error") {
-          throw new Error(event.data.message);
-        }
-      });
+      pendingAdvanceCountRef.current = 1;
+      await runStepGeneration(decision);
+      flushBufferedYears();
+      pendingDecisionRef.current = null;
     } catch (error) {
       pendingDecisionRef.current = null;
+      pendingAdvanceCountRef.current = Math.max(0, pendingAdvanceCountRef.current - 1);
       if (isServerBusyError(error)) {
         setShowBusyModal(true);
         setStatus("服务器繁忙，请稍后重试。");
       } else {
         setStatus(`推进失败：${String(error)}`);
       }
-    } finally {
-      setIsStreaming(false);
     }
   }
 
@@ -457,7 +637,10 @@ export default function App(): React.JSX.Element {
     setFlippedCards({});
     setStats(defaultStats);
     setTimeline([]);
+    setTimelineBuffer([]);
+    timelineBufferRef.current = [];
     setDecisionHistory([]);
+    resetPendingFlowState();
     pendingDecisionRef.current = null;
     setShowEndingModal(false);
     setEnvReady(false);
@@ -541,7 +724,7 @@ export default function App(): React.JSX.Element {
             </div>
           </div>
 
-          <button disabled={!canStart || isStreaming} onClick={() => void onStart()}>
+          <button disabled={!canStart || isStreaming || isGenerating} onClick={() => void onStart()}>
             开始游戏
           </button>
           <p className="status">{status}</p>
@@ -611,12 +794,12 @@ export default function App(): React.JSX.Element {
             )}
           </section>
 
-          {run.nextMilestoneChoice ? (
+          {run.nextMilestoneChoice && phaseOf(run) === "waiting_decision" ? (
             <div>
               <p>{run.nextMilestoneChoice.background ?? "你来到抉择时刻："}</p>
               <div className="row">
                 {run.nextMilestoneChoice.options.map((opt) => (
-                  <button key={opt.id} disabled={isStreaming} onClick={() => void onDecision(opt.id)}>
+                  <button key={opt.id} disabled={isStreaming || isGenerating} onClick={() => void onDecision(opt.id)}>
                     {opt.label}
                   </button>
                 ))}
@@ -629,9 +812,14 @@ export default function App(): React.JSX.Element {
             </div>
           ) : null}
 
-          {!run.nextMilestoneChoice && !run.ended ? (
+          {phaseOf(run) === "ready" ? (
             <div className="row">
-              <button disabled={isStreaming} onClick={() => void onAdvance()}>继续推进年份</button>
+              <button
+                disabled={isStreaming || isGenerating || !canAdvance(run)}
+                onClick={() => void onAdvance()}
+              >
+                {isGenerating ? "等待命运揭露..." : "推进年份"}
+              </button>
             </div>
           ) : null}
 

@@ -142,6 +142,18 @@ export default function App() {
         }
         void init();
     }, []);
+    async function refreshBootstrapForReplay() {
+        try {
+            const boot = await fetchBootstrap();
+            setBootstrap(boot);
+            setRuntimeMode(boot.deployMode);
+            setWorldId((prev) => (boot.worlds.some((w) => w.id === prev) ? prev : (boot.worlds[0]?.id ?? prev)));
+            setDifficultyId((prev) => (boot.difficulties.some((d) => d.id === prev) ? prev : (boot.difficulties[0]?.id ?? prev)));
+        }
+        catch (error) {
+            setStatus(`刷新开局配置失败：${String(error)}`);
+        }
+    }
     useEffect(() => {
         writeLocalProviderConfig(localProvider);
     }, [localProvider]);
@@ -198,11 +210,14 @@ export default function App() {
         pendingMilestoneRef.current = null;
     }
     function enqueueTimelineEntry(entry) {
-        setTimelineBuffer((prev) => {
-            if (prev.some((item) => timelineKey(item) === timelineKey(entry)))
-                return prev;
-            return [...prev, entry];
-        });
+        const nextKey = timelineKey(entry);
+        if (timelineBufferRef.current.some((item) => timelineKey(item) === nextKey)) {
+            return false;
+        }
+        const next = [...timelineBufferRef.current, entry];
+        timelineBufferRef.current = next;
+        setTimelineBuffer(next);
+        return true;
     }
     function commitRunWithBufferedMilestone(baseRun) {
         const mergedPhase = phaseOf(baseRun);
@@ -294,15 +309,15 @@ export default function App() {
     }
     function flushBufferedYears() {
         if (pendingAdvanceCountRef.current <= 0) {
-            if (timelineBufferRef.current.length > 0) {
-                setStatus("命运已抵达，点击“推进年份”揭露。");
-                return;
-            }
             if (!isGeneratingRef.current) {
                 const pendingRun = pendingRunAfterBufferRef.current;
                 if (pendingRun) {
                     commitRunWithBufferedMilestone(pendingRun);
                 }
+            }
+            if (timelineBufferRef.current.length > 0) {
+                setStatus("命运已抵达，点击“推进年份”揭露。");
+                return;
             }
             return;
         }
@@ -327,7 +342,7 @@ export default function App() {
             }
         }
     }
-    async function runStepGeneration(decision) {
+    async function runStepGeneration(decision, decisionAgeOverride) {
         const currentRun = runRef.current;
         if (!currentRun)
             return;
@@ -335,14 +350,15 @@ export default function App() {
             return;
         isGeneratingRef.current = true;
         setIsGenerating(true);
-        let timelineEmitted = false;
         try {
             await stepRunStream(decision
                 ? {
                     runId: currentRun.runId,
                     action: "decide",
                     decision,
-                    decisionAge: currentRun.nextMilestoneChoice?.age ?? currentRun.age,
+                    decisionAge: typeof decisionAgeOverride === "number"
+                        ? decisionAgeOverride
+                        : (currentRun.nextMilestoneChoice?.age ?? currentRun.age),
                     requestId: makeStepRequestId(currentRun.runId, "decide", ++requestNonceRef.current, decision)
                 }
                 : {
@@ -351,7 +367,6 @@ export default function App() {
                     requestId: makeStepRequestId(currentRun.runId, "consume", ++requestNonceRef.current)
                 }, async (event) => {
                 if (event.type === "timeline") {
-                    timelineEmitted = true;
                     enqueueTimelineEntry(event.data.entry);
                     setStatus(`揭露命运中...(${event.data.index + 1}/${event.data.total})`);
                     flushBufferedYears();
@@ -372,7 +387,7 @@ export default function App() {
             });
         }
         finally {
-            if (!timelineEmitted && pendingAdvanceCountRef.current > 0) {
+            if (pendingAdvanceCountRef.current > 0) {
                 pendingAdvanceCountRef.current = Math.max(0, pendingAdvanceCountRef.current - 1);
             }
             isGeneratingRef.current = false;
@@ -557,6 +572,8 @@ export default function App() {
             return;
         if (isStreaming || isGeneratingRef.current)
             return;
+        const currentRun = run;
+        const decisionAge = currentRun.nextMilestoneChoice?.age ?? currentRun.age;
         const choice = run.nextMilestoneChoice?.options.find((opt) => opt.id === decision);
         if (run.nextMilestoneChoice && choice) {
             pendingDecisionRef.current = {
@@ -573,13 +590,22 @@ export default function App() {
         }
         try {
             resetPendingFlowState();
+            const optimisticRun = {
+                ...currentRun,
+                nextMilestoneChoice: undefined,
+                phase: "generating"
+            };
+            setRun(optimisticRun);
+            runRef.current = optimisticRun;
             setStatus("命运流转中...");
             pendingAdvanceCountRef.current = 1;
-            await runStepGeneration(decision);
+            await runStepGeneration(decision, decisionAge);
             flushBufferedYears();
             pendingDecisionRef.current = null;
         }
         catch (error) {
+            setRun(currentRun);
+            runRef.current = currentRun;
             pendingDecisionRef.current = null;
             pendingAdvanceCountRef.current = Math.max(0, pendingAdvanceCountRef.current - 1);
             if (isServerBusyError(error)) {
@@ -605,6 +631,7 @@ export default function App() {
         setShowEndingModal(false);
         setEnvReady(false);
         setStatus("已重置，请重新确认 Setting 并开局。");
+        void refreshBootstrapForReplay();
     }
     function playAgain() {
         resetRun();
@@ -617,5 +644,5 @@ export default function App() {
                                         const selected = selectedCards.includes(card.id);
                                         const flipped = Boolean(flippedCards[card.id]);
                                         return (_jsx("div", { className: "flip-wrap", children: !flipped ? (_jsxs("button", { className: "card card-back", onClick: () => flipCard(card.id), children: [_jsx("strong", { children: "???" }), _jsx("small", { children: "\u70B9\u51FB\u7FFB\u724C" })] })) : (_jsxs("button", { className: `card ${selected ? "picked" : ""} ${rarityClass(card.rarity)}`, onClick: () => toggleCard(card.id), children: [_jsx("strong", { children: card.name }), _jsx("small", { children: card.rarity }), _jsx("p", { children: card.description })] })) }, card.id));
-                                    }) })] }), _jsx("button", { disabled: !canStart || isStreaming || isGenerating, onClick: () => void onStart(), children: "\u5F00\u59CB\u6E38\u620F" }), _jsx("p", { className: "status", children: status })] })) : (_jsxs("section", { className: "panel run-panel", children: [_jsxs("h2", { children: [run.age, " \u5C81 \u00B7 ", run.ageStage.label] }), _jsxs("p", { children: [statIcons.intelligence, "\u667A\u529B ", run.stats.intelligence, " \u00B7 ", statIcons.charisma, "\u9B45\u529B ", run.stats.charisma, " \u00B7 ", statIcons.family, "\u5BB6\u5883 ", run.stats.family, " \u00B7 ", statIcons.fortune, "\u6C14\u8FD0 ", run.stats.fortune, "\u00B7 ", statIcons.physique, "\u4F53\u9B44 ", run.stats.physique] }), _jsxs("p", { children: ["\u540D\u671B\uFF1A", run.fame, " \u00B7 \u7ED3\u5C40\u72B6\u6001\uFF1A", run.outcome === "ongoing" ? "进行中" : outcomeLabel(run.outcome)] }), _jsx("div", { className: "timeline-scroll", ref: timelineRef, children: timeline.slice(-14).map((item) => (_jsxs("article", { className: "narrative", children: [_jsxs("strong", { children: [item.age, "\u5C81 \u00B7 ", item.ageStage.label, " \u00B7 ", item.title] }), _jsx("div", { className: "delta-row", children: extractDeltaLabels(item).length === 0 ? (_jsx("small", { children: "\u5C5E\u6027\u53D8\u5316\uFF1A\u65E0" })) : (extractDeltaLabels(item).map((label, idx) => (_jsx("small", { children: label }, `${timelineKey(item)}-${idx}`)))) }), _jsx("p", { children: item.narrative })] }, timelineKey(item)))) }), _jsxs("section", { className: "decision-history", children: [_jsxs("div", { className: "decision-history-head", children: [_jsx("h3", { children: "\u6289\u62E9\u5386\u53F2" }), _jsx("small", {})] }), decisionHistory.length === 0 ? (_jsx("p", { className: "decision-history-empty", children: "\u6682\u65E0\u6289\u62E9\u8BB0\u5F55\u3002" })) : (_jsx("div", { className: "decision-history-list", children: decisionHistory.map((entry) => (_jsxs("article", { className: "decision-history-item", children: [_jsxs("p", { className: "decision-history-meta", children: [entry.age, "\u5C81 \u00B7 ", entry.ageStageLabel] }), _jsx("p", { className: "decision-history-bg", children: entry.background || "你走到了命运分岔口。" }), _jsxs("p", { className: "decision-history-choice", children: [_jsx("span", { className: "decision-choice-pill", children: entry.choiceLabel }), entry.choiceDescription] }), _jsx("div", { className: "decision-history-rolls", children: entry.rollLabels.length === 0 ? (_jsx("small", { className: "decision-roll-pill", children: "\u63B7\u70B9\uFF1A\u65E0\u660E\u663E\u53D8\u5316" })) : (entry.rollLabels.map((label, idx) => (_jsx("small", { className: "decision-roll-pill", children: label }, `${entry.id}-roll-${idx}`)))) })] }, entry.id))) }))] }), run.nextMilestoneChoice && phaseOf(run) === "waiting_decision" ? (_jsxs("div", { children: [_jsx("p", { children: run.nextMilestoneChoice.background ?? "你来到抉择时刻：" }), _jsx("div", { className: "row", children: run.nextMilestoneChoice.options.map((opt) => (_jsx("button", { disabled: isStreaming || isGenerating, onClick: () => void onDecision(opt.id), children: opt.label }, opt.id))) }), _jsx("div", { className: "row", children: run.nextMilestoneChoice.options.map((opt) => (_jsxs("small", { children: [opt.label, "\uFF1A", opt.description] }, `${opt.id}-desc`))) })] })) : null, phaseOf(run) === "ready" ? (_jsx("div", { className: "row", children: _jsx("button", { disabled: isStreaming || isGenerating || !canAdvance(run), onClick: () => void onAdvance(), children: isGenerating ? "等待命运揭露..." : "推进年份" }) })) : null, run.ended ? (_jsxs("div", { className: "ending", children: [_jsxs("div", { className: "ending-head", children: [_jsx("h3", { children: "\u7ED3\u5C40" }), _jsx("span", { className: `ending-pill ${run.outcome === "dead" ? "is-dead" : "is-ascended"}`, children: endingBadgeText(run) })] }), _jsxs("p", { className: "ending-meta", children: ["\u540D\u671B ", run.fame, " \u00B7 ", fameTitle(run.fame)] }), _jsx("blockquote", { className: "ending-quote", children: run.endingSummary ?? "命运已暂告一段落。" })] })) : null, _jsx("p", { className: "status", children: status })] })) }), showSettings ? (_jsx(AdminPanel, { onClose: () => setShowSettings(false), bootstrap: bootstrap, localApiKey: localApiKey, setLocalApiKey: setLocalApiKey, localProvider: localProvider, setLocalProvider: setLocalProvider, onConfirmEnvironment: onConfirmEnvironment, canConfirmEnv: canConfirmEnv, envReady: envReady, worldId: worldId, setWorldId: setWorldId, difficultyId: difficultyId, setDifficultyId: setDifficultyId })) : null, run?.ended && showEndingModal ? (_jsx("div", { className: "modal-mask", children: _jsxs("div", { className: "modal ending-modal", children: [_jsx("h2", { children: "\u672C\u5C40\u7ED3\u7B97" }), _jsxs("div", { className: "ending-summary-top", children: [_jsx("span", { className: `ending-pill ${run.outcome === "dead" ? "is-dead" : "is-ascended"}`, children: outcomeLabel(run.outcome) }), _jsx("small", { children: endingBadgeText(run) })] }), _jsxs("p", { children: ["\u540D\u671B\u5F97\u5206\uFF1A", run.fame] }), _jsxs("p", { children: ["\u79F0\u53F7\uFF1A", fameTitle(run.fame)] }), _jsx("blockquote", { className: "ending-quote ending-quote-modal", children: run.endingSummary ?? "命运已暂告一段落。" }), _jsxs("div", { className: "row", children: [_jsx("button", { onClick: playAgain, children: "\u518D\u6765\u4E00\u628A" }), _jsx("button", { className: "ghost", onClick: () => setShowEndingModal(false), children: "\u5173\u95ED" })] })] }) })) : null, showBusyModal ? (_jsx("div", { className: "modal-mask", children: _jsxs("div", { className: "modal ending-modal", children: [_jsx("h2", { children: "\u63D0\u793A" }), _jsx("p", { children: "\u670D\u52A1\u5668\u7E41\u5FD9\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5\u3002" }), _jsx("div", { className: "row", children: _jsx("button", { onClick: () => setShowBusyModal(false), children: "\u6211\u77E5\u9053\u4E86" }) })] }) })) : null, _jsx("footer", { className: "site-footer", children: _jsxs("a", { className: "repo-link", href: "https://github.com/Vcity-ci/life_remake", target: "_blank", rel: "noreferrer", children: [_jsx("svg", { className: "repo-icon", viewBox: "0 0 16 16", "aria-hidden": "true", focusable: "false", children: _jsx("path", { d: "M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.5-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z" }) }), _jsx("span", { children: "Vcity-ci/life_remake" })] }) })] }));
+                                    }) })] }), _jsx("button", { disabled: !canStart || isStreaming || isGenerating, onClick: () => void onStart(), children: "\u5F00\u59CB\u6E38\u620F" }), _jsx("p", { className: "status", children: status })] })) : (_jsxs("section", { className: "panel run-panel", children: [_jsxs("h2", { children: [run.age, " \u5C81 \u00B7 ", run.ageStage.label] }), _jsxs("p", { children: [statIcons.intelligence, "\u667A\u529B ", run.stats.intelligence, " \u00B7 ", statIcons.charisma, "\u9B45\u529B ", run.stats.charisma, " \u00B7 ", statIcons.family, "\u5BB6\u5883 ", run.stats.family, " \u00B7 ", statIcons.fortune, "\u6C14\u8FD0 ", run.stats.fortune, "\u00B7 ", statIcons.physique, "\u4F53\u9B44 ", run.stats.physique] }), _jsxs("p", { children: ["\u540D\u671B\uFF1A", run.fame, " \u00B7 \u7ED3\u5C40\u72B6\u6001\uFF1A", run.outcome === "ongoing" ? "进行中" : outcomeLabel(run.outcome)] }), _jsx("div", { className: "timeline-scroll", ref: timelineRef, children: timeline.slice(-14).map((item) => (_jsxs("article", { className: "narrative", children: [_jsxs("strong", { children: [item.age, "\u5C81 \u00B7 ", item.ageStage.label, " \u00B7 ", item.title] }), _jsx("div", { className: "delta-row", children: extractDeltaLabels(item).length === 0 ? (_jsx("small", { children: "\u5C5E\u6027\u53D8\u5316\uFF1A\u65E0" })) : (extractDeltaLabels(item).map((label, idx) => (_jsx("small", { children: label }, `${timelineKey(item)}-${idx}`)))) }), _jsx("p", { children: item.narrative })] }, timelineKey(item)))) }), _jsxs("section", { className: "decision-history", children: [_jsxs("div", { className: "decision-history-head", children: [_jsx("h3", { children: "\u6289\u62E9\u5386\u53F2" }), _jsx("small", {})] }), decisionHistory.length === 0 ? (_jsx("p", { className: "decision-history-empty", children: "\u6682\u65E0\u6289\u62E9\u8BB0\u5F55\u3002" })) : (_jsx("div", { className: "decision-history-list", children: decisionHistory.map((entry) => (_jsxs("article", { className: "decision-history-item", children: [_jsxs("p", { className: "decision-history-meta", children: [entry.age, "\u5C81 \u00B7 ", entry.ageStageLabel] }), _jsx("p", { className: "decision-history-bg", children: entry.background || "你走到了命运分岔口。" }), _jsxs("p", { className: "decision-history-choice", children: [_jsx("span", { className: "decision-choice-pill", children: entry.choiceLabel }), entry.choiceDescription] }), _jsx("div", { className: "decision-history-rolls", children: entry.rollLabels.length === 0 ? (_jsx("small", { className: "decision-roll-pill", children: "\u63B7\u70B9\uFF1A\u65E0\u660E\u663E\u53D8\u5316" })) : (entry.rollLabels.map((label, idx) => (_jsx("small", { className: "decision-roll-pill", children: label }, `${entry.id}-roll-${idx}`)))) })] }, entry.id))) }))] }), run.nextMilestoneChoice && phaseOf(run) === "waiting_decision" && timelineBuffer.length === 0 ? (_jsxs("div", { children: [_jsx("p", { children: run.nextMilestoneChoice.background ?? "你来到抉择时刻：" }), _jsx("div", { className: "row", children: run.nextMilestoneChoice.options.map((opt) => (_jsx("button", { disabled: isStreaming || isGenerating, onClick: () => void onDecision(opt.id), children: opt.label }, opt.id))) }), _jsx("div", { className: "row", children: run.nextMilestoneChoice.options.map((opt) => (_jsxs("small", { children: [opt.label, "\uFF1A", opt.description] }, `${opt.id}-desc`))) })] })) : null, !run.ended && !(run.nextMilestoneChoice && phaseOf(run) === "waiting_decision") ? (_jsx("div", { className: "row", children: _jsx("button", { disabled: isStreaming || isGenerating || !canAdvance(run), onClick: () => void onAdvance(), children: "\u7EE7\u7EED\u63A8\u8FDB\u5E74\u4EFD" }) })) : null, run.ended ? (_jsxs("div", { className: "ending", children: [_jsxs("div", { className: "ending-head", children: [_jsx("h3", { children: "\u7ED3\u5C40" }), _jsx("span", { className: `ending-pill ${run.outcome === "dead" ? "is-dead" : "is-ascended"}`, children: endingBadgeText(run) })] }), _jsxs("p", { className: "ending-meta", children: ["\u540D\u671B ", run.fame, " \u00B7 ", fameTitle(run.fame)] }), _jsx("blockquote", { className: "ending-quote", children: run.endingSummary ?? "命运已暂告一段落。" })] })) : null, _jsx("p", { className: "status", children: status })] })) }), showSettings ? (_jsx(AdminPanel, { onClose: () => setShowSettings(false), bootstrap: bootstrap, localApiKey: localApiKey, setLocalApiKey: setLocalApiKey, localProvider: localProvider, setLocalProvider: setLocalProvider, onConfirmEnvironment: onConfirmEnvironment, canConfirmEnv: canConfirmEnv, envReady: envReady, worldId: worldId, setWorldId: setWorldId, difficultyId: difficultyId, setDifficultyId: setDifficultyId })) : null, run?.ended && showEndingModal ? (_jsx("div", { className: "modal-mask", children: _jsxs("div", { className: "modal ending-modal", children: [_jsx("h2", { children: "\u672C\u5C40\u7ED3\u7B97" }), _jsxs("div", { className: "ending-summary-top", children: [_jsx("span", { className: `ending-pill ${run.outcome === "dead" ? "is-dead" : "is-ascended"}`, children: outcomeLabel(run.outcome) }), _jsx("small", { children: endingBadgeText(run) })] }), _jsxs("p", { children: ["\u540D\u671B\u5F97\u5206\uFF1A", run.fame] }), _jsxs("p", { children: ["\u79F0\u53F7\uFF1A", fameTitle(run.fame)] }), _jsx("blockquote", { className: "ending-quote ending-quote-modal", children: run.endingSummary ?? "命运已暂告一段落。" }), _jsxs("div", { className: "row", children: [_jsx("button", { onClick: playAgain, children: "\u518D\u6765\u4E00\u628A" }), _jsx("button", { className: "ghost", onClick: () => setShowEndingModal(false), children: "\u5173\u95ED" })] })] }) })) : null, showBusyModal ? (_jsx("div", { className: "modal-mask", children: _jsxs("div", { className: "modal ending-modal", children: [_jsx("h2", { children: "\u63D0\u793A" }), _jsx("p", { children: "\u670D\u52A1\u5668\u7E41\u5FD9\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5\u3002" }), _jsx("div", { className: "row", children: _jsx("button", { onClick: () => setShowBusyModal(false), children: "\u6211\u77E5\u9053\u4E86" }) })] }) })) : null, _jsx("footer", { className: "site-footer", children: _jsxs("a", { className: "repo-link", href: "https://github.com/Vcity-ci/life_remake", target: "_blank", rel: "noreferrer", children: [_jsx("svg", { className: "repo-icon", viewBox: "0 0 16 16", "aria-hidden": "true", focusable: "false", children: _jsx("path", { d: "M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.5-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z" }) }), _jsx("span", { children: "Vcity-ci/life_remake" })] }) })] }));
 }

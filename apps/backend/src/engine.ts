@@ -578,6 +578,7 @@ function maybeUnlockAscension(run: InternalRunState, rng: Rng): AscensionState {
   if (run.ascension.unlocked) return run.ascension;
   const deterministic = checkAscension(run);
   if (deterministic.unlocked) return deterministic;
+  if (run.age < 25) return run.ascension;
 
   const ascensionTuning = run.tuningSnapshot.ascension;
   const stats = run.stats;

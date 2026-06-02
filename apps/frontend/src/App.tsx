@@ -39,6 +39,10 @@ interface PendingDecisionItem {
 }
 
 type MilestoneChoice = NonNullable<RunState["nextMilestoneChoice"]>;
+type StartOverrides = {
+  stats?: Stats;
+  selectedCardIds?: string[];
+};
 
 const statLabels: Record<StatKey, string> = {
   intelligence: "智力",
@@ -63,6 +67,7 @@ const defaultStats: Stats = {
   fortune: 0,
   physique: 0
 };
+const statKeys: StatKey[] = ["intelligence", "charisma", "family", "fortune", "physique"];
 
 function rarityClass(r: BackgroundCard["rarity"]): string {
   return `rarity-${r}`;
@@ -137,6 +142,7 @@ export default function App(): React.JSX.Element {
   const [showBusyModal, setShowBusyModal] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [autoAdvance, setAutoAdvance] = useState(false);
   const timelineRef = useRef<HTMLDivElement | null>(null);
   const pendingDecisionRef = useRef<PendingDecisionItem | null>(null);
   const timelineBufferRef = useRef<TimelineEntry[]>([]);
@@ -248,6 +254,11 @@ export default function App(): React.JSX.Element {
     ) return false;
     return true;
   }, [bootstrap, envReady, personaPrompt, selectedCards, stats]);
+  const canRandomStart = useMemo(() => {
+    if (!bootstrap || !envReady) return false;
+    if (personaPrompt.trim().length < 4) return false;
+    return bootstrap.cardPool.length >= bootstrap.startAllocation.selectedCardMin;
+  }, [bootstrap, envReady, personaPrompt]);
 
   const usedTalentPoints = useMemo(
     () => stats.intelligence + stats.charisma + stats.physique + stats.family + stats.fortune,
@@ -482,6 +493,37 @@ export default function App(): React.JSX.Element {
     setFlippedCards((prev) => ({ ...prev, [id]: true }));
   }
 
+  function createRandomStats(totalPoints: number): Stats {
+    const next = { ...defaultStats };
+    let remaining = totalPoints;
+    while (remaining > 0) {
+      const available = statKeys.filter((key) => next[key] < 10);
+      if (available.length === 0) break;
+      const picked = available[Math.floor(Math.random() * available.length)];
+      next[picked] += 1;
+      remaining -= 1;
+    }
+    return next;
+  }
+
+  function pickRandomCardIds(): string[] {
+    if (!bootstrap) return [];
+    const maxCards = Math.min(bootstrap.startAllocation.selectedCardMax, bootstrap.cardPool.length);
+    const minCards = Math.min(bootstrap.startAllocation.selectedCardMin, maxCards);
+    const count = Math.max(minCards, maxCards);
+    return [...bootstrap.cardPool]
+      .sort(() => Math.random() - 0.5)
+      .slice(0, count)
+      .map((card) => card.id);
+  }
+
+  function buildFlippedCards(cardIds: string[]): Record<string, boolean> {
+    return cardIds.reduce<Record<string, boolean>>((acc, id) => {
+      acc[id] = true;
+      return acc;
+    }, {});
+  }
+
   async function onConfirmEnvironment(): Promise<void> {
     if (!bootstrap) return;
     try {
@@ -500,9 +542,11 @@ export default function App(): React.JSX.Element {
     }
   }
 
-  async function onStart(): Promise<void> {
+  async function onStart(overrides?: StartOverrides): Promise<void> {
     if (!bootstrap) return;
     if (isStreaming || isGenerating) return;
+    const startStats = overrides?.stats ?? stats;
+    const startSelectedCards = overrides?.selectedCardIds ?? selectedCards;
     try {
       setIsStreaming(true);
       resetPendingFlowState();
@@ -515,8 +559,8 @@ export default function App(): React.JSX.Element {
         difficultyId,
         personaPrompt,
         talentPointTotal: bootstrap.talentPointTotal,
-        stats,
-        selectedCardIds: selectedCards
+        stats: startStats,
+        selectedCardIds: startSelectedCards
       }, async (event: GameStreamEvent) => {
         if (event.type === "meta") {
           setStatus("本局调参已同步，继续推进叙事...");
@@ -568,6 +612,7 @@ export default function App(): React.JSX.Element {
       });
     } catch (error) {
       if (isServerBusyError(error)) {
+        setAutoAdvance(false);
         setShowBusyModal(true);
         setStatus("服务器繁忙，请稍后重试。");
       } else {
@@ -576,6 +621,34 @@ export default function App(): React.JSX.Element {
     } finally {
       setIsStreaming(false);
     }
+  }
+
+  async function onRandomStart(): Promise<void> {
+    if (!bootstrap) return;
+    if (isStreaming || isGenerating) return;
+    if (!envReady) {
+      setStatus("请先在 Setting 确认本局环境。");
+      return;
+    }
+    if (personaPrompt.trim().length < 4) {
+      setStatus("请先填写至少四个字的人设提示词。");
+      return;
+    }
+    const randomStats = createRandomStats(bootstrap.talentPointTotal);
+    const allocated = statKeys.reduce((sum, key) => sum + randomStats[key], 0);
+    if (allocated !== bootstrap.talentPointTotal) {
+      setStatus("天赋点超过当前单项上限，无法随机分配。");
+      return;
+    }
+    const randomCardIds = pickRandomCardIds();
+    if (randomCardIds.length < bootstrap.startAllocation.selectedCardMin) {
+      setStatus("可用天赋卡不足，无法随机开局。");
+      return;
+    }
+    setStats(randomStats);
+    setSelectedCards(randomCardIds);
+    setFlippedCards(buildFlippedCards(randomCardIds));
+    await onStart({ stats: randomStats, selectedCardIds: randomCardIds });
   }
 
   async function onAdvance(): Promise<void> {
@@ -604,6 +677,7 @@ export default function App(): React.JSX.Element {
     } catch (error) {
       pendingAdvanceCountRef.current = Math.max(0, pendingAdvanceCountRef.current - 1);
       if (isServerBusyError(error)) {
+        setAutoAdvance(false);
         setShowBusyModal(true);
         setStatus("服务器繁忙，请稍后重试。");
       } else {
@@ -650,6 +724,7 @@ export default function App(): React.JSX.Element {
       pendingDecisionRef.current = null;
       pendingAdvanceCountRef.current = Math.max(0, pendingAdvanceCountRef.current - 1);
       if (isServerBusyError(error)) {
+        setAutoAdvance(false);
         setShowBusyModal(true);
         setStatus("服务器繁忙，请稍后重试。");
       } else {
@@ -670,6 +745,7 @@ export default function App(): React.JSX.Element {
     resetPendingFlowState();
     pendingDecisionRef.current = null;
     setShowEndingModal(false);
+    setAutoAdvance(false);
     setEnvReady(false);
     setStatus("已重置，请重新确认 Setting 并开局。");
     void refreshBootstrapForReplay();
@@ -680,6 +756,25 @@ export default function App(): React.JSX.Element {
     setStatus("再来一把！请重新确认 Setting 并开局。");
   }
 
+  useEffect(() => {
+    if (!autoAdvance) return;
+    if (!run) return;
+    if (run.ended || phaseOf(run) === "ended") {
+      setAutoAdvance(false);
+      return;
+    }
+    if (isStreaming || isGenerating) return;
+    if (run.nextMilestoneChoice && phaseOf(run) === "waiting_decision" && timelineBuffer.length === 0) {
+      setStatus("自动流转已暂停，等待抉择。");
+      return;
+    }
+    if (!canAdvance(run)) return;
+    const timer = window.setTimeout(() => {
+      void onAdvance();
+    }, 350);
+    return () => window.clearTimeout(timer);
+  }, [autoAdvance, run, timeline.length, timelineBuffer.length, isStreaming, isGenerating]);
+
   if (!bootstrap) {
     return <main className="app"><p>{status}</p></main>;
   }
@@ -689,7 +784,17 @@ export default function App(): React.JSX.Element {
       <header className="topbar">
         <button className="setting-btn" onClick={() => setShowSettings(true)}>⚙ Setting</button>
         <h1>人生重开器</h1>
-        <button className="ghost" onClick={resetRun}>重开</button>
+        <div className="topbar-actions">
+          <label className={`auto-flow-toggle ${autoAdvance ? "active" : ""}`}>
+            <input
+              type="checkbox"
+              checked={autoAdvance}
+              onChange={(e) => setAutoAdvance(e.target.checked)}
+            />
+            自动流转
+          </label>
+          <button className="ghost" onClick={resetRun}>重开</button>
+        </div>
       </header>
 
       <div className="game-content">
@@ -752,9 +857,14 @@ export default function App(): React.JSX.Element {
             </div>
           </div>
 
-          <button disabled={!canStart || isStreaming || isGenerating} onClick={() => void onStart()}>
-            开始游戏
-          </button>
+          <div className="row">
+            <button disabled={!canStart || isStreaming || isGenerating} onClick={() => void onStart()}>
+              开始游戏
+            </button>
+            <button className="ghost" disabled={!canRandomStart || isStreaming || isGenerating} onClick={() => void onRandomStart()}>
+              随机分配并开始
+            </button>
+          </div>
           <p className="status">{status}</p>
           </section>
         ) : (

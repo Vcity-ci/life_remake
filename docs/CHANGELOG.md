@@ -1,5 +1,16 @@
 # 更新日志
 
+## v1.0.2 - 2026-06-02
+- 新增小说/长篇素材蒸馏操作文档：
+  - `docs/NOVEL_DISTILLATION_GUIDE.md`
+- 文档覆盖：
+  - 如何分章摘要小说素材
+  - 如何用 AI 蒸馏世界观圣经
+  - 如何生成 `worlds/worldlines/factions/faction-events/talent-cards/promptPack`
+  - 如何同步到 `storage/custom-content.json`
+  - 如何做本地跑局验证与复读排查
+- `README.md` 文档导航新增该入口。
+
 ## v1.0.1 - 2026-06-01
 - 修复“第二个抉择后卡死”问题（前端推进状态机）：
   - `pendingAdvanceCountRef` 在 `runStepGeneration` 结束时统一释放，避免等待计数悬挂

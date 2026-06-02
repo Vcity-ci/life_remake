@@ -60,6 +60,36 @@ body {
   background: var(--accent-3);
 }
 
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.auto-flow-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #f4f7fb;
+  color: #304150;
+  cursor: pointer;
+  user-select: none;
+}
+
+.auto-flow-toggle.active {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: #ecfff7;
+}
+
+.auto-flow-toggle input {
+  margin: 0;
+}
+
 .panel {
   background: var(--panel);
   border: 1px solid var(--line);

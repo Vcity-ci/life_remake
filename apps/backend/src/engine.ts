@@ -37,6 +37,8 @@ interface NarrativeReservoirState {
 }
 const coreStatKeys: CoreStatKey[] = ["intelligence", "charisma", "family", "fortune"];
 const allStatKeys: StatKey[] = [...coreStatKeys, "physique"];
+const CORE_STAT_MIN = -30;
+const STAT_MAX = 60;
 const negativeStatLabel: Record<CoreStatKey, string> = {
   intelligence: "智力",
   charisma: "魅力",
@@ -357,9 +359,9 @@ function applyChanges(stats: Stats, changes: Partial<Record<StatKey, number>>): 
   const next = cloneStats(stats);
   for (const key of coreStatKeys) {
     const delta = changes[key] ?? 0;
-    next[key] = clamp(next[key] + delta, -30, 40);
+    next[key] = clamp(next[key] + delta, CORE_STAT_MIN, STAT_MAX);
   }
-  next.physique = clamp(next.physique + (changes.physique ?? 0), 0, 30);
+  next.physique = clamp(next.physique + (changes.physique ?? 0), 0, STAT_MAX);
   return next;
 }
 

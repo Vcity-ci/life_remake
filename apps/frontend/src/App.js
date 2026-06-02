@@ -24,6 +24,7 @@ const defaultStats = {
     fortune: 0,
     physique: 0
 };
+const statKeys = ["intelligence", "charisma", "family", "fortune", "physique"];
 function rarityClass(r) {
     return `rarity-${r}`;
 }
@@ -94,6 +95,7 @@ export default function App() {
     const [showBusyModal, setShowBusyModal] = useState(false);
     const [isStreaming, setIsStreaming] = useState(false);
     const [isGenerating, setIsGenerating] = useState(false);
+    const [autoAdvance, setAutoAdvance] = useState(false);
     const timelineRef = useRef(null);
     const pendingDecisionRef = useRef(null);
     const timelineBufferRef = useRef([]);
@@ -202,6 +204,13 @@ export default function App() {
             return false;
         return true;
     }, [bootstrap, envReady, personaPrompt, selectedCards, stats]);
+    const canRandomStart = useMemo(() => {
+        if (!bootstrap || !envReady)
+            return false;
+        if (personaPrompt.trim().length < 4)
+            return false;
+        return bootstrap.cardPool.length >= bootstrap.startAllocation.selectedCardMin;
+    }, [bootstrap, envReady, personaPrompt]);
     const usedTalentPoints = useMemo(() => stats.intelligence + stats.charisma + stats.physique + stats.family + stats.fortune, [stats]);
     const remainingTalentPoints = useMemo(() => (bootstrap ? Math.max(0, bootstrap.talentPointTotal - usedTalentPoints) : 0), [bootstrap, usedTalentPoints]);
     function resetPendingFlowState() {
@@ -424,6 +433,36 @@ export default function App() {
     function flipCard(id) {
         setFlippedCards((prev) => ({ ...prev, [id]: true }));
     }
+    function createRandomStats(totalPoints) {
+        const next = { ...defaultStats };
+        let remaining = totalPoints;
+        while (remaining > 0) {
+            const available = statKeys.filter((key) => next[key] < 10);
+            if (available.length === 0)
+                break;
+            const picked = available[Math.floor(Math.random() * available.length)];
+            next[picked] += 1;
+            remaining -= 1;
+        }
+        return next;
+    }
+    function pickRandomCardIds() {
+        if (!bootstrap)
+            return [];
+        const maxCards = Math.min(bootstrap.startAllocation.selectedCardMax, bootstrap.cardPool.length);
+        const minCards = Math.min(bootstrap.startAllocation.selectedCardMin, maxCards);
+        const count = Math.max(minCards, maxCards);
+        return [...bootstrap.cardPool]
+            .sort(() => Math.random() - 0.5)
+            .slice(0, count)
+            .map((card) => card.id);
+    }
+    function buildFlippedCards(cardIds) {
+        return cardIds.reduce((acc, id) => {
+            acc[id] = true;
+            return acc;
+        }, {});
+    }
     async function onConfirmEnvironment() {
         if (!bootstrap)
             return;
@@ -443,11 +482,13 @@ export default function App() {
             setStatus(`环境配置失败：${String(error)}`);
         }
     }
-    async function onStart() {
+    async function onStart(overrides) {
         if (!bootstrap)
             return;
         if (isStreaming || isGenerating)
             return;
+        const startStats = overrides?.stats ?? stats;
+        const startSelectedCards = overrides?.selectedCardIds ?? selectedCards;
         try {
             setIsStreaming(true);
             resetPendingFlowState();
@@ -460,8 +501,8 @@ export default function App() {
                 difficultyId,
                 personaPrompt,
                 talentPointTotal: bootstrap.talentPointTotal,
-                stats,
-                selectedCardIds: selectedCards
+                stats: startStats,
+                selectedCardIds: startSelectedCards
             }, async (event) => {
                 if (event.type === "meta") {
                     setStatus("本局调参已同步，继续推进叙事...");
@@ -517,6 +558,7 @@ export default function App() {
         }
         catch (error) {
             if (isServerBusyError(error)) {
+                setAutoAdvance(false);
                 setShowBusyModal(true);
                 setStatus("服务器繁忙，请稍后重试。");
             }
@@ -527,6 +569,35 @@ export default function App() {
         finally {
             setIsStreaming(false);
         }
+    }
+    async function onRandomStart() {
+        if (!bootstrap)
+            return;
+        if (isStreaming || isGenerating)
+            return;
+        if (!envReady) {
+            setStatus("请先在 Setting 确认本局环境。");
+            return;
+        }
+        if (personaPrompt.trim().length < 4) {
+            setStatus("请先填写至少四个字的人设提示词。");
+            return;
+        }
+        const randomStats = createRandomStats(bootstrap.talentPointTotal);
+        const allocated = statKeys.reduce((sum, key) => sum + randomStats[key], 0);
+        if (allocated !== bootstrap.talentPointTotal) {
+            setStatus("天赋点超过当前单项上限，无法随机分配。");
+            return;
+        }
+        const randomCardIds = pickRandomCardIds();
+        if (randomCardIds.length < bootstrap.startAllocation.selectedCardMin) {
+            setStatus("可用天赋卡不足，无法随机开局。");
+            return;
+        }
+        setStats(randomStats);
+        setSelectedCards(randomCardIds);
+        setFlippedCards(buildFlippedCards(randomCardIds));
+        await onStart({ stats: randomStats, selectedCardIds: randomCardIds });
     }
     async function onAdvance() {
         if (!run)
@@ -559,6 +630,7 @@ export default function App() {
         catch (error) {
             pendingAdvanceCountRef.current = Math.max(0, pendingAdvanceCountRef.current - 1);
             if (isServerBusyError(error)) {
+                setAutoAdvance(false);
                 setShowBusyModal(true);
                 setStatus("服务器繁忙，请稍后重试。");
             }
@@ -609,6 +681,7 @@ export default function App() {
             pendingDecisionRef.current = null;
             pendingAdvanceCountRef.current = Math.max(0, pendingAdvanceCountRef.current - 1);
             if (isServerBusyError(error)) {
+                setAutoAdvance(false);
                 setShowBusyModal(true);
                 setStatus("服务器繁忙，请稍后重试。");
             }
@@ -629,6 +702,7 @@ export default function App() {
         resetPendingFlowState();
         pendingDecisionRef.current = null;
         setShowEndingModal(false);
+        setAutoAdvance(false);
         setEnvReady(false);
         setStatus("已重置，请重新确认 Setting 并开局。");
         void refreshBootstrapForReplay();
@@ -637,12 +711,34 @@ export default function App() {
         resetRun();
         setStatus("再来一把！请重新确认 Setting 并开局。");
     }
+    useEffect(() => {
+        if (!autoAdvance)
+            return;
+        if (!run)
+            return;
+        if (run.ended || phaseOf(run) === "ended") {
+            setAutoAdvance(false);
+            return;
+        }
+        if (isStreaming || isGenerating)
+            return;
+        if (run.nextMilestoneChoice && phaseOf(run) === "waiting_decision" && timelineBuffer.length === 0) {
+            setStatus("自动流转已暂停，等待抉择。");
+            return;
+        }
+        if (!canAdvance(run))
+            return;
+        const timer = window.setTimeout(() => {
+            void onAdvance();
+        }, 350);
+        return () => window.clearTimeout(timer);
+    }, [autoAdvance, run, timeline.length, timelineBuffer.length, isStreaming, isGenerating]);
     if (!bootstrap) {
         return _jsx("main", { className: "app", children: _jsx("p", { children: status }) });
     }
-    return (_jsxs("main", { className: "app game-shell", children: [_jsxs("header", { className: "topbar", children: [_jsx("button", { className: "setting-btn", onClick: () => setShowSettings(true), children: "\u2699 Setting" }), _jsx("h1", { children: "\u4EBA\u751F\u91CD\u5F00\u5668" }), _jsx("button", { className: "ghost", onClick: resetRun, children: "\u91CD\u5F00" })] }), _jsx("div", { className: "game-content", children: !run ? (_jsxs("section", { className: "panel start-panel", children: [_jsx("h2", { children: "\u521B\u5EFA\u89D2\u8272" }), _jsxs("label", { children: ["\u4EBA\u8BBE\u63D0\u793A\u8BCD", _jsx("textarea", { rows: 4, value: personaPrompt, onChange: (e) => setPersonaPrompt(e.target.value), placeholder: "\u4F8B\u5982\uFF1A\u5B64\u72EC\u4F46\u5F3A\u97E7\uFF0C\u6267\u7740\u8FFD\u6C42\u88AB\u8BA4\u53EF\uFF0C\u5E0C\u671B\u6539\u53D8\u5BB6\u65CF\u547D\u8FD0(\u81F3\u5C11\u56DB\u4E2A\u5B57)\u3002" })] }), _jsxs("div", { children: [_jsxs("p", { children: ["\u53EF\u7528\u5929\u8D4B\u70B9\uFF1A", remainingTalentPoints] }), _jsx("div", { className: "stats-grid pixel-grid", children: Object.keys(statLabels).map((key) => (_jsxs("div", { className: "stat-box pixel-stat", children: [_jsxs("strong", { children: [statIcons[key], " ", statLabels[key]] }), _jsxs("div", { className: "row", children: [_jsx("button", { onClick: () => changeStat(key, -1), children: "-" }), _jsx("span", { children: stats[key] }), _jsx("button", { onClick: () => changeStat(key, 1), children: "+" })] })] }, key))) })] }), _jsxs("div", { children: [_jsxs("p", { children: ["\u62BD\u5361\u7FFB\u724C\uFF08\u53EF\u9009 ", bootstrap.startAllocation.selectedCardMin, "-", bootstrap.startAllocation.selectedCardMax, "\uFF09"] }), _jsx("div", { className: "cards", children: bootstrap.cardPool.map((card) => {
+    return (_jsxs("main", { className: "app game-shell", children: [_jsxs("header", { className: "topbar", children: [_jsx("button", { className: "setting-btn", onClick: () => setShowSettings(true), children: "\u2699 Setting" }), _jsx("h1", { children: "\u4EBA\u751F\u91CD\u5F00\u5668" }), _jsxs("div", { className: "topbar-actions", children: [_jsxs("label", { className: `auto-flow-toggle ${autoAdvance ? "active" : ""}`, children: [_jsx("input", { type: "checkbox", checked: autoAdvance, onChange: (e) => setAutoAdvance(e.target.checked) }), "\u81EA\u52A8\u6D41\u8F6C"] }), _jsx("button", { className: "ghost", onClick: resetRun, children: "\u91CD\u5F00" })] })] }), _jsx("div", { className: "game-content", children: !run ? (_jsxs("section", { className: "panel start-panel", children: [_jsx("h2", { children: "\u521B\u5EFA\u89D2\u8272" }), _jsxs("label", { children: ["\u4EBA\u8BBE\u63D0\u793A\u8BCD", _jsx("textarea", { rows: 4, value: personaPrompt, onChange: (e) => setPersonaPrompt(e.target.value), placeholder: "\u4F8B\u5982\uFF1A\u5B64\u72EC\u4F46\u5F3A\u97E7\uFF0C\u6267\u7740\u8FFD\u6C42\u88AB\u8BA4\u53EF\uFF0C\u5E0C\u671B\u6539\u53D8\u5BB6\u65CF\u547D\u8FD0(\u81F3\u5C11\u56DB\u4E2A\u5B57)\u3002" })] }), _jsxs("div", { children: [_jsxs("p", { children: ["\u53EF\u7528\u5929\u8D4B\u70B9\uFF1A", remainingTalentPoints] }), _jsx("div", { className: "stats-grid pixel-grid", children: Object.keys(statLabels).map((key) => (_jsxs("div", { className: "stat-box pixel-stat", children: [_jsxs("strong", { children: [statIcons[key], " ", statLabels[key]] }), _jsxs("div", { className: "row", children: [_jsx("button", { onClick: () => changeStat(key, -1), children: "-" }), _jsx("span", { children: stats[key] }), _jsx("button", { onClick: () => changeStat(key, 1), children: "+" })] })] }, key))) })] }), _jsxs("div", { children: [_jsxs("p", { children: ["\u62BD\u5361\u7FFB\u724C\uFF08\u53EF\u9009 ", bootstrap.startAllocation.selectedCardMin, "-", bootstrap.startAllocation.selectedCardMax, "\uFF09"] }), _jsx("div", { className: "cards", children: bootstrap.cardPool.map((card) => {
                                         const selected = selectedCards.includes(card.id);
                                         const flipped = Boolean(flippedCards[card.id]);
                                         return (_jsx("div", { className: "flip-wrap", children: !flipped ? (_jsxs("button", { className: "card card-back", onClick: () => flipCard(card.id), children: [_jsx("strong", { children: "???" }), _jsx("small", { children: "\u70B9\u51FB\u7FFB\u724C" })] })) : (_jsxs("button", { className: `card ${selected ? "picked" : ""} ${rarityClass(card.rarity)}`, onClick: () => toggleCard(card.id), children: [_jsx("strong", { children: card.name }), _jsx("small", { children: card.rarity }), _jsx("p", { children: card.description })] })) }, card.id));
-                                    }) })] }), _jsx("button", { disabled: !canStart || isStreaming || isGenerating, onClick: () => void onStart(), children: "\u5F00\u59CB\u6E38\u620F" }), _jsx("p", { className: "status", children: status })] })) : (_jsxs("section", { className: "panel run-panel", children: [_jsxs("h2", { children: [run.age, " \u5C81 \u00B7 ", run.ageStage.label] }), _jsxs("p", { children: [statIcons.intelligence, "\u667A\u529B ", run.stats.intelligence, " \u00B7 ", statIcons.charisma, "\u9B45\u529B ", run.stats.charisma, " \u00B7 ", statIcons.family, "\u5BB6\u5883 ", run.stats.family, " \u00B7 ", statIcons.fortune, "\u6C14\u8FD0 ", run.stats.fortune, "\u00B7 ", statIcons.physique, "\u4F53\u9B44 ", run.stats.physique] }), _jsxs("p", { children: ["\u540D\u671B\uFF1A", run.fame, " \u00B7 \u7ED3\u5C40\u72B6\u6001\uFF1A", run.outcome === "ongoing" ? "进行中" : outcomeLabel(run.outcome)] }), _jsx("div", { className: "timeline-scroll", ref: timelineRef, children: timeline.slice(-14).map((item) => (_jsxs("article", { className: "narrative", children: [_jsxs("strong", { children: [item.age, "\u5C81 \u00B7 ", item.ageStage.label, " \u00B7 ", item.title] }), _jsx("div", { className: "delta-row", children: extractDeltaLabels(item).length === 0 ? (_jsx("small", { children: "\u5C5E\u6027\u53D8\u5316\uFF1A\u65E0" })) : (extractDeltaLabels(item).map((label, idx) => (_jsx("small", { children: label }, `${timelineKey(item)}-${idx}`)))) }), _jsx("p", { children: item.narrative })] }, timelineKey(item)))) }), _jsxs("section", { className: "decision-history", children: [_jsxs("div", { className: "decision-history-head", children: [_jsx("h3", { children: "\u6289\u62E9\u5386\u53F2" }), _jsx("small", {})] }), decisionHistory.length === 0 ? (_jsx("p", { className: "decision-history-empty", children: "\u6682\u65E0\u6289\u62E9\u8BB0\u5F55\u3002" })) : (_jsx("div", { className: "decision-history-list", children: decisionHistory.map((entry) => (_jsxs("article", { className: "decision-history-item", children: [_jsxs("p", { className: "decision-history-meta", children: [entry.age, "\u5C81 \u00B7 ", entry.ageStageLabel] }), _jsx("p", { className: "decision-history-bg", children: entry.background || "你走到了命运分岔口。" }), _jsxs("p", { className: "decision-history-choice", children: [_jsx("span", { className: "decision-choice-pill", children: entry.choiceLabel }), entry.choiceDescription] }), _jsx("div", { className: "decision-history-rolls", children: entry.rollLabels.length === 0 ? (_jsx("small", { className: "decision-roll-pill", children: "\u63B7\u70B9\uFF1A\u65E0\u660E\u663E\u53D8\u5316" })) : (entry.rollLabels.map((label, idx) => (_jsx("small", { className: "decision-roll-pill", children: label }, `${entry.id}-roll-${idx}`)))) })] }, entry.id))) }))] }), run.nextMilestoneChoice && phaseOf(run) === "waiting_decision" && timelineBuffer.length === 0 ? (_jsxs("div", { children: [_jsx("p", { children: run.nextMilestoneChoice.background ?? "你来到抉择时刻：" }), _jsx("div", { className: "row", children: run.nextMilestoneChoice.options.map((opt) => (_jsx("button", { disabled: isStreaming || isGenerating, onClick: () => void onDecision(opt.id), children: opt.label }, opt.id))) }), _jsx("div", { className: "row", children: run.nextMilestoneChoice.options.map((opt) => (_jsxs("small", { children: [opt.label, "\uFF1A", opt.description] }, `${opt.id}-desc`))) })] })) : null, !run.ended && !(run.nextMilestoneChoice && phaseOf(run) === "waiting_decision") ? (_jsx("div", { className: "row", children: _jsx("button", { disabled: isStreaming || isGenerating || !canAdvance(run), onClick: () => void onAdvance(), children: "\u7EE7\u7EED\u63A8\u8FDB\u5E74\u4EFD" }) })) : null, run.ended ? (_jsxs("div", { className: "ending", children: [_jsxs("div", { className: "ending-head", children: [_jsx("h3", { children: "\u7ED3\u5C40" }), _jsx("span", { className: `ending-pill ${run.outcome === "dead" ? "is-dead" : "is-ascended"}`, children: endingBadgeText(run) })] }), _jsxs("p", { className: "ending-meta", children: ["\u540D\u671B ", run.fame, " \u00B7 ", fameTitle(run.fame)] }), _jsx("blockquote", { className: "ending-quote", children: run.endingSummary ?? "命运已暂告一段落。" })] })) : null, _jsx("p", { className: "status", children: status })] })) }), showSettings ? (_jsx(AdminPanel, { onClose: () => setShowSettings(false), bootstrap: bootstrap, localApiKey: localApiKey, setLocalApiKey: setLocalApiKey, localProvider: localProvider, setLocalProvider: setLocalProvider, onConfirmEnvironment: onConfirmEnvironment, canConfirmEnv: canConfirmEnv, envReady: envReady, worldId: worldId, setWorldId: setWorldId, difficultyId: difficultyId, setDifficultyId: setDifficultyId })) : null, run?.ended && showEndingModal ? (_jsx("div", { className: "modal-mask", children: _jsxs("div", { className: "modal ending-modal", children: [_jsx("h2", { children: "\u672C\u5C40\u7ED3\u7B97" }), _jsxs("div", { className: "ending-summary-top", children: [_jsx("span", { className: `ending-pill ${run.outcome === "dead" ? "is-dead" : "is-ascended"}`, children: outcomeLabel(run.outcome) }), _jsx("small", { children: endingBadgeText(run) })] }), _jsxs("p", { children: ["\u540D\u671B\u5F97\u5206\uFF1A", run.fame] }), _jsxs("p", { children: ["\u79F0\u53F7\uFF1A", fameTitle(run.fame)] }), _jsx("blockquote", { className: "ending-quote ending-quote-modal", children: run.endingSummary ?? "命运已暂告一段落。" }), _jsxs("div", { className: "row", children: [_jsx("button", { onClick: playAgain, children: "\u518D\u6765\u4E00\u628A" }), _jsx("button", { className: "ghost", onClick: () => setShowEndingModal(false), children: "\u5173\u95ED" })] })] }) })) : null, showBusyModal ? (_jsx("div", { className: "modal-mask", children: _jsxs("div", { className: "modal ending-modal", children: [_jsx("h2", { children: "\u63D0\u793A" }), _jsx("p", { children: "\u670D\u52A1\u5668\u7E41\u5FD9\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5\u3002" }), _jsx("div", { className: "row", children: _jsx("button", { onClick: () => setShowBusyModal(false), children: "\u6211\u77E5\u9053\u4E86" }) })] }) })) : null, _jsx("footer", { className: "site-footer", children: _jsxs("a", { className: "repo-link", href: "https://github.com/Vcity-ci/life_remake", target: "_blank", rel: "noreferrer", children: [_jsx("svg", { className: "repo-icon", viewBox: "0 0 16 16", "aria-hidden": "true", focusable: "false", children: _jsx("path", { d: "M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.5-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z" }) }), _jsx("span", { children: "Vcity-ci/life_remake" })] }) })] }));
+                                    }) })] }), _jsxs("div", { className: "row", children: [_jsx("button", { disabled: !canStart || isStreaming || isGenerating, onClick: () => void onStart(), children: "\u5F00\u59CB\u6E38\u620F" }), _jsx("button", { className: "ghost", disabled: !canRandomStart || isStreaming || isGenerating, onClick: () => void onRandomStart(), children: "\u968F\u673A\u5206\u914D\u5E76\u5F00\u59CB" })] }), _jsx("p", { className: "status", children: status })] })) : (_jsxs("section", { className: "panel run-panel", children: [_jsxs("h2", { children: [run.age, " \u5C81 \u00B7 ", run.ageStage.label] }), _jsxs("p", { children: [statIcons.intelligence, "\u667A\u529B ", run.stats.intelligence, " \u00B7 ", statIcons.charisma, "\u9B45\u529B ", run.stats.charisma, " \u00B7 ", statIcons.family, "\u5BB6\u5883 ", run.stats.family, " \u00B7 ", statIcons.fortune, "\u6C14\u8FD0 ", run.stats.fortune, "\u00B7 ", statIcons.physique, "\u4F53\u9B44 ", run.stats.physique] }), _jsxs("p", { children: ["\u540D\u671B\uFF1A", run.fame, " \u00B7 \u7ED3\u5C40\u72B6\u6001\uFF1A", run.outcome === "ongoing" ? "进行中" : outcomeLabel(run.outcome)] }), _jsx("div", { className: "timeline-scroll", ref: timelineRef, children: timeline.slice(-14).map((item) => (_jsxs("article", { className: "narrative", children: [_jsxs("strong", { children: [item.age, "\u5C81 \u00B7 ", item.ageStage.label, " \u00B7 ", item.title] }), _jsx("div", { className: "delta-row", children: extractDeltaLabels(item).length === 0 ? (_jsx("small", { children: "\u5C5E\u6027\u53D8\u5316\uFF1A\u65E0" })) : (extractDeltaLabels(item).map((label, idx) => (_jsx("small", { children: label }, `${timelineKey(item)}-${idx}`)))) }), _jsx("p", { children: item.narrative })] }, timelineKey(item)))) }), _jsxs("section", { className: "decision-history", children: [_jsxs("div", { className: "decision-history-head", children: [_jsx("h3", { children: "\u6289\u62E9\u5386\u53F2" }), _jsx("small", {})] }), decisionHistory.length === 0 ? (_jsx("p", { className: "decision-history-empty", children: "\u6682\u65E0\u6289\u62E9\u8BB0\u5F55\u3002" })) : (_jsx("div", { className: "decision-history-list", children: decisionHistory.map((entry) => (_jsxs("article", { className: "decision-history-item", children: [_jsxs("p", { className: "decision-history-meta", children: [entry.age, "\u5C81 \u00B7 ", entry.ageStageLabel] }), _jsx("p", { className: "decision-history-bg", children: entry.background || "你走到了命运分岔口。" }), _jsxs("p", { className: "decision-history-choice", children: [_jsx("span", { className: "decision-choice-pill", children: entry.choiceLabel }), entry.choiceDescription] }), _jsx("div", { className: "decision-history-rolls", children: entry.rollLabels.length === 0 ? (_jsx("small", { className: "decision-roll-pill", children: "\u63B7\u70B9\uFF1A\u65E0\u660E\u663E\u53D8\u5316" })) : (entry.rollLabels.map((label, idx) => (_jsx("small", { className: "decision-roll-pill", children: label }, `${entry.id}-roll-${idx}`)))) })] }, entry.id))) }))] }), run.nextMilestoneChoice && phaseOf(run) === "waiting_decision" && timelineBuffer.length === 0 ? (_jsxs("div", { children: [_jsx("p", { children: run.nextMilestoneChoice.background ?? "你来到抉择时刻：" }), _jsx("div", { className: "row", children: run.nextMilestoneChoice.options.map((opt) => (_jsx("button", { disabled: isStreaming || isGenerating, onClick: () => void onDecision(opt.id), children: opt.label }, opt.id))) }), _jsx("div", { className: "row", children: run.nextMilestoneChoice.options.map((opt) => (_jsxs("small", { children: [opt.label, "\uFF1A", opt.description] }, `${opt.id}-desc`))) })] })) : null, !run.ended && !(run.nextMilestoneChoice && phaseOf(run) === "waiting_decision") ? (_jsx("div", { className: "row", children: _jsx("button", { disabled: isStreaming || isGenerating || !canAdvance(run), onClick: () => void onAdvance(), children: "\u7EE7\u7EED\u63A8\u8FDB\u5E74\u4EFD" }) })) : null, run.ended ? (_jsxs("div", { className: "ending", children: [_jsxs("div", { className: "ending-head", children: [_jsx("h3", { children: "\u7ED3\u5C40" }), _jsx("span", { className: `ending-pill ${run.outcome === "dead" ? "is-dead" : "is-ascended"}`, children: endingBadgeText(run) })] }), _jsxs("p", { className: "ending-meta", children: ["\u540D\u671B ", run.fame, " \u00B7 ", fameTitle(run.fame)] }), _jsx("blockquote", { className: "ending-quote", children: run.endingSummary ?? "命运已暂告一段落。" })] })) : null, _jsx("p", { className: "status", children: status })] })) }), showSettings ? (_jsx(AdminPanel, { onClose: () => setShowSettings(false), bootstrap: bootstrap, localApiKey: localApiKey, setLocalApiKey: setLocalApiKey, localProvider: localProvider, setLocalProvider: setLocalProvider, onConfirmEnvironment: onConfirmEnvironment, canConfirmEnv: canConfirmEnv, envReady: envReady, worldId: worldId, setWorldId: setWorldId, difficultyId: difficultyId, setDifficultyId: setDifficultyId })) : null, run?.ended && showEndingModal ? (_jsx("div", { className: "modal-mask", children: _jsxs("div", { className: "modal ending-modal", children: [_jsx("h2", { children: "\u672C\u5C40\u7ED3\u7B97" }), _jsxs("div", { className: "ending-summary-top", children: [_jsx("span", { className: `ending-pill ${run.outcome === "dead" ? "is-dead" : "is-ascended"}`, children: outcomeLabel(run.outcome) }), _jsx("small", { children: endingBadgeText(run) })] }), _jsxs("p", { children: ["\u540D\u671B\u5F97\u5206\uFF1A", run.fame] }), _jsxs("p", { children: ["\u79F0\u53F7\uFF1A", fameTitle(run.fame)] }), _jsx("blockquote", { className: "ending-quote ending-quote-modal", children: run.endingSummary ?? "命运已暂告一段落。" }), _jsxs("div", { className: "row", children: [_jsx("button", { onClick: playAgain, children: "\u518D\u6765\u4E00\u628A" }), _jsx("button", { className: "ghost", onClick: () => setShowEndingModal(false), children: "\u5173\u95ED" })] })] }) })) : null, showBusyModal ? (_jsx("div", { className: "modal-mask", children: _jsxs("div", { className: "modal ending-modal", children: [_jsx("h2", { children: "\u63D0\u793A" }), _jsx("p", { children: "\u670D\u52A1\u5668\u7E41\u5FD9\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5\u3002" }), _jsx("div", { className: "row", children: _jsx("button", { onClick: () => setShowBusyModal(false), children: "\u6211\u77E5\u9053\u4E86" }) })] }) })) : null, _jsx("footer", { className: "site-footer", children: _jsxs("a", { className: "repo-link", href: "https://github.com/Vcity-ci/life_remake", target: "_blank", rel: "noreferrer", children: [_jsx("svg", { className: "repo-icon", viewBox: "0 0 16 16", "aria-hidden": "true", focusable: "false", children: _jsx("path", { d: "M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.5-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z" }) }), _jsx("span", { children: "Vcity-ci/life_remake" })] }) })] }));
 }

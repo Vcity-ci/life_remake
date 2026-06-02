@@ -173,11 +173,11 @@ export function createDefaultGameplayTuning(): GameplayTuning {
       minEligibleAge: 5,
       guaranteeYears: 20,
       triggerRateByStage: {
-        child: 0.1,
-        youth: 0.2,
-        prime: 0.3,
-        middle: 0.3,
-        elder: 0.3
+        child: 0.05,
+        youth: 0.1,
+        prime: 0.15,
+        middle: 0.15,
+        elder: 0.15
       }
     },
     stage: {
@@ -259,15 +259,15 @@ export function createDefaultGameplayTuning(): GameplayTuning {
       finalRiskClampMax: 0.85
     },
     ascension: {
-      deterministicStatThreshold: 35,
+      deterministicStatThreshold: 50,
       chanceA: 0.02,
       chanceB: 0.02,
       chanceC: 0.02,
-      highStatsThresholdA: 20,
-      highStatsThresholdC: 20,
-      fortuneThresholdA: 25,
+      highStatsThresholdA: 3,
+      highStatsThresholdC: 3,
+      fortuneThresholdA: 45,
       legendaryCountThresholdB: 1,
-      intelligenceThresholdB: 20
+      intelligenceThresholdB: 40
     },
     fame: {
       intelligenceWeight: 1,

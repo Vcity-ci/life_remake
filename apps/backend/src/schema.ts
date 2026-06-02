@@ -231,9 +231,9 @@ const gameplayTuningSchema = z.object({
     chanceC: z.number().min(0).max(1),
     highStatsThresholdA: z.number().int().min(1).max(5),
     highStatsThresholdC: z.number().int().min(1).max(5),
-    fortuneThresholdA: z.number().int().min(0).max(30),
+    fortuneThresholdA: z.number().int().min(0).max(60),
     legendaryCountThresholdB: z.number().int().min(0).max(10),
-    intelligenceThresholdB: z.number().int().min(0).max(30)
+    intelligenceThresholdB: z.number().int().min(0).max(60)
   }),
   fame: z.object({
     intelligenceWeight: z.number().min(0).max(3),

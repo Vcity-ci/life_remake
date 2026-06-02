@@ -617,7 +617,7 @@ function buildSystemPrompt(
   const yearMode = mode === "year";
   const milestoneMode = mode === "milestone";
   const endingMode = mode === "ending";
-  const worldlineSummary = compactText(ctx.worldlineSummary, 120);
+  const worldlineSummary = compactText(ctx.worldlineSummary, endingMode ? 260 : 120);
   const factionSummary = compactPipeSummary(ctx.factionSummary, {
     maxSegments: 3,
     maxSegmentLen: 42,
@@ -642,12 +642,12 @@ function buildSystemPrompt(
   const modeAddon = yearMode
     ? `R:Y2 ${compactText(promptPack.factionForeshadowRule, 96)}`
     : endingMode
-      ? "R:E2 只做收束，不扩展新支线。"
+      ? "R:E2 只做收束，不扩展新支线；飞升结局重点写原因，结合BG主线/世界规则/前史说明为何走到飞升，结果一句带过。"
       : "";
 
   const worldBackground = [
     `W0 ${compactText(world.name, 24)}`,
-    `W1 ${compactText(world.stylePrompt, 64)}`,
+    `W1 ${compactText(world.stylePrompt, endingMode ? 96 : 64)}`,
     worldlineSummary ? `W2 ${worldlineSummary}` : "",
     factionSummary ? `W3 ${factionSummary}` : "",
     eventPoolSummary ? `W4 ${eventPoolSummary}` : "",
@@ -915,8 +915,11 @@ function buildEndingPrompt(run: InternalRunState, baseEnding: string): string {
   const outcomeRule = run.outcome === "dead"
     ? "必须明确死亡原因，不得改写死亡年龄与名望。"
     : run.outcome === "ascended"
-      ? "必须点明飞升称号或类型，并写出余韵或代价。"
+      ? "必须点明飞升称号或类型；重点写原因而非结果：结合系统BG中的世界背景、主线冲突、阶段目标，以及最近经历/属性/天赋，解释为何此人会走到飞升；结果一句带过并写出代价或余韵。"
       : "必须点明人生收束与总体评价。";
+  const lengthRule = run.outcome === "ascended"
+    ? "R:ELEN 110-170字，2-3句；只输出结算文案；先写飞升原因，再一句带过结果；不做同义重复。"
+    : "R:ELEN 80-140字，2-3句；只输出结算文案；不扩写新支线；不做同义重复。";
 
   return [
     "T:E 结局收束任务。",
@@ -925,7 +928,7 @@ function buildEndingPrompt(run: InternalRunState, baseEnding: string): string {
     `S2 cards=${compactText(cards, 52)} key=${compactText(summarizeEndingRecent(run.history), 120)}`,
     `S3 base=${compactText(baseEnding, 70)}`,
     `R:E ${outcomeRule}`,
-    "R:ELEN 80-140字，2-3句；只输出结算文案；不扩写新支线；不做同义重复。"
+    lengthRule
   ].join("\n");
 }
 

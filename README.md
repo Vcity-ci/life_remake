@@ -91,6 +91,7 @@ docs/        # 全量文档
 
 - [使用流程](./docs/USAGE_FLOW.md)
 - [配置指南](./docs/CONFIG_GUIDE.md)
+- [小说蒸馏成新图配置操作文档](./docs/NOVEL_DISTILLATION_GUIDE.md)
 - [架构文档](./docs/ARCHITECTURE.md)
 - [技术文档](./docs/TECHNICAL.md)
 - [部署手册（Windows Server + IIS）](./docs/DEPLOYMENT.md)

@@ -288,13 +288,27 @@ function summarizeWorldline(worldline: unknown): string {
     coreConflict?: string;
     socialOrder?: string;
     taboos?: string[];
+    mainlineStages?: Array<{ stage?: string; ageRange?: string; goal?: string }>;
   };
+  const stages = Array.isArray(w.mainlineStages)
+    ? w.mainlineStages
+        .map((stage) => {
+          const name = stage.stage?.trim();
+          const ageRange = stage.ageRange?.trim();
+          const goal = stage.goal?.trim();
+          if (!name && !ageRange && !goal) return "";
+          return `${name || "阶段"}${ageRange ? `(${ageRange})` : ""}${goal ? `=${goal}` : ""}`;
+        })
+        .filter(Boolean)
+        .join("；")
+    : "";
   return [
     w.eraName ? `时代:${w.eraName}` : "",
     w.timeframe ? `时间:${w.timeframe}` : "",
     w.coreConflict ? `主冲突:${w.coreConflict}` : "",
     w.socialOrder ? `秩序:${w.socialOrder}` : "",
-    w.taboos?.length ? `禁忌:${w.taboos.join("、")}` : ""
+    w.taboos?.length ? `禁忌:${w.taboos.join("、")}` : "",
+    stages ? `阶段:${stages}` : ""
   ].filter(Boolean).join(" | ");
 }
 

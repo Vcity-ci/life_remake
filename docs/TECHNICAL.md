@@ -115,3 +115,13 @@ docs/
 - 全量：`npm run build`
 - 后端：`npm run build -w @reroll/backend`
 - 前端：`npm run build -w @reroll/frontend`
+
+## 10. 当前叙事运行时对齐（2026-08-15 01:22 +08:00，增量）
+
+> 本节补充当前代码状态；如与第 6 节的历史简述冲突，以本节为准。
+
+- `apps/backend/src/narrative.ts` 将世界包定义投影为分层上下文，并以事实、活跃场景、路线承诺、高潮与回收状态计算主线完成；当前不使用 RAG。
+- `apps/backend/src/engine.ts` 负责候选过滤、事实账本、属性结算、`TurnRecord` 和结局状态机。模型永远不能直接修改这些状态。
+- `apps/backend/src/ai.ts` 的常规导演工具为 `propose_story_intent`；主线完成后的强制工具为 `request_story_closure`。两者只传递意图，不传递事件 ID、数值或结局极性。
+- 叙事世界包中的 `endingBlueprints` 提供路线的好/坏结局大纲。引擎先锁定蓝图，再请求最终结局文本；最终文本调用失败时保留引擎结算摘要。
+- 古代叙事世界的最终 outcome 可为 `completed`；死亡仍是立即中断，旧的 `ascended` 仅保留给未启用叙事世界包的兼容路径。

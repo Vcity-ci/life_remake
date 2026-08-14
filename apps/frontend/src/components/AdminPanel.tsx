@@ -34,8 +34,8 @@ interface Props {
 
 const defaultProvider: ProviderConfig = {
   provider: "openai-compatible",
-  baseUrl: "https://api.openai.com/v1",
-  model: "",
+  baseUrl: "https://api.deepseek.com",
+  model: "deepseek-v4-flash",
   apiPath: "/chat/completions",
   temperature: 0.9,
   maxTokens: 1824,

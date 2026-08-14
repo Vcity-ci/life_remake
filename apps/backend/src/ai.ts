@@ -1,9 +1,11 @@
 import OpenAI from "openai";
 import { createHash } from "node:crypto";
 import type { InternalRunState } from "./engine.js";
-import type { AiMilestoneOptions, DecisionType, ProviderConfig, Stats, WorldConfig, YearEvent } from "@reroll/shared";
+import type { ChatConversationState, ChatHistoryMessage, StoryConversationState, ToolCallRecord } from "./conversation.js";
+import type { AiMilestoneOptions, DecisionType, EventStoryPosition, NarrativeIntent, ProviderConfig, Stats, WorldConfig, YearEvent } from "@reroll/shared";
+import { formatNarrativePromptPlan, type NarrativePromptPlan } from "./narrative.js";
 
-interface NarrativeContext {
+export interface NarrativeContext {
   providerConfig: ProviderConfig;
   apiKey: string;
   promptPack: Record<string, string>;
@@ -13,19 +15,7 @@ interface NarrativeContext {
   talentHookSummary?: string;
   recentNarratives?: string[];
   conversation?: ChatConversationState;
-}
-
-interface ChatHistoryMessage {
-  role: "user" | "assistant";
-  content: string;
-}
-
-interface ChatConversationState {
-  systemHash: string;
-  headCore: string;
-  headMemory: string;
-  history: ChatHistoryMessage[];
-  archive: Array<{ user: string; assistant: string }>;
+  narrativePlan?: NarrativePromptPlan;
 }
 
 type ChatContentPart = { type?: string; text?: string };
@@ -36,6 +26,7 @@ interface StructuredOutputSpec {
 }
 interface CallModelOptions {
   structuredOutput?: StructuredOutputSpec;
+  jsonMode?: boolean;
   conversation?: ChatConversationState;
 }
 interface ModelCallResult {
@@ -46,6 +37,122 @@ interface ModelCallResult {
 interface YearNarrativeOptions {
   avoidNarratives?: string[];
 }
+
+export interface DirectedFocusInput {
+  id: string;
+  storyPosition?: EventStoryPosition;
+  candidateCount: number;
+}
+
+export interface DirectedFocusSelection {
+  focusTag: string;
+  conversationTurn: {
+    userPrompt: string;
+    toolCall: ToolCallRecord;
+  };
+}
+
+export interface DirectedNarrativeInput {
+  id: string;
+  title: string;
+  factionId?: string;
+  tags: string[];
+  promptHook: string;
+  outcomeHint: string;
+  focusTag: string;
+}
+
+export interface DirectedNarrativeResult {
+  narrative: string;
+  milestoneCopy?: {
+    background: string;
+    optionOverrides: Array<{
+      id: DecisionType;
+      label: string;
+      description: string;
+    }>;
+  };
+}
+
+export interface DirectedStoryMaterial extends DirectedNarrativeInput {
+  directionIds: string[];
+}
+
+export interface DirectedStoryDirectionInput {
+  id: string;
+  label: string;
+  summary: string;
+  focusTags: string[];
+  storyPosition?: EventStoryPosition;
+  materialIds: string[];
+}
+
+export interface DirectedStoryChoiceDirection {
+  decision: DecisionType;
+  directionId: string;
+  label: string;
+  summary: string;
+}
+
+export interface DirectedStoryTurnInput {
+  allowedIntents: NarrativeIntent[];
+  focusOptions?: Array<{
+    id: string;
+    label: string;
+    hint: string;
+  }>;
+  allowClosureRequest: boolean;
+  /** The engine has completed the mainline; no new scene may be proposed. */
+  closureRequired?: boolean;
+}
+
+export interface DirectedStoryTurnResult {
+  intent?: NarrativeIntent;
+  focusComponentId?: string;
+  closureRequest?: "guide";
+  toolCall: ToolCallRecord;
+  continuation: DirectedStoryContinuation;
+}
+
+export interface DirectedStoryContinuation {
+  protocol: "chat" | "responses";
+  systemPrompt: string;
+  userPrompt: string;
+  responseId?: string;
+}
+
+export interface DirectedStoryRenderInput {
+  kind: "normal" | "milestone";
+  intent: NarrativeIntent;
+  premise: string;
+  outcomeHint: string;
+  sceneHint?: string;
+  focus?: {
+    label: string;
+    hint: string;
+  };
+  turn: DirectedStoryTurnResult;
+}
+
+export interface DirectedStoryRenderResult {
+  narrative: string;
+  toolResult: string;
+}
+
+export class DirectedStoryTurnError extends Error {
+  constructor(code: "directed_story_turn_unavailable" | "directed_story_turn_invalid_output" | "directed_story_tools_unavailable") {
+    super(code);
+    this.name = "DirectedStoryTurnError";
+  }
+}
+
+export class DirectedStoryRenderError extends Error {
+  constructor(code: "directed_story_render_unavailable" | "directed_story_render_invalid_output") {
+    super(code);
+    this.name = "DirectedStoryRenderError";
+  }
+}
+
 interface PromptPackResolved {
   systemCore: string;
   immersionRules: string;
@@ -67,6 +174,10 @@ const CHAT_WINDOW_ROUNDS = 3;
 const ARCHIVE_SUMMARY_BATCH_ROUNDS = 10;
 const CHAT_SUMMARY_MAX_LEN = 120;
 const CHAT_HISTORY_ITEM_MAX_LEN = 220;
+const CHAT_TOOL_CALL_ARGUMENT_MAX_LEN = 800;
+const CHAT_TOOL_RESULT_MAX_LEN = 260;
+const CHAT_TOOL_NAME_MAX_LEN = 64;
+const CHAT_TOOL_CALL_ID_MAX_LEN = 80;
 const SHORT_YEAR_MIN_CHARS = 50;
 const SHORT_YEAR_MAX_CHARS = 80;
 const archiveSummaryJobs = new WeakMap<ChatConversationState, Promise<void>>();
@@ -78,6 +189,9 @@ const SEMANTIC_CACHE_ENABLED = process.env.SEMANTIC_CACHE_ENABLED !== "0";
 const SEMANTIC_CACHE_MAX = Number(process.env.SEMANTIC_CACHE_MAX ?? "500");
 const clientCache = new Map<string, OpenAI>();
 const CLIENT_CACHE_MAX = 64;
+const toolSupportCache = new Map<string, boolean>();
+type JsonOutputMode = "json-schema" | "json-object" | "plain";
+const structuredOutputSupportCache = new Map<string, JsonOutputMode>();
 const fallbackPromptPack: PromptPackResolved = {
   systemCore: "你是一个高度沉浸的TRPG人生旁白。你必须严格遵循引擎状态，不得修改年龄、属性、结局状态，不得跳出世界观。",
   immersionRules: "统一规则：第二人称；画面+动作+后果；信息简洁但有戏剧张力；不使用条目符号；不出现系统提示语。",
@@ -225,6 +339,116 @@ function createConversationState(systemHash: string, headCore: string): ChatConv
   };
 }
 
+function normalizeStoryConversationState(input: unknown): StoryConversationState | undefined {
+  if (!input || typeof input !== "object" || Array.isArray(input)) return undefined;
+  const state = input as Partial<StoryConversationState>;
+  const persona = typeof state.persona === "string" ? normalizeChatText(state.persona, 120) : "";
+  if (!persona) return undefined;
+  const closureState = state.closureState === "guiding" || state.closureState === "finished"
+    ? state.closureState
+    : "open";
+  const narrativeState = state.narrative;
+  const validArcPhases = ["setup", "rising", "pressure", "climax", "aftermath", "ending"] as const;
+  const validEndingStates = ["open", "eligible", "locked", "guiding", "finished"] as const;
+  const narrative = narrativeState && validArcPhases.includes(narrativeState.arcPhase) && validEndingStates.includes(narrativeState.endingState)
+    ? {
+        arcPhase: narrativeState.arcPhase,
+        climaxCount: Math.max(0, Math.min(8, Number(narrativeState.climaxCount) || 0)),
+        payoffCount: Math.max(0, Math.min(8, Number(narrativeState.payoffCount) || 0)),
+        endingState: narrativeState.endingState
+      }
+    : undefined;
+  return {
+    version: 1,
+    persona,
+    currentConflict: typeof state.currentConflict === "string"
+      ? normalizeChatText(state.currentConflict, 180)
+      : "既有处境仍待推进。",
+    recentAftermath: typeof state.recentAftermath === "string"
+      ? normalizeChatText(state.recentAftermath, 180)
+      : "",
+    closureState,
+    narrative
+  };
+}
+
+function syncStoryConversationState(conversation: ChatConversationState, run: InternalRunState): void {
+  conversation.storyState = {
+    version: 1,
+    persona: normalizeChatText(run.personaPrompt, 120),
+    currentConflict: normalizeChatText(run.narrative.scene.conflict, 180) || "既有处境仍待推进。",
+    recentAftermath: normalizeChatText(run.narrative.scene.aftermath, 180),
+    closureState: run.story.closureState,
+    narrative: run.narrative.enabled
+      ? {
+          arcPhase: run.narrative.arcPhase,
+          climaxCount: run.narrative.climaxCount,
+          payoffCount: run.narrative.payoffCount,
+          endingState: run.narrative.endingState
+        }
+      : undefined
+  };
+}
+
+function formatStoryConversationState(state: StoryConversationState): string {
+  return [
+    `人物=${state.persona}`,
+    `当前矛盾=${state.currentConflict}`,
+    state.recentAftermath ? `此前后果=${state.recentAftermath}` : ""
+  ].join("；");
+}
+
+function normalizeToolArguments(input: unknown): string {
+  let source = "";
+  if (typeof input === "string") {
+    source = input.trim();
+  } else if (input && typeof input === "object") {
+    try {
+      source = JSON.stringify(input);
+    } catch {
+      source = "";
+    }
+  }
+  if (!source) return "{}";
+  if (source.length <= CHAT_TOOL_CALL_ARGUMENT_MAX_LEN) return source;
+  return JSON.stringify({ truncated: true, preview: compactText(source, CHAT_TOOL_CALL_ARGUMENT_MAX_LEN - 80) });
+}
+
+function normalizeChatHistoryMessage(input: unknown): ChatHistoryMessage | null {
+  if (!input || typeof input !== "object") return null;
+  const value = input as {
+    role?: unknown;
+    content?: unknown;
+    toolCall?: { id?: unknown; name?: unknown; arguments?: unknown };
+    toolCallId?: unknown;
+    name?: unknown;
+  };
+  if (value.role === "assistant" && value.toolCall) {
+    const id = normalizeChatText(typeof value.toolCall.id === "string" ? value.toolCall.id : "", CHAT_TOOL_CALL_ID_MAX_LEN);
+    const name = normalizeChatText(typeof value.toolCall.name === "string" ? value.toolCall.name : "", CHAT_TOOL_NAME_MAX_LEN);
+    if (!id || !name) return null;
+    return {
+      role: "assistant",
+      toolCall: {
+        id,
+        name,
+        arguments: normalizeToolArguments(value.toolCall.arguments)
+      }
+    };
+  }
+  if (value.role === "tool") {
+    const toolCallId = normalizeChatText(typeof value.toolCallId === "string" ? value.toolCallId : "", CHAT_TOOL_CALL_ID_MAX_LEN);
+    const name = normalizeChatText(typeof value.name === "string" ? value.name : "", CHAT_TOOL_NAME_MAX_LEN);
+    const content = normalizeChatText(typeof value.content === "string" ? value.content : "", CHAT_TOOL_RESULT_MAX_LEN);
+    return toolCallId && name && content ? { role: "tool", toolCallId, name, content } : null;
+  }
+  if (value.role === "user" || value.role === "assistant") {
+    const content = normalizeChatText(typeof value.content === "string" ? value.content : "", CHAT_HISTORY_ITEM_MAX_LEN);
+    return content ? { role: value.role, content: value.role === "user" ? projectConversationUserPrompt(content) : content } : null;
+  }
+  return null;
+}
+
 function ensureConversationState(
   conversation: ChatConversationState | undefined,
   systemHash: string,
@@ -237,18 +461,15 @@ function ensureConversationState(
     systemHash,
     headCore: normalizeChatText(conversation.headCore || headCore, 2600) || normalizeChatText(headCore, 2600),
     headMemory: normalizeChatText(conversation.headMemory || "", CHAT_SUMMARY_MAX_LEN),
+    storyState: normalizeStoryConversationState(conversation.storyState),
     history: conversation.history
-      .filter((item) => item && (item.role === "user" || item.role === "assistant"))
-      .map((item) => ({
-        role: item.role,
-        content: normalizeChatText(item.content, CHAT_HISTORY_ITEM_MAX_LEN)
-      }))
-      .filter((item) => item.content.length > 0),
+      .map(normalizeChatHistoryMessage)
+      .filter((item): item is ChatHistoryMessage => item !== null),
     archive: Array.isArray(conversation.archive)
       ? conversation.archive
         .filter((x) => x && typeof x.user === "string" && typeof x.assistant === "string")
         .map((x) => ({
-          user: normalizeChatText(x.user, CHAT_HISTORY_ITEM_MAX_LEN),
+          user: projectConversationUserPrompt(normalizeChatText(x.user, CHAT_HISTORY_ITEM_MAX_LEN)),
           assistant: normalizeChatText(x.assistant, CHAT_HISTORY_ITEM_MAX_LEN)
         }))
         .filter((x) => x.user && x.assistant)
@@ -257,8 +478,11 @@ function ensureConversationState(
 }
 
 function buildSystemMessage(conversation: ChatConversationState): string {
-  if (!conversation.headMemory.trim()) return conversation.headCore;
-  return `${conversation.headCore}\nM0 历史摘要：${conversation.headMemory.trim()}`;
+  return [
+    conversation.headCore,
+    conversation.storyState ? `M1 主线账本：${formatStoryConversationState(conversation.storyState)}` : "",
+    conversation.headMemory.trim() ? `M0 历史摘要：${conversation.headMemory.trim()}` : ""
+  ].filter(Boolean).join("\n");
 }
 
 function buildSemanticGrams(text: string): string[] {
@@ -357,35 +581,112 @@ function pushHistory(conversation: ChatConversationState, role: "user" | "assist
   conversation.history.push({ role, content: normalized });
 }
 
-function pairHistory(history: ChatHistoryMessage[]): Array<{ user: string; assistant: string }> {
-  const pairs: Array<{ user: string; assistant: string }> = [];
-  let pendingUser: string | null = null;
+function pushToolCall(conversation: ChatConversationState, toolCall: ToolCallRecord): void {
+  const id = normalizeChatText(toolCall.id, CHAT_TOOL_CALL_ID_MAX_LEN);
+  const name = normalizeChatText(toolCall.name, CHAT_TOOL_NAME_MAX_LEN);
+  if (!id || !name) return;
+  conversation.history.push({
+    role: "assistant",
+    toolCall: {
+      id,
+      name,
+      arguments: normalizeToolArguments(toolCall.arguments)
+    }
+  });
+}
+
+function pushToolResult(
+  conversation: ChatConversationState,
+  toolCall: ToolCallRecord,
+  content: string
+): void {
+  const toolCallId = normalizeChatText(toolCall.id, CHAT_TOOL_CALL_ID_MAX_LEN);
+  const name = normalizeChatText(toolCall.name, CHAT_TOOL_NAME_MAX_LEN);
+  const normalized = normalizeChatText(content, CHAT_TOOL_RESULT_MAX_LEN);
+  if (!toolCallId || !name || !normalized) return;
+  conversation.history.push({ role: "tool", toolCallId, name, content: normalized });
+}
+
+function isTextHistoryMessage(
+  item: ChatHistoryMessage
+): item is Extract<ChatHistoryMessage, { role: "user" | "assistant"; content: string }> {
+  return item.role === "user" || (item.role === "assistant" && "content" in item);
+}
+
+interface ConversationRound {
+  user: string;
+  assistant: string;
+  messages: ChatHistoryMessage[];
+}
+
+function collectConversationRounds(history: ChatHistoryMessage[]): ConversationRound[] {
+  const rounds: ConversationRound[] = [];
+  let pendingUser = "";
+  let pendingMessages: ChatHistoryMessage[] = [];
   for (const item of history) {
-    if (item.role === "user") {
+    if (isTextHistoryMessage(item) && item.role === "user") {
       pendingUser = item.content;
+      pendingMessages = [item];
       continue;
     }
-    if (item.role === "assistant" && pendingUser) {
-      pairs.push({ user: pendingUser, assistant: item.content });
-      pendingUser = null;
+    if (!pendingUser) continue;
+    pendingMessages.push(item);
+    if (isTextHistoryMessage(item) && item.role === "assistant") {
+      rounds.push({ user: pendingUser, assistant: item.content, messages: pendingMessages });
+      pendingUser = "";
+      pendingMessages = [];
     }
   }
-  return pairs;
+  return rounds;
+}
+
+function formatToolHistoryMessage(item: ChatHistoryMessage): string {
+  if (item.role === "assistant" && "toolCall" in item) {
+    return "";
+  }
+  if (item.role === "tool") {
+    return "";
+  }
+  return item.content;
+}
+
+function buildConversationHistoryMessages(conversation: ChatConversationState): Array<{ role: "user" | "assistant"; content: string }> {
+  return collectConversationRounds(conversation.history).flatMap((round) => {
+    const assistantContent = round.messages
+      .slice(1)
+      .map(formatToolHistoryMessage)
+      .filter(Boolean)
+      .join("\n");
+    return assistantContent
+      ? [
+          { role: "user" as const, content: projectConversationUserPrompt(round.user) },
+          { role: "assistant" as const, content: compactText(assistantContent, 620) }
+        ]
+      : [];
+  });
+}
+
+function projectConversationUserPrompt(prompt: string): string {
+  const normalized = prompt.trim();
+  const age = normalized.match(/(?:\bS0 age=|\bage=|年龄=)(\d+)/)?.[1] ?? "下一";
+  if (/^T:(?:D4|I)\b/.test(normalized)) {
+    return `岁月推进至${age}岁，人物继续面对当时的主要矛盾。`;
+  }
+  if (/^T:Y\b/.test(normalized)) return `岁月推进至${age}岁，叙事承接此前的处境。`;
+  if (/^T:M\b/.test(normalized)) return `人物在${age}岁来到一处需要取舍的关口。`;
+  if (/^T:E\b/.test(normalized)) return "这一生已经走到结局，请回望已发生的关键后果。";
+  return prompt;
 }
 
 function keepRecentRounds(conversation: ChatConversationState): void {
-  const pairs = pairHistory(conversation.history);
-  const recentPairs = pairs.slice(-CHAT_WINDOW_ROUNDS);
+  const rounds = collectConversationRounds(conversation.history);
+  const recentRounds = rounds.slice(-CHAT_WINDOW_ROUNDS);
+  const pairs = rounds.map(({ user, assistant }) => ({ user, assistant }));
   const overflowPairs = pairs.slice(0, Math.max(0, pairs.length - CHAT_WINDOW_ROUNDS));
   if (overflowPairs.length > 0) {
     conversation.archive.push(...overflowPairs);
   }
-  const nextHistory: ChatHistoryMessage[] = [];
-  for (const pair of recentPairs) {
-    nextHistory.push({ role: "user", content: pair.user });
-    nextHistory.push({ role: "assistant", content: pair.assistant });
-  }
-  conversation.history = nextHistory;
+  conversation.history = recentRounds.flatMap((round) => round.messages);
 }
 
 async function summarizeOverflowPairs(
@@ -571,23 +872,55 @@ function fallbackLine(event: YearEvent): string {
   return "这一年平静而充实，你也在悄悄成长。";
 }
 
+function debugDirectedStoryTurn(
+  status: "success" | "truncated" | "invalid" | "error",
+  startedAt: number,
+  structuredOutput: boolean,
+  error?: unknown
+): void {
+  if (!debugModel) return;
+  console.log("[model-debug:directed-story-turn]", {
+    status,
+    elapsedMs: Date.now() - startedAt,
+    structuredOutput,
+    failure: error
+      ? isLikelyStructuredOutputUnsupported(error)
+        ? "structured_output_unsupported"
+        : isRetryableModelError(error)
+          ? "transient"
+          : "provider"
+      : undefined
+  });
+}
+
+function buildToolSupportCacheKey(ctx: NarrativeContext): string {
+  return `${ctx.providerConfig.baseUrl}|${ctx.providerConfig.model}|${ctx.providerConfig.apiPath}`;
+}
+
+export function isDirectedToolAvailable(provider: ProviderConfig): boolean {
+  if (provider.apiPath !== "/chat/completions" && provider.apiPath !== "/responses") return false;
+  const key = `${provider.baseUrl}|${provider.model}|${provider.apiPath}`;
+  return toolSupportCache.get(key) !== false;
+}
+
+function isLikelyToolUnsupported(error: unknown): boolean {
+  const maybe = error as { status?: number; message?: string; code?: string; type?: string };
+  if (maybe?.status !== 400 && maybe?.status !== 404 && maybe?.status !== 422) return false;
+  const text = `${maybe?.code ?? ""} ${maybe?.type ?? ""} ${maybe?.message ?? ""}`.toLowerCase();
+  return /tool_calls|tools|function calling|function_call|tool choice/.test(text) && /unsupported|unknown|invalid|not found|not permitted/.test(text);
+}
+
+function isLikelyToolTranscriptUnsupported(error: unknown): boolean {
+  const maybe = error as { status?: number; message?: string; code?: string; type?: string };
+  if (maybe?.status !== 400 && maybe?.status !== 422) return false;
+  const text = `${maybe?.code ?? ""} ${maybe?.type ?? ""} ${maybe?.message ?? ""}`.toLowerCase();
+  return /tool_call_id|role.*tool|messages.*tool|tool_calls.*message/.test(text);
+}
+
 function isLikelyTruncated(text: string): boolean {
   const t = text.trim();
   if (!t) return false;
   return !/[。！？!?…】）)」』]$/.test(t);
-}
-
-function forceNarrativeClosure(text: string): string {
-  const trimmed = text.trim();
-  if (!trimmed) return "";
-  if (!isLikelyTruncated(trimmed)) return trimmed;
-  if (/[，、,:：]$/.test(trimmed)) {
-    return `${trimmed}这一年也就此收束。`;
-  }
-  if (trimmed.length <= 14) {
-    return `${trimmed}。`;
-  }
-  return `${trimmed}，这一年也就此收束。`;
 }
 
 async function continueNarrative(
@@ -634,35 +967,42 @@ function buildSystemPrompt(
     maxTotalLen: 120
   });
   const modeRule = yearMode
-    ? `R:Y ${compactText(`${promptPack.yearNormalRule} ${promptPack.yearMinorRule}`, 140)}`
+    ? compactText(`${promptPack.yearNormalRule} ${promptPack.yearMinorRule}`, 140)
     : milestoneMode
-      ? `R:M ${compactText(promptPack.milestoneRule, 140)}`
-      : `R:E ${compactText(promptPack.endingHint, 120)}`;
+      ? compactText(promptPack.milestoneRule, 140)
+      : compactText(promptPack.endingHint, 120);
 
   const modeAddon = yearMode
-    ? `R:Y2 ${compactText(promptPack.factionForeshadowRule, 96)}`
+    ? compactText(promptPack.factionForeshadowRule, 96)
     : endingMode
       ? "R:E2 只做收束，不扩展新支线；飞升结局重点写原因，结合BG主线/世界规则/前史说明为何走到飞升，结果一句带过。"
       : "";
 
   const worldBackground = [
-    `W0 ${compactText(world.name, 24)}`,
-    `W1 ${compactText(world.stylePrompt, endingMode ? 96 : 64)}`,
-    worldlineSummary ? `W2 ${worldlineSummary}` : "",
-    factionSummary ? `W3 ${factionSummary}` : "",
-    eventPoolSummary ? `W4 ${eventPoolSummary}` : "",
-    talentHookSummary ? `W5 ${talentHookSummary}` : ""
-  ].filter(Boolean).join(" | ");
+    compactText(world.name, 24),
+    compactText(world.stylePrompt, endingMode ? 96 : 64),
+    worldlineSummary,
+    !ctx.narrativePlan ? factionSummary : "",
+    talentHookSummary
+  ].filter(Boolean).join("；");
+  const narrativeBible = ctx.narrativePlan?.storyBible
+    ? `世界设定：${compactText(ctx.narrativePlan.storyBible, 260)}`
+    : "";
+  const narrativeStyle = ctx.narrativePlan?.styleRules.length
+    ? `文风要求：${compactText(ctx.narrativePlan.styleRules.join("；"), 220)}`
+    : "";
 
   return [
-    "C0 只输出叙事；第二人称；禁止越权；不得改写年龄/属性/结局。",
-    `C1 ${compactText(promptPack.systemCore, 120)}`,
-    `C2 ${compactText(promptPack.immersionRules, 100)}`,
-    `C3 ${compactText(promptPack.userInputGuardRule, 96)}`,
-    `C4 ${compactText(promptPack.restrictedContentRule, 80)}`,
-    `C5 ${compactText(promptPack.storyConstraint, 120)}`,
-    `BG ${worldBackground}`,
-    modeRule,
+    "你是中文人生叙事的旁白。只写玩家可见的第二人称故事，不解释指令、机制或创作过程。",
+    compactText(promptPack.systemCore, 120),
+    compactText(promptPack.immersionRules, 100),
+    compactText(promptPack.userInputGuardRule, 96),
+    compactText(promptPack.restrictedContentRule, 80),
+    compactText(promptPack.storyConstraint, 120),
+    `世界背景：${worldBackground}`,
+    narrativeBible,
+    narrativeStyle,
+    `本轮要求：${modeRule}`,
     modeAddon
   ].filter(Boolean).join("\n");
 }
@@ -812,7 +1152,12 @@ function summarizeLatestDecision(run: InternalRunState, event: YearEvent): strin
   return `age=${found.age} choice=${choice} delta=${formatDelta(found.statChanges as Partial<Record<keyof Stats, number>>)}`;
 }
 
-function buildYearPrompt(run: InternalRunState, event: YearEvent, promptPack: PromptPackResolved): string {
+function buildYearPrompt(
+  run: InternalRunState,
+  event: YearEvent,
+  promptPack: PromptPackResolved,
+  narrativePlan?: NarrativePromptPlan
+): string {
   const cards = run.cards.map((c) => `${c.name}(${c.rarity})`).join("、") || "无";
   const rule = event.tags.includes("special")
     ? promptPack.yearMinorRule
@@ -839,6 +1184,10 @@ function buildYearPrompt(run: InternalRunState, event: YearEvent, promptPack: Pr
     recent ? `S5 recent=${compactText(recent, 90)}` : "",
     latestDecision ? `S6 decision=${compactText(latestDecision, 64)}` : "",
     `E0 title=${compactText(eventTitle, 24)} summary=${compactText(event.summary, 54)}`,
+    formatNarrativePromptPlan(narrativePlan),
+    run.narrative.enabled && !run.story.mainlineCompleted
+      ? "R:YEND 主线尚未完成；不得暗示故事、人生或命运即将结束，也不得写结局式收束。"
+      : "",
     yearLenRule,
     `R:YMAIN 先写本年关键变化，再点出直接后果。`,
     `R:YAGE 若出现年龄词，必须与S0一致，只能写${event.age}岁；禁止写上一年或下一年。`,
@@ -867,13 +1216,19 @@ function buildYearDedupeRetryPrompt(
   ].filter(Boolean).join("\n");
 }
 
-function buildMilestoneOptionsPrompt(run: InternalRunState, recent: YearEvent[], promptPack: PromptPackResolved): string {
+function buildMilestoneOptionsPrompt(
+  run: InternalRunState,
+  recent: YearEvent[],
+  promptPack: PromptPackResolved,
+  narrativePlan?: NarrativePromptPlan
+): string {
   return [
     "T:M 抉择节点任务。",
     `S0 age=${run.age} stage=${run.ageStage.label} fame=${run.fame}(${fameGrade(run.fame)})`,
     `S1 stats=${summarizeStatsShort(run.stats)} blank=${hasBlankYears(run.history.slice(-12)) ? "Y" : "N"}`,
     `S2 persona=${compactText(run.personaPrompt, 80)}`,
     `S3 recent=${compactText(summarizeRecent(recent.slice(-4)), 120)}`,
+    formatNarrativePromptPlan(narrativePlan),
     `R:M ${compactText(promptPack.milestoneRule, 120)}`,
     "R:MOUT 只返回JSON:{background,optionOverrides[3]}",
     "R:MLEN background 60-80字；description <=20字；仅一种表达，不做同义复述。"
@@ -904,10 +1259,13 @@ function fallbackEndingSummary(run: InternalRunState): string {
     const title = run.ascension.title?.trim() || "飞升";
     return `你触发了“${title}”，在人世规则之外延展了命运。`;
   }
+  if (run.outcome === "completed") {
+    return `你在${run.age}岁走到这段人生的收束处。最终名望：${run.fame}。`;
+  }
   return `你在${run.age}岁走完此生。最终名望：${run.fame}。`;
 }
 
-function buildEndingPrompt(run: InternalRunState, baseEnding: string): string {
+function buildEndingPrompt(run: InternalRunState, baseEnding: string, narrativePlan?: NarrativePromptPlan): string {
   const cards = run.cards.map((c) => `${c.name}(${c.rarity})`).join("、") || "无";
   const ascensionInfo = run.ascension.unlocked
     ? `${run.ascension.title ?? "未知称号"} / ${run.ascension.type ?? "unknown"} / ${run.ascension.unlockedAge ?? run.age}岁`
@@ -916,7 +1274,9 @@ function buildEndingPrompt(run: InternalRunState, baseEnding: string): string {
     ? "必须明确死亡原因，不得改写死亡年龄与名望。"
     : run.outcome === "ascended"
       ? "必须点明飞升称号或类型；重点写原因而非结果：结合系统BG中的世界背景、主线冲突、阶段目标，以及最近经历/属性/天赋，解释为何此人会走到飞升；结果一句带过并写出代价或余韵。"
-      : "必须点明人生收束与总体评价。";
+      : run.outcome === "completed"
+        ? "必须按结局大纲写出人生收束与总体评价；不得把坏结局擅自写成死亡，也不得新增支线。"
+        : "必须点明人生收束与总体评价。";
   const lengthRule = run.outcome === "ascended"
     ? "R:ELEN 110-170字，2-3句；只输出结算文案；先写飞升原因，再一句带过结果；不做同义重复。"
     : "R:ELEN 80-140字，2-3句；只输出结算文案；不扩写新支线；不做同义重复。";
@@ -927,6 +1287,7 @@ function buildEndingPrompt(run: InternalRunState, baseEnding: string): string {
     `S1 stats=${summarizeStatsShort(run.stats)} death=${compactText(run.deathCause ?? "none", 32)} asc=${compactText(ascensionInfo, 56)}`,
     `S2 cards=${compactText(cards, 52)} key=${compactText(summarizeEndingRecent(run.history), 120)}`,
     `S3 base=${compactText(baseEnding, 70)}`,
+    formatNarrativePromptPlan(narrativePlan, "ending"),
     `R:E ${outcomeRule}`,
     lengthRule
   ].join("\n");
@@ -969,12 +1330,9 @@ function isLikelyStructuredOutputUnsupported(error: unknown): boolean {
   const maybe = error as { status?: number; message?: string; code?: string; type?: string };
   if (maybe?.status !== 400 && maybe?.status !== 422) return false;
   const text = `${maybe?.code ?? ""} ${maybe?.type ?? ""} ${maybe?.message ?? ""}`.toLowerCase();
-  return (
-    text.includes("response_format") ||
-    text.includes("json_schema") ||
-    text.includes("unsupported") ||
-    text.includes("invalid_request_error")
-  );
+  const namesStructuredOutput = /response_format|json_schema|json schema|structured output|json mode/.test(text);
+  const rejectsStructuredOutput = /unsupported|not support|unknown|invalid|not permitted/.test(text);
+  return namesStructuredOutput && rejectsStructuredOutput;
 }
 
 function isLikelyReasoningEffortUnsupported(error: unknown): boolean {
@@ -1046,12 +1404,7 @@ async function callModel(
   const client = getOpenAIClient(ctx);
 
   const attempt = async (): Promise<ModelCallResult> => {
-    const historyMessages = convo
-      ? convo.history.map((item) => ({
-          role: item.role,
-          content: item.content
-        }))
-      : [];
+    const historyMessages = convo ? buildConversationHistoryMessages(convo) : [];
     const requestBase = {
       model: ctx.providerConfig.model,
       temperature: ctx.providerConfig.temperature,
@@ -1066,7 +1419,9 @@ async function callModel(
               strict: true
             }
           }
-        : undefined,
+        : options?.jsonMode
+          ? { type: "json_object" as const }
+          : undefined,
       messages: [
         { role: "system" as const, content: systemMessage },
         ...historyMessages,
@@ -1153,6 +1508,816 @@ async function callModel(
   throw lastError;
 }
 
+async function callModelAsJson(
+  ctx: NarrativeContext,
+  systemPrompt: string,
+  userPrompt: string,
+  structuredOutput: StructuredOutputSpec,
+  options: {
+    mode: SystemPromptMode;
+    conversation?: ChatConversationState;
+    semanticQuery: string;
+    skipCache: boolean;
+  }
+): Promise<{ result: ModelCallResult; outputMode: JsonOutputMode }> {
+  const supportKey = buildToolSupportCacheKey(ctx);
+  let outputMode = structuredOutputSupportCache.get(supportKey) ?? "json-schema";
+  while (true) {
+    try {
+      const result = await callModel(ctx, systemPrompt, userPrompt, {
+        ...options,
+        structuredOutput: outputMode === "json-schema" ? structuredOutput : undefined,
+        jsonMode: outputMode === "json-object"
+      });
+      structuredOutputSupportCache.set(supportKey, outputMode);
+      return { result, outputMode };
+    } catch (error) {
+      if (outputMode === "plain" || !isLikelyStructuredOutputUnsupported(error)) throw error;
+      outputMode = outputMode === "json-schema" ? "json-object" : "plain";
+      structuredOutputSupportCache.set(supportKey, outputMode);
+    }
+  }
+}
+
+function directedFocusToolDefinition(focusTags: string[]): Record<string, unknown> {
+  return {
+    type: "function",
+    function: {
+      name: "select_event_focus",
+      description: "选择本年最适合人物处境和故事阶段的事件方向。具体事件由引擎从该方向中确定。",
+      parameters: {
+        type: "object",
+        additionalProperties: false,
+        required: ["focusTag"],
+        properties: {
+          focusTag: { type: "string", enum: focusTags }
+        }
+      }
+    }
+  };
+}
+
+function directedStoryTools(input: DirectedStoryTurnInput): Record<string, unknown>[] {
+  if (input.closureRequired) {
+    return [{
+      type: "function",
+      function: {
+        name: "request_story_closure",
+        description: "主线已经完成。请求由引擎锁定结局蓝图并进入结算。",
+        parameters: {
+          type: "object",
+          additionalProperties: false,
+          required: [],
+          properties: {}
+        }
+      }
+    }];
+  }
+  const argumentProperties: Record<string, unknown> = {
+    intent: { type: "string", enum: input.allowedIntents }
+  };
+  if (input.focusOptions?.length) {
+    argumentProperties.focusComponentId = {
+      type: "string",
+      enum: input.focusOptions.map((option) => option.id)
+    };
+  }
+  const tools: Record<string, unknown>[] = [
+    {
+      type: "function",
+      function: {
+        name: "propose_story_intent",
+        description: "提出下一段故事的叙事意图。引擎会根据当前主线状态选择唯一合法事件。",
+        parameters: {
+          type: "object",
+          additionalProperties: false,
+          required: ["intent"],
+          properties: argumentProperties
+        }
+      }
+    }
+  ];
+  if (input.allowClosureRequest) {
+    tools.push({
+      type: "function",
+      function: {
+        name: "request_story_closure",
+        description: "仅当已有主线冲突完成回收时，申请由引擎审查是否进入结局引导。",
+        parameters: {
+          type: "object",
+          additionalProperties: false,
+          required: [],
+          properties: {}
+        }
+      }
+    });
+  }
+  return tools;
+}
+
+function directedStoryResponseTools(input: DirectedStoryTurnInput): Record<string, unknown>[] {
+  return directedStoryTools(input).map((tool) => {
+    const functionTool = tool.function as {
+      name: string;
+      description: string;
+      parameters: Record<string, unknown>;
+    };
+    return {
+      type: "function",
+      name: functionTool.name,
+      description: functionTool.description,
+      parameters: functionTool.parameters,
+      strict: true
+    };
+  });
+}
+
+function findResponseFunctionCall(
+  response: { output?: unknown[] },
+  toolName: string
+): { toolCall: ToolCallRecord; rawArguments: unknown } | null {
+  const call = response.output?.find((item) => {
+    const value = item as { type?: unknown; name?: unknown };
+    return value.type === "function_call" && value.name === toolName;
+  }) as { call_id?: unknown; name?: unknown; arguments?: unknown } | undefined;
+  if (!call || typeof call.call_id !== "string" || call.name !== toolName) return null;
+  const argumentsText = normalizeToolArguments(call.arguments);
+  return {
+    toolCall: {
+      id: normalizeChatText(call.call_id, CHAT_TOOL_CALL_ID_MAX_LEN),
+      name: toolName,
+      arguments: argumentsText
+    },
+    rawArguments: call.arguments
+  };
+}
+
+function parseDirectedToolArguments(raw: unknown): Record<string, unknown> | null {
+  if (raw && typeof raw === "object" && !Array.isArray(raw)) {
+    return raw as Record<string, unknown>;
+  }
+  if (typeof raw !== "string") return null;
+
+  let source = raw.trim();
+  const fenced = source.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
+  if (fenced) source = fenced[1].trim();
+  if (!source) return null;
+
+  try {
+    let parsed: unknown = JSON.parse(source);
+    if (typeof parsed === "string") parsed = JSON.parse(parsed);
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? parsed as Record<string, unknown>
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function findDirectedToolCall(
+  message: unknown,
+  toolName: string
+): { toolCall: ToolCallRecord; rawArguments: unknown } | null {
+  const value = message as {
+    tool_calls?: Array<{
+      id?: unknown;
+      type?: unknown;
+      function?: { name?: unknown; arguments?: unknown };
+    }>;
+    function_call?: { name?: unknown; arguments?: unknown };
+  };
+  const call = Array.isArray(value?.tool_calls)
+    ? value.tool_calls.find((item) => item.function?.name === toolName)
+    : undefined;
+  if (call?.function) {
+    const argumentsText = normalizeToolArguments(call.function.arguments);
+    const id = normalizeChatText(
+      typeof call.id === "string" ? call.id : `director_${createHash("sha256").update(`${toolName}:${argumentsText}`).digest("hex").slice(0, 16)}`,
+      CHAT_TOOL_CALL_ID_MAX_LEN
+    );
+    return {
+      toolCall: { id, name: toolName, arguments: argumentsText },
+      rawArguments: call.function.arguments
+    };
+  }
+  if (value?.function_call?.name === toolName) {
+    const argumentsText = normalizeToolArguments(value.function_call.arguments);
+    return {
+      toolCall: {
+        id: `director_${createHash("sha256").update(`${toolName}:${argumentsText}`).digest("hex").slice(0, 16)}`,
+        name: toolName,
+        arguments: argumentsText
+      },
+      rawArguments: value.function_call.arguments
+    };
+  }
+  return null;
+}
+
+function readDirectedFocusSelection(raw: unknown, focusTags: string[]): string | null {
+  const parsed = parseDirectedToolArguments(raw);
+  if (!parsed) return null;
+  const focusTag = typeof parsed.focusTag === "string" ? parsed.focusTag.trim() : "";
+  return focusTags.includes(focusTag) ? focusTag : null;
+}
+
+function readDirectedStoryIntent(
+  raw: unknown,
+  input: DirectedStoryTurnInput
+): Pick<DirectedStoryTurnResult, "intent" | "focusComponentId"> | null {
+  const parsed = parseDirectedToolArguments(raw);
+  if (!parsed) return null;
+  const intent = typeof parsed.intent === "string" ? parsed.intent.trim() as NarrativeIntent : undefined;
+  if (!intent || !input.allowedIntents.includes(intent)) return null;
+  const rawFocus = typeof parsed.focusComponentId === "string" ? parsed.focusComponentId.trim() : "";
+  const focusComponentId = input.focusOptions?.some((option) => option.id === rawFocus)
+    ? rawFocus
+    : undefined;
+  return { intent, focusComponentId };
+}
+
+function directedStoryToolCallId(toolName: string, argumentsText: string, nonce: string): string {
+  return normalizeChatText(
+    `story_${createHash("sha256").update(`${toolName}:${argumentsText}:${nonce}`).digest("hex").slice(0, 20)}`,
+    CHAT_TOOL_CALL_ID_MAX_LEN
+  );
+}
+
+function parseDirectedMilestoneNarrative(text: string): DirectedNarrativeResult | null {
+  const cleaned = stripCodeFence(text);
+  const candidates = [cleaned, extractFirstJsonObject(cleaned)].filter(Boolean) as string[];
+  for (const candidate of candidates) {
+    try {
+      const parsed = JSON.parse(candidate) as {
+        narrative?: unknown;
+        background?: unknown;
+        optionOverrides?: unknown;
+      };
+      const narrative = typeof parsed.narrative === "string" ? parsed.narrative.trim() : "";
+      if (narrative.length < 10 || isLikelyTruncated(narrative)) continue;
+      const optionOverrides = normalizeMilestoneOptionOverrides(parsed.optionOverrides);
+      const background = typeof parsed.background === "string" ? parsed.background.trim() : "";
+      return {
+        narrative,
+        milestoneCopy: optionOverrides && background
+          ? { background, optionOverrides }
+          : undefined
+      };
+    } catch {
+      // Try the next JSON candidate.
+    }
+  }
+  return null;
+}
+
+function buildDirectedNarrativePrompt(
+  run: InternalRunState,
+  input: DirectedNarrativeInput,
+  kind: "normal" | "milestone"
+): string {
+  const items = run.items.map((item) => item.name).join("、") || "无";
+  const recent = summarizeRecent(run.history.slice(-2));
+  const material = {
+    id: input.id,
+    title: compactText(input.title, 42),
+    faction: input.factionId ?? "无",
+    focusTag: input.focusTag,
+    tags: input.tags.slice(0, 5),
+    premise: compactText(input.promptHook, 80),
+    outcome: compactText(input.outcomeHint, 64)
+  };
+  const outputRule = kind === "milestone"
+    ? "R 仅输出JSON:{narrative,background,optionOverrides[3]}。narrative为本年叙事；optionOverrides 的 id 必须为 safe、balanced、risky。"
+    : "R 只输出60-100字的自然人生叙事，不要标题、JSON、选项或系统说明。";
+  return [
+    `T:D2 ${kind === "milestone" ? "关键转向渲染" : "年度事件渲染"}`,
+    `S0 age=${run.age + 1} persona=${compactText(run.personaPrompt, 80)}`,
+    `S1 stats=${summarizeStatsShort(run.stats)} cards=${compactText(run.cards.map((card) => card.name).join("、"), 64)} items=${compactText(items, 48)}`,
+    recent ? `S2 recent=${compactText(recent, 120)}` : "",
+    `M engine_material=${JSON.stringify(material)}`,
+    "D 引擎已确定具体事件与数值后果。只能渲染该素材的因果，不得改写事件、属性、掉落或结局。",
+    outputRule
+  ].filter(Boolean).join("\n");
+}
+
+function buildDirectedToolResultContent(
+  input: DirectedNarrativeInput,
+  kind: "normal" | "milestone"
+): string {
+  return JSON.stringify({
+    status: "material_ready",
+    focusTag: input.focusTag,
+    event: {
+      id: input.id,
+      title: compactText(input.title, 42),
+      faction: input.factionId ?? "none",
+      tags: input.tags.slice(0, 5),
+      premise: compactText(input.promptHook, 80),
+      outcomeHint: compactText(input.outcomeHint, 64)
+    },
+    task: kind === "milestone"
+      ? "根据该事件渲染叙事、背景和三个风险梯度选项。"
+      : "根据该事件渲染自然的人生叙事。",
+    outputRule: kind === "milestone"
+      ? "仅输出合法JSON:{narrative,background,optionOverrides[3]}；optionOverrides 的 id 必须为 safe、balanced、risky。"
+      : "只输出60-100字的自然人生叙事，不要标题、JSON、选项或系统说明。"
+  });
+}
+
+function readChatCompletionText(message: unknown): string {
+  const content = (message as { content?: unknown })?.content;
+  if (typeof content === "string") return content.trim();
+  if (!Array.isArray(content)) return "";
+  return (content as ChatContentPart[]).map((part) => part.text ?? "").join("").trim();
+}
+
+export function recordDirectedFocusOutcome(
+  ctx: NarrativeContext,
+  selection: DirectedFocusSelection | null,
+  outcome: {
+    focusTag: string;
+    eventId: string;
+    title: string;
+    kind: "normal" | "milestone";
+    narrative: string;
+    statChanges: Partial<Record<keyof Stats, number>>;
+    itemName?: string;
+    tags: string[];
+    promptHook: string;
+  }
+): void {
+  if (!selection || !ctx.conversation) return;
+  const conversation = ctx.conversation;
+  pushHistory(
+    conversation,
+    "user",
+    `人物继续面对当时的主要矛盾。${outcome.kind === "milestone" ? "新的取舍已经出现。" : "既有处境得到推进。"}`
+  );
+  pushHistory(conversation, "assistant", outcome.narrative);
+  compactConversationWindow(ctx, conversation);
+}
+
+export async function generateDirectedFocusSelection(
+  run: InternalRunState,
+  world: WorldConfig,
+  focusOptions: DirectedFocusInput[],
+  ctx: NarrativeContext,
+  kind: "normal" | "milestone"
+): Promise<DirectedFocusSelection | null> {
+  if (!ctx.apiKey.trim() || focusOptions.length === 0) return null;
+  if (ctx.providerConfig.apiPath !== "/chat/completions") return null;
+  const supportKey = buildToolSupportCacheKey(ctx);
+  if (toolSupportCache.get(supportKey) === false) return null;
+
+  const promptPack = normalizePromptPackForModel(ctx.promptPack);
+  const systemPrompt = buildSystemPrompt(promptPack, world, ctx, "year");
+  const conversation = ensureConversationState(ctx.conversation, hashSystemPrompt(systemPrompt), systemPrompt);
+  ctx.conversation = conversation;
+  const recent = summarizeRecent(run.history.slice(-2));
+  const items = run.items.map((item) => item.name).join("、") || "无";
+  const focusBlock = focusOptions.map((option) => ({
+    id: option.id,
+    storyPosition: option.storyPosition ?? "ordinary",
+    candidateCount: option.candidateCount
+  }));
+  const userPrompt = [
+    `T:D1 ${kind === "milestone" ? "关键转向方向" : "年度方向"}`,
+    `S0 age=${run.age + 1} persona=${compactText(run.personaPrompt, 80)}`,
+    `S1 stats=${summarizeStatsShort(run.stats)} cards=${compactText(run.cards.map((card) => card.name).join("、"), 64)} items=${compactText(items, 48)}`,
+    recent ? `S2 recent=${compactText(recent, 120)}` : "",
+    `C focus_options=${JSON.stringify(focusBlock)}`,
+    "D0 你是人生小说的事件导演。只能选择一个事件方向，具体事件由引擎从该方向中确定。",
+    "D1 不得提前结束故事，不得编造数值、掉落、事件或结局。",
+    "R 根据人物处境、最近经历和当前故事位置，调用工具选择最自然的方向。"
+  ].filter(Boolean).join("\n");
+  const toolName = "select_event_focus";
+  const tool = directedFocusToolDefinition(focusOptions.map((option) => option.id));
+
+  try {
+    compactConversationWindow(ctx, conversation);
+    const client = getOpenAIClient(ctx);
+    // This request only selects a direction; event material and narrative are handled by the next stage.
+    const completion = await client.chat.completions.create({
+      model: ctx.providerConfig.model,
+      temperature: ctx.providerConfig.temperature,
+      max_tokens: ctx.providerConfig.maxTokens,
+      messages: [
+        { role: "system", content: buildSystemMessage(conversation) },
+        ...buildConversationHistoryMessages(conversation),
+        { role: "user", content: userPrompt }
+      ],
+      tools: [tool as never],
+      tool_choice: { type: "function", function: { name: toolName } }
+    } as never);
+    const directedToolCall = findDirectedToolCall(completion.choices[0]?.message, toolName);
+    if (!directedToolCall) return null;
+    toolSupportCache.set(supportKey, true);
+    const focusTag = readDirectedFocusSelection(directedToolCall.rawArguments, focusOptions.map((option) => option.id));
+    return focusTag
+      ? {
+          focusTag,
+          conversationTurn: {
+            userPrompt,
+            toolCall: directedToolCall.toolCall
+          }
+        }
+      : null;
+  } catch (error) {
+    if (isLikelyToolUnsupported(error)) toolSupportCache.set(supportKey, false);
+    debugError("director-tool", error);
+    return null;
+  }
+}
+
+export async function generateDirectedNarrative(
+  run: InternalRunState,
+  world: WorldConfig,
+  input: DirectedNarrativeInput,
+  selection: DirectedFocusSelection,
+  ctx: NarrativeContext,
+  kind: "normal" | "milestone"
+): Promise<DirectedNarrativeResult | null> {
+  if (!ctx.apiKey.trim()) return null;
+  const promptPack = normalizePromptPackForModel(ctx.promptPack);
+  const systemPrompt = buildSystemPrompt(promptPack, world, ctx, "year");
+  const conversation = ensureConversationState(ctx.conversation, hashSystemPrompt(systemPrompt), systemPrompt);
+  ctx.conversation = conversation;
+  const userPrompt = buildDirectedNarrativePrompt(run, input, kind);
+  const toolResultContent = buildDirectedToolResultContent(input, kind);
+
+  const parseResult = (text: string): DirectedNarrativeResult | null => {
+    if (kind === "milestone") return parseDirectedMilestoneNarrative(text);
+    const narrative = stripMilestoneOptionArtifacts(text).trim();
+    return narrative && !isLikelyTruncated(narrative) ? { narrative } : null;
+  };
+
+  try {
+    compactConversationWindow(ctx, conversation);
+    const client = getOpenAIClient(ctx);
+    const completion = await client.chat.completions.create({
+      model: ctx.providerConfig.model,
+      temperature: ctx.providerConfig.temperature,
+      max_tokens: ctx.providerConfig.maxTokens,
+      messages: [
+        { role: "system", content: buildSystemMessage(conversation) },
+        ...buildConversationHistoryMessages(conversation),
+        { role: "user", content: selection.conversationTurn.userPrompt },
+        {
+          role: "assistant",
+          content: null,
+          tool_calls: [
+            {
+              id: selection.conversationTurn.toolCall.id,
+              type: "function",
+              function: {
+                name: selection.conversationTurn.toolCall.name,
+                arguments: selection.conversationTurn.toolCall.arguments
+              }
+            }
+          ]
+        },
+        {
+          role: "tool",
+          tool_call_id: selection.conversationTurn.toolCall.id,
+          content: toolResultContent
+        }
+      ]
+    } as never);
+    return parseResult(readChatCompletionText(completion.choices[0]?.message));
+  } catch (error) {
+    if (!isLikelyToolTranscriptUnsupported(error)) {
+      debugError("director-render", error);
+      return null;
+    }
+    try {
+      const fallback = await callModel(ctx, systemPrompt, userPrompt, {
+        mode: "year",
+        conversation,
+        semanticQuery: `director-render|${run.age + 1}|${input.id}|${input.focusTag}|${run.personaPrompt}`
+      });
+      return parseResult(fallback.text);
+    } catch (fallbackError) {
+      debugError("director-render-fallback", fallbackError);
+      return null;
+    }
+  }
+}
+
+function buildDirectedStoryTurnPrompt(
+  run: InternalRunState,
+  input: DirectedStoryTurnInput,
+  narrativePlan?: NarrativePromptPlan
+): string {
+  if (input.closureRequired) {
+    return [
+      `T:C age=${run.age}`,
+      formatNarrativePromptPlan(narrativePlan, "planning"),
+      "C 主线已由引擎确认完成，且不再存在活动矛盾。不得开启、延续或评论新的主线。",
+      "R 必须且只能调用 request_story_closure；不要输出给玩家看的正文、结论、说明或结局措辞。"
+    ].filter(Boolean).join("\n");
+  }
+  return [
+    `T:I age=${run.age + 1}`,
+    `C allowed_intents=${input.allowedIntents.join(",")}`,
+    input.focusOptions?.length
+      ? `C focus_components=${input.focusOptions.map((option) => `${option.id}=${compactText(option.label, 24)}(${compactText(option.hint, 52)})`).join(" | ")}`
+      : "",
+    input.allowClosureRequest
+      ? "C closure_request=仅当主线已完成至少一次高潮与回收、且不再有当前矛盾时，才可调用 request_story_closure；由引擎决定是否进入结局流程。"
+      : "",
+    formatNarrativePromptPlan(narrativePlan, "planning"),
+    run.narrative.enabled && !run.story.mainlineCompleted
+      ? "C 主线尚未完成；不得暗示故事、人生或命运即将结束，也不得在正文或说明中表现结局意图。"
+      : "",
+    "D0 根据最近叙事、当前矛盾和故事节拍，只提出一次下一步叙事意图。continue 表示延续，pressure 表示加压，payoff 表示回收当前线索。",
+    "D1 可选 focusComponentId 只能从 focus_components 选择，用来表明本段优先承接的既有线索；不能选择路线、事件、属性、道具或结局。",
+    "R 必须调用 propose_story_intent；不要输出给玩家看的正文、结论或说明。"
+  ].filter(Boolean).join("\n");
+}
+
+export async function generateDirectedStoryTurn(
+  run: InternalRunState,
+  world: WorldConfig,
+  input: DirectedStoryTurnInput,
+  ctx: NarrativeContext
+): Promise<DirectedStoryTurnResult> {
+  if (!ctx.apiKey.trim() || (!input.closureRequired && input.allowedIntents.length === 0)) {
+    throw new DirectedStoryTurnError("directed_story_turn_unavailable");
+  }
+  const promptPack = normalizePromptPackForModel(ctx.promptPack);
+  const systemPrompt = buildSystemPrompt(promptPack, world, ctx, "year");
+  const conversation = ensureConversationState(ctx.conversation, hashSystemPrompt(systemPrompt), systemPrompt);
+  ctx.conversation = conversation;
+  syncStoryConversationState(conversation, run);
+  const userPrompt = buildDirectedStoryTurnPrompt(run, input, ctx.narrativePlan);
+  const startedAt = Date.now();
+  const supportKey = buildToolSupportCacheKey(ctx);
+  if (toolSupportCache.get(supportKey) === false) {
+    throw new DirectedStoryTurnError("directed_story_tools_unavailable");
+  }
+
+  try {
+    compactConversationWindow(ctx, conversation);
+    const client = getOpenAIClient(ctx);
+    const isResponsesApi = ctx.providerConfig.apiPath === "/responses";
+    const toolChoice = input.closureRequired
+      ? { type: "function", function: { name: "request_story_closure" } }
+      : input.allowClosureRequest
+        ? "required"
+        : { type: "function", function: { name: "propose_story_intent" } };
+    const responseToolChoice = input.closureRequired
+      ? { type: "function", name: "request_story_closure" }
+      : input.allowClosureRequest
+        ? "required"
+        : { type: "function", name: "propose_story_intent" };
+    const completion = isResponsesApi
+      ? await client.responses.create({
+          model: ctx.providerConfig.model,
+          instructions: buildSystemMessage(conversation),
+          input: [
+            ...buildConversationHistoryMessages(conversation),
+            { role: "user", content: userPrompt }
+          ],
+          temperature: ctx.providerConfig.temperature,
+          max_output_tokens: ctx.providerConfig.maxTokens,
+          tools: directedStoryResponseTools(input) as never,
+          tool_choice: responseToolChoice,
+          parallel_tool_calls: false
+        } as never)
+      : await client.chat.completions.create({
+          model: ctx.providerConfig.model,
+          temperature: ctx.providerConfig.temperature,
+          max_tokens: ctx.providerConfig.maxTokens,
+          messages: [
+            { role: "system", content: buildSystemMessage(conversation) },
+            ...buildConversationHistoryMessages(conversation),
+            { role: "user", content: userPrompt }
+          ],
+          tools: directedStoryTools(input) as never,
+          tool_choice: toolChoice,
+          parallel_tool_calls: false,
+          thinking: { type: "disabled" },
+          reasoning_effort: reasoningEffortForSdk(ctx.providerConfig.reasoningEffort)
+        } as never);
+    const closureCall = input.allowClosureRequest ? (isResponsesApi
+      ? findResponseFunctionCall(completion as { output?: unknown[] }, "request_story_closure")
+      : findDirectedToolCall((completion as { choices?: Array<{ message?: unknown }> }).choices?.[0]?.message, "request_story_closure")) : null;
+    const intentCall = isResponsesApi
+      ? findResponseFunctionCall(completion as { output?: unknown[] }, "propose_story_intent")
+      : findDirectedToolCall((completion as { choices?: Array<{ message?: unknown }> }).choices?.[0]?.message, "propose_story_intent");
+    if (input.closureRequired && !closureCall) {
+      debugDirectedStoryTurn("invalid", startedAt, true);
+      throw new DirectedStoryTurnError("directed_story_turn_invalid_output");
+    }
+    if (!intentCall && !closureCall) {
+      debugDirectedStoryTurn("invalid", startedAt, true);
+      throw new DirectedStoryTurnError("directed_story_turn_invalid_output");
+    }
+    const parsed = intentCall ? readDirectedStoryIntent(intentCall.rawArguments, input) : { intent: undefined, focusComponentId: undefined };
+    if (intentCall && !parsed) {
+      debugDirectedStoryTurn("invalid", startedAt, true);
+      throw new DirectedStoryTurnError("directed_story_turn_invalid_output");
+    }
+    const selectedCall = closureCall ?? intentCall!;
+    const closureRequest = closureCall ? "guide" as const : undefined;
+    const argumentsText = normalizeToolArguments(selectedCall.toolCall.arguments);
+    const toolCall: ToolCallRecord = {
+      id: selectedCall.toolCall.id || directedStoryToolCallId(selectedCall.toolCall.name, argumentsText, `${run.runId}:${run.age}`),
+      name: selectedCall.toolCall.name,
+      arguments: argumentsText
+    };
+    toolSupportCache.set(supportKey, true);
+    debugDirectedStoryTurn("success", startedAt, true);
+    return {
+      ...parsed,
+      closureRequest,
+      toolCall,
+      continuation: {
+        protocol: isResponsesApi ? "responses" : "chat",
+        systemPrompt,
+        userPrompt,
+        responseId: isResponsesApi ? (completion as { id?: string }).id : undefined
+      }
+    };
+  } catch (error) {
+    if (isLikelyToolUnsupported(error)) toolSupportCache.set(supportKey, false);
+    debugDirectedStoryTurn("error", startedAt, true, error);
+    debugError("directed-story-turn", error);
+    if (error instanceof DirectedStoryTurnError) throw error;
+    throw new DirectedStoryTurnError(isLikelyToolUnsupported(error)
+      ? "directed_story_tools_unavailable"
+      : "directed_story_turn_unavailable");
+  }
+}
+
+function buildDirectedStoryRenderPrompt(run: InternalRunState, input: DirectedStoryRenderInput): string {
+  return [
+    `请写人物在${run.age + 1}岁经历的${input.kind === "milestone" ? "一个抉择场景" : "一段人生经历"}。`,
+    `眼前发生的事：${compactText(input.premise, 160)}`,
+    input.focus ? `这段经历应自然回应：${compactText(input.focus.label, 36)}。${compactText(input.focus.hint, 120)}` : "",
+    input.sceneHint ? `必须承接的处境：${compactText(input.sceneHint, 160)}` : "",
+    input.outcomeHint ? `这件事会留下的后果：${compactText(input.outcomeHint, 80)}` : "",
+    run.narrative.enabled && !run.story.mainlineCompleted
+      ? "主线尚未完成；不得使用结局、落幕、终局、收束等完成式表述，也不得暗示故事将结束。"
+      : "",
+    "只写故事本身，不写标题、路线、数值、规则、提示、工具、请求或创作说明。以仍会影响后续的行动、消息或代价结束本段。",
+    input.kind === "milestone"
+      ? "抉择的行动与后果已由引擎固定并会另行展示；只写将人物推到取舍面前的场景，不复述或改写选项。"
+      : "这段经历不提供选项，也不写总结或人生结论。",
+    "只输出完整的最终叙事文本。"
+  ].filter(Boolean).join("\n");
+}
+
+const INTERNAL_NARRATIVE_ARTIFACT = /(?:system\s*prompt|prompt\s*injection|tool[_\s-]?call|function[_\s-]?call|closurerequest|allowed[_\s-]?intents|focus[_\s-]?components|json\s*(?:schema|格式)|状态机|系统提示|提示词|工具调用|函数调用|内部标签|创作说明|\b[NTSDCMRTYWE][0-9]+\b|\b[A-Z]:[A-Z0-9]+)/i;
+const PREMATURE_NARRATIVE_CONCLUSION = /(?:故事|人生|此生|命运).{0,12}(?:已经|终于|至此)?(?:结束|终结|完结|落幕|收束)|(?:这便是|这就是).{0,8}(?:结局|终局)|(?:至此|从此).{0,8}(?:再无(?:后续|转机)|尘埃落定|一切结束)|(?:最终结局|人生结局|故事结局)/;
+
+function isSafePlayerNarrative(text: string): boolean {
+  const normalized = text.replace(/\s+/g, " ").trim();
+  return normalized.length >= 10 && !INTERNAL_NARRATIVE_ARTIFACT.test(normalized) && !PREMATURE_NARRATIVE_CONCLUSION.test(normalized);
+}
+
+export function isDirectedStoryRenderSafe(
+  result: DirectedStoryRenderResult,
+  _input: DirectedStoryRenderInput
+): boolean {
+  return isSafePlayerNarrative(result.narrative);
+}
+
+function parseDirectedStoryRender(text: string, input: DirectedStoryRenderInput): DirectedStoryRenderResult | null {
+  const narrative = stripCodeFence(text).trim();
+  if (!narrative || isLikelyTruncated(narrative)) return null;
+  const result = { narrative, toolResult: "" };
+  return isDirectedStoryRenderSafe(result, input) ? result : null;
+}
+
+export async function generateDirectedStoryRender(
+  run: InternalRunState,
+  world: WorldConfig,
+  input: DirectedStoryRenderInput,
+  ctx: NarrativeContext
+): Promise<DirectedStoryRenderResult> {
+  if (!ctx.apiKey.trim()) throw new DirectedStoryRenderError("directed_story_render_unavailable");
+  const { turn } = input;
+  const conversation = ctx.conversation;
+  if (!conversation) throw new DirectedStoryRenderError("directed_story_render_unavailable");
+  ctx.conversation = conversation;
+  const userPrompt = buildDirectedStoryRenderPrompt(run, input);
+    const resultPayload = JSON.stringify({
+      status: "approved_scene",
+      requestedTool: turn.toolCall.name,
+    kind: input.kind,
+    premise: compactText(input.premise, 160),
+    outcomeHint: compactText(input.outcomeHint, 80),
+    sceneHint: input.sceneHint ? compactText(input.sceneHint, 160) : undefined,
+    instruction: input.kind === "milestone"
+      ? "只渲染场景正文；玩家选项由引擎提供，不得改写。"
+      : "只渲染场景正文。"
+  });
+  try {
+    compactConversationWindow(ctx, conversation);
+    const client = getOpenAIClient(ctx);
+    const completion = turn.continuation.protocol === "responses"
+      ? await client.responses.create({
+          model: ctx.providerConfig.model,
+          instructions: turn.continuation.systemPrompt,
+          previous_response_id: turn.continuation.responseId,
+          input: [
+            { type: "function_call_output", call_id: turn.toolCall.id, output: resultPayload },
+            { role: "user", content: userPrompt }
+          ],
+          temperature: ctx.providerConfig.temperature,
+          max_output_tokens: ctx.providerConfig.maxTokens,
+          reasoning: { effort: reasoningEffortForSdk(ctx.providerConfig.reasoningEffort) }
+        } as never)
+      : await client.chat.completions.create({
+          model: ctx.providerConfig.model,
+          temperature: ctx.providerConfig.temperature,
+          max_tokens: ctx.providerConfig.maxTokens,
+          messages: [
+            { role: "system", content: turn.continuation.systemPrompt },
+            ...buildConversationHistoryMessages(conversation),
+            { role: "user", content: turn.continuation.userPrompt },
+            {
+              role: "assistant",
+              content: null,
+              tool_calls: [{
+                id: turn.toolCall.id,
+                type: "function",
+                function: { name: turn.toolCall.name, arguments: turn.toolCall.arguments }
+              }]
+            },
+            { role: "tool", tool_call_id: turn.toolCall.id, content: resultPayload },
+            { role: "user", content: userPrompt }
+          ],
+          thinking: { type: "disabled" },
+          reasoning_effort: reasoningEffortForSdk(ctx.providerConfig.reasoningEffort)
+        } as never);
+    const content = turn.continuation.protocol === "responses"
+      ? (completion as { output_text?: string; incomplete_details?: unknown }).output_text ?? ""
+      : readChatCompletionText((completion as { choices?: Array<{ message?: unknown }> }).choices?.[0]?.message);
+    const incomplete = turn.continuation.protocol === "responses"
+      ? Boolean((completion as { incomplete_details?: unknown }).incomplete_details)
+      : (completion as { choices?: Array<{ finish_reason?: string | null }> }).choices?.[0]?.finish_reason === "length";
+    const parsed = incomplete ? null : parseDirectedStoryRender(content, input);
+    if (!parsed) throw new DirectedStoryRenderError("directed_story_render_invalid_output");
+    return { ...parsed, toolResult: resultPayload };
+  } catch (error) {
+    debugError("directed-story-render", error);
+    if (error instanceof DirectedStoryRenderError) throw error;
+    throw new DirectedStoryRenderError("directed_story_render_unavailable");
+  }
+}
+
+export function recordDirectedStoryTurnOutcome(
+  ctx: NarrativeContext,
+  run: InternalRunState,
+  outcome: {
+    kind: "normal" | "milestone";
+    narrative: string;
+    statChanges: Partial<Record<keyof Stats, number>>;
+    turn?: DirectedStoryTurnResult;
+    toolResult?: string;
+  }
+): void {
+  if (!ctx.conversation) return;
+  const conversation = ctx.conversation;
+  if (outcome.turn) {
+    pushHistory(conversation, "user", projectConversationUserPrompt(outcome.turn.continuation.userPrompt));
+    pushToolCall(conversation, outcome.turn.toolCall);
+    pushToolResult(conversation, outcome.turn.toolCall, outcome.toolResult ?? "已批准并生成下一段故事素材。");
+  }
+  const delta = formatDelta(outcome.statChanges);
+  pushHistory(
+    conversation,
+    "user",
+    `岁月推进至${run.age}岁。${outcome.kind === "milestone" ? "人物来到需要作出取舍的关口。" : "人物继续面对既有处境。"}${delta ? ` 此段变化：${delta}。` : ""}`
+  );
+  pushHistory(conversation, "assistant", outcome.narrative);
+  syncStoryConversationState(conversation, run);
+  compactConversationWindow(ctx, conversation);
+}
+
+export function recordDirectedDecisionOutcome(
+  ctx: NarrativeContext,
+  run: InternalRunState,
+  outcome: {
+    decision: DecisionType;
+    label: string;
+    narrative: string;
+  }
+): void {
+  if (!ctx.conversation) return;
+  const conversation = ctx.conversation;
+  pushHistory(
+    conversation,
+    "user",
+    `人物作出取舍：${outcome.label}。这项选择的后果将延续到后续处境。`
+  );
+  pushHistory(conversation, "assistant", outcome.narrative);
+  syncStoryConversationState(conversation, run);
+  compactConversationWindow(ctx, conversation);
+}
+
 export async function generateYearNarrative(
   run: InternalRunState,
   world: WorldConfig,
@@ -1166,7 +2331,7 @@ export async function generateYearNarrative(
   const systemHash = hashSystemPrompt(systemPrompt);
   const conversation = ensureConversationState(ctx.conversation, systemHash, systemPrompt);
   ctx.conversation = conversation;
-  const userPrompt = buildYearPrompt(run, event, promptPack);
+  const userPrompt = buildYearPrompt(run, event, promptPack, ctx.narrativePlan);
   const avoidNarratives = options?.avoidNarratives ?? [];
   const isMilestoneYear = event.tags.includes("milestone");
   if (debugModel) {
@@ -1182,7 +2347,7 @@ export async function generateYearNarrative(
 
   try {
     compactConversationWindow(ctx, conversation);
-    pushHistory(conversation, "user", userPrompt);
+    pushHistory(conversation, "user", projectConversationUserPrompt(userPrompt));
     let callResult = await callModel(ctx, systemPrompt, userPrompt, {
       mode: "year",
       conversation,
@@ -1209,9 +2374,7 @@ export async function generateYearNarrative(
         continuationCount += 1;
       }
     }
-    if (callResult.truncated || isLikelyTruncated(text)) {
-      text = forceNarrativeClosure(text);
-    }
+    if (callResult.truncated || isLikelyTruncated(text)) text = "";
     if (isMilestoneYear && text && isNarrativeNearDuplicate(text, avoidNarratives)) {
       const retryPrompt = buildYearDedupeRetryPrompt(userPrompt, text, avoidNarratives);
       const retried = await callModel(ctx, systemPrompt, retryPrompt, {
@@ -1221,9 +2384,7 @@ export async function generateYearNarrative(
         skipCache: true
       });
       let rewritten = stripMilestoneOptionArtifacts(retried.text);
-      if (retried.truncated || isLikelyTruncated(rewritten)) {
-        rewritten = forceNarrativeClosure(rewritten);
-      }
+      if (retried.truncated || isLikelyTruncated(rewritten)) rewritten = "";
       if (rewritten) {
         text = rewritten;
       }
@@ -1262,13 +2423,19 @@ function defaultOptions(): AiMilestoneOptions {
   };
 }
 
+function fallbackDecisionDescription(id: DecisionType): string {
+  if (id === "safe") return "优先保全眼前局面，代价较小。";
+  if (id === "balanced") return "承担可控代价，争取更稳的推进。";
+  return "押上现有筹码，换取一次突破机会。";
+}
+
 function fallbackFromChoice(choice: NonNullable<InternalRunState["nextMilestoneChoice"]>): AiMilestoneOptions {
   return {
     background: (choice.background ?? "").trim() || "命运的岔路在你面前展开。",
     optionOverrides: choice.options.map((opt) => ({
       id: opt.id,
       label: (opt.label ?? "").trim() || (opt.id === "safe" ? "A" : opt.id === "balanced" ? "B" : "C"),
-      description: (opt.description ?? "").trim() || "请谨慎抉择。"
+      description: (opt.description ?? "").trim() || fallbackDecisionDescription(opt.id)
     }))
   };
 }
@@ -1423,13 +2590,14 @@ function normalizeMilestoneOptionOverrides(raw: unknown): AiMilestoneOptions["op
     const maybe = item as { id?: unknown; label?: unknown; description?: unknown };
     const label = typeof maybe.label === "string" ? maybe.label.trim() : "";
     const description = typeof maybe.description === "string" ? maybe.description.trim() : "";
+    if (!label || !description) return null;
     const normalizedId = normalizeDecisionId(maybe.id) ?? normalizeDecisionId(label);
 
     if (normalizedId && !byId.has(normalizedId)) {
       byId.set(normalizedId, {
         id: normalizedId,
-        label: label || fallbackDecisionLabel(normalizedId),
-        description: description || "请谨慎抉择。"
+        label,
+        description
       });
       continue;
     }
@@ -1447,8 +2615,8 @@ function normalizeMilestoneOptionOverrides(raw: unknown): AiMilestoneOptions["op
     if (direct) {
       normalized.push({
         id,
-        label: direct.label.trim() || fallbackDecisionLabel(id),
-        description: direct.description.trim() || "请谨慎抉择。"
+        label: direct.label,
+        description: direct.description
       });
       continue;
     }
@@ -1457,8 +2625,8 @@ function normalizeMilestoneOptionOverrides(raw: unknown): AiMilestoneOptions["op
     if (!fallback) return null;
     normalized.push({
       id,
-      label: fallback.label || fallbackDecisionLabel(id),
-      description: fallback.description || "请谨慎抉择。"
+      label: fallback.label,
+      description: fallback.description
     });
   }
 
@@ -1528,7 +2696,7 @@ export async function generateMilestoneOptions(
   const systemHash = hashSystemPrompt(systemPrompt);
   const conversation = ensureConversationState(ctx.conversation, systemHash, systemPrompt);
   ctx.conversation = conversation;
-  const userPrompt = buildMilestoneOptionsPrompt(run, recent, promptPack);
+  const userPrompt = buildMilestoneOptionsPrompt(run, recent, promptPack, ctx.narrativePlan);
   if (debugModel) {
     console.log("[model-debug:prompt-shape:milestone]", {
       systemPromptLen: systemPrompt.length,
@@ -1542,29 +2710,14 @@ export async function generateMilestoneOptions(
 
   try {
     compactConversationWindow(ctx, conversation);
-    pushHistory(conversation, "user", userPrompt);
-    let text = "";
-    try {
-      const first = await callModel(ctx, systemPrompt, userPrompt, {
-        structuredOutput: milestoneStructuredOutput,
-        mode: "milestone",
-        conversation,
-        semanticQuery: `${run.age}|${run.ageStage.label}|${run.personaPrompt}`,
-        skipCache: true
-      });
-      text = first.text;
-    } catch (structuredErr) {
-      if (!isLikelyStructuredOutputUnsupported(structuredErr)) {
-        throw structuredErr;
-      }
-      const first = await callModel(ctx, systemPrompt, userPrompt, {
-        mode: "milestone",
-        conversation,
-        semanticQuery: `${run.age}|${run.ageStage.label}|${run.personaPrompt}`,
-        skipCache: true
-      });
-      text = first.text;
-    }
+    pushHistory(conversation, "user", projectConversationUserPrompt(userPrompt));
+    const first = await callModelAsJson(ctx, systemPrompt, userPrompt, milestoneStructuredOutput, {
+      mode: "milestone",
+      conversation,
+      semanticQuery: `${run.age}|${run.ageStage.label}|${run.personaPrompt}`,
+      skipCache: true
+    });
+    const text = first.result.text;
     if (debugModel) {
       console.log("[model-debug:milestone-options]", {
         hasText: Boolean(text?.trim()),
@@ -1580,41 +2733,21 @@ export async function generateMilestoneOptions(
         "R1 仅输出合法JSON，不要markdown与解释。",
         "R2 模板:{\"background\":\"...\",\"optionOverrides\":[{\"id\":\"safe\",\"label\":\"A\",\"description\":\"...\"},{\"id\":\"balanced\",\"label\":\"B\",\"description\":\"...\"},{\"id\":\"risky\",\"label\":\"C\",\"description\":\"...\"}]}"
       ].join("\n");
-      let retriedText = "";
-      try {
-        const retried = await callModel(ctx, systemPrompt, retryPrompt, {
-          structuredOutput: milestoneStructuredOutput,
-          mode: "milestone",
-          conversation,
-          semanticQuery: retryPrompt,
-          skipCache: true
-        });
-        retriedText = retried.text;
-      } catch (structuredErr) {
-        if (!isLikelyStructuredOutputUnsupported(structuredErr)) {
-          throw structuredErr;
-        }
-        const retried = await callModel(ctx, systemPrompt, retryPrompt, {
-          mode: "milestone",
-          conversation,
-          semanticQuery: retryPrompt,
-          skipCache: true
-        });
-        retriedText = retried.text;
-      }
+      const retried = await callModelAsJson(ctx, systemPrompt, retryPrompt, milestoneStructuredOutput, {
+        mode: "milestone",
+        conversation,
+        semanticQuery: retryPrompt,
+        skipCache: true
+      });
+      const retriedText = retried.result.text;
       parsed = parseMilestonePayload(retriedText);
     }
 
     if (!baseChoice) {
       if (!parsed) return defaultOptions();
-      const normalized = parsed.optionOverrides.map((o) => ({
-        id: o.id,
-        label: (o.label || "").trim() || fallbackDecisionLabel(o.id),
-        description: (o.description || "").trim() || "请谨慎抉择。"
-      }));
       return {
         background: (parsed.background || "命运在你面前摊开新赌局。").trim(),
-        optionOverrides: normalized
+        optionOverrides: parsed.optionOverrides
       };
     }
 
@@ -1650,7 +2783,8 @@ export async function generateEndingNarrative(
   const systemHash = hashSystemPrompt(systemPrompt);
   const conversation = ensureConversationState(ctx.conversation, systemHash, systemPrompt);
   ctx.conversation = conversation;
-  const userPrompt = buildEndingPrompt(run, fallback);
+  syncStoryConversationState(conversation, run);
+  const userPrompt = buildEndingPrompt(run, fallback, ctx.narrativePlan);
   if (debugModel) {
     console.log("[model-debug:prompt-shape:ending]", {
       systemPromptLen: systemPrompt.length,
@@ -1661,7 +2795,7 @@ export async function generateEndingNarrative(
 
   try {
     compactConversationWindow(ctx, conversation);
-    pushHistory(conversation, "user", userPrompt);
+    pushHistory(conversation, "user", projectConversationUserPrompt(userPrompt));
     const callResult = await callModel(ctx, systemPrompt, userPrompt, {
       mode: "ending",
       conversation,

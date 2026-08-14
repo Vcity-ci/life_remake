@@ -17,6 +17,7 @@
 - `C:\srv\life_remake\data\...`
 - `C:\srv\life_remake\skills\ai-gm\prompt-pack.json`
 - `C:\srv\life_remake\apps\frontend\dist\...`
+- `C:\srv\life_remake\storage\anonymous-game-store.json`（匿名会话、临时局与存档）
 
 ## 3. 当前代码对齐点
 
@@ -77,14 +78,20 @@ npm run build
 PORT=4000
 DEPLOY_MODE=cloud
 CLOUD_MODEL_API_KEY=your_key
-DEFAULT_PROVIDER_BASE_URL=https://api.openai.com/v1
-DEFAULT_PROVIDER_MODEL=gpt-4.1-mini
+DEFAULT_PROVIDER_BASE_URL=https://api.deepseek.com
+DEFAULT_PROVIDER_MODEL=deepseek-v4-flash
 DEFAULT_PROVIDER_API_PATH=/chat/completions
 DEFAULT_PROVIDER_TEMPERATURE=0.9
 DEFAULT_PROVIDER_MAX_TOKENS=700
 DEFAULT_PROVIDER_TIMEOUT_MS=45000
 DEBUG_MODEL_CALLS=0
+ANONYMOUS_SESSION_TTL_DAYS=30
+ANONYMOUS_RUN_TTL_DAYS=7
+ANONYMOUS_SAVE_TTL_DAYS=180
+ANONYMOUS_SAVE_SLOT_LIMIT=5
 ```
+
+`storage/` 必须位于持久磁盘或被挂载为持久卷。此版本面向单后端实例；多实例部署前需将 `store.ts` 的文件仓储替换为共享仓储。`CORS_ORIGIN` 必须设置为唯一前端域名，不能使用 `*`，以保证匿名会话 Cookie 正常工作。
 
 健康检查：
 - `http://127.0.0.1:4000/health` 返回 `{ "ok": true }`

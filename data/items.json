@@ -1,0 +1,110 @@
+[
+  {
+    "id": "item_guardian_charm",
+    "name": "护身旧符",
+    "rarity": "rare",
+    "description": "在厄运临头时替你挡下一次最重的损失。",
+    "tags": ["guardian", "survival"],
+    "effects": [
+      {
+        "type": "negative_reduce",
+        "amount": 1,
+        "description": "降低一次负面属性变化。"
+      },
+      {
+        "type": "death_risk_reduce",
+        "amount": 0.08,
+        "description": "降低一次致命风险。"
+      }
+    ]
+  },
+  {
+    "id": "item_introduction_letter",
+    "name": "引荐信",
+    "rarity": "rare",
+    "description": "一封仍有人认得的信，能让机会多停留片刻。",
+    "tags": ["mentor", "institution"],
+    "effects": [
+      {
+        "type": "candidate_weight",
+        "tags": ["mentor", "institution"],
+        "amount": 2,
+        "description": "提高贵人与制度机会出现率。"
+      }
+    ]
+  },
+  {
+    "id": "item_family_medicine",
+    "name": "祖传药方",
+    "rarity": "common",
+    "description": "药性温和，却能在长期消耗中守住底线。",
+    "tags": ["health", "family"],
+    "effects": [
+      {
+        "type": "negative_reduce",
+        "stat": "physique",
+        "amount": 1,
+        "description": "减轻体魄损失。"
+      }
+    ]
+  },
+  {
+    "id": "item_private_ledger",
+    "name": "私账残页",
+    "rarity": "epic",
+    "description": "它记着旁人不愿公开的往来，也带来新的风险。",
+    "tags": ["ambition", "broker"],
+    "effects": [
+      {
+        "type": "candidate_weight",
+        "tags": ["ambition", "broker"],
+        "amount": 3,
+        "description": "提高资源与博弈类事件出现率。"
+      },
+      {
+        "type": "reward_bonus",
+        "amount": 0.08,
+        "description": "提高高价值收获概率。"
+      }
+    ]
+  },
+  {
+    "id": "item_unfinished_map",
+    "name": "未竟地图",
+    "rarity": "epic",
+    "description": "地图指向一条还无人走通的路。",
+    "tags": ["outsider", "exploration"],
+    "effects": [
+      {
+        "type": "candidate_weight",
+        "tags": ["outsider"],
+        "amount": 2,
+        "description": "提高非常规转机出现率。"
+      },
+      {
+        "type": "unlock_event",
+        "eventIds": ["outsider"],
+        "description": "允许陌生路径进入候选池。"
+      }
+    ]
+  },
+  {
+    "id": "item_second_chance_token",
+    "name": "回环筹码",
+    "rarity": "legendary",
+    "description": "命运翻向最坏处时，它会替你争取一次喘息。",
+    "tags": ["fortune", "destiny", "turnaround"],
+    "effects": [
+      {
+        "type": "death_risk_reduce",
+        "amount": 0.18,
+        "description": "大幅降低致命风险。"
+      },
+      {
+        "type": "negative_reduce",
+        "amount": 2,
+        "description": "显著减轻负面变化。"
+      }
+    ]
+  }
+]

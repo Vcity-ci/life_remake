@@ -12,30 +12,58 @@ import type {
   DifficultyConfig,
   GameplayTuning,
   GameEnvConfigRequest,
+  NarrativeComponentDefinition,
+  NarrativeWorldDefinition,
+  PublicMilestoneChoice,
+  PublicTimelineEntry,
+  TurnRecord,
   ProviderConfig,
   StepAction,
   StartAllocationConfig,
   StartRunRequest,
   StepRunRequest,
+  StoryDirectionDefinition,
   WorldConfig,
   YearEvent
 } from "@reroll/shared";
 import { createDefaultGameplayTuning } from "@reroll/shared";
-import { generateEndingNarrative, generateMilestoneOptions, generateYearNarrative } from "./ai.js";
+import {
+  generateEndingNarrative,
+  generateMilestoneOptions,
+  generateYearNarrative,
+  isDirectedToolAvailable,
+  recordDirectedDecisionOutcome,
+  recordDirectedStoryTurnOutcome
+} from "./ai.js";
+import { generateNarrativeRender, generateNarrativeTurn } from "./narrative-provider.js";
+import { approveStoryClosure, approveStoryIntent } from "./tool-gateway.js";
 import { providerLimits } from "./constants.js";
 import { getCloudApiKey, getDeployMode, readRuntimeConfig, writeRuntimeConfig } from "./config.js";
 import {
   loadFactionEvents,
   loadFactions,
+  loadEventDefinitions,
+  loadItemDefinitions,
+  loadNarrativeWorldDefinition,
   loadTalentPromptHooks,
   loadWorldlineSetting,
   readContentBundle,
   writeContentBundle
 } from "./content.js";
+import { buildNarrativePromptPlan } from "./narrative.js";
 import {
   attachTimelineChunk,
+  advanceWithDirectedEvent,
   autoAdvanceToCheckpoint,
   applyMilestoneDecisionAndAdvance,
+  appendPublicTurnRecord,
+  buildDirectedEventCandidates,
+  buildDirectedDecisionDirections,
+  buildDirectedStoryDirections,
+  buildDirectedNarrativeComponentFocuses,
+  buildDirectedNarrativeIntents,
+  beginDirectedClosureGuidance,
+  canRequestDirectedClosure,
   createRun,
   hasPendingRequestId,
   markRunPhase,
@@ -43,16 +71,47 @@ import {
   rememberRequestId,
   revealNextTimelineEntry,
   toClientRun,
+  toPublicMilestoneChoice,
+  toPublicTimelineEntry,
+  toPublicTimelineEntryFromEvent,
+  toPresentationTimelineEntries,
+  resolvePublicDecisionOption,
+  resolveTurnRecordChoice,
+  ensureVisibleTurnRecords,
   type InternalRunState
 } from "./engine.js";
 import {
   adminConfigSchema,
   contentBundleSchema,
+  createSaveSchema,
   gameEnvSchema,
+  recoverSaveSchema,
+  restoreSaveSchema,
   startRunSchema,
   stepRunSchema
 } from "./schema.js";
-import { getGameEnv, getRun, getRunClientId, saveGameEnv, saveRun } from "./store.js";
+import {
+  anonymousSessionTtlMs,
+  clearSessionRuns,
+  createDecisionCheckpoint,
+  createSaveSlot,
+  deleteSaveSlot,
+  ensureStoreReady,
+  getGameEnv,
+  getLatestRun,
+  getRun,
+  getRunSessionId,
+  listSaveSlots,
+  resolveAnonymousSession,
+  resetAnonymousGameData,
+  restoreSaveByRecoveryCode,
+  restoreSaveSlot,
+  saveGameEnv,
+  saveRun,
+  withRunLock,
+  withSessionLock,
+  type AnonymousSession
+} from "./store.js";
 
 dotenv.config({
   path: path.join(process.cwd(), ".env")
@@ -62,11 +121,12 @@ const app = express();
 const port = Number(process.env.PORT ?? "4000");
 const deployMode = getDeployMode();
 const debugModel = process.env.DEBUG_MODEL_CALLS === "1";
+const anonymousSessionCookie = "reroll_session";
 type NarrativeCallContext = Parameters<typeof generateYearNarrative>[3];
 type TimelineEntryChunk = NonNullable<InternalRunState["timelineChunk"]>;
-type TimelineEntryItem = TimelineEntryChunk[number];
-type MilestoneChoicePayload = NonNullable<InternalRunState["nextMilestoneChoice"]>;
-type StreamDonePayload = { run: ReturnType<typeof toClientRun>; timelineChunk: TimelineEntryChunk };
+type TimelineEntryItem = PublicTimelineEntry;
+type StreamDonePayload = { run: ReturnType<typeof toClientRun>; timelineChunk: PublicTimelineEntry[]; turns?: TurnRecord[] };
+type GameRequest = express.Request & { anonymousSession?: AnonymousSession };
 type GameStreamEvent =
   | {
       type: "meta";
@@ -80,8 +140,7 @@ type GameStreamEvent =
       };
     }
   | { type: "started"; data: { run: ReturnType<typeof toClientRun> } }
-  | { type: "timeline"; data: { index: number; total: number; entry: TimelineEntryItem } }
-  | { type: "milestone"; data: MilestoneChoicePayload }
+  | { type: "turn"; data: { index: number; total: number; record: TurnRecord } }
   | { type: "done"; data: StreamDonePayload }
   | { type: "error"; data: { message: string } };
 
@@ -171,12 +230,6 @@ function isServerBusyError(error: unknown): error is ServerBusyError {
   return error instanceof ServerBusyError || (error as Error | undefined)?.name === "ServerBusyError";
 }
 
-function toBusyPayload(): { error: string; message: string } {
-  return {
-    error: "server_busy",
-    message: "服务器繁忙，请稍后重试"
-  };
-}
 const narrativeConcurrency = (() => {
   const parsed = Number(process.env.NARRATIVE_CONCURRENCY ?? "1");
   if (!Number.isFinite(parsed)) return 2;
@@ -206,10 +259,57 @@ async function writeNdjsonEvent(res: express.Response, event: GameStreamEvent): 
 
 app.use(
   cors({
-    origin: process.env.CORS_ORIGIN ?? "http://localhost:5173"
+    origin: process.env.CORS_ORIGIN ?? "http://localhost:5173",
+    credentials: true
   })
 );
 app.use(express.json({ limit: "2mb" }));
+
+if (deployMode === "cloud") {
+  app.set("trust proxy", 1);
+}
+
+function readCookieValue(header: string | undefined, name: string): string | undefined {
+  if (!header) return undefined;
+  const prefix = `${name}=`;
+  for (const item of header.split(";")) {
+    const value = item.trim();
+    if (!value.startsWith(prefix)) continue;
+    try {
+      return decodeURIComponent(value.slice(prefix.length));
+    } catch {
+      return undefined;
+    }
+  }
+  return undefined;
+}
+
+function requireAnonymousSession(req: express.Request): AnonymousSession {
+  const session = (req as GameRequest).anonymousSession;
+  if (!session) throw new Error("anonymous_session_missing");
+  return session;
+}
+
+app.use("/api/game", async (req, res, next) => {
+  try {
+    const requestToken = readCookieValue(req.headers.cookie, anonymousSessionCookie);
+    const resolved = await resolveAnonymousSession(requestToken);
+    (req as GameRequest).anonymousSession = resolved.session;
+    const cookieToken = resolved.token ?? requestToken;
+    if (cookieToken) {
+      res.cookie(anonymousSessionCookie, cookieToken, {
+        httpOnly: true,
+        secure: deployMode === "cloud",
+        sameSite: "lax",
+        maxAge: anonymousSessionTtlMs,
+        path: "/"
+      });
+    }
+    next();
+  } catch (error) {
+    next(error);
+  }
+});
 
 function resolveWorld(worlds: WorldConfig[], worldId: string): WorldConfig {
   const found = worlds.find((w) => w.id === worldId);
@@ -243,19 +343,8 @@ function resolveAgeStageForStream(age: number, world: WorldConfig): AgeThreshold
   return found ?? thresholds[thresholds.length - 1];
 }
 
-function toTimelineEntryForStream(event: YearEvent, world: WorldConfig): TimelineEntryItem {
-  const titlePrefix = `${event.age}岁`;
-  const normalizedTitle = event.title.startsWith(titlePrefix)
-    ? event.title.slice(titlePrefix.length).replace(/^·/, "").trim()
-    : event.title;
-  return {
-    age: event.age,
-    ageStage: resolveAgeStageForStream(event.age, world),
-    title: normalizedTitle,
-    narrative: event.summary,
-    tags: event.tags,
-    statChanges: event.statChanges
-  };
+function toTimelineEntryForStream(run: InternalRunState, event: YearEvent, world: WorldConfig): TimelineEntryItem {
+  return toPublicTimelineEntryFromEvent(run, event, world);
 }
 
 function resolveProviderConfig(
@@ -312,6 +401,65 @@ function summarizeWorldline(worldline: unknown): string {
   ].filter(Boolean).join(" | ");
 }
 
+interface PublicGameError {
+  status: number;
+  code: string;
+  message: string;
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function toPublicGameError(error: unknown): PublicGameError {
+  if (isServerBusyError(error)) {
+    return { status: 503, code: "server_busy", message: "服务器繁忙，请稍后重试。" };
+  }
+  const message = errorMessage(error);
+  if (message === "run_not_found" || message === "run_client_missing") {
+    return { status: 404, code: "run_not_found", message: "本局记录不存在或已失效，请重新开始。" };
+  }
+  if (message === "anonymous_session_missing") {
+    return { status: 503, code: "session_unavailable", message: "本局会话暂不可用，请稍后重试。" };
+  }
+  if (message === "save_not_found") {
+    return { status: 404, code: "save_not_found", message: "存档不存在、已过期，或不属于当前浏览器会话。" };
+  }
+  if (message === "recovery_code_invalid") {
+    return { status: 404, code: "recovery_code_invalid", message: "恢复码无效或对应存档已过期。" };
+  }
+  if (message === "save_limit_reached") {
+    return { status: 409, code: "save_limit_reached", message: "当前会话的存档数量已达上限，请先删除不需要的存档。" };
+  }
+  if (message === "missing_game_environment_config" || message === "deploy_mode_env_mismatch") {
+    return { status: 409, code: "game_environment_invalid", message: "本局环境已失效，请重新确认后继续。" };
+  }
+  if (message === "decision_required" || message === "当前没有可用的关键抉择") {
+    return { status: 409, code: "decision_unavailable", message: "当前抉择状态已变化，请刷新后重试。" };
+  }
+  if (
+    message === "directed_story_turn_unavailable" ||
+    message === "directed_story_turn_invalid_output" ||
+    message === "directed_story_tools_unavailable" ||
+    message === "directed_story_render_unavailable" ||
+    message === "directed_story_render_invalid_output"
+  ) {
+    return { status: 503, code: "narrative_unavailable", message: "叙事服务暂时不可用，请稍后重试。" };
+  }
+  if (
+    message === "天赋点超出当前配置允许范围" ||
+    message === "选卡数量超出当前配置允许范围" ||
+    message === "属性分配总和必须等于本局可用天赋点"
+  ) {
+    return { status: 400, code: "invalid_start_request", message: "开局参数无效，请重新检查后开始。" };
+  }
+  return { status: 500, code: "game_unavailable", message: "游戏服务暂时不可用，请稍后重试。" };
+}
+
+function logGameFlowError(operation: string, error: unknown): void {
+  console.error(`[game-flow:${operation}]`, error);
+}
+
 function summarizeFactions(
   factions: Array<{ name: string; values: string[]; behavior: string; eventBias?: string[]; intelStyle?: string }>
 ): string {
@@ -326,16 +474,21 @@ function summarizeFactions(
     .join(" | ");
 }
 
-function summarizeFactionEvents(events: Array<{ factionId: string; events: string[] }>): string {
+function eventTitle(event: string | { title: string }): string {
+  return typeof event === "string" ? event : event.title;
+}
+
+function summarizeFactionEvents(events: Array<{ factionId: string; events: Array<string | { title: string }> }>): string {
   return events
     .slice(0, 8)
-    .map((x) => `${x.factionId}:${x.events.slice(0, 3).join("；")}`)
+    .map((x) => `${x.factionId}:${x.events.slice(0, 3).map(eventTitle).join("；")}`)
     .join(" | ");
 }
 
-function flattenMilestoneEventPool(events: Array<{ events: string[] }>): string[] {
+function flattenMilestoneEventPool(events: Array<{ events: Array<string | { title: string }> }>): string[] {
   return events
     .flatMap((x) => x.events ?? [])
+    .map(eventTitle)
     .map((x) => x.trim())
     .filter((x) => x.length > 0);
 }
@@ -356,17 +509,23 @@ interface GameResources {
   worldline: Awaited<ReturnType<typeof loadWorldlineSetting>>;
   factions: Awaited<ReturnType<typeof loadFactions>>;
   factionEvents: Awaited<ReturnType<typeof loadFactionEvents>>;
+  eventDefinitions: Awaited<ReturnType<typeof loadEventDefinitions>>;
+  itemDefinitions: Awaited<ReturnType<typeof loadItemDefinitions>>;
   talentHooks: Awaited<ReturnType<typeof loadTalentPromptHooks>>;
+  narrativeWorld: NarrativeWorldDefinition | null;
 }
 
 async function loadGameResources(worldId: string): Promise<GameResources> {
-  const [content, runtime, worldline, factions, factionEvents, talentHooks] = await Promise.all([
+  const [content, runtime, worldline, factions, factionEvents, eventDefinitions, itemDefinitions, talentHooks, narrativeWorld] = await Promise.all([
     readContentBundle(),
     readRuntimeConfig(),
     loadWorldlineSetting(worldId),
     loadFactions(),
     loadFactionEvents(worldId),
-    loadTalentPromptHooks()
+    loadEventDefinitions(worldId),
+    loadItemDefinitions(),
+    loadTalentPromptHooks(),
+    loadNarrativeWorldDefinition(worldId)
   ]);
   return {
     content,
@@ -374,7 +533,10 @@ async function loadGameResources(worldId: string): Promise<GameResources> {
     worldline,
     factions,
     factionEvents,
-    talentHooks
+    eventDefinitions,
+    itemDefinitions,
+    talentHooks,
+    narrativeWorld
   };
 }
 
@@ -502,9 +664,46 @@ async function narrateChunkWithConcurrency(
   return narratedChunk;
 }
 
+async function narrateBackgroundPassage(
+  run: InternalRunState,
+  world: WorldConfig,
+  chunk: YearEvent[],
+  narrativeCtx: NarrativeCallContext
+): Promise<YearEvent[]> {
+  if (chunk.length === 0) return [];
+  const first = chunk[0]!;
+  const last = chunk[chunk.length - 1]!;
+  const historyBeforeChunk = run.history.slice(0, Math.max(0, run.history.length - chunk.length));
+  const passageEvent: YearEvent = {
+    ...last,
+    summary: `${first.age}岁至${last.age}岁间的经历需要被写成同一段自然推进的人生余波。`,
+    tags: [...last.tags, "background_segment"]
+  };
+  const promptRun: InternalRunState = {
+    ...run,
+    age: last.age,
+    ageStage: resolveAgeStageForStream(last.age, world),
+    history: [...historyBeforeChunk, passageEvent]
+  };
+  let narrative = "";
+  try {
+    narrative = await generateYearNarrative(promptRun, world, passageEvent, narrativeCtx, {
+      avoidNarratives: historyBeforeChunk.slice(-6).map((event) => event.summary).filter(Boolean)
+    });
+  } catch {
+    narrative = "";
+  }
+  const resolvedSummary = narrative.trim() && !isLikelyLowQualityNarrative(narrative)
+    ? narrative.trim()
+    : buildBackgroundPassageFallback(run, first, last);
+  return chunk.map((event, index) => index === chunk.length - 1
+    ? { ...event, summary: resolvedSummary, tags: [...event.tags, "background_segment"] }
+    : { ...event, summary: "", tags: [...event.tags, "presentation_hidden"] });
+}
+
 interface StartFlowResult {
   updatedRun: InternalRunState;
-  timelineChunk: TimelineEntryChunk;
+  timelineChunk: PublicTimelineEntry[];
   rawChunkCount: number;
   fromAge: number;
   toAge: number;
@@ -531,7 +730,9 @@ interface RunYearFlowOptions {
   factionSummary: string;
   eventPoolSummary: string;
   talentHookSummary: string;
-  onTimeline?: (entry: TimelineEntryItem, index: number, total: number) => Promise<void> | void;
+  narrativeWorld?: NarrativeWorldDefinition | null;
+  presentation?: "event" | "background";
+  skipEndingNarrative?: boolean;
 }
 
 async function runYearFlow(options: RunYearFlowOptions): Promise<{ updatedRun: InternalRunState; timelineChunk: TimelineEntryChunk }> {
@@ -547,7 +748,9 @@ async function runYearFlow(options: RunYearFlowOptions): Promise<{ updatedRun: I
     factionSummary,
     eventPoolSummary,
     talentHookSummary,
-    onTimeline
+    narrativeWorld,
+    presentation = "event",
+    skipEndingNarrative
   } = options;
 
   const narrativeCtx: NarrativeCallContext = {
@@ -558,6 +761,7 @@ async function runYearFlow(options: RunYearFlowOptions): Promise<{ updatedRun: I
     factionSummary,
     eventPoolSummary,
     talentHookSummary,
+    narrativePlan: buildNarrativePromptPlan(currentRun, narrativeWorld ?? null),
     conversation: currentRun.aiConversation?.year
   };
   const useConversationChain = narrativeConcurrency === 1;
@@ -571,18 +775,14 @@ async function runYearFlow(options: RunYearFlowOptions): Promise<{ updatedRun: I
     });
   }
 
-  const narratedChunk = await narrateChunkWithConcurrency(
-    currentRun,
-    world,
-    rawChunk,
-    narrativeCtx,
-    onTimeline
-      ? async (event, index, total) => {
-          const mapped = toTimelineEntryForStream(event, world);
-          await onTimeline(mapped, index, total);
-        }
-      : undefined
-  );
+  const narratedChunk = presentation === "background"
+    ? await narrateBackgroundPassage(currentRun, world, rawChunk, narrativeCtx)
+    : await narrateChunkWithConcurrency(
+        currentRun,
+        world,
+        rawChunk,
+        narrativeCtx
+      );
 
   if (debugModel) {
     console.log(`[model-debug:${branch}-chunk-after-ai]`, {
@@ -609,6 +809,7 @@ async function runYearFlow(options: RunYearFlowOptions): Promise<{ updatedRun: I
         factionSummary,
         eventPoolSummary,
         talentHookSummary,
+        narrativePlan: buildNarrativePromptPlan(currentRun, narrativeWorld ?? null),
         conversation: currentRun.aiConversation?.milestone
       };
       if (!useConversationChain) {
@@ -635,10 +836,11 @@ async function runYearFlow(options: RunYearFlowOptions): Promise<{ updatedRun: I
     ...narratedChunk
   ];
 
-  if (currentRun.ended) {
+  if (currentRun.ended && !skipEndingNarrative) {
     try {
       const endingCtx: NarrativeCallContext = {
         ...narrativeCtx,
+        narrativePlan: buildNarrativePromptPlan(currentRun, narrativeWorld ?? null),
         conversation: currentRun.aiConversation?.ending
       };
       if (!useConversationChain) {
@@ -663,8 +865,8 @@ async function runYearFlow(options: RunYearFlowOptions): Promise<{ updatedRun: I
   return { updatedRun: currentRun, timelineChunk };
 }
 
-function buildVisibleTimelineEntry(world: WorldConfig, event: YearEvent): TimelineEntryItem {
-  return toTimelineEntryForStream(event, world);
+function buildVisibleTimelineEntry(run: InternalRunState, world: WorldConfig, event: YearEvent): TimelineEntryItem {
+  return toTimelineEntryForStream(run, event, world);
 }
 
 function revealOneEntryFromReservoir(
@@ -672,13 +874,13 @@ function revealOneEntryFromReservoir(
   world: WorldConfig
 ): TimelineEntryItem | null {
   const queued = revealNextTimelineEntry(run);
-  if (queued) return queued;
+  if (queued) return toPublicTimelineEntry(run, queued);
   const nextEvent = run.history[run.narrativeReservoir.revealedCount];
   if (!nextEvent) return null;
-  const mapped = buildVisibleTimelineEntry(world, nextEvent);
+  const mapped = buildVisibleTimelineEntry(run, world, nextEvent);
   run.narrativeReservoir.revealedCount += 1;
   run.narrativeReservoir.revealedAge = mapped.age;
-  run.narrativeReservoir.revealedAgeStage = mapped.ageStage;
+  run.narrativeReservoir.revealedAgeStage = resolveAgeStageForStream(mapped.age, world);
   return mapped;
 }
 
@@ -698,6 +900,282 @@ function syncRunPhase(run: InternalRunState): void {
   markRunPhase(run, "ready");
 }
 
+function resolveEventStoryDirection(
+  run: InternalRunState,
+  candidate: ReturnType<typeof buildDirectedEventCandidates>[number],
+  directions: StoryDirectionDefinition[]
+): StoryDirectionDefinition | undefined {
+  const candidateIds = new Set(candidate.definition.storyDirectionIds ?? []);
+  const active = run.story.activeDirectionId
+    ? directions.find((direction) => direction.id === run.story.activeDirectionId)
+    : undefined;
+  if (active && candidateIds.has(active.id)) return active;
+  return directions.find((direction) => candidateIds.has(direction.id));
+}
+
+interface DirectedNarrativeFocusMaterial {
+  label: string;
+  type: NarrativeComponentDefinition["type"];
+  hint: string;
+}
+
+function narrativeComponentHint(
+  definition: NarrativeComponentDefinition,
+  status: InternalRunState["narrative"]["components"][number]["status"]
+): string {
+  if (status === "introduced") return definition.introHint;
+  if (status === "active") return definition.activeHint;
+  if (status === "escalated") return definition.escalationHint;
+  return definition.payoffHint;
+}
+
+function resolveDirectedNarrativeFocus(
+  run: InternalRunState,
+  narrativeWorld: NarrativeWorldDefinition | null | undefined,
+  componentId: string | undefined
+): DirectedNarrativeFocusMaterial | undefined {
+  if (!componentId) return undefined;
+  const state = run.narrative.components.find((component) => component.id === componentId && component.status !== "resolved");
+  const definition = narrativeWorld?.components?.find((component) => component.id === componentId);
+  if (!state || !definition) return undefined;
+  return {
+    label: definition.label,
+    type: definition.type,
+    hint: narrativeComponentHint(definition, state.status)
+  };
+}
+
+function buildBackgroundPassageFallback(run: InternalRunState, first: YearEvent, last: YearEvent): string {
+  const rawAftermath = run.narrative.scene.aftermath.trim();
+  const aftermath = rawAftermath && rawAftermath !== "无"
+    ? rawAftermath
+    : "此前的经历仍在日常中留下痕迹";
+  return `${first.age}岁至${last.age}岁间，${aftermath}。你在日常奔忙中慢慢积累，也察觉有些事情尚未真正结束。`;
+}
+
+function resolveNarrativeBackgroundYears(
+  run: InternalRunState,
+  world: WorldConfig,
+  eventDefinitions: Awaited<ReturnType<typeof loadEventDefinitions>>,
+  hasSceneCandidate: boolean,
+  narrativeWorld?: NarrativeWorldDefinition | null
+): number | undefined {
+  const pacing = narrativeWorld?.progression?.backgroundPacing;
+  const minYears = Math.max(1, Math.trunc(pacing?.minYears ?? run.tuningSnapshot.pacing.maxYearsPerChunk));
+  const maxYears = Math.max(minYears, Math.trunc(pacing?.maxYears ?? run.tuningSnapshot.pacing.maxYearsPerChunk));
+  const rng = seedrandom(`${run.seed}:narrative-background:${run.age}:${run.history.length}`);
+  const configuredSpan = minYears + Math.floor(rng() * (maxYears - minYears + 1));
+  const lastSceneAge = run.narrative.activeScene?.lastTouchedAge ?? run.narrative.lastResolvedSceneAge;
+  if (lastSceneAge !== undefined && run.age - lastSceneAge < configuredSpan) {
+    return Math.max(1, configuredSpan - (run.age - lastSceneAge));
+  }
+  if (hasSceneCandidate) return undefined;
+
+  const nextSetupAge = run.narrative.activeScene
+    ? undefined
+    : eventDefinitions
+      .filter((event) => event.worldId === world.id && event.narrativeBeat === "setup" && event.minAge > run.age)
+      .map((event) => event.minAge)
+      .sort((a, b) => a - b)[0];
+  if (nextSetupAge === undefined) return configuredSpan;
+
+  // Candidate eligibility is evaluated for age + 1. Stop the passage one year
+  // before a setup becomes legal so that it is narrated at its declared age.
+  return Math.max(1, Math.min(configuredSpan, nextSetupAge - run.age - 1));
+}
+
+async function generateApprovedDirectedEnding(
+  run: InternalRunState,
+  world: WorldConfig,
+  narrativeCtx: NarrativeCallContext,
+  narrativeWorld?: NarrativeWorldDefinition | null
+): Promise<void> {
+  if (!run.ended || run.story.closureState !== "finished") return;
+
+  run.aiConversation = run.aiConversation ?? {};
+  const endingCtx: NarrativeCallContext = {
+    ...narrativeCtx,
+    narrativePlan: buildNarrativePromptPlan(run, narrativeWorld ?? null),
+    conversation: run.aiConversation.ending
+  };
+  try {
+    const endingNarrative = await generateEndingNarrative(run, world, endingCtx);
+    run.aiConversation.ending = endingCtx.conversation;
+    if (endingNarrative.trim()) {
+      run.endingSummary = endingNarrative.trim();
+    }
+  } catch {
+    // Keep the engine-approved ending summary.
+  }
+}
+
+interface DirectedSegmentOptions {
+  run: InternalRunState;
+  world: WorldConfig;
+  difficulty: DifficultyConfig;
+  providerConfig: ProviderConfig;
+  apiKey: string;
+  promptPack: Record<string, string>;
+  worldlineSummary: string;
+  factionSummary: string;
+  eventPoolSummary: string;
+  talentHookSummary: string;
+  eventDefinitions: Awaited<ReturnType<typeof loadEventDefinitions>>;
+  itemDefinitions: Awaited<ReturnType<typeof loadItemDefinitions>>;
+  storyDirections: StoryDirectionDefinition[];
+  narrativeWorld?: NarrativeWorldDefinition | null;
+}
+
+async function generateDirectedSegmentForRun(options: DirectedSegmentOptions): Promise<GenerationOutput> {
+  const runBeforeTurn = structuredClone(options.run);
+  try {
+    return await generateDirectedSegmentForRunUnsafe(options);
+  } catch (error) {
+    Object.assign(options.run, runBeforeTurn);
+    // Once the engine has recognized a complete mainline, a malformed or
+    // unavailable tool response must not leak into an unrelated extra year.
+    // Preserve the run in ending guidance for the next approved settlement.
+    if (options.run.narrative.enabled && options.run.story.mainlineCompleted &&
+      beginDirectedClosureGuidance(options.run, options.narrativeWorld ?? null)) {
+      markRunPhase(options.run, "ready");
+      return {
+        run: options.run,
+        generatedChunk: [],
+        fromAge: options.run.age,
+        toAge: options.run.age,
+        rawChunkCount: 0
+      };
+    }
+    throw error;
+  }
+}
+
+async function generateDirectedSegmentForRunUnsafe(options: DirectedSegmentOptions): Promise<GenerationOutput> {
+  const {
+    run,
+    world,
+    difficulty,
+    providerConfig,
+    apiKey,
+    promptPack,
+    worldlineSummary,
+    factionSummary,
+    eventPoolSummary,
+    talentHookSummary,
+    eventDefinitions,
+    itemDefinitions,
+    storyDirections,
+    narrativeWorld
+  } = options;
+  markRunPhase(run, "generating");
+  const candidates = buildDirectedEventCandidates(
+    run,
+    world,
+    difficulty,
+    eventDefinitions,
+    itemDefinitions,
+    storyDirections,
+    narrativeWorld
+  );
+  const narrativeCtx: NarrativeCallContext = {
+    providerConfig,
+    apiKey,
+    promptPack,
+    worldlineSummary,
+    factionSummary,
+    eventPoolSummary,
+    talentHookSummary,
+    narrativePlan: buildNarrativePromptPlan(run, narrativeWorld ?? null),
+    conversation: run.aiConversation?.year
+  };
+  // Route mapping is a deterministic engine responsibility, not a model decision.
+  // The readiness check may latch `mainlineCompleted` for a migrated or
+  // freshly recovered run, so it must execute before we decide the tool set.
+  const closureRequestEligible = canRequestDirectedClosure(run, narrativeWorld ?? null);
+  const closureRequired = run.narrative.enabled && run.story.mainlineCompleted &&
+    run.story.closureState === "open" && closureRequestEligible;
+  const directionOptions = buildDirectedStoryDirections(candidates, storyDirections);
+  const decisionDirections = candidates.some((candidate) => candidate.kind === "milestone")
+    ? buildDirectedDecisionDirections(run, directionOptions, storyDirections)
+    : undefined;
+  const allowedIntents = closureRequired ? [] : buildDirectedNarrativeIntents(run, candidates, narrativeWorld);
+  const focusOptions = closureRequired ? [] : buildDirectedNarrativeComponentFocuses(run, candidates, narrativeWorld ?? null);
+  const canRequestClosure = closureRequired || closureRequestEligible;
+  const turnInput = {
+    allowedIntents,
+    focusOptions,
+    allowClosureRequest: canRequestClosure,
+    closureRequired
+  };
+  const turn = await generateNarrativeTurn({ run, world, input: turnInput, context: narrativeCtx });
+  const closureOutcome = approveStoryClosure(run, turn.closureRequest, narrativeWorld ?? null);
+  const approvedIntent = approveStoryIntent(run, candidates, allowedIntents, turn, focusOptions, narrativeWorld);
+  const closureCandidates = closureOutcome === "guiding"
+    ? buildDirectedEventCandidates(run, world, difficulty, eventDefinitions, itemDefinitions, storyDirections, narrativeWorld)
+    : candidates;
+  const selected = closureOutcome === "guiding"
+    ? closureCandidates.find((candidate) => candidate.definition.narrativeBeat === "ending")
+    : approvedIntent.candidate;
+  if (!selected) {
+    markRunPhase(run, "ready");
+    return { run, generatedChunk: [], fromAge: run.age, toAge: run.age, rawChunkCount: 0 };
+  }
+  const selectedDirection = resolveEventStoryDirection(run, selected, storyDirections);
+  const focus = closureOutcome === "guiding"
+    ? undefined
+    : resolveDirectedNarrativeFocus(run, narrativeWorld, approvedIntent.focusComponentId);
+  const rendered = await generateNarrativeRender({
+    run,
+    world,
+    input: {
+      kind: selected.kind,
+      intent: approvedIntent.intent,
+      premise: selected.definition.promptHook || selected.definition.title,
+      outcomeHint: focus?.hint || "这件事会留下需要在后续面对的真实后果。",
+      sceneHint: run.narrative.scene.conflict,
+      focus: focus ? { label: focus.label, hint: focus.hint } : undefined,
+      turn
+    },
+    context: narrativeCtx
+  });
+  const advanced = advanceWithDirectedEvent(
+    run,
+    world,
+    selected,
+    rendered.narrative,
+    selectedDirection,
+    decisionDirections,
+    narrativeWorld ?? null
+  );
+  const engineApprovedClosureBeat = selected.definition.narrativeBeat === "ending" &&
+    run.story.closureState === "guiding";
+  const settledClosureOutcome = engineApprovedClosureBeat
+    ? approveStoryClosure(advanced.updated, "finish", narrativeWorld ?? null)
+    : undefined;
+  const settledEvent = advanced.chunk[0];
+  recordDirectedStoryTurnOutcome(narrativeCtx, run, {
+    kind: selected.kind,
+    narrative: settledEvent?.summary ?? rendered.narrative,
+    statChanges: settledEvent?.statChanges ?? selected.preview.statChanges,
+    turn,
+    toolResult: rendered.toolResult
+  });
+  run.aiConversation = run.aiConversation ?? {};
+  run.aiConversation.year = narrativeCtx.conversation;
+  if (settledClosureOutcome === "finished") {
+    await generateApprovedDirectedEnding(run, world, narrativeCtx, narrativeWorld);
+  }
+  attachTimelineChunk(advanced.updated, world, advanced.chunk);
+  const timelineChunk = advanced.updated.timelineChunk ?? [];
+  return {
+    run: advanced.updated,
+    generatedChunk: timelineChunk,
+    fromAge: advanced.fromAge,
+    toAge: advanced.toAge,
+    rawChunkCount: advanced.chunk.length
+  };
+}
+
 async function generateSegmentForRun(
   run: InternalRunState,
   world: WorldConfig,
@@ -709,7 +1187,11 @@ async function generateSegmentForRun(
   factionSummary: string,
   eventPoolSummary: string,
   talentHookSummary: string,
-  milestoneEventPool: string[]
+  milestoneEventPool: string[],
+  eventDefinitions: Awaited<ReturnType<typeof loadEventDefinitions>>,
+  itemDefinitions: Awaited<ReturnType<typeof loadItemDefinitions>>,
+  storyDirections: StoryDirectionDefinition[],
+  narrativeWorld?: NarrativeWorldDefinition | null
 ): Promise<GenerationOutput> {
   if (run.ended) {
     markRunPhase(run, "ended");
@@ -736,6 +1218,104 @@ async function generateSegmentForRun(
     };
   }
 
+  const usesNarrativeDirector = Boolean(narrativeWorld && run.narrative.enabled && storyDirections.length > 0);
+  const useDirectedTurn = usesNarrativeDirector || (storyDirections.length > 0 && (
+    providerConfig.directorMode === "tool-fast" || (
+      providerConfig.directorMode !== "legacy" && isDirectedToolAvailable(providerConfig)
+    )
+  ));
+  if (usesNarrativeDirector) {
+    // Refresh completion before background pacing so migrated saves that have
+    // already resolved their mainline cannot receive one extra ordinary year.
+    canRequestDirectedClosure(run, narrativeWorld ?? null);
+    // Completion waits for the explicit closing tool request. It must never be
+    // converted into a background passage merely because no normal event is
+    // currently legal.
+    if (run.story.mainlineCompleted && run.story.closureState === "open") {
+      return generateDirectedSegmentForRun({
+        run,
+        world,
+        difficulty,
+        providerConfig,
+        apiKey,
+        promptPack,
+        worldlineSummary,
+        factionSummary,
+        eventPoolSummary,
+        talentHookSummary,
+        eventDefinitions,
+        itemDefinitions,
+        storyDirections,
+        narrativeWorld
+      });
+    }
+    const sceneCandidates = buildDirectedEventCandidates(
+      run,
+      world,
+      difficulty,
+      eventDefinitions,
+      itemDefinitions,
+      storyDirections,
+      narrativeWorld
+    );
+    const hasSceneCandidate = sceneCandidates.some((candidate) => Boolean(candidate.definition.narrativeBeat));
+    const backgroundYears = resolveNarrativeBackgroundYears(run, world, eventDefinitions, hasSceneCandidate, narrativeWorld);
+    if (backgroundYears !== undefined) {
+      markRunPhase(run, "generating");
+      const advanced = autoAdvanceToCheckpoint(run, world, difficulty, {
+        milestoneEventPool,
+        targetYears: backgroundYears,
+        maxTargetYears: narrativeWorld?.progression?.backgroundPacing.maxYears,
+        allowRandomMilestone: false
+      });
+      rawChunk = advanced.chunk;
+      fromAge = advanced.fromAge;
+      toAge = advanced.toAge;
+      const flow = await runYearFlow({
+        branch: "step",
+        rawChunk,
+        currentRun: advanced.updated,
+        world,
+        providerConfig,
+        apiKey,
+        promptPack,
+        worldlineSummary,
+        factionSummary,
+        eventPoolSummary,
+        talentHookSummary,
+        narrativeWorld,
+        presentation: "background"
+      });
+      queueTimelineEntries(flow.updatedRun, flow.timelineChunk);
+      syncRunPhase(flow.updatedRun);
+      return {
+        run: flow.updatedRun,
+        generatedChunk: flow.timelineChunk,
+        fromAge,
+        toAge,
+        rawChunkCount: rawChunk.length
+      };
+    }
+  }
+  if (useDirectedTurn) {
+    return generateDirectedSegmentForRun({
+      run,
+      world,
+      difficulty,
+      providerConfig,
+      apiKey,
+      promptPack,
+      worldlineSummary,
+      factionSummary,
+      eventPoolSummary,
+      talentHookSummary,
+      eventDefinitions,
+      itemDefinitions,
+      storyDirections,
+      narrativeWorld
+    });
+  }
+
   markRunPhase(run, "generating");
   const advanced = autoAdvanceToCheckpoint(run, world, difficulty, { milestoneEventPool });
   rawChunk = advanced.chunk;
@@ -753,7 +1333,8 @@ async function generateSegmentForRun(
     worldlineSummary,
     factionSummary,
     eventPoolSummary,
-    talentHookSummary
+    talentHookSummary,
+    narrativeWorld
   });
 
   queueTimelineEntries(flow.updatedRun, flow.timelineChunk);
@@ -769,12 +1350,22 @@ async function generateSegmentForRun(
 
 async function runStartFlow(
   body: StartRunRequest,
+  sessionId: string,
   hooks?: {
     onStarted?: (run: ReturnType<typeof toClientRun>) => Promise<void> | void;
-    onTimeline?: (entry: TimelineEntryItem, index: number, total: number) => Promise<void> | void;
   }
 ): Promise<StartFlowResult> {
-  const env = getGameEnv(body.clientId);
+  return withSessionLock(sessionId, () => runStartFlowUnlocked(body, sessionId, hooks));
+}
+
+async function runStartFlowUnlocked(
+  body: StartRunRequest,
+  sessionId: string,
+  hooks?: {
+    onStarted?: (run: ReturnType<typeof toClientRun>) => Promise<void> | void;
+  }
+): Promise<StartFlowResult> {
+  const env = await getGameEnv(sessionId);
   if (!env) {
     throw new Error("missing_game_environment_config");
   }
@@ -783,19 +1374,21 @@ async function runStartFlow(
   }
 
   const resources = await loadGameResources(body.worldId);
-  const { content, runtime, worldline, factions, factionEvents, talentHooks } = resources;
+  const { content, runtime, worldline, factions, factionEvents, eventDefinitions, itemDefinitions, talentHooks, narrativeWorld } = resources;
   const tuning = resolveGameplayTuning(content);
   const allocation = toStartAllocationConfig(tuning);
   const world = resolveWorld(content.worlds, body.worldId);
   const difficulty = resolveDifficulty(content.difficulties, body.difficultyId);
   const milestoneEventPool = flattenMilestoneEventPool(factionEvents);
 
+  await clearSessionRuns(sessionId);
   const run = createRun(
     {
       world,
       difficulty,
       cards: content.cards,
-      tuning
+      tuning,
+      narrativeEnabled: Boolean(narrativeWorld)
     },
     body
   );
@@ -824,10 +1417,10 @@ async function runStartFlow(
       nextMilestoneChoice: undefined
     });
   }
-  const timelineChunk: TimelineEntryChunk = [];
+  const timelineChunk: PublicTimelineEntry[] = [];
   markRunPhase(run, "ready");
   syncRunPhase(run);
-  saveRun(run, body.clientId);
+  await saveRun(run, sessionId);
   return {
     updatedRun: run,
     timelineChunk,
@@ -840,7 +1433,7 @@ async function runStartFlow(
 
 interface StepFlowResult {
   updatedRun: InternalRunState;
-  timelineChunk: TimelineEntryChunk;
+  timelineChunk: PublicTimelineEntry[];
   rawChunkCount: number;
   fromAge: number;
   toAge: number;
@@ -850,18 +1443,27 @@ interface StepFlowResult {
 
 async function runStepFlow(
   body: StepRunRequest,
-  onTimeline?: (entry: TimelineEntryItem, index: number, total: number) => Promise<void> | void
+  sessionId: string,
+  onTurn?: (record: TurnRecord, index: number, total: number) => Promise<void> | void
 ): Promise<StepFlowResult> {
-  const run = getRun(body.runId) as InternalRunState | undefined;
+  return withSessionLock(sessionId, () => withRunLock(body.runId, () => runStepFlowUnlocked(body, sessionId, onTurn)));
+}
+
+async function runStepFlowUnlocked(
+  body: StepRunRequest,
+  sessionId: string,
+  onTurn?: (record: TurnRecord, index: number, total: number) => Promise<void> | void
+): Promise<StepFlowResult> {
+  const run = await getRun(body.runId) as InternalRunState | undefined;
   if (!run) {
     throw new Error("run_not_found");
   }
 
-  const clientId = getRunClientId(body.runId);
-  if (!clientId) {
-    throw new Error("run_client_missing");
+  const ownerSessionId = await getRunSessionId(body.runId);
+  if (!ownerSessionId || ownerSessionId !== sessionId) {
+    throw new Error("run_not_found");
   }
-  const env = getGameEnv(clientId);
+  const env = await getGameEnv(sessionId);
   if (!env) {
     throw new Error("missing_game_environment_config");
   }
@@ -882,10 +1484,8 @@ async function runStepFlow(
       action
     };
   }
-  rememberRequestId(run, body.requestId);
-
   const resources = await loadGameResources(run.worldId);
-  const { content, runtime, worldline, factions, factionEvents, talentHooks } = resources;
+  const { content, runtime, worldline, factions, factionEvents, eventDefinitions, itemDefinitions, talentHooks, narrativeWorld } = resources;
   const tuning = resolveGameplayTuning(content);
   const allocation = toStartAllocationConfig(tuning);
   if (run.ended && run.narrativeReservoir.queued.length === 0) {
@@ -918,6 +1518,8 @@ async function runStepFlow(
   let fromAge = run.age;
   let toAge = run.age;
   let rawChunkCount = 0;
+  let resolvedChoice: PublicMilestoneChoice | undefined;
+  let resolvedChoiceOutcome: TurnRecord["choiceOutcome"] | undefined;
 
   if (action === "decide") {
     if (run.narrativeReservoir.queued.length > 0) {
@@ -927,7 +1529,7 @@ async function runStepFlow(
     const decisionChoice = run.nextMilestoneChoice;
     if (!decisionChoice) {
       syncRunPhase(run);
-      saveRun(run, clientId);
+      await saveRun(run, sessionId);
       return {
         updatedRun: run,
         timelineChunk: [],
@@ -940,7 +1542,24 @@ async function runStepFlow(
     }
     if (typeof body.decisionAge === "number" && body.decisionAge !== decisionChoice.age) {
       syncRunPhase(run);
-      saveRun(run, clientId);
+      await saveRun(run, sessionId);
+      return {
+        updatedRun: run,
+        timelineChunk: [],
+        rawChunkCount: 0,
+        fromAge: run.age,
+        toAge: run.age,
+        tuning: allocation,
+        action
+      };
+    }
+    const publicChoice = toPublicMilestoneChoice(run);
+    if (
+      (body.sceneId && body.sceneId !== publicChoice?.sceneId) ||
+      (typeof body.sceneRevision === "number" && body.sceneRevision !== publicChoice?.revision)
+    ) {
+      syncRunPhase(run);
+      await saveRun(run, sessionId);
       return {
         updatedRun: run,
         timelineChunk: [],
@@ -954,33 +1573,86 @@ async function runStepFlow(
     if (!body.decision) {
       throw new Error("decision_required");
     }
+    const resolvedDecision = resolvePublicDecisionOption(run, body.decision);
+    if (!resolvedDecision) {
+      syncRunPhase(run);
+      await saveRun(run, sessionId);
+      return {
+        updatedRun: run,
+        timelineChunk: [],
+        rawChunkCount: 0,
+        fromAge: run.age,
+        toAge: run.age,
+        tuning: allocation,
+        action
+      };
+    }
+    const wasDirectedMilestone = run.history[run.history.length - 1]?.tags.includes("director") === true;
+    const usesStoryDirectionDecision = Boolean(run.pendingDirectedDecisionDirections);
+    const selectedOption = decisionChoice.options.find((option) => option.id === resolvedDecision);
+    resolvedChoice = publicChoice;
+    resolvedChoiceOutcome = selectedOption ? {
+      optionId: selectedOption.id,
+      label: selectedOption.label,
+      description: selectedOption.description
+    } : undefined;
+    await createDecisionCheckpoint(sessionId, run);
     const stepped = applyMilestoneDecisionAndAdvance(
       run,
       world,
       difficulty,
-      body.decision as DecisionType,
+      resolvedDecision,
       { milestoneEventPool }
     );
+    resolveTurnRecordChoice(run, publicChoice, selectedOption);
     if (debugModel) {
       console.log("[model-debug:step-branch]", { branch: "decision", chunkCount: stepped.chunk.length });
     }
-    const flow = await runYearFlow({
-      branch: "step",
-      rawChunk: stepped.chunk,
-      currentRun: stepped.updated,
-      world,
-      providerConfig,
-      apiKey,
-      promptPack: content.promptPack,
-      worldlineSummary,
-      factionSummary,
-      eventPoolSummary,
-      talentHookSummary
-    });
-    generatedChunk = flow.timelineChunk;
-    fromAge = stepped.fromAge;
-    toAge = stepped.toAge;
-    rawChunkCount = stepped.chunk.length;
+    if (wasDirectedMilestone && usesStoryDirectionDecision) {
+      const closureCtx: NarrativeCallContext = {
+        providerConfig,
+        apiKey,
+        promptPack: content.promptPack,
+        worldlineSummary,
+        factionSummary,
+        eventPoolSummary,
+        talentHookSummary,
+        narrativePlan: buildNarrativePromptPlan(stepped.updated, narrativeWorld),
+        conversation: stepped.updated.aiConversation?.year
+      };
+      recordDirectedDecisionOutcome(closureCtx, stepped.updated, {
+        decision: resolvedDecision,
+        label: selectedOption?.label ?? "已选抉择",
+        narrative: stepped.decisionEvent.summary
+      });
+      stepped.updated.aiConversation = stepped.updated.aiConversation ?? {};
+      stepped.updated.aiConversation.year = closureCtx.conversation;
+      attachTimelineChunk(stepped.updated, world, stepped.chunk);
+      generatedChunk = stepped.updated.timelineChunk ?? [];
+      fromAge = stepped.fromAge;
+      toAge = stepped.toAge;
+      rawChunkCount = stepped.chunk.length;
+    } else {
+      const flow = await runYearFlow({
+        branch: "step",
+        rawChunk: stepped.chunk,
+        currentRun: stepped.updated,
+        world,
+        providerConfig,
+        apiKey,
+        promptPack: content.promptPack,
+        worldlineSummary,
+        factionSummary,
+        eventPoolSummary,
+        talentHookSummary,
+        narrativeWorld,
+        skipEndingNarrative: providerConfig.directorMode !== "legacy"
+      });
+      generatedChunk = flow.timelineChunk;
+      fromAge = stepped.fromAge;
+      toAge = stepped.toAge;
+      rawChunkCount = stepped.chunk.length;
+    }
   } else if (run.narrativeReservoir.queued.length === 0 && !run.nextMilestoneChoice && !run.ended) {
     const generated = await generateSegmentForRun(
       run,
@@ -993,7 +1665,11 @@ async function runStepFlow(
       factionSummary,
       eventPoolSummary,
       talentHookSummary,
-      milestoneEventPool
+      milestoneEventPool,
+      eventDefinitions,
+      itemDefinitions,
+      worldline?.storyDirections ?? [],
+      narrativeWorld
     );
     generatedChunk = generated.generatedChunk;
     fromAge = generated.fromAge;
@@ -1001,18 +1677,33 @@ async function runStepFlow(
     rawChunkCount = generated.rawChunkCount;
   }
 
-  const timelineChunk: TimelineEntryChunk = [];
+  const timelineChunk: PublicTimelineEntry[] = [];
+  const turnRecords: TurnRecord[] = [];
   const revealed = revealOneEntryFromReservoir(run, world);
   if (revealed) {
     timelineChunk.push(revealed);
-    if (onTimeline) {
-      await onTimeline(revealed, 0, 1);
-    }
+    const pendingChoice = toPublicMilestoneChoice(run);
+    turnRecords.push(appendPublicTurnRecord(
+      run,
+      revealed,
+      resolvedChoice ?? (
+        pendingChoice?.age === revealed.age
+          ? pendingChoice
+          : undefined
+      ),
+      resolvedChoiceOutcome
+    ));
   }
 
   syncRunPhase(run);
 
-  saveRun(run, clientId);
+  rememberRequestId(run, body.requestId);
+  await saveRun(run, sessionId);
+  if (onTurn) {
+    for (const [index, record] of turnRecords.entries()) {
+      await onTurn(record, index, turnRecords.length);
+    }
+  }
   return {
     updatedRun: run,
     timelineChunk,
@@ -1036,9 +1727,19 @@ app.get("/api/meta/bootstrap", async (_req, res) => {
 
   res.json({
     deployMode,
-    worlds,
-    difficulties,
-    cardPool,
+    worlds: worlds.map((world) => ({ id: world.id, name: world.name, intro: world.intro })),
+    difficulties: difficulties.map((difficulty) => ({
+      id: difficulty.id,
+      name: difficulty.name,
+      description: difficulty.description
+    })),
+    cardPool: cardPool.map((card) => ({
+      id: card.id,
+      name: card.name,
+      rarity: card.rarity,
+      description: card.description,
+      modifiers: card.modifiers
+    })),
     talentPointTotal,
     startAllocation: allocation,
     runtime,
@@ -1049,7 +1750,7 @@ app.get("/api/meta/bootstrap", async (_req, res) => {
 app.post("/api/game/env", async (req, res) => {
   const parsed = gameEnvSchema.safeParse(req.body);
   if (!parsed.success) {
-    return res.status(400).json({ error: parsed.error.flatten() });
+    return res.status(400).json({ error: "invalid_game_environment", message: "本局环境配置无效，请重新检查。" });
   }
 
   const payload = parsed.data as GameEnvConfigRequest;
@@ -1062,7 +1763,8 @@ app.post("/api/game/env", async (req, res) => {
     return res.status(400).json({ error: "local_mode_requires_local_key" });
   }
 
-  saveGameEnv(payload.clientId, {
+  const session = requireAnonymousSession(req);
+  await saveGameEnv(session.id, {
     runtimeMode,
     localApiKey: payload.localApiKey,
     localProviderConfig: payload.localProviderConfig
@@ -1084,6 +1786,183 @@ app.post("/api/game/env", async (req, res) => {
     effectiveProvider,
     limits: providerLimits
   });
+});
+
+async function currentGameRunPayload(sessionId: string): Promise<{
+  run: ReturnType<typeof toClientRun> | null;
+  timeline: TimelineEntryItem[];
+  turns: TurnRecord[];
+  environmentReady: boolean;
+}> {
+  const [run, env] = await Promise.all([getLatestRun(sessionId), getGameEnv(sessionId)]);
+  const environmentReady = Boolean(env && (env.runtimeMode === "cloud" || env.localApiKey?.trim()));
+  if (!run) {
+    return { run: null, timeline: [], turns: [], environmentReady };
+  }
+
+  const { content } = await loadGameResources(run.worldId);
+  const world = resolveWorld(content.worlds, run.worldId);
+  const internalRun = run as InternalRunState;
+  const hadTurnRecords = internalRun.turnRecords?.length ?? 0;
+  const turns = ensureVisibleTurnRecords(internalRun, world);
+  if (hadTurnRecords === 0 && turns.length > 0) {
+    await saveRun(internalRun, sessionId);
+  }
+  return {
+    run: toClientRun(internalRun),
+    timeline: turns.map((turn) => ({
+      entryId: turn.turnId,
+      ageFrom: turn.ageFrom,
+      age: turn.age,
+      ageStage: turn.ageStage,
+      kind: turn.kind,
+      narrative: turn.narrative,
+      statChanges: turn.statChanges
+    })),
+    turns,
+    environmentReady
+  };
+}
+
+app.get("/api/game/current", async (req, res) => {
+  try {
+    const session = requireAnonymousSession(req);
+    return res.json(await currentGameRunPayload(session.id));
+  } catch (error) {
+    logGameFlowError("current", error);
+    const publicError = toPublicGameError(error);
+    return res.status(publicError.status).json({ error: publicError.code, message: publicError.message });
+  }
+});
+
+app.get("/api/game/saves", async (req, res) => {
+  try {
+    const session = requireAnonymousSession(req);
+    return res.json({ saves: await listSaveSlots(session.id) });
+  } catch (error) {
+    logGameFlowError("list-saves", error);
+    const publicError = toPublicGameError(error);
+    return res.status(publicError.status).json({ error: publicError.code, message: publicError.message });
+  }
+});
+
+app.post("/api/game/saves", async (req, res) => {
+  const parsed = createSaveSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: "invalid_save_request", message: "存档参数无效，请稍后重试。" });
+  }
+
+  try {
+    const session = requireAnonymousSession(req);
+    const created = await withSessionLock(session.id, () => withRunLock(parsed.data.runId, async () => {
+      const [run, ownerSessionId] = await Promise.all([
+        getRun(parsed.data.runId),
+        getRunSessionId(parsed.data.runId)
+      ]);
+      if (!run || ownerSessionId !== session.id) throw new Error("run_not_found");
+      return createSaveSlot(session.id, run, parsed.data.title);
+    }));
+    return res.status(201).json(created);
+  } catch (error) {
+    logGameFlowError("create-save", error);
+    const publicError = toPublicGameError(error);
+    return res.status(publicError.status).json({ error: publicError.code, message: publicError.message });
+  }
+});
+
+app.post("/api/game/saves/restore", async (req, res) => {
+  const parsed = restoreSaveSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: "invalid_save_request", message: "存档参数无效，请稍后重试。" });
+  }
+
+  let release: (() => void) | null = null;
+  try {
+    const session = requireAnonymousSession(req);
+    release = await acquireGlobalFlowSlot();
+    const payload = await withSessionLock(session.id, async () => {
+      const restored = await restoreSaveSlot(session.id, parsed.data.saveId);
+      if (!restored) throw new Error("save_not_found");
+      return currentGameRunPayload(session.id);
+    });
+    return res.json(payload);
+  } catch (error) {
+    logGameFlowError("restore-save", error);
+    const publicError = toPublicGameError(error);
+    return res.status(publicError.status).json({ error: publicError.code, message: publicError.message });
+  } finally {
+    release?.();
+  }
+});
+
+app.post("/api/game/saves/recover", async (req, res) => {
+  const parsed = recoverSaveSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: "invalid_recovery_code", message: "恢复码格式无效。" });
+  }
+
+  let release: (() => void) | null = null;
+  try {
+    const session = requireAnonymousSession(req);
+    release = await acquireGlobalFlowSlot();
+    const payload = await withSessionLock(session.id, async () => {
+      const restored = await restoreSaveByRecoveryCode(session.id, parsed.data.recoveryCode);
+      if (!restored) throw new Error("recovery_code_invalid");
+      return currentGameRunPayload(session.id);
+    });
+    return res.json(payload);
+  } catch (error) {
+    logGameFlowError("recover-save", error);
+    const publicError = toPublicGameError(error);
+    return res.status(publicError.status).json({ error: publicError.code, message: publicError.message });
+  } finally {
+    release?.();
+  }
+});
+
+app.post("/api/game/reset", async (req, res) => {
+  let release: (() => void) | null = null;
+  try {
+    const session = requireAnonymousSession(req);
+    release = await acquireGlobalFlowSlot();
+    await withSessionLock(session.id, () => clearSessionRuns(session.id));
+    return res.status(204).end();
+  } catch (error) {
+    logGameFlowError("reset-run", error);
+    const publicError = toPublicGameError(error);
+    return res.status(publicError.status).json({ error: publicError.code, message: publicError.message });
+  } finally {
+    release?.();
+  }
+});
+
+app.post("/api/game/anonymous/reset", async (req, res) => {
+  let release: (() => void) | null = null;
+  try {
+    const session = requireAnonymousSession(req);
+    release = await acquireGlobalFlowSlot();
+    await withSessionLock(session.id, () => resetAnonymousGameData(session.id));
+    return res.status(204).end();
+  } catch (error) {
+    logGameFlowError("reset-anonymous-game-data", error);
+    const publicError = toPublicGameError(error);
+    return res.status(publicError.status).json({ error: publicError.code, message: publicError.message });
+  } finally {
+    release?.();
+  }
+});
+
+app.delete("/api/game/saves/:saveId", async (req, res) => {
+  try {
+    const session = requireAnonymousSession(req);
+    const deleted = await withSessionLock(session.id, () => deleteSaveSlot(session.id, req.params.saveId));
+    if (!deleted) throw new Error("save_not_found");
+    return res.status(204).end();
+  } catch (error) {
+    logGameFlowError("delete-save", error);
+    const publicError = toPublicGameError(error);
+    return res.status(publicError.status).json({ error: publicError.code, message: publicError.message });
+  }
 });
 
 app.get("/api/admin/content", async (_req, res) => {
@@ -1132,24 +2011,25 @@ app.post("/api/admin/config", async (req, res) => {
 app.post("/api/game/start", async (req, res) => {
   const parsed = startRunSchema.safeParse(req.body);
   if (!parsed.success) {
-    return res.status(400).json({ error: parsed.error.flatten() });
+    return res.status(400).json({ error: "invalid_start_request", message: "开局参数无效，请重新检查后开始。" });
   }
 
   const body = parsed.data as StartRunRequest;
   let release: (() => void) | null = null;
   try {
+    const session = requireAnonymousSession(req);
     release = await acquireGlobalFlowSlot();
-    const result = await runStartFlow(body);
+    const result = await runStartFlow(body, session.id);
     return res.json({
       run: toClientRun(result.updatedRun),
       timelineChunk: result.timelineChunk,
+      turns: result.updatedRun.turnRecords,
       startAllocation: result.tuning
     });
   } catch (error) {
-    if (isServerBusyError(error)) {
-      return res.status(503).json(toBusyPayload());
-    }
-    return res.status(400).json({ error: (error as Error).message || String(error) });
+    logGameFlowError("start", error);
+    const publicError = toPublicGameError(error);
+    return res.status(publicError.status).json({ error: publicError.code, message: publicError.message });
   } finally {
     release?.();
   }
@@ -1158,26 +2038,25 @@ app.post("/api/game/start", async (req, res) => {
 app.post("/api/game/step", async (req, res) => {
   const parsed = stepRunSchema.safeParse(req.body);
   if (!parsed.success) {
-    return res.status(400).json({ error: parsed.error.flatten() });
+    return res.status(400).json({ error: "invalid_step_request", message: "推进请求无效，请刷新后重试。" });
   }
 
   const body = parsed.data as StepRunRequest;
   let release: (() => void) | null = null;
   try {
+    const session = requireAnonymousSession(req);
     release = await acquireGlobalFlowSlot();
-    const result = await runStepFlow(body);
+    const result = await runStepFlow(body, session.id);
     return res.json({
       run: toClientRun(result.updatedRun),
       timelineChunk: result.timelineChunk,
+      turns: result.updatedRun.turnRecords,
       startAllocation: result.tuning
     });
   } catch (error) {
-    if (isServerBusyError(error)) {
-      return res.status(503).json(toBusyPayload());
-    }
-    const msg = (error as Error).message || String(error);
-    if (msg === "run_not_found") return res.status(404).json({ error: msg });
-    return res.status(400).json({ error: msg });
+    logGameFlowError("step", error);
+    const publicError = toPublicGameError(error);
+    return res.status(publicError.status).json({ error: publicError.code, message: publicError.message });
   } finally {
     release?.();
   }
@@ -1186,32 +2065,26 @@ app.post("/api/game/step", async (req, res) => {
 app.post("/api/game/start/stream", async (req, res) => {
   const parsed = startRunSchema.safeParse(req.body);
   if (!parsed.success) {
-    return res.status(400).json({ error: parsed.error.flatten() });
+    return res.status(400).json({ error: "invalid_start_request", message: "开局参数无效，请重新检查后开始。" });
   }
 
   const body = parsed.data as StartRunRequest;
+  const session = requireAnonymousSession(req);
   let release: (() => void) | null = null;
   try {
     release = await acquireGlobalFlowSlot();
   } catch (error) {
-    if (isServerBusyError(error)) {
-      return res.status(503).json(toBusyPayload());
-    }
-    return res.status(500).json({ error: (error as Error).message || String(error) });
+    logGameFlowError("start-stream-queue", error);
+    const publicError = toPublicGameError(error);
+    return res.status(publicError.status).json({ error: publicError.code, message: publicError.message });
   }
   initNdjsonResponse(res);
   try {
-    const result = await runStartFlow(body, {
+    const result = await runStartFlow(body, session.id, {
       onStarted: async (run) => {
         await writeNdjsonEvent(res, {
           type: "started",
           data: { run }
-        });
-      },
-      onTimeline: async (entry, index, total) => {
-        await writeNdjsonEvent(res, {
-          type: "timeline",
-          data: { index, total, entry }
         });
       }
     });
@@ -1228,28 +2101,16 @@ app.post("/api/game/start/stream", async (req, res) => {
       }
     });
 
-    if (result.updatedRun.nextMilestoneChoice) {
-      await writeNdjsonEvent(res, {
-        type: "milestone",
-        data: result.updatedRun.nextMilestoneChoice
-      });
-    }
-
     await writeNdjsonEvent(res, {
       type: "done",
-      data: { run: toClientRun(result.updatedRun), timelineChunk: result.timelineChunk }
+      data: { run: toClientRun(result.updatedRun), timelineChunk: result.timelineChunk, turns: result.updatedRun.turnRecords }
     });
   } catch (error) {
-    if (isServerBusyError(error)) {
-      await writeNdjsonEvent(res, {
-        type: "error",
-        data: { message: "server_busy" }
-      });
-      return;
-    }
+    logGameFlowError("start-stream", error);
+    const publicError = toPublicGameError(error);
     await writeNdjsonEvent(res, {
       type: "error",
-      data: { message: (error as Error).message || String(error) }
+      data: { message: publicError.message }
     });
   } finally {
     release?.();
@@ -1260,25 +2121,25 @@ app.post("/api/game/start/stream", async (req, res) => {
 app.post("/api/game/step/stream", async (req, res) => {
   const parsed = stepRunSchema.safeParse(req.body);
   if (!parsed.success) {
-    return res.status(400).json({ error: parsed.error.flatten() });
+    return res.status(400).json({ error: "invalid_step_request", message: "推进请求无效，请刷新后重试。" });
   }
 
   const body = parsed.data as StepRunRequest;
+  const session = requireAnonymousSession(req);
   let release: (() => void) | null = null;
   try {
     release = await acquireGlobalFlowSlot();
   } catch (error) {
-    if (isServerBusyError(error)) {
-      return res.status(503).json(toBusyPayload());
-    }
-    return res.status(500).json({ error: (error as Error).message || String(error) });
+    logGameFlowError("step-stream-queue", error);
+    const publicError = toPublicGameError(error);
+    return res.status(publicError.status).json({ error: publicError.code, message: publicError.message });
   }
   initNdjsonResponse(res);
   try {
-    const result = await runStepFlow(body, async (entry, index, total) => {
+    const result = await runStepFlow(body, session.id, async (record, index, total) => {
       await writeNdjsonEvent(res, {
-        type: "timeline",
-        data: { index, total, entry }
+        type: "turn",
+        data: { index, total, record }
       });
     });
 
@@ -1294,28 +2155,16 @@ app.post("/api/game/step/stream", async (req, res) => {
       }
     });
 
-    if (result.updatedRun.nextMilestoneChoice) {
-      await writeNdjsonEvent(res, {
-        type: "milestone",
-        data: result.updatedRun.nextMilestoneChoice
-      });
-    }
-
     await writeNdjsonEvent(res, {
       type: "done",
-      data: { run: toClientRun(result.updatedRun), timelineChunk: result.timelineChunk }
+      data: { run: toClientRun(result.updatedRun), timelineChunk: result.timelineChunk, turns: result.updatedRun.turnRecords }
     });
   } catch (error) {
-    if (isServerBusyError(error)) {
-      await writeNdjsonEvent(res, {
-        type: "error",
-        data: { message: "server_busy" }
-      });
-      return;
-    }
+    logGameFlowError("step-stream", error);
+    const publicError = toPublicGameError(error);
     await writeNdjsonEvent(res, {
       type: "error",
-      data: { message: (error as Error).message || String(error) }
+      data: { message: publicError.message }
     });
   } finally {
     release?.();
@@ -1327,7 +2176,31 @@ app.get("/health", (_req, res) => {
   res.json({ ok: true });
 });
 
-app.listen(port, () => {
-  console.log(`backend listening at http://localhost:${port}`);
+app.use((error: unknown, req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  logGameFlowError(`unhandled:${req.method} ${req.path}`, error);
+  if (req.path.startsWith("/api/game")) {
+    if (!res.headersSent) {
+      const publicError = toPublicGameError(error);
+      res.status(publicError.status).json({ error: publicError.code, message: publicError.message });
+    }
+    return;
+  }
+  if (!res.headersSent) {
+    res.status(500).json({ error: "server_unavailable" });
+  }
 });
+
+async function startServer(): Promise<void> {
+  try {
+    await ensureStoreReady();
+    app.listen(port, () => {
+      console.log(`backend listening at http://localhost:${port}`);
+    });
+  } catch (error) {
+    console.error("[anonymous-store:startup]", error);
+    process.exitCode = 1;
+  }
+}
+
+void startServer();
 

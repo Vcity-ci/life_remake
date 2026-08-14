@@ -1,6 +1,7 @@
 [
   {
     "id": "ancient",
+    "mainlineId": "ancient.mainline",
     "eraName": "王朝旧世",
     "timeframe": "架空王朝四百年中后段",
     "coreConflict": "礼法名节与权力私欲之间的结构性冲突",
@@ -11,6 +12,62 @@
       { "stage": "入局期", "ageRange": "15-28", "goal": "通过科举、幕府、军功或婚约第一次进入权力视野" },
       { "stage": "制衡期", "ageRange": "29-45", "goal": "在地方治理、朝堂派系、边患和家族风险中平衡代价" },
       { "stage": "余响期", "ageRange": "46+", "goal": "守成、清算、告老或翻案，决定身后名" }
+    ],
+    "storyDirections": [
+      {
+        "id": "ancient.guardian",
+        "label": "仁政与守责",
+        "summary": "以家族、民生和职责为先，在礼法与现实代价之间承担责任。",
+        "focusTags": ["governance", "care", "family", "integrity"],
+        "factionIds": ["guardian"],
+        "openingThreadIds": ["ancient.guardian_relief"],
+        "closureTags": ["care", "legacy", "governance"]
+      },
+      {
+        "id": "ancient.ambition",
+        "label": "功名与权势",
+        "summary": "借科举、军功或朝局攀升，在名节、派系和权力欲之间作出取舍。",
+        "focusTags": ["career", "public", "strategy", "institution"],
+        "factionIds": ["ambition"],
+        "openingThreadIds": ["ancient.ambition_name"],
+        "closureTags": ["career", "public", "legacy"]
+      },
+      {
+        "id": "ancient.broker",
+        "label": "人情与经营",
+        "summary": "依靠商路、人情和资源周转立足，面对利益网络与家族信誉的拉扯。",
+        "focusTags": ["resource", "network", "relationship", "family"],
+        "factionIds": ["broker"],
+        "openingThreadIds": ["ancient.broker_ledger"],
+        "closureTags": ["resource", "relationship", "legacy"]
+      },
+      {
+        "id": "ancient.mentor",
+        "label": "学问与师承",
+        "summary": "通过学问、师承与教化形成位置，并决定所学是否能承担现实后果。",
+        "focusTags": ["study", "legacy", "career", "teaching"],
+        "factionIds": ["mentor"],
+        "openingThreadIds": ["ancient.mentor_learning"],
+        "closureTags": ["study", "legacy", "public"]
+      },
+      {
+        "id": "ancient.institution",
+        "label": "法度与官署",
+        "summary": "在官署、军府与制度边界内积累权责，决定服从、修补或对抗既有秩序。",
+        "focusTags": ["institution", "governance", "authority", "integrity"],
+        "factionIds": ["institution"],
+        "openingThreadIds": ["ancient.institution_reform"],
+        "closureTags": ["institution", "governance", "legacy"]
+      },
+      {
+        "id": "ancient.outsider",
+        "label": "边地与异路",
+        "summary": "从边地、军旅或非常规师承中寻找出路，并承受脱离主流的风险。",
+        "focusTags": ["frontier", "risk", "career", "integrity"],
+        "factionIds": ["outsider"],
+        "openingThreadIds": ["ancient.outsider_truth"],
+        "closureTags": ["frontier", "career", "integrity"]
+      }
     ],
     "factionTone": "文风凝练、带历史质感，强调名节、因果与代价"
   }

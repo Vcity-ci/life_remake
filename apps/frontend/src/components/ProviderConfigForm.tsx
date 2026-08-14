@@ -27,7 +27,7 @@ export function ProviderConfigForm({ value, onChange, limits, compact }: Props):
         <input
           value={value.baseUrl}
           onChange={(e) => onChange(patch(value, "baseUrl", e.target.value))}
-          placeholder="https://api.openai.com/v1"
+          placeholder="https://api.deepseek.com"
         />
       </label>
 
@@ -49,6 +49,18 @@ export function ProviderConfigForm({ value, onChange, limits, compact }: Props):
           {limits.apiPathOptions.map((opt) => (
             <option key={opt} value={opt}>{opt}</option>
           ))}
+        </select>
+      </label>
+
+      <label>
+        命运编排
+        <select
+          value={value.directorMode ?? "auto"}
+          onChange={(e) => onChange(patch(value, "directorMode", e.target.value as ProviderConfig["directorMode"]))}
+        >
+          <option value="auto">智能事件选择</option>
+          <option value="legacy">传统随机事件</option>
+          <option value="tool-fast">仅使用工具选择</option>
         </select>
       </label>
 

@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" role="img" aria-label="古代城阙夜景">
+  <rect width="1600" height="900" fill="#101317"/>
+  <circle cx="1240" cy="174" r="86" fill="#c5a35a" opacity=".3"/>
+  <circle cx="1240" cy="174" r="62" fill="#d7bd7b" opacity=".18"/>
+  <path d="M0 570 92 522l84 48 102-82 106 80 96-60 78 62 104-98 111 99 89-57 101 61 101-88 122 91 98-58 124 64 85-75 99 56v317H0Z" fill="#171b1d"/>
+  <path d="m0 633 164-96 157 96 0 267H0Zm378 0 153-124 160 124v267H378Zm394 0 163-154 171 154v267H772Zm433 0 146-111 150 111v267h-296Z" fill="#0b0e10" opacity=".9"/>
+  <path d="m58 599 106-128 109 128M415 578l116-149 119 149M818 562l117-168 126 168M1248 582l103-132 112 132" fill="none" stroke="#4a3d29" stroke-width="8" opacity=".45"/>
+  <g fill="#c5a35a" opacity=".16">
+    <rect x="106" y="655" width="20" height="52"/><rect x="178" y="655" width="20" height="52"/>
+    <rect x="468" y="646" width="20" height="58"/><rect x="565" y="646" width="20" height="58"/>
+    <rect x="871" y="635" width="20" height="68"/><rect x="984" y="635" width="20" height="68"/>
+    <rect x="1290" y="649" width="20" height="54"/><rect x="1385" y="649" width="20" height="54"/>
+  </g>
+  <path d="M0 803c208-32 345 33 540 0 201-34 375 37 548 3 194-37 324 28 512-4v98H0Z" fill="#080a0c"/>
+</svg>

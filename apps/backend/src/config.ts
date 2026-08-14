@@ -20,18 +20,19 @@ export function getDeployMode(): "local" | "cloud" {
 }
 
 export function getDefaultRuntimeConfig(): RuntimeConfig {
-  const model = (process.env.DEFAULT_PROVIDER_MODEL ?? "gpt-4.1-mini").trim();
+  const model = (process.env.DEFAULT_PROVIDER_MODEL ?? "deepseek-v4-flash").trim();
   return {
     runtimeMode: getDeployMode(),
     cloud: {
       provider: "openai-compatible",
-      baseUrl: process.env.DEFAULT_PROVIDER_BASE_URL ?? "https://api.openai.com/v1",
-      model: model && /[A-Za-z]/.test(model) ? model : "gpt-4.1-mini",
+      baseUrl: process.env.DEFAULT_PROVIDER_BASE_URL ?? "https://api.deepseek.com",
+      model: model && /[A-Za-z]/.test(model) ? model : "deepseek-v4-flash",
       apiPath: process.env.DEFAULT_PROVIDER_API_PATH ?? "/chat/completions",
       temperature: parseNum(process.env.DEFAULT_PROVIDER_TEMPERATURE, 0.9),
       maxTokens: parseNum(process.env.DEFAULT_PROVIDER_MAX_TOKENS, 1824),
       timeoutMs: parseNum(process.env.DEFAULT_PROVIDER_TIMEOUT_MS, 45000),
-      reasoningEffort: (process.env.DEFAULT_PROVIDER_REASONING_EFFORT?.trim().toLowerCase() as "minimal" | "low" | "medium" | "high" | undefined) ?? "minimal"
+      reasoningEffort: (process.env.DEFAULT_PROVIDER_REASONING_EFFORT?.trim().toLowerCase() as "minimal" | "low" | "medium" | "high" | undefined) ?? "minimal",
+      directorMode: (process.env.EVENT_DIRECTOR_MODE?.trim().toLowerCase() as "legacy" | "tool-fast" | "auto" | undefined) ?? "auto"
     }
   };
 }
@@ -58,7 +59,8 @@ export async function writeRuntimeConfig(payload: AdminConfigPayload): Promise<R
       temperature: payload.runtime.cloud.temperature,
       maxTokens: payload.runtime.cloud.maxTokens,
       timeoutMs: payload.runtime.cloud.timeoutMs,
-      reasoningEffort: payload.runtime.cloud.reasoningEffort ?? "minimal"
+      reasoningEffort: payload.runtime.cloud.reasoningEffort ?? "minimal",
+      directorMode: payload.runtime.cloud.directorMode ?? "auto"
     }
   };
   await fs.writeFile(configPath, JSON.stringify(normalized, null, 2), "utf8");

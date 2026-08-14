@@ -1,4 +1,7 @@
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "";
+function gameFetch(path, init) {
+    return fetch(`${API_BASE}${path}`, { ...init, credentials: "include" });
+}
 export class ApiError extends Error {
     status;
     code;
@@ -60,7 +63,7 @@ export async function saveAdminContent(payload) {
     return parseJson(res);
 }
 export async function saveGameEnvironment(payload) {
-    const res = await fetch(`${API_BASE}/api/game/env`, {
+    const res = await gameFetch("/api/game/env", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
@@ -68,7 +71,7 @@ export async function saveGameEnvironment(payload) {
     return parseJson(res);
 }
 export async function startRun(payload) {
-    const res = await fetch(`${API_BASE}/api/game/start`, {
+    const res = await gameFetch("/api/game/start", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
@@ -76,7 +79,7 @@ export async function startRun(payload) {
     return parseJson(res);
 }
 export async function stepRun(payload) {
-    const res = await fetch(`${API_BASE}/api/game/step`, {
+    const res = await gameFetch("/api/game/step", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
@@ -133,7 +136,7 @@ async function readNdjsonStream(res, onEvent) {
     }
 }
 export async function startRunStream(payload, onEvent) {
-    const res = await fetch(`${API_BASE}/api/game/start/stream`, {
+    const res = await gameFetch("/api/game/start/stream", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
@@ -141,10 +144,60 @@ export async function startRunStream(payload, onEvent) {
     await readNdjsonStream(res, onEvent);
 }
 export async function stepRunStream(payload, onEvent) {
-    const res = await fetch(`${API_BASE}/api/game/step/stream`, {
+    const res = await gameFetch("/api/game/step/stream", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
     });
     await readNdjsonStream(res, onEvent);
+}
+export async function fetchCurrentRun() {
+    const res = await gameFetch("/api/game/current");
+    return parseJson(res);
+}
+export async function fetchSaveSlots() {
+    const res = await gameFetch("/api/game/saves");
+    return parseJson(res);
+}
+export async function createSaveSlot(payload) {
+    const res = await gameFetch("/api/game/saves", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+    });
+    return parseJson(res);
+}
+export async function restoreSaveSlot(saveId) {
+    const res = await gameFetch("/api/game/saves/restore", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ saveId })
+    });
+    return parseJson(res);
+}
+export async function recoverSaveSlot(recoveryCode) {
+    const res = await gameFetch("/api/game/saves/recover", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ recoveryCode })
+    });
+    return parseJson(res);
+}
+export async function resetCurrentRun() {
+    const res = await gameFetch("/api/game/reset", { method: "POST" });
+    if (!res.ok) {
+        await parseJson(res);
+    }
+}
+export async function resetAnonymousGameData() {
+    const res = await gameFetch("/api/game/anonymous/reset", { method: "POST" });
+    if (!res.ok) {
+        await parseJson(res);
+    }
+}
+export async function deleteSaveSlot(saveId) {
+    const res = await gameFetch(`/api/game/saves/${encodeURIComponent(saveId)}`, { method: "DELETE" });
+    if (!res.ok) {
+        await parseJson(res);
+    }
 }

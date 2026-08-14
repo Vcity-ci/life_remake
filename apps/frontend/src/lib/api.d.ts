@@ -1,4 +1,4 @@
-import type { AdminConfigPayload, ContentBundle, DecisionType, DifficultyConfig, GameEnvConfigResponse, ProviderConfig, ProviderLimits, RunState, StepAction, StartAllocationConfig, StartRunResponse, StepRunResponse, WorldConfig, BackgroundCard } from "@reroll/shared";
+import type { AdminConfigPayload, ContentBundle, CreateSaveResponse, CurrentGameRunResponse, GameEnvConfigResponse, PublicBackgroundCard, PublicDifficultyOption, PublicRunState, PublicTimelineEntry, TurnRecord, PublicWorldOption, ProviderConfig, ProviderLimits, SaveSlotSummary, StepAction, StartAllocationConfig, StartRunResponse, StepRunResponse, Stats } from "@reroll/shared";
 export declare class ApiError extends Error {
     status: number;
     code?: string;
@@ -6,9 +6,9 @@ export declare class ApiError extends Error {
 }
 export interface BootstrapPayload {
     deployMode: "local" | "cloud";
-    worlds: WorldConfig[];
-    difficulties: DifficultyConfig[];
-    cardPool: BackgroundCard[];
+    worlds: PublicWorldOption[];
+    difficulties: PublicDifficultyOption[];
+    cardPool: PublicBackgroundCard[];
     talentPointTotal: number;
     startAllocation: StartAllocationConfig;
     runtime: AdminConfigPayload["runtime"];
@@ -27,23 +27,21 @@ export type GameStreamEvent = {
 } | {
     type: "started";
     data: {
-        run: RunState;
+        run: PublicRunState;
     };
 } | {
-    type: "timeline";
+    type: "turn";
     data: {
         index: number;
         total: number;
-        entry: NonNullable<RunState["timelineChunk"]>[number];
+        record: TurnRecord;
     };
-} | {
-    type: "milestone";
-    data: NonNullable<RunState["nextMilestoneChoice"]>;
 } | {
     type: "done";
     data: {
-        run: RunState;
-        timelineChunk: NonNullable<RunState["timelineChunk"]>;
+        run: PublicRunState;
+        timelineChunk: PublicTimelineEntry[];
+        turns?: TurnRecord[];
     };
 } | {
     type: "error";
@@ -73,14 +71,16 @@ export declare function startRun(payload: {
     difficultyId: string;
     personaPrompt: string;
     talentPointTotal: number;
-    stats: RunState["stats"];
+    stats: Stats;
     selectedCardIds: string[];
 }): Promise<StartRunResponse>;
 export declare function stepRun(payload: {
     runId: string;
     action?: StepAction;
-    decision?: DecisionType;
+    decision?: string;
     decisionAge?: number;
+    sceneId?: string;
+    sceneRevision?: number;
     requestId?: string;
 }): Promise<StepRunResponse>;
 export declare function startRunStream(payload: {
@@ -89,13 +89,28 @@ export declare function startRunStream(payload: {
     difficultyId: string;
     personaPrompt: string;
     talentPointTotal: number;
-    stats: RunState["stats"];
+    stats: Stats;
     selectedCardIds: string[];
 }, onEvent: (event: GameStreamEvent) => void | Promise<void>): Promise<void>;
 export declare function stepRunStream(payload: {
     runId: string;
     action?: StepAction;
-    decision?: DecisionType;
+    decision?: string;
     decisionAge?: number;
+    sceneId?: string;
+    sceneRevision?: number;
     requestId?: string;
 }, onEvent: (event: GameStreamEvent) => void | Promise<void>): Promise<void>;
+export declare function fetchCurrentRun(): Promise<CurrentGameRunResponse>;
+export declare function fetchSaveSlots(): Promise<{
+    saves: SaveSlotSummary[];
+}>;
+export declare function createSaveSlot(payload: {
+    runId: string;
+    title?: string;
+}): Promise<CreateSaveResponse>;
+export declare function restoreSaveSlot(saveId: string): Promise<CurrentGameRunResponse>;
+export declare function recoverSaveSlot(recoveryCode: string): Promise<CurrentGameRunResponse>;
+export declare function resetCurrentRun(): Promise<void>;
+export declare function resetAnonymousGameData(): Promise<void>;
+export declare function deleteSaveSlot(saveId: string): Promise<void>;

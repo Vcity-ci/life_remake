@@ -1,17 +1,29 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { createDefaultGameplayTuning } from "@reroll/shared";
-import type { BackgroundCard, ContentBundle, DifficultyConfig, WorldConfig } from "@reroll/shared";
+import { resolveProjectRoot } from "./project-root.js";
+import type {
+  BackgroundCard,
+  ContentBundle,
+  DifficultyConfig,
+  EventDefinition,
+  ItemDefinition,
+  NarrativeComponentCatalog,
+  NarrativeWorldDefinition,
+  StoryDirectionDefinition,
+  WorldConfig
+} from "@reroll/shared";
 
-interface WorldlineSetting {
+export interface WorldlineSetting {
   id: string;
+  mainlineId: string;
   eraName: string;
   timeframe: string;
   coreConflict: string;
   socialOrder: string;
   taboos: string[];
   mainlineStages: Array<{ stage: string; ageRange: string; goal: string }>;
+  storyDirections: StoryDirectionDefinition[];
   factionTone: string;
 }
 
@@ -27,7 +39,46 @@ interface FactionSetting {
 interface FactionEventSetting {
   worldId: string;
   factionId: string;
-  events: string[];
+  events: Array<string | EventDefinition>;
+}
+
+type EventMetadata = Partial<Pick<
+  EventDefinition,
+  | "kind"
+  | "tags"
+  | "minAge"
+  | "maxAge"
+  | "cooldownYears"
+  | "baseWeight"
+  | "outcomeProfileId"
+  | "storyRole"
+  | "storyPosition"
+  | "focusTags"
+  | "requiresFlags"
+  | "setsFlags"
+  | "clearsFlags"
+  | "blocksFlags"
+  | "primaryStat"
+  | "secondaryStat"
+  | "storyDirectionIds"
+  | "opensThreads"
+  | "resolvesThreads"
+  | "followUpIds"
+  | "narrativeBeat"
+  | "narrativeCharacterIds"
+  | "requiresFactIds"
+  | "modifiesFactIds"
+  | "reclaimableFactIds"
+  | "factEffect"
+  | "decisionFactEffects"
+  | "promptHook"
+>>;
+
+interface EventMetadataSetting {
+  worldId: string;
+  factionId: string;
+  defaults?: EventMetadata;
+  events: EventMetadata[];
 }
 
 interface TalentPromptHook {
@@ -44,9 +95,7 @@ interface TalentPromptHook {
   };
 }
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const projectRoot = path.resolve(__dirname, "../../..");
+const projectRoot = resolveProjectRoot(import.meta.url);
 const dataRoot = path.resolve(projectRoot, "data");
 const skillsRoot = path.resolve(projectRoot, "skills");
 const storageRoot = path.resolve(projectRoot, "storage");
@@ -57,7 +106,10 @@ const skillPromptPath = path.resolve(skillsRoot, "ai-gm", "prompt-pack.json");
 const worldlineDir = path.resolve(dataRoot, "settings", "worldlines");
 const factionPath = path.resolve(dataRoot, "settings", "factions", "factions.json");
 const factionEventPath = path.resolve(dataRoot, "events", "faction-events.json");
+const eventMetadataPath = path.resolve(dataRoot, "events", "event-metadata.json");
+const narrativeWorldDir = path.resolve(dataRoot, "narratives");
 const talentPromptPath = path.resolve(dataRoot, "talents", "talent-cards.json");
+const itemPath = path.resolve(dataRoot, "items.json");
 const defaultPromptPack: Record<string, string> = {
   systemCore: "C0 只输出叙事；第二人称；不得改写年龄、属性、结局。",
   immersionRules: "C1 画面+动作+后果；语句简洁；禁止系统腔与条目化解释。",
@@ -80,8 +132,14 @@ let factionsCache: FactionSetting[] | null = null;
 let factionsLoadPromise: Promise<FactionSetting[]> | null = null;
 let factionEventsAllCache: FactionEventSetting[] | null = null;
 let factionEventsLoadPromise: Promise<FactionEventSetting[]> | null = null;
+let eventMetadataCache: EventMetadataSetting[] | null = null;
+let eventMetadataLoadPromise: Promise<EventMetadataSetting[]> | null = null;
+const narrativeWorldCache = new Map<string, NarrativeWorldDefinition | null>();
+const narrativeWorldLoadPromises = new Map<string, Promise<NarrativeWorldDefinition | null>>();
 let talentHooksCache: TalentPromptHook[] | null = null;
 let talentHooksLoadPromise: Promise<TalentPromptHook[]> | null = null;
+let itemDefinitionsCache: ItemDefinition[] | null = null;
+let itemDefinitionsLoadPromise: Promise<ItemDefinition[]> | null = null;
 
 async function readJsonFile<T>(targetPath: string): Promise<T> {
   const raw = await fs.readFile(targetPath, "utf8");
@@ -285,6 +343,398 @@ export async function loadFactionEvents(worldId: string): Promise<FactionEventSe
     return [];
   } finally {
     factionEventsLoadPromise = null;
+  }
+}
+
+async function loadEventMetadata(): Promise<EventMetadataSetting[]> {
+  try {
+    if (eventMetadataCache) return eventMetadataCache;
+    if (!eventMetadataLoadPromise) {
+      eventMetadataLoadPromise = readJsonFile<EventMetadataSetting[]>(eventMetadataPath).then((items) => {
+        eventMetadataCache = items;
+        return items;
+      });
+    }
+    return await eventMetadataLoadPromise;
+  } catch {
+    return [];
+  } finally {
+    eventMetadataLoadPromise = null;
+  }
+}
+
+function mergeNarrativeComponentCatalog(
+  definition: NarrativeWorldDefinition,
+  catalog: NarrativeComponentCatalog | null,
+  worldId: string
+): NarrativeWorldDefinition | null {
+  if (!catalog) return { ...definition, components: [], componentEventBindings: [] };
+  if (catalog.version !== 1 || catalog.worldId !== worldId) return null;
+
+  const componentTypes = new Set(["plot", "character", "relationship", "object", "promise", "consequence"]);
+  const componentStatuses = new Set(["introduced", "active", "escalated", "payable", "resolved"]);
+  const narrativeEventIds = new Set(definition.eventBindings.map((binding) => binding.eventId));
+  const componentIds = new Set<string>();
+  for (const component of catalog.components) {
+    if (!component.id?.trim() || !component.label?.trim() || !component.introHint?.trim() ||
+      !component.activeHint?.trim() || !component.escalationHint?.trim() || !component.payoffHint?.trim() ||
+      componentIds.has(component.id) || !Number.isFinite(component.priority) || !componentTypes.has(component.type)) {
+      return null;
+    }
+    componentIds.add(component.id);
+  }
+
+  const eventIds = new Set<string>();
+  for (const binding of catalog.eventBindings) {
+    if (!binding.eventId?.trim() || eventIds.has(binding.eventId) || !narrativeEventIds.has(binding.eventId) || !Array.isArray(binding.transitions)) {
+      return null;
+    }
+    eventIds.add(binding.eventId);
+    if (binding.transitions.some((transition) => !componentIds.has(transition.componentId) || !componentStatuses.has(transition.status))) {
+      return null;
+    }
+  }
+
+  return {
+    ...definition,
+    components: catalog.components,
+    componentEventBindings: catalog.eventBindings
+  };
+}
+
+export async function loadNarrativeWorldDefinition(worldId: string): Promise<NarrativeWorldDefinition | null> {
+  if (narrativeWorldCache.has(worldId)) {
+    return narrativeWorldCache.get(worldId) ?? null;
+  }
+  const pending = narrativeWorldLoadPromises.get(worldId);
+  if (pending) return pending;
+
+  const load = Promise.all([
+    readJsonFile<NarrativeWorldDefinition>(path.resolve(narrativeWorldDir, `${worldId}.story.json`)),
+    readJsonFile<NarrativeComponentCatalog>(path.resolve(narrativeWorldDir, `${worldId}.components.json`)).catch(() => null)
+  ])
+    .then(([definition, catalog]) => {
+      const valid = (definition.version === 1 || definition.version === 2) && definition.worldId === worldId
+        ? mergeNarrativeComponentCatalog(definition, catalog, worldId)
+        : null;
+      narrativeWorldCache.set(worldId, valid);
+      return valid;
+    })
+    .catch(() => {
+      narrativeWorldCache.set(worldId, null);
+      return null;
+    })
+    .finally(() => {
+      narrativeWorldLoadPromises.delete(worldId);
+    });
+  narrativeWorldLoadPromises.set(worldId, load);
+  return load;
+}
+
+function defaultTagsForFaction(factionId: string): string[] {
+  const profiles: Record<string, string[]> = {
+    guardian: ["charisma", "physique", "guardian"],
+    ambition: ["intelligence", "family", "ambition"],
+    broker: ["family", "fortune", "broker"],
+    mentor: ["intelligence", "charisma", "mentor"],
+    institution: ["intelligence", "family", "institution"],
+    outsider: ["fortune", "physique", "outsider"]
+  };
+  return profiles[factionId] ?? [factionId];
+}
+
+function normalizeEventDefinition(
+  worldId: string,
+  factionId: string,
+  source: string | EventDefinition,
+  index: number,
+  metadata?: EventMetadata
+): EventDefinition {
+  const defaults: EventDefinition = {
+    id: `${worldId}_${factionId}_${String(index + 1).padStart(2, "0")}`,
+    worldId,
+    factionId,
+    title: "",
+    kind: "any",
+    tags: defaultTagsForFaction(factionId),
+    minAge: 5,
+    maxAge: 120,
+    cooldownYears: 8,
+    baseWeight: 10,
+    outcomeProfileId: factionId,
+    promptHook: ""
+  };
+  const metadataStatTags = [metadata?.primaryStat, metadata?.secondaryStat]
+    .filter((stat): stat is NonNullable<typeof stat> => Boolean(stat));
+  if (typeof source !== "string") {
+    return {
+      ...defaults,
+      ...metadata,
+      ...source,
+      worldId,
+      factionId: source.factionId ?? factionId,
+      tags: Array.from(new Set([
+        ...defaults.tags,
+        ...metadataStatTags,
+        ...(metadata?.tags ?? []),
+        ...(metadata?.focusTags ?? []),
+        ...source.tags
+      ])),
+      promptHook: source.promptHook || metadata?.promptHook || source.title
+    };
+  }
+  const title = source.trim();
+  return {
+    ...defaults,
+    ...metadata,
+    title,
+    tags: Array.from(new Set([...defaults.tags, ...metadataStatTags, ...(metadata?.tags ?? []), ...(metadata?.focusTags ?? [])])),
+    promptHook: metadata?.promptHook || title
+  };
+}
+
+function applyNarrativeEventBinding(
+  definition: EventDefinition,
+  narrativeWorld: NarrativeWorldDefinition | null
+): EventDefinition {
+  const binding = narrativeWorld?.eventBindings.find((item) => item.eventId === definition.id);
+  const componentBinding = narrativeWorld?.componentEventBindings?.find((item) => item.eventId === definition.id);
+  const routeThreadIds = (definition.storyDirectionIds ?? []).flatMap((directionId) => (
+    narrativeWorld?.routeArcs.find((arc) => arc.directionId === directionId)?.coreThreadIds ?? []
+  ));
+  if (!binding && !componentBinding && routeThreadIds.length === 0) return definition;
+  const threadIds = Array.from(new Set([
+    ...(definition.narrativeThreadIds ?? []),
+    ...routeThreadIds,
+    ...(binding?.opensThreads ?? []),
+    ...(binding?.resolvesThreads ?? [])
+  ]));
+  const componentTransitions = componentBinding?.transitions ?? definition.narrativeComponentTransitions ?? [];
+  const componentById = new Map((narrativeWorld?.components ?? []).map((component) => [component.id, component]));
+  const threadById = new Map((narrativeWorld?.threads ?? []).map((thread) => [thread.id, thread]));
+  const factKindForComponent = (componentId: string) => {
+    const type = componentById.get(componentId)?.type;
+    if (type === "promise") return "commitment" as const;
+    if (type === "consequence") return "cost" as const;
+    if (type === "relationship" || type === "character") return "relationship_change" as const;
+    if (type === "object") return "stake" as const;
+    return "open_question" as const;
+  };
+  const introducedFacts = componentTransitions
+    .filter((transition) => transition.status === "introduced")
+    .map((transition) => ({
+      id: `component:${transition.componentId}`,
+      kind: factKindForComponent(transition.componentId),
+      label: transition.fact?.trim() || componentById.get(transition.componentId)?.label || transition.componentId,
+      priority: componentById.get(transition.componentId)?.priority ?? 1,
+      threadId: componentById.get(transition.componentId)?.threadIds?.[0] ?? threadIds[0],
+      routeIds: definition.storyDirectionIds,
+      characterIds: binding?.characterIds
+    }));
+  const payoffFactIds = componentTransitions
+    .filter((transition) => transition.status === "resolved")
+    .map((transition) => `component:${transition.componentId}`);
+  const openedThreadIds = Array.from(new Set([
+    ...(definition.opensThreads ?? []),
+    ...(binding?.opensThreads ?? []),
+    ...(binding?.beat === "setup" ? threadIds : [])
+  ]));
+  const resolvedThreadIds = Array.from(new Set([
+    ...(definition.resolvesThreads ?? []),
+    ...(binding?.resolvesThreads ?? [])
+  ]));
+  const threadFacts = openedThreadIds.map((threadId) => ({
+    id: `thread:${threadId}`,
+    kind: "open_question" as const,
+    label: threadById.get(threadId)?.label || "一条会持续影响后续人生的主线已经开启。",
+    priority: 2,
+    threadId,
+    routeIds: definition.storyDirectionIds,
+    characterIds: binding?.characterIds
+  }));
+  const resolvedThreadFactIds = resolvedThreadIds.map((threadId) => `thread:${threadId}`);
+  const continuationThreadIds = threadIds.filter((threadId) => !openedThreadIds.includes(threadId) && !resolvedThreadIds.includes(threadId));
+  const continuationFactIds = continuationThreadIds.map((threadId) => `thread:${threadId}`);
+  const factEffect = definition.factEffect ?? (threadFacts.length || introducedFacts.length || payoffFactIds.length || resolvedThreadFactIds.length
+    ? {
+        introduce: [...threadFacts, ...introducedFacts],
+        modifyFactIds: continuationFactIds,
+        resolveFactIds: [...payoffFactIds, ...resolvedThreadFactIds]
+      }
+    : threadIds.length > 0
+      ? { modifyFactIds: continuationFactIds }
+      : undefined);
+  const relatedFactIds = Array.from(new Set(componentTransitions.map((transition) => `component:${transition.componentId}`)));
+  const defaultDecisionFactEffects: NonNullable<EventDefinition["decisionFactEffects"]> | undefined = (definition.kind === "milestone" || threadIds.length > 0 || Boolean(binding))
+    ? {
+        safe: {
+          introduce: [{
+            id: `decision:${definition.id}:safe`,
+            kind: "commitment",
+            label: "人物选择保全既有承诺，并承担由此留下的后续责任。",
+            priority: 2,
+            threadId: threadIds[0],
+            routeIds: definition.storyDirectionIds,
+            characterIds: binding?.characterIds
+          }],
+          modifyFactIds: relatedFactIds
+        },
+        balanced: {
+          introduce: [{
+            id: `decision:${definition.id}:balanced`,
+            kind: "commitment",
+            label: "人物以交换条件推进主线，承诺和代价都将留在后续故事中。",
+            priority: 2,
+            threadId: threadIds[0],
+            routeIds: definition.storyDirectionIds,
+            characterIds: binding?.characterIds
+          }, {
+            id: `cost:${definition.id}:balanced`,
+            kind: "cost",
+            label: "这次权衡留下了必须兑现的代价。",
+            priority: 2,
+            threadId: threadIds[0],
+            routeIds: definition.storyDirectionIds
+          }],
+          modifyFactIds: relatedFactIds
+        },
+        risky: {
+          introduce: [{
+            id: `decision:${definition.id}:risky`,
+            kind: "commitment",
+            label: "人物押上已有筹码，作出不可逆的冒险承诺。",
+            priority: 3,
+            threadId: threadIds[0],
+            routeIds: definition.storyDirectionIds,
+            characterIds: binding?.characterIds
+          }, {
+            id: `cost:${definition.id}:risky`,
+            kind: "cost",
+            label: "这次冒险留下了更沉重的后续代价。",
+            priority: 3,
+            threadId: threadIds[0],
+            routeIds: definition.storyDirectionIds
+          }, {
+            id: `relationship:${definition.id}:risky`,
+            kind: "relationship_change",
+            label: "人物与相关人物之间的信任和立场因此发生了变化。",
+            priority: 2,
+            threadId: threadIds[0],
+            routeIds: definition.storyDirectionIds,
+            characterIds: binding?.characterIds
+          }],
+          modifyFactIds: relatedFactIds
+        }
+      }
+    : undefined;
+  return {
+    ...definition,
+    narrativeBeat: binding?.beat ?? definition.narrativeBeat,
+    narrativeThreadIds: threadIds,
+    narrativeCharacterIds: Array.from(new Set([
+      ...(definition.narrativeCharacterIds ?? []),
+      ...(binding?.characterIds ?? [])
+    ])),
+    narrativeComponentTransitions: componentTransitions,
+    opensThreads: Array.from(new Set([
+      ...(definition.opensThreads ?? []),
+      ...(binding?.opensThreads ?? [])
+    ])),
+    resolvesThreads: Array.from(new Set([
+      ...(definition.resolvesThreads ?? []),
+      ...(binding?.resolvesThreads ?? [])
+    ])),
+    promptHook: binding?.sceneHint?.trim() || definition.promptHook,
+    factEffect,
+    decisionFactEffects: definition.decisionFactEffects ?? defaultDecisionFactEffects,
+    reclaimableFactIds: Array.from(new Set([
+      ...(definition.reclaimableFactIds ?? []),
+      ...resolvedThreadFactIds
+    ]))
+  };
+}
+
+function validateNarrativeFactContract(worldId: string, definitions: EventDefinition[]): EventDefinition[] {
+  const byId = new Map(definitions.map((event) => [event.id, event]));
+  const knownFacts = new Set<string>();
+  for (const definition of definitions) {
+    for (const fact of definition.factEffect?.introduce ?? []) knownFacts.add(fact.id);
+  }
+  for (const definition of definitions) {
+    const references = [
+      ...(definition.requiresFactIds ?? []),
+      ...(definition.modifiesFactIds ?? []),
+      ...(definition.reclaimableFactIds ?? []),
+      ...(definition.factEffect?.modifyFactIds ?? []),
+      ...(definition.factEffect?.resolveFactIds ?? []),
+      ...(definition.factEffect?.blockFactIds ?? [])
+    ];
+    for (const effect of Object.values(definition.decisionFactEffects ?? {})) {
+      references.push(
+        ...(effect?.modifyFactIds ?? []),
+        ...(effect?.resolveFactIds ?? []),
+        ...(effect?.blockFactIds ?? [])
+      );
+      for (const fact of effect?.introduce ?? []) knownFacts.add(fact.id);
+    }
+    if (!definition.id || !definition.storyDirectionIds?.length || !definition.narrativeBeat) {
+      throw new Error(`${worldId}_event_contract_invalid:${definition.id || "unknown"}`);
+    }
+    if (references.some((id) => !knownFacts.has(id))) {
+      throw new Error(`${worldId}_event_fact_reference_invalid:${definition.id}`);
+    }
+    if (definition.followUpIds?.some((id) => !byId.has(id))) {
+      throw new Error(`${worldId}_event_follow_up_invalid:${definition.id}`);
+    }
+  }
+  return definitions;
+}
+
+export async function loadEventDefinitions(worldId: string): Promise<EventDefinition[]> {
+  const [groups, metadataGroups, narrativeWorld] = await Promise.all([
+    loadFactionEvents(worldId),
+    loadEventMetadata(),
+    loadNarrativeWorldDefinition(worldId)
+  ]);
+  const metadataByFaction = new Map<string, EventMetadataSetting>(
+    metadataGroups
+      .filter((group) => group.worldId === worldId)
+      .map((group): [string, EventMetadataSetting] => [`${group.worldId}:${group.factionId}`, group])
+  );
+  const definitions = groups.flatMap((group) =>
+    group.events
+      .map((event, index) => applyNarrativeEventBinding(
+        normalizeEventDefinition(
+          group.worldId,
+          group.factionId,
+          event,
+          index,
+          (() => {
+            const metadata = metadataByFaction.get(`${group.worldId}:${group.factionId}`);
+            return metadata ? { ...metadata.defaults, ...metadata.events[index] } : undefined;
+          })()
+        ),
+        narrativeWorld
+      ))
+      .filter((event) => event.title.trim().length > 0)
+  );
+  return narrativeWorld ? validateNarrativeFactContract(worldId, definitions) : definitions;
+}
+
+export async function loadItemDefinitions(): Promise<ItemDefinition[]> {
+  try {
+    if (itemDefinitionsCache) return itemDefinitionsCache;
+    if (!itemDefinitionsLoadPromise) {
+      itemDefinitionsLoadPromise = readJsonFile<ItemDefinition[]>(itemPath).then((items) => {
+        itemDefinitionsCache = items.filter((item) => item.id && item.name && Array.isArray(item.effects));
+        return itemDefinitionsCache;
+      });
+    }
+    return await itemDefinitionsLoadPromise;
+  } catch {
+    return [];
+  } finally {
+    itemDefinitionsLoadPromise = null;
   }
 }
 

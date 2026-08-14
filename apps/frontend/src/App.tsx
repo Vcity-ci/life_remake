@@ -1,14 +1,29 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import type { BackgroundCard, DecisionType, ProviderConfig, ProviderLimits, RunPhase, RunState, StartAllocationConfig, StatKey, Stats, StepAction, TimelineEntry } from "@reroll/shared";
+import type { CurrentGameRunResponse, ProviderConfig, ProviderLimits, PublicBackgroundCard, PublicRunState, RunPhase, SaveSlotSummary, StartAllocationConfig, StatKey, Stats, StepAction, TurnRecord } from "@reroll/shared";
 import { AdminPanel } from "./components/AdminPanel";
-import { ApiError, fetchBootstrap, saveGameEnvironment, startRunStream, stepRunStream, type GameStreamEvent } from "./lib/api";
+import {
+  ApiError,
+  createSaveSlot,
+  deleteSaveSlot,
+  fetchBootstrap,
+  fetchCurrentRun,
+  fetchSaveSlots,
+  recoverSaveSlot,
+  resetAnonymousGameData,
+  resetCurrentRun,
+  restoreSaveSlot,
+  saveGameEnvironment,
+  startRunStream,
+  stepRunStream,
+  type GameStreamEvent
+} from "./lib/api";
 import { getOrCreateClientId, readLocalProviderConfig, writeLocalProviderConfig } from "./lib/localConfig";
 
 interface BootstrapState {
   deployMode: "local" | "cloud";
   worlds: Array<{ id: string; name: string; intro: string }>;
   difficulties: Array<{ id: string; name: string; description: string }>;
-  cardPool: BackgroundCard[];
+  cardPool: PublicBackgroundCard[];
   talentPointTotal: number;
   startAllocation: StartAllocationConfig;
   runtime: {
@@ -18,27 +33,7 @@ interface BootstrapState {
   limits: ProviderLimits;
 }
 
-interface DecisionHistoryItem {
-  id: string;
-  age: number;
-  ageStageLabel: string;
-  background: string;
-  choiceId: DecisionType;
-  choiceLabel: string;
-  choiceDescription: string;
-  rollLabels: string[];
-}
-
-interface PendingDecisionItem {
-  age: number;
-  ageStageLabel: string;
-  background: string;
-  choiceId: DecisionType;
-  choiceLabel: string;
-  choiceDescription: string;
-}
-
-type MilestoneChoice = NonNullable<RunState["nextMilestoneChoice"]>;
+type MilestoneChoice = NonNullable<PublicRunState["nextMilestoneChoice"]>;
 type StartOverrides = {
   stats?: Stats;
   selectedCardIds?: string[];
@@ -69,12 +64,12 @@ const defaultStats: Stats = {
 };
 const statKeys: StatKey[] = ["intelligence", "charisma", "family", "fortune", "physique"];
 
-function rarityClass(r: BackgroundCard["rarity"]): string {
+function rarityClass(r: PublicBackgroundCard["rarity"]): string {
   return `rarity-${r}`;
 }
 
-function timelineKey(t: TimelineEntry): string {
-  return `${t.age}-${t.title}-${t.narrative}`;
+function timelineKey(t: TurnRecord): string {
+  return t.turnId;
 }
 
 function formatDeltaLabel(
@@ -86,7 +81,7 @@ function formatDeltaLabel(
   return `${name}${sign}${delta}`;
 }
 
-function extractDeltaLabels(entry: TimelineEntry): string[] {
+function extractDeltaLabels(entry: Pick<TurnRecord, "statChanges">): string[] {
   const keys: StatKey[] = ["intelligence", "charisma", "physique", "family", "fortune"];
   const labels: string[] = [];
   for (const key of keys) {
@@ -106,19 +101,30 @@ function fameTitle(fame: number): string {
   return "举世传奇";
 }
 
-function outcomeLabel(outcome: RunState["outcome"]): string {
+function outcomeLabel(outcome: PublicRunState["outcome"]): string {
   if (outcome === "dead") return "死亡";
   if (outcome === "ascended") return "飞升";
+  if (outcome === "completed") return "收束";
   return "终局";
 }
 
-function endingBadgeText(run: RunState): string {
+function endingBadgeText(run: PublicRunState): string {
   if (run.outcome === "dead") return "命数已尽";
   if (run.outcome === "ascended") return run.ascension.title?.trim() || "超凡飞升";
+  if (run.outcome === "completed") return "人生收束";
   return "尘世落幕";
 }
 
-function makeStepRequestId(runId: string, action: StepAction, nonce: number, decision?: DecisionType): string {
+function formatSaveTime(updatedAt: number): string {
+  return new Date(updatedAt).toLocaleString("zh-CN", {
+    month: "numeric",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
+}
+
+function makeStepRequestId(runId: string, action: StepAction, nonce: number, decision?: string): string {
   const decisionPart = decision ?? "none";
   return `${runId}:${action}:${decisionPart}:${nonce}`;
 }
@@ -126,51 +132,75 @@ function makeStepRequestId(runId: string, action: StepAction, nonce: number, dec
 export default function App(): React.JSX.Element {
   const [bootstrap, setBootstrap] = useState<BootstrapState | null>(null);
   const [runtimeMode, setRuntimeMode] = useState<"cloud" | "local">("local");
-  const [worldId, setWorldId] = useState("modern");
+  const [worldId, setWorldId] = useState("ancient");
   const [difficultyId, setDifficultyId] = useState("standard");
   const [personaPrompt, setPersonaPrompt] = useState("");
   const [selectedCards, setSelectedCards] = useState<string[]>([]);
   const [stats, setStats] = useState<Stats>(defaultStats);
-  const [run, setRun] = useState<RunState | null>(null);
+  const [run, setRun] = useState<PublicRunState | null>(null);
   const [status, setStatus] = useState("初始化中...");
   const [showSettings, setShowSettings] = useState(false);
   const [envReady, setEnvReady] = useState(false);
-  const [timeline, setTimeline] = useState<TimelineEntry[]>([]);
-  const [timelineBuffer, setTimelineBuffer] = useState<TimelineEntry[]>([]);
-  const [decisionHistory, setDecisionHistory] = useState<DecisionHistoryItem[]>([]);
+  const [turns, setTurns] = useState<TurnRecord[]>([]);
   const [showEndingModal, setShowEndingModal] = useState(false);
   const [showBusyModal, setShowBusyModal] = useState(false);
+  const [showSaveModal, setShowSaveModal] = useState(false);
+  const [saveSlots, setSaveSlots] = useState<SaveSlotSummary[]>([]);
+  const [saveTitle, setSaveTitle] = useState("");
+  const [recoveryCode, setRecoveryCode] = useState("");
+  const [issuedRecoveryCode, setIssuedRecoveryCode] = useState("");
+  const [saveWorking, setSaveWorking] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [autoAdvance, setAutoAdvance] = useState(false);
   const timelineRef = useRef<HTMLDivElement | null>(null);
-  const pendingDecisionRef = useRef<PendingDecisionItem | null>(null);
-  const timelineBufferRef = useRef<TimelineEntry[]>([]);
-  const pendingAdvanceCountRef = useRef(0);
-  const pendingRunAfterBufferRef = useRef<RunState | null>(null);
-  const pendingMilestoneRef = useRef<MilestoneChoice | null>(null);
+  const followLatestTimelineRef = useRef(true);
   const isGeneratingRef = useRef(false);
-  const runRef = useRef<RunState | null>(null);
+  const runRef = useRef<PublicRunState | null>(null);
   const requestNonceRef = useRef(0);
   const [flippedCards, setFlippedCards] = useState<Record<string, boolean>>({});
+
+  const timeline = turns;
+  const activeDecision = useMemo<MilestoneChoice | undefined>(() => (
+    [...turns].reverse().find((turn) => turn.choice && !turn.choiceOutcome)?.choice
+  ), [turns]);
+  const decisionHistory = useMemo(() => {
+    const seen = new Set<string>();
+    return [...turns].reverse().flatMap((turn) => {
+      if (turn.kind !== "choice_outcome" || !turn.choice || !turn.choiceOutcome || seen.has(turn.choice.sceneId)) return [];
+      seen.add(turn.choice.sceneId);
+      return [{
+        id: turn.choice.sceneId,
+        age: turn.age,
+        ageStageLabel: turn.ageStage.label,
+        background: turn.choice.background ?? "",
+        choiceLabel: turn.choiceOutcome.label,
+        choiceDescription: turn.choiceOutcome.description,
+        rollLabels: extractDeltaLabels(turn)
+      }];
+    }).reverse();
+  }, [turns]);
 
   const [localApiKey, setLocalApiKey] = useState("");
   const [localProvider, setLocalProvider] = useState<ProviderConfig>({
     provider: "openai-compatible",
-    baseUrl: "https://api.openai.com/v1",
-    model: "",
+    baseUrl: "https://api.deepseek.com",
+    model: "deepseek-v4-flash",
     apiPath: "/chat/completions",
     temperature: 0.9,
     maxTokens: 1824,
     timeoutMs: 45000,
-    reasoningEffort: "minimal"
+    reasoningEffort: "minimal",
+    directorMode: "auto"
   });
 
   const clientId = useMemo(() => getOrCreateClientId(), []);
 
   function isServerBusyError(error: unknown): boolean {
-    if (!(error instanceof ApiError)) return false;
-    return error.status === 503 || error.code === "server_busy" || error.message.includes("服务器繁忙");
+    if (error instanceof ApiError) {
+      return error.status === 503 || error.code === "server_busy" || error.message.includes("服务器繁忙");
+    }
+    return error instanceof Error && error.message.includes("服务器繁忙");
   }
 
   useEffect(() => {
@@ -179,30 +209,37 @@ export default function App(): React.JSX.Element {
         const boot = await fetchBootstrap();
         setBootstrap(boot);
         setRuntimeMode(boot.deployMode);
-        setWorldId(boot.worlds[0]?.id ?? "modern");
+        setWorldId(boot.worlds.some((world) => world.id === "ancient") ? "ancient" : (boot.worlds[0]?.id ?? "modern"));
         setDifficultyId(boot.difficulties[0]?.id ?? "standard");
 
         const localCfg = readLocalProviderConfig();
         if (localCfg) setLocalProvider(localCfg);
         else setLocalProvider(boot.runtime.cloud);
 
-        setStatus("请先在 Setting 确认本局环境，然后开始人生。");
-      } catch (error) {
-        setStatus(`初始化失败：${String(error)}`);
+        const current = await fetchCurrentRun();
+        if (!restoreCurrentRun(current)) {
+          setStatus(current.environmentReady ? "本局环境已确认，可以开始人生。" : "请先在 Setting 确认本局环境，然后开始人生。");
+        }
+      } catch {
+        setStatus("服务暂不可用，请稍后刷新页面。");
       }
     }
     void init();
   }, []);
 
-  async function refreshBootstrapForReplay(): Promise<void> {
+  async function refreshBootstrapForReplay(freshAnonymousStart = false): Promise<void> {
     try {
       const boot = await fetchBootstrap();
       setBootstrap(boot);
       setRuntimeMode(boot.deployMode);
-      setWorldId((prev) => (boot.worlds.some((w) => w.id === prev) ? prev : (boot.worlds[0]?.id ?? prev)));
-      setDifficultyId((prev) => (boot.difficulties.some((d) => d.id === prev) ? prev : (boot.difficulties[0]?.id ?? prev)));
-    } catch (error) {
-      setStatus(`刷新开局配置失败：${String(error)}`);
+      setWorldId((prev) => freshAnonymousStart
+        ? (boot.worlds.some((world) => world.id === "ancient") ? "ancient" : (boot.worlds[0]?.id ?? prev))
+        : (boot.worlds.some((world) => world.id === prev) ? prev : (boot.worlds[0]?.id ?? prev)));
+      setDifficultyId((prev) => freshAnonymousStart
+        ? (boot.difficulties[0]?.id ?? prev)
+        : (boot.difficulties.some((difficulty) => difficulty.id === prev) ? prev : (boot.difficulties[0]?.id ?? prev)));
+    } catch {
+      setStatus("开局配置暂不可用，请稍后重试。");
     }
   }
 
@@ -211,13 +248,9 @@ export default function App(): React.JSX.Element {
   }, [localProvider]);
 
   useEffect(() => {
-    if (!timelineRef.current) return;
+    if (!timelineRef.current || !followLatestTimelineRef.current) return;
     timelineRef.current.scrollTop = timelineRef.current.scrollHeight;
   }, [timeline]);
-
-  useEffect(() => {
-    timelineBufferRef.current = timelineBuffer;
-  }, [timelineBuffer]);
 
   useEffect(() => {
     isGeneratingRef.current = isGenerating;
@@ -270,138 +303,74 @@ export default function App(): React.JSX.Element {
   );
 
   function resetPendingFlowState(): void {
-    pendingAdvanceCountRef.current = 0;
-    pendingRunAfterBufferRef.current = null;
-    pendingMilestoneRef.current = null;
+    // Streamed turns are already committed by the server; there is no client-side reveal queue.
   }
 
-  function enqueueTimelineEntry(entry: TimelineEntry): boolean {
-    const nextKey = timelineKey(entry);
-    if (timelineBufferRef.current.some((item) => timelineKey(item) === nextKey)) {
-      return false;
-    }
-    const next = [...timelineBufferRef.current, entry];
-    timelineBufferRef.current = next;
-    setTimelineBuffer(next);
+  function restoreCurrentRun(payload: CurrentGameRunResponse): boolean {
+    setEnvReady(payload.environmentReady);
+    const restored = payload.run;
+    if (!restored) return false;
+    resetPendingFlowState();
+    followLatestTimelineRef.current = true;
+    setTurns(payload.turns ?? payload.timeline.map((entry, index) => ({
+      turnId: entry.entryId,
+      sequence: index + 1,
+      kind: entry.kind,
+      ageFrom: entry.ageFrom,
+      age: entry.age,
+      ageStage: entry.ageStage,
+      narrative: entry.narrative,
+      statChanges: entry.statChanges,
+      statsSnapshot: restored.stats,
+      itemsSnapshot: restored.items,
+      fameSnapshot: restored.fame,
+      createdAt: 0
+    })));
+    setRun(restored);
+    runRef.current = restored;
+    setWorldId(restored.worldId);
+    setDifficultyId(restored.difficultyId);
+    setPersonaPrompt(restored.personaPrompt);
+    setStats(restored.stats);
+    setSelectedCards(restored.cards.map((card) => card.id));
+    setFlippedCards(buildFlippedCards(restored.cards.map((card) => card.id)));
+    setAutoAdvance(false);
+    setShowEndingModal(false);
+    setStatus(payload.environmentReady ? "已恢复本局人生。" : "已恢复本局人生，请在 Setting 重新确认本局环境。");
     return true;
   }
 
-  function commitRunWithBufferedMilestone(baseRun: RunState): void {
-    const mergedPhase = phaseOf(baseRun);
-    setRun(baseRun);
-    pendingRunAfterBufferRef.current = null;
-    pendingMilestoneRef.current = null;
-    if (mergedPhase === "ended") {
-      setStatus("本局结束。");
-      setShowEndingModal(true);
-    } else if (baseRun.nextMilestoneChoice && mergedPhase === "waiting_decision") {
-      setStatus("新的抉择出现。");
-    } else {
-      setStatus("命运已揭露，继续推进。");
-    }
+  function appendTurn(record: TurnRecord): void {
+    setTurns((previous) => {
+      const settled = record.choice?.sceneId && record.choiceOutcome
+        ? previous.map((item) => item.choice?.sceneId === record.choice?.sceneId && !item.choiceOutcome
+          ? { ...item, choiceOutcome: record.choiceOutcome }
+          : item)
+        : previous;
+      const existingIndex = settled.findIndex((item) => item.turnId === record.turnId);
+      if (existingIndex < 0) return [...settled, record];
+      return settled.map((item, index) => index === existingIndex ? record : item);
+    });
   }
 
-  function phaseOf(runState: RunState | null): RunPhase {
+  function phaseOf(runState: PublicRunState | null): RunPhase {
     if (!runState) return "ready";
     return (runState.phase ?? (runState.ended ? "ended" : "ready")) as RunPhase;
   }
 
-  function currentDisplayedAge(runState: RunState | null): number {
+  function currentDisplayedAge(runState: PublicRunState | null): number {
     const lastTimelineAge = timeline.length > 0 ? timeline[timeline.length - 1]?.age : undefined;
     if (typeof lastTimelineAge === "number") return lastTimelineAge;
     return runState?.revealedAge ?? runState?.age ?? 0;
   }
 
-  function isAdvanceEntryForAge(entry: TimelineEntry | undefined, age: number): boolean {
-    if (!entry) return false;
-    if (entry.age === age + 1) return true;
-    if (entry.age === age && entry.tags.includes("milestone")) return true;
-    return false;
-  }
-
-  function canAdvance(runState: RunState | null): boolean {
+  function canAdvance(runState: PublicRunState | null): boolean {
     if (!runState) return false;
     const runPhase = phaseOf(runState);
-    if (runPhase !== "ready") return false;
-    const nextEntry = timelineBufferRef.current[0];
-    const age = currentDisplayedAge(runState);
-    if (isAdvanceEntryForAge(nextEntry, age)) return true;
-    return timelineBufferRef.current.length === 0;
+    return runPhase === "ready";
   }
 
-  function recordPendingDecisionFromDisplayedYears(displayed: TimelineEntry[]): void {
-    const pending = pendingDecisionRef.current;
-    if (!pending) return;
-    const milestoneEntry = displayed.find((item) => item.tags.includes("milestone"));
-    if (!milestoneEntry) return;
-    const runId = runRef.current?.runId ?? "run";
-    setDecisionHistory((prev) => ([
-      ...prev,
-      {
-        id: `${runId}-${pending.age}-${pending.choiceId}-${prev.length}`,
-        age: pending.age,
-        ageStageLabel: pending.ageStageLabel,
-        background: pending.background,
-        choiceId: pending.choiceId,
-        choiceLabel: pending.choiceLabel,
-        choiceDescription: pending.choiceDescription,
-        rollLabels: extractDeltaLabels(milestoneEntry)
-      }
-    ]));
-    pendingDecisionRef.current = null;
-  }
-
-  function consumeBufferedYears(count: number): number {
-    if (count <= 0) return 0;
-    const current = timelineBufferRef.current;
-    if (current.length === 0) return 0;
-    const takeCount = Math.min(count, current.length);
-    const take = current.slice(0, takeCount);
-    const remaining = current.slice(takeCount);
-    timelineBufferRef.current = remaining;
-    setTimelineBuffer(remaining);
-    if (take.length > 0) {
-      setTimeline((prev) => [...prev, ...take]);
-      recordPendingDecisionFromDisplayedYears(take);
-    }
-    return take.length;
-  }
-
-  function flushBufferedYears(): void {
-    if (pendingAdvanceCountRef.current <= 0) {
-      if (!isGeneratingRef.current) {
-        const pendingRun = pendingRunAfterBufferRef.current;
-        if (pendingRun) {
-          commitRunWithBufferedMilestone(pendingRun);
-        }
-      }
-      if (timelineBufferRef.current.length > 0) {
-        setStatus("命运已抵达，点击“推进年份”揭露。");
-        return;
-      }
-      return;
-    }
-    const consumed = consumeBufferedYears(pendingAdvanceCountRef.current);
-    if (consumed > 0) {
-      pendingAdvanceCountRef.current = Math.max(0, pendingAdvanceCountRef.current - consumed);
-    }
-    if (pendingAdvanceCountRef.current > 0) {
-      setStatus("等待命运流转中...");
-      return;
-    }
-    if (timelineBufferRef.current.length > 0) {
-      setStatus("命运已抵达，点击“推进年份”揭露。");
-    } else if (isGeneratingRef.current) {
-      setStatus("揭露命运中...");
-    } else {
-      const pendingRun = pendingRunAfterBufferRef.current;
-      if (pendingRun) {
-        commitRunWithBufferedMilestone(pendingRun);
-      }
-    }
-  }
-
-  async function runStepGeneration(decision?: DecisionType, decisionAgeOverride?: number): Promise<void> {
+  async function runStepGeneration(decision?: string, decisionAgeOverride?: number): Promise<void> {
     const currentRun = runRef.current;
     if (!currentRun) return;
     if (isGeneratingRef.current) return;
@@ -416,7 +385,9 @@ export default function App(): React.JSX.Element {
               decision,
               decisionAge: typeof decisionAgeOverride === "number"
                 ? decisionAgeOverride
-                : (currentRun.nextMilestoneChoice?.age ?? currentRun.age),
+                : (activeDecision?.age ?? currentRun.age),
+              sceneId: activeDecision?.sceneId,
+              sceneRevision: activeDecision?.revision,
               requestId: makeStepRequestId(
                 currentRun.runId,
                 "decide",
@@ -434,19 +405,23 @@ export default function App(): React.JSX.Element {
               )
             },
         async (event: GameStreamEvent) => {
-          if (event.type === "timeline") {
-            enqueueTimelineEntry(event.data.entry);
-            setStatus(`揭露命运中...(${event.data.index + 1}/${event.data.total})`);
-            flushBufferedYears();
-            return;
-          }
-          if (event.type === "milestone") {
-            pendingMilestoneRef.current = event.data;
+          if (event.type === "turn") {
+            appendTurn(event.data.record);
+            setStatus(`人生推进中...(${event.data.index + 1}/${event.data.total})`);
             return;
           }
           if (event.type === "done") {
-            pendingRunAfterBufferRef.current = event.data.run;
-            flushBufferedYears();
+            if (event.data.turns) setTurns(event.data.turns);
+            setRun(event.data.run);
+            runRef.current = event.data.run;
+            if (event.data.run.ended || phaseOf(event.data.run) === "ended") {
+              setStatus("本局结束。");
+              setShowEndingModal(true);
+            } else if (event.data.run.nextMilestoneChoice && phaseOf(event.data.run) === "waiting_decision") {
+              setStatus("新的抉择出现。");
+            } else {
+              setStatus("已就绪，继续推进年份。");
+            }
             return;
           }
           if (event.type === "error") {
@@ -455,12 +430,8 @@ export default function App(): React.JSX.Element {
         }
       );
     } finally {
-      if (pendingAdvanceCountRef.current > 0) {
-        pendingAdvanceCountRef.current = Math.max(0, pendingAdvanceCountRef.current - 1);
-      }
       isGeneratingRef.current = false;
       setIsGenerating(false);
-      flushBufferedYears();
     }
   }
 
@@ -536,9 +507,83 @@ export default function App(): React.JSX.Element {
       setEnvReady(true);
       setStatus(`本局环境已确认。`);
       setShowSettings(false);
-    } catch (error) {
+    } catch {
       setEnvReady(false);
-      setStatus(`环境配置失败：${String(error)}`);
+      setStatus("环境配置失败，请检查模型设置后重试。");
+    }
+  }
+
+  async function refreshSaveSlots(): Promise<void> {
+    const response = await fetchSaveSlots();
+    setSaveSlots(response.saves);
+  }
+
+  async function openSaveManager(): Promise<void> {
+    setRecoveryCode("");
+    setIssuedRecoveryCode("");
+    setShowSaveModal(true);
+    try {
+      await refreshSaveSlots();
+    } catch {
+      setStatus("存档列表暂不可用，请稍后重试。");
+    }
+  }
+
+  async function saveCurrentRun(): Promise<void> {
+    if (!run || saveWorking || isStreaming || isGenerating) return;
+    setSaveWorking(true);
+    try {
+      const created = await createSaveSlot({ runId: run.runId, title: saveTitle.trim() || undefined });
+      setIssuedRecoveryCode(created.recoveryCode);
+      setSaveTitle("");
+      await refreshSaveSlots();
+      setStatus("当前人生已存档。");
+    } catch {
+      setStatus("存档失败，请稍后重试。");
+    } finally {
+      setSaveWorking(false);
+    }
+  }
+
+  async function restoreSavedRun(saveId: string): Promise<void> {
+    if (saveWorking) return;
+    setSaveWorking(true);
+    try {
+      const restored = await restoreSaveSlot(saveId);
+      if (!restoreCurrentRun(restored)) throw new Error("save_restore_empty");
+      setShowSaveModal(false);
+    } catch {
+      setStatus("恢复存档失败，请稍后重试。");
+    } finally {
+      setSaveWorking(false);
+    }
+  }
+
+  async function recoverSavedRun(): Promise<void> {
+    if (!recoveryCode.trim() || saveWorking) return;
+    setSaveWorking(true);
+    try {
+      const restored = await recoverSaveSlot(recoveryCode.trim());
+      if (!restoreCurrentRun(restored)) throw new Error("save_recovery_empty");
+      setShowSaveModal(false);
+    } catch {
+      setStatus("恢复码无效或存档已过期。");
+    } finally {
+      setSaveWorking(false);
+    }
+  }
+
+  async function removeSaveSlot(saveId: string): Promise<void> {
+    if (saveWorking) return;
+    setSaveWorking(true);
+    try {
+      await deleteSaveSlot(saveId);
+      await refreshSaveSlots();
+      setStatus("存档已删除。");
+    } catch {
+      setStatus("删除存档失败，请稍后重试。");
+    } finally {
+      setSaveWorking(false);
     }
   }
 
@@ -550,8 +595,6 @@ export default function App(): React.JSX.Element {
     try {
       setIsStreaming(true);
       resetPendingFlowState();
-      setTimelineBuffer([]);
-      timelineBufferRef.current = [];
       setStatus("人生推进中...");
       await startRunStream({
         clientId,
@@ -569,32 +612,22 @@ export default function App(): React.JSX.Element {
         if (event.type === "started") {
           setRun(event.data.run);
           runRef.current = event.data.run;
-          setTimeline([]);
-          setTimelineBuffer([]);
-          timelineBufferRef.current = [];
-          setDecisionHistory([]);
-          pendingDecisionRef.current = null;
+          setTurns([]);
           setStatus("角色已开局，点击“推进年份”开始流转。");
           return;
         }
-        if (event.type === "timeline") {
-          enqueueTimelineEntry(event.data.entry);
-          setStatus(`揭露命运中...(${event.data.index + 1}/${event.data.total})`);
-          flushBufferedYears();
-          return;
-        }
-        if (event.type === "milestone") {
-          pendingMilestoneRef.current = event.data;
+        if (event.type === "turn") {
+          appendTurn(event.data.record);
+          setStatus(`人生推进中...(${event.data.index + 1}/${event.data.total})`);
           return;
         }
         if (event.type === "done") {
+          if (event.data.turns) setTurns(event.data.turns);
           const mergedRun = event.data.run;
           const mergedPhase = phaseOf(mergedRun);
           setRun(mergedRun);
           runRef.current = mergedRun;
-          if (timelineBufferRef.current.length > 0) {
-            setStatus("命运已抵达，点击“推进年份”揭露。");
-          } else if (mergedPhase === "ended") {
+          if (mergedPhase === "ended") {
             setStatus("本局结束。");
             setShowEndingModal(true);
           } else if (mergedRun.nextMilestoneChoice && mergedPhase === "waiting_decision") {
@@ -602,8 +635,6 @@ export default function App(): React.JSX.Element {
           } else {
             setStatus("已就绪，点击“推进年份”。");
           }
-          pendingRunAfterBufferRef.current = null;
-          pendingMilestoneRef.current = null;
           return;
         }
         if (event.type === "error") {
@@ -616,7 +647,7 @@ export default function App(): React.JSX.Element {
         setShowBusyModal(true);
         setStatus("服务器繁忙，请稍后重试。");
       } else {
-        setStatus(`开局失败：${String(error)}`);
+        setStatus("开局暂不可用，请检查本局环境后重试。");
       }
     } finally {
       setIsStreaming(false);
@@ -660,53 +691,36 @@ export default function App(): React.JSX.Element {
       setStatus("本局已结束。");
       return;
     }
-    if (run.nextMilestoneChoice && runPhase === "waiting_decision" && timelineBufferRef.current.length === 0) {
+    if (activeDecision && runPhase === "waiting_decision") {
       setStatus("请先完成当前抉择。");
       return;
     }
     try {
       setStatus("推进年份中...");
-      pendingAdvanceCountRef.current += 1;
-      flushBufferedYears();
-      if (pendingAdvanceCountRef.current === 0) return;
       if (isGeneratingRef.current) {
         setStatus("等待命运流转中...");
         return;
       }
       await runStepGeneration();
     } catch (error) {
-      pendingAdvanceCountRef.current = Math.max(0, pendingAdvanceCountRef.current - 1);
       if (isServerBusyError(error)) {
         setAutoAdvance(false);
         setShowBusyModal(true);
         setStatus("服务器繁忙，请稍后重试。");
       } else {
-        setStatus(`推进失败：${String(error)}`);
+        setStatus("暂时无法推进，请稍后重试。");
       }
     }
   }
 
-  async function onDecision(decision: DecisionType): Promise<void> {
+  async function onDecision(decision: string): Promise<void> {
     if (!run) return;
     if (isStreaming || isGeneratingRef.current) return;
     const currentRun = run;
-    const decisionAge = currentRun.nextMilestoneChoice?.age ?? currentRun.age;
-    const choice = run.nextMilestoneChoice?.options.find((opt) => opt.id === decision);
-    if (run.nextMilestoneChoice && choice) {
-      pendingDecisionRef.current = {
-        age: run.nextMilestoneChoice.age ?? run.age,
-        ageStageLabel: run.ageStage.label,
-        background: run.nextMilestoneChoice?.background ?? "",
-        choiceId: decision,
-        choiceLabel: choice.label,
-        choiceDescription: choice.description
-      };
-    } else {
-      pendingDecisionRef.current = null;
-    }
+    const decisionAge = activeDecision?.age ?? currentRun.age;
     try {
       resetPendingFlowState();
-      const optimisticRun: RunState = {
+      const optimisticRun: PublicRunState = {
         ...currentRun,
         nextMilestoneChoice: undefined,
         phase: "generating"
@@ -714,46 +728,80 @@ export default function App(): React.JSX.Element {
       setRun(optimisticRun);
       runRef.current = optimisticRun;
       setStatus("命运流转中...");
-      pendingAdvanceCountRef.current = 1;
       await runStepGeneration(decision, decisionAge);
-      flushBufferedYears();
-      pendingDecisionRef.current = null;
     } catch (error) {
       setRun(currentRun);
       runRef.current = currentRun;
-      pendingDecisionRef.current = null;
-      pendingAdvanceCountRef.current = Math.max(0, pendingAdvanceCountRef.current - 1);
       if (isServerBusyError(error)) {
         setAutoAdvance(false);
         setShowBusyModal(true);
         setStatus("服务器繁忙，请稍后重试。");
       } else {
-        setStatus(`推进失败：${String(error)}`);
+        setStatus("暂时无法完成抉择，请稍后重试。");
       }
     }
   }
 
-  function resetRun(): void {
+  async function resetRun(): Promise<boolean> {
+    if (isStreaming || isGenerating || saveWorking) return false;
+    try {
+      await resetCurrentRun();
+    } catch {
+      setStatus("重置失败，请稍后重试。");
+      return false;
+    }
     setRun(null);
+    runRef.current = null;
     setSelectedCards([]);
     setFlippedCards({});
     setStats(defaultStats);
-    setTimeline([]);
-    setTimelineBuffer([]);
-    timelineBufferRef.current = [];
-    setDecisionHistory([]);
+    setTurns([]);
+    followLatestTimelineRef.current = true;
     resetPendingFlowState();
-    pendingDecisionRef.current = null;
     setShowEndingModal(false);
     setAutoAdvance(false);
-    setEnvReady(false);
-    setStatus("已重置，请重新确认 Setting 并开局。");
+    setStatus(envReady ? "已重开本局，可以开始新的人生。" : "已重开本局，请先确认 Setting 后开局。");
     void refreshBootstrapForReplay();
+    return true;
   }
 
-  function playAgain(): void {
-    resetRun();
-    setStatus("再来一把！请重新确认 Setting 并开局。");
+  async function resetAnonymousSave(): Promise<void> {
+    if (isStreaming || isGenerating || saveWorking) return;
+    const confirmed = window.confirm("这会删除当前匿名档案中的全部人生、存档、抉择分岔和恢复码，且无法恢复。模型配置会保留。确定继续吗？");
+    if (!confirmed) return;
+
+    setSaveWorking(true);
+    try {
+      await resetAnonymousGameData();
+      setRun(null);
+      runRef.current = null;
+      setPersonaPrompt("");
+      setSelectedCards([]);
+      setFlippedCards({});
+      setStats(defaultStats);
+      setTurns([]);
+      setSaveSlots([]);
+      setSaveTitle("");
+      setRecoveryCode("");
+      setIssuedRecoveryCode("");
+      followLatestTimelineRef.current = true;
+      resetPendingFlowState();
+      setShowSaveModal(false);
+      setShowEndingModal(false);
+      setAutoAdvance(false);
+      setStatus(envReady ? "匿名存档已重置，可以开始新的人生。" : "匿名存档已重置，请先确认 Setting 后开局。");
+      void refreshBootstrapForReplay(true);
+    } catch {
+      setStatus("匿名存档重置失败，请稍后重试。");
+    } finally {
+      setSaveWorking(false);
+    }
+  }
+
+  async function playAgain(): Promise<void> {
+    if (await resetRun()) {
+      setStatus(envReady ? "再来一把！可以开始新的人生。" : "再来一把！请先确认 Setting 后开局。");
+    }
   }
 
   useEffect(() => {
@@ -764,7 +812,7 @@ export default function App(): React.JSX.Element {
       return;
     }
     if (isStreaming || isGenerating) return;
-    if (run.nextMilestoneChoice && phaseOf(run) === "waiting_decision" && timelineBuffer.length === 0) {
+    if (activeDecision && phaseOf(run) === "waiting_decision") {
       setStatus("自动流转已暂停，等待抉择。");
       return;
     }
@@ -773,16 +821,16 @@ export default function App(): React.JSX.Element {
       void onAdvance();
     }, 350);
     return () => window.clearTimeout(timer);
-  }, [autoAdvance, run, timeline.length, timelineBuffer.length, isStreaming, isGenerating]);
+  }, [autoAdvance, run, timeline.length, activeDecision, isStreaming, isGenerating]);
 
   if (!bootstrap) {
     return <main className="app"><p>{status}</p></main>;
   }
 
   return (
-    <main className="app game-shell">
+    <main className={`app game-shell world-${worldId}`}>
       <header className="topbar">
-        <button className="setting-btn" onClick={() => setShowSettings(true)}>⚙ Setting</button>
+        <button className="icon-action" onClick={() => setShowSettings(true)} title="本局设置" aria-label="本局设置">⚙</button>
         <h1>人生重开器</h1>
         <div className="topbar-actions">
           <label className={`auto-flow-toggle ${autoAdvance ? "active" : ""}`}>
@@ -793,7 +841,8 @@ export default function App(): React.JSX.Element {
             />
             自动流转
           </label>
-          <button className="ghost" onClick={resetRun}>重开</button>
+          <button className="icon-action" disabled={isStreaming || isGenerating} onClick={() => void openSaveManager()} title="存档" aria-label="存档">▣</button>
+          <button className="icon-action" disabled={isStreaming || isGenerating || saveWorking} onClick={() => void resetRun()} title="重开本局" aria-label="重开本局">↻</button>
         </div>
       </header>
 
@@ -868,117 +917,76 @@ export default function App(): React.JSX.Element {
           <p className="status">{status}</p>
           </section>
         ) : (
-          <section className="panel run-panel">
-          <h2>{run.age} 岁 · {run.ageStage.label}</h2>
-          <p>
-            {statIcons.intelligence}智力 {run.stats.intelligence} · {statIcons.charisma}魅力 {run.stats.charisma} · {statIcons.family}家境 {run.stats.family} · {statIcons.fortune}气运 {run.stats.fortune}
-            · {statIcons.physique}体魄 {run.stats.physique}
-          </p>
-          <p>
-            名望：{run.fame} · 结局状态：{run.outcome === "ongoing" ? "进行中" : outcomeLabel(run.outcome)}
-          </p>
+          <section className="run-panel reader-layout">
+            <aside className="reader-rail character-rail">
+              <div className="rail-title"><small>此生行至</small><strong>{run.age} 岁</strong><span>{run.ageStage.label}</span></div>
+              <dl className="stat-list">
+                {statKeys.map((key) => <div key={key}><dt>{statIcons[key]} {statLabels[key]}</dt><dd>{run.stats[key]}</dd></div>)}
+              </dl>
+              <div className="rail-meta"><span>名望 {run.fame}</span><span>{run.outcome === "ongoing" ? "命途未定" : outcomeLabel(run.outcome)}</span></div>
+            </aside>
 
-          <div className="timeline-scroll" ref={timelineRef}>
-            {timeline.slice(-14).map((item) => (
-              <article className="narrative" key={timelineKey(item)}>
-                <strong>{item.age}岁 · {item.ageStage.label} · {item.title}</strong>
-                <div className="delta-row">
-                  {extractDeltaLabels(item).length === 0 ? (
-                    <small>属性变化：无</small>
-                  ) : (
-                    extractDeltaLabels(item).map((label, idx) => (
-                      <small key={`${timelineKey(item)}-${idx}`}>{label}</small>
-                    ))
-                  )}
-                </div>
-                <p>{item.narrative}</p>
-              </article>
-            ))}
-          </div>
-
-          <section className="decision-history">
-            <div className="decision-history-head">
-              <h3>抉择历史</h3>
-              <small></small>
-            </div>
-            {decisionHistory.length === 0 ? (
-              <p className="decision-history-empty">暂无抉择记录。</p>
-            ) : (
-              <div className="decision-history-list">
-                {decisionHistory.map((entry) => (
-                  <article className="decision-history-item" key={entry.id}>
-                    <p className="decision-history-meta">
-                      {entry.age}岁 · {entry.ageStageLabel}
-                    </p>
-                    <p className="decision-history-bg">
-                      {entry.background || "你走到了命运分岔口。"}
-                    </p>
-                    <p className="decision-history-choice">
-                      <span className="decision-choice-pill">{entry.choiceLabel}</span>
-                      {entry.choiceDescription}
-                    </p>
-                    <div className="decision-history-rolls">
-                      {entry.rollLabels.length === 0 ? (
-                        <small className="decision-roll-pill">掷点：无明显变化</small>
-                      ) : (
-                        entry.rollLabels.map((label, idx) => (
-                          <small className="decision-roll-pill" key={`${entry.id}-roll-${idx}`}>{label}</small>
-                        ))
-                      )}
-                    </div>
+            <section className="story-reader" aria-label="人生叙事">
+              <header className="reader-heading"><small>命运纪事</small><h2>{run.age} 岁 · {run.ageStage.label}</h2></header>
+              <div
+                className="timeline-scroll"
+                ref={timelineRef}
+                onScroll={(event) => {
+                  const target = event.currentTarget;
+                  followLatestTimelineRef.current = target.scrollHeight - target.scrollTop - target.clientHeight < 24;
+                }}
+              >
+                {timeline.map((item) => (
+                  <article className="narrative" key={timelineKey(item)}>
+                    <header><strong>{item.ageFrom && item.ageFrom < item.age ? `${item.ageFrom}-${item.age}岁` : `${item.age}岁`}</strong></header>
+                    <p>{item.narrative}</p>
+                    <div className="delta-row">{extractDeltaLabels(item).map((label, idx) => <small key={`${timelineKey(item)}-${idx}`}>{label}</small>)}</div>
                   </article>
                 ))}
               </div>
-            )}
-          </section>
 
-          {run.nextMilestoneChoice && phaseOf(run) === "waiting_decision" && timelineBuffer.length === 0 ? (
-            <div>
-              <p>{run.nextMilestoneChoice.background ?? "你来到抉择时刻："}</p>
-              <div className="row">
-                {run.nextMilestoneChoice.options.map((opt) => (
-                  <button key={opt.id} disabled={isStreaming || isGenerating} onClick={() => void onDecision(opt.id)}>
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
-              <div className="row">
-                {run.nextMilestoneChoice.options.map((opt) => (
-                  <small key={`${opt.id}-desc`}>{opt.label}：{opt.description}</small>
-                ))}
-              </div>
-            </div>
-          ) : null}
+              {activeDecision && phaseOf(run) === "waiting_decision" ? (
+                <section className="decision-dock">
+                  <p>{activeDecision.background ?? "你来到抉择时刻："}</p>
+                  <div className="decision-options">
+                    {activeDecision.options.map((opt) => (
+                      <button key={opt.id} disabled={isStreaming || isGenerating} onClick={() => void onDecision(opt.id)}><strong>{opt.label}</strong><small>{opt.description}</small></button>
+                    ))}
+                  </div>
+                </section>
+              ) : null}
 
-          {!run.ended && !(run.nextMilestoneChoice && phaseOf(run) === "waiting_decision") ? (
-            <div className="row">
-              <button
-                disabled={isStreaming || isGenerating || !canAdvance(run)}
-                onClick={() => void onAdvance()}
-              >
-                继续推进年份
-              </button>
-            </div>
-          ) : null}
+              {!run.ended && !(activeDecision && phaseOf(run) === "waiting_decision") ? (
+                <div className="advance-bar"><button disabled={isStreaming || isGenerating || !canAdvance(run)} onClick={() => void onAdvance()}>继续推进</button></div>
+              ) : null}
 
-          {run.ended ? (
-            <div className="ending">
-              <div className="ending-head">
-                <h3>结局</h3>
-                <span className={`ending-pill ${run.outcome === "dead" ? "is-dead" : "is-ascended"}`}>
-                  {endingBadgeText(run)}
-                </span>
-              </div>
-              <p className="ending-meta">
-                名望 {run.fame} · {fameTitle(run.fame)}
-              </p>
-              <blockquote className="ending-quote">
-                {run.endingSummary ?? "命运已暂告一段落。"}
-              </blockquote>
-            </div>
-          ) : null}
+              {run.ended ? (
+                <div className="ending">
+                  <div className="ending-head"><h3>此生结局</h3><span className={`ending-pill ${run.outcome === "dead" ? "is-dead" : run.outcome === "ascended" ? "is-ascended" : "is-completed"}`}>{endingBadgeText(run)}</span></div>
+                  <p className="ending-meta">名望 {run.fame} · {fameTitle(run.fame)}</p>
+                  <blockquote className="ending-quote">{run.endingSummary ?? "命运已暂告一段落。"}</blockquote>
+                </div>
+              ) : null}
+              <p className="status">{status}</p>
+            </section>
 
-          <p className="status">{status}</p>
+            <aside className="reader-rail fate-rail" aria-label="命运档案">
+              <section className="rail-section"><h3>天赋</h3><div className="asset-list">{run.cards.map((card) => <span className={`asset-chip ${rarityClass(card.rarity)}`} key={card.id} title={card.description}>{card.name}</span>)}</div></section>
+              <section className="rail-section"><h3>命运道具</h3><div className="asset-list">{run.items.length === 0 ? <small>尚无命运物件</small> : run.items.map((item) => <span className={`asset-chip item-chip ${rarityClass(item.rarity)}`} key={item.id} title={item.description}>{item.name}</span>)}</div></section>
+              <section className="decision-history">
+                <div className="decision-history-head"><h3>已作抉择</h3></div>
+                {decisionHistory.length === 0 ? <p className="decision-history-empty">尚未走到分岔处。</p> : (
+                  <div className="decision-history-list">{decisionHistory.map((entry) => (
+                    <article className="decision-history-item" key={entry.id}>
+                      <p className="decision-history-meta">{entry.age}岁 · {entry.ageStageLabel}</p>
+                      <p className="decision-history-bg">{entry.background || "你走到了命运分岔口。"}</p>
+                      <p className="decision-history-choice"><span>{entry.choiceLabel}</span>{entry.choiceDescription}</p>
+                      {entry.rollLabels.length > 0 ? <div className="decision-history-rolls">{entry.rollLabels.map((label, idx) => <small key={`${entry.id}-roll-${idx}`}>{label}</small>)}</div> : null}
+                    </article>
+                  ))}</div>
+                )}
+              </section>
+            </aside>
           </section>
         )}
       </div>
@@ -1006,7 +1014,7 @@ export default function App(): React.JSX.Element {
           <div className="modal ending-modal">
             <h2>本局结算</h2>
             <div className="ending-summary-top">
-              <span className={`ending-pill ${run.outcome === "dead" ? "is-dead" : "is-ascended"}`}>
+              <span className={`ending-pill ${run.outcome === "dead" ? "is-dead" : run.outcome === "ascended" ? "is-ascended" : "is-completed"}`}>
                 {outcomeLabel(run.outcome)}
               </span>
               <small>{endingBadgeText(run)}</small>
@@ -1017,7 +1025,7 @@ export default function App(): React.JSX.Element {
               {run.endingSummary ?? "命运已暂告一段落。"}
             </blockquote>
             <div className="row">
-              <button onClick={playAgain}>再来一把</button>
+              <button onClick={() => void playAgain()}>再来一把</button>
               <button className="ghost" onClick={() => setShowEndingModal(false)}>关闭</button>
             </div>
           </div>
@@ -1031,6 +1039,66 @@ export default function App(): React.JSX.Element {
             <p>服务器繁忙，请稍后重试。</p>
             <div className="row">
               <button onClick={() => setShowBusyModal(false)}>我知道了</button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {showSaveModal ? (
+        <div className="modal-mask">
+          <div className="modal save-modal">
+            <h2>存档</h2>
+            {run ? (
+              <section className="save-section">
+                <label>
+                  存档名称
+                  <input value={saveTitle} maxLength={40} onChange={(event) => setSaveTitle(event.target.value)} placeholder={`${run.age}岁的人生记录`} />
+                </label>
+                <button disabled={saveWorking || isStreaming || isGenerating} onClick={() => void saveCurrentRun()}>保存当前人生</button>
+              </section>
+            ) : null}
+
+            {issuedRecoveryCode ? (
+              <section className="save-section recovery-issued">
+                <small>恢复码</small>
+                <code>{issuedRecoveryCode}</code>
+              </section>
+            ) : null}
+
+            <section className="save-section">
+              <h3>当前浏览器的存档</h3>
+              {saveSlots.length === 0 ? <p className="save-empty">尚无存档。</p> : (
+                <div className="save-list">
+                  {saveSlots.map((slot) => (
+                    <article className="save-item" key={slot.id}>
+                      <div>
+                        <strong>{slot.title}</strong>
+                        <small>{slot.age}岁 · {slot.kind === "decision" ? "抉择分岔" : slot.ended ? "已结局" : "进行中"} · {formatSaveTime(slot.updatedAt)}</small>
+                      </div>
+                      <div className="save-actions">
+                        <button className="ghost" disabled={saveWorking} onClick={() => void restoreSavedRun(slot.id)}>{slot.kind === "decision" ? "回到分岔" : "恢复"}</button>
+                        <button className="icon-action save-delete" disabled={saveWorking} onClick={() => void removeSaveSlot(slot.id)} title="删除存档" aria-label={`删除存档 ${slot.title}`}>×</button>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              )}
+            </section>
+
+            <section className="save-section">
+              <label>
+                恢复码
+                <input value={recoveryCode} onChange={(event) => setRecoveryCode(event.target.value)} placeholder="save_..." />
+              </label>
+              <button disabled={saveWorking || !recoveryCode.trim()} onClick={() => void recoverSavedRun()}>恢复存档</button>
+            </section>
+            <section className="save-section reset-anonymous-section">
+              <h3>匿名档案</h3>
+              <p>删除当前浏览器的全部人生记录、存档、分岔和恢复码；模型配置会保留。</p>
+              <button className="danger" disabled={saveWorking || isStreaming || isGenerating} onClick={() => void resetAnonymousSave()}>重置匿名存档</button>
+            </section>
+            <div className="row">
+              <button className="ghost" disabled={saveWorking} onClick={() => setShowSaveModal(false)}>关闭</button>
             </div>
           </div>
         </div>

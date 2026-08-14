@@ -1,21 +1,30 @@
 import type {
   AdminConfigPayload,
   ContentBundle,
-  DecisionType,
-  DifficultyConfig,
+  CreateSaveResponse,
+  CurrentGameRunResponse,
   GameEnvConfigResponse,
+  PublicBackgroundCard,
+  PublicDifficultyOption,
+  PublicRunState,
+  PublicTimelineEntry,
+  TurnRecord,
+  PublicWorldOption,
   ProviderConfig,
   ProviderLimits,
-  RunState,
+  SaveSlotSummary,
   StepAction,
   StartAllocationConfig,
   StartRunResponse,
   StepRunResponse,
-  WorldConfig,
-  BackgroundCard
+  Stats
 } from "@reroll/shared";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "";
+
+function gameFetch(path: string, init?: RequestInit): Promise<Response> {
+  return fetch(`${API_BASE}${path}`, { ...init, credentials: "include" });
+}
 
 export class ApiError extends Error {
   status: number;
@@ -30,9 +39,9 @@ export class ApiError extends Error {
 
 export interface BootstrapPayload {
   deployMode: "local" | "cloud";
-  worlds: WorldConfig[];
-  difficulties: DifficultyConfig[];
-  cardPool: BackgroundCard[];
+  worlds: PublicWorldOption[];
+  difficulties: PublicDifficultyOption[];
+  cardPool: PublicBackgroundCard[];
   talentPointTotal: number;
   startAllocation: StartAllocationConfig;
   runtime: AdminConfigPayload["runtime"];
@@ -53,23 +62,19 @@ export type GameStreamEvent =
     }
   | {
       type: "started";
-      data: { run: RunState };
+      data: { run: PublicRunState };
     }
   | {
-      type: "timeline";
+      type: "turn";
       data: {
         index: number;
         total: number;
-        entry: NonNullable<RunState["timelineChunk"]>[number];
+        record: TurnRecord;
       };
     }
   | {
-      type: "milestone";
-      data: NonNullable<RunState["nextMilestoneChoice"]>;
-    }
-  | {
       type: "done";
-      data: { run: RunState; timelineChunk: NonNullable<RunState["timelineChunk"]> };
+      data: { run: PublicRunState; timelineChunk: PublicTimelineEntry[]; turns?: TurnRecord[] };
     }
   | { type: "error"; data: { message: string } };
 
@@ -133,7 +138,7 @@ export async function saveGameEnvironment(payload: {
   localApiKey?: string;
   localProviderConfig?: ProviderConfig;
 }): Promise<GameEnvConfigResponse> {
-  const res = await fetch(`${API_BASE}/api/game/env`, {
+  const res = await gameFetch("/api/game/env", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload)
@@ -147,10 +152,10 @@ export async function startRun(payload: {
   difficultyId: string;
   personaPrompt: string;
   talentPointTotal: number;
-  stats: RunState["stats"];
+  stats: Stats;
   selectedCardIds: string[];
 }): Promise<StartRunResponse> {
-  const res = await fetch(`${API_BASE}/api/game/start`, {
+  const res = await gameFetch("/api/game/start", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload)
@@ -161,11 +166,13 @@ export async function startRun(payload: {
 export async function stepRun(payload: {
   runId: string;
   action?: StepAction;
-  decision?: DecisionType;
+  decision?: string;
   decisionAge?: number;
+  sceneId?: string;
+  sceneRevision?: number;
   requestId?: string;
 }): Promise<StepRunResponse> {
-  const res = await fetch(`${API_BASE}/api/game/step`, {
+  const res = await gameFetch("/api/game/step", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload)
@@ -230,12 +237,12 @@ export async function startRunStream(
     difficultyId: string;
     personaPrompt: string;
     talentPointTotal: number;
-    stats: RunState["stats"];
+    stats: Stats;
     selectedCardIds: string[];
   },
   onEvent: (event: GameStreamEvent) => void | Promise<void>
 ): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/game/start/stream`, {
+  const res = await gameFetch("/api/game/start/stream", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload)
@@ -247,16 +254,76 @@ export async function stepRunStream(
   payload: {
     runId: string;
     action?: StepAction;
-    decision?: DecisionType;
+    decision?: string;
     decisionAge?: number;
+    sceneId?: string;
+    sceneRevision?: number;
     requestId?: string;
   },
   onEvent: (event: GameStreamEvent) => void | Promise<void>
 ): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/game/step/stream`, {
+  const res = await gameFetch("/api/game/step/stream", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload)
   });
   await readNdjsonStream(res, onEvent);
+}
+
+export async function fetchCurrentRun(): Promise<CurrentGameRunResponse> {
+  const res = await gameFetch("/api/game/current");
+  return parseJson<CurrentGameRunResponse>(res);
+}
+
+export async function fetchSaveSlots(): Promise<{ saves: SaveSlotSummary[] }> {
+  const res = await gameFetch("/api/game/saves");
+  return parseJson<{ saves: SaveSlotSummary[] }>(res);
+}
+
+export async function createSaveSlot(payload: { runId: string; title?: string }): Promise<CreateSaveResponse> {
+  const res = await gameFetch("/api/game/saves", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+  return parseJson<CreateSaveResponse>(res);
+}
+
+export async function restoreSaveSlot(saveId: string): Promise<CurrentGameRunResponse> {
+  const res = await gameFetch("/api/game/saves/restore", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ saveId })
+  });
+  return parseJson<CurrentGameRunResponse>(res);
+}
+
+export async function recoverSaveSlot(recoveryCode: string): Promise<CurrentGameRunResponse> {
+  const res = await gameFetch("/api/game/saves/recover", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ recoveryCode })
+  });
+  return parseJson<CurrentGameRunResponse>(res);
+}
+
+export async function resetCurrentRun(): Promise<void> {
+  const res = await gameFetch("/api/game/reset", { method: "POST" });
+  if (!res.ok) {
+    await parseJson<never>(res);
+  }
+}
+
+export async function resetAnonymousGameData(): Promise<void> {
+  const res = await gameFetch("/api/game/anonymous/reset", { method: "POST" });
+  if (!res.ok) {
+    await parseJson<never>(res);
+  }
+}
+
+export async function deleteSaveSlot(saveId: string): Promise<void> {
+  const res = await gameFetch(`/api/game/saves/${encodeURIComponent(saveId)}`, { method: "DELETE" });
+  if (!res.ok) {
+    await parseJson<never>(res);
+  }
 }

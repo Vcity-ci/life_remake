@@ -1,6 +1,7 @@
 [
   {
     "id": "modern",
+    "mainlineId": "modern.mainline",
     "eraName": "新纪现代",
     "timeframe": "2005-2050",
     "coreConflict": "个人成长、家庭责任与城市资源分配之间的长期冲突",
@@ -11,6 +12,62 @@
       { "stage": "竞速期", "ageRange": "18-30", "goal": "在专业选择、实习、第一份工作、情感绑定和创业诱惑中取舍" },
       { "stage": "承压期", "ageRange": "31-45", "goal": "处理资产压力、职业瓶颈、家庭责任和舆论风险" },
       { "stage": "定型期", "ageRange": "46+", "goal": "面对健康、子女、财富守成和时代更替，兑现长期承诺" }
+    ],
+    "storyDirections": [
+      {
+        "id": "modern.guardian",
+        "label": "守护与承担",
+        "summary": "把家庭、照料和公共责任置于个人上升之前，承担由此带来的资源与关系代价。",
+        "focusTags": ["family", "care", "community", "integrity"],
+        "factionIds": ["guardian"],
+        "openingThreadIds": ["modern.guardian_commitment"],
+        "closureTags": ["care", "legacy", "family"]
+      },
+      {
+        "id": "modern.ambition",
+        "label": "上升与取舍",
+        "summary": "在竞争、资源和职业跃迁中争取主动，同时面对效率与底线之间的取舍。",
+        "focusTags": ["career", "strategy", "resource", "integrity"],
+        "factionIds": ["ambition"],
+        "openingThreadIds": ["modern.ambition_commitment"],
+        "closureTags": ["career", "resource", "legacy"]
+      },
+      {
+        "id": "modern.broker",
+        "label": "关系与资源",
+        "summary": "通过人脉、协商和资源配置获得位置，并承受关系网络反噬的风险。",
+        "focusTags": ["network", "resource", "relationship", "negotiation"],
+        "factionIds": ["broker"],
+        "openingThreadIds": ["modern.network_commitment"],
+        "closureTags": ["network", "resource", "relationship"]
+      },
+      {
+        "id": "modern.mentor",
+        "label": "学识与传承",
+        "summary": "围绕学习、专业能力和师承建立长期价值，并决定知识将服务于谁。",
+        "focusTags": ["study", "career", "legacy", "teaching"],
+        "factionIds": ["mentor"],
+        "openingThreadIds": ["modern.study_commitment"],
+        "closureTags": ["study", "legacy", "career"]
+      },
+      {
+        "id": "modern.institution",
+        "label": "秩序与权责",
+        "summary": "进入组织与公共体系，在规则、职责和个人判断之间寻找可承担的位置。",
+        "focusTags": ["institution", "public", "career", "integrity"],
+        "factionIds": ["institution"],
+        "openingThreadIds": ["modern.institution_commitment"],
+        "closureTags": ["institution", "public", "legacy"]
+      },
+      {
+        "id": "modern.outsider",
+        "label": "边缘与开拓",
+        "summary": "从非主流机会、风险选择或城市迁徙中开辟道路，并决定是否接受主流秩序。",
+        "focusTags": ["risk", "frontier", "career", "public"],
+        "factionIds": ["outsider"],
+        "openingThreadIds": ["modern.outsider_commitment"],
+        "closureTags": ["risk", "career", "integrity"]
+      }
     ],
     "factionTone": "写实、克制、因果明确，强调日常决策的连锁反应"
   }

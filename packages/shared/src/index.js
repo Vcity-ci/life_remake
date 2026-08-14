@@ -117,7 +117,7 @@ export function createDefaultGameplayTuning() {
             familyWeight: 0,
             fortuneWeight: 1,
             physiqueWeight: 1,
-            maxStatValue: 60,
+            maxStatValue: 100,
             min: 0,
             max: 100
         },

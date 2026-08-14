@@ -1,6 +1,7 @@
 [
   {
     "id": "fantasy",
+    "mainlineId": "fantasy.mainline",
     "eraName": "群星魔潮",
     "timeframe": "魔潮纪元第七阶段",
     "coreConflict": "凡人秩序与古神遗产、超凡垄断、灾厄污染之间的长期冲突",
@@ -11,6 +12,62 @@
       { "stage": "远征期", "ageRange": "17-30", "goal": "在秘境、公会、宗门试炼和边境战场建立生存资本" },
       { "stage": "裂变期", "ageRange": "31-48", "goal": "在王都阴谋、阵营战争、古神污染和飞升线索中确定立场" },
       { "stage": "传承期", "ageRange": "49+", "goal": "选择封印、传承、飞升或陨落，成为新时代规则的一部分" }
+    ],
+    "storyDirections": [
+      {
+        "id": "fantasy.guardian",
+        "label": "守望与庇护",
+        "summary": "把部族、同伴或边境安危置于个人力量之前，在灾厄中承担守护责任。",
+        "focusTags": ["care", "survival", "family", "integrity"],
+        "factionIds": ["guardian"],
+        "openingThreadIds": ["fantasy.guardian_commitment"],
+        "closureTags": ["care", "survival", "legacy"]
+      },
+      {
+        "id": "fantasy.ambition",
+        "label": "力量与攀升",
+        "summary": "追逐力量、地位与稀缺资源，在超凡捷径和失控代价之间确定底线。",
+        "focusTags": ["power", "career", "strategy", "risk"],
+        "factionIds": ["ambition"],
+        "openingThreadIds": ["fantasy.ambition_commitment"],
+        "closureTags": ["power", "career", "legacy"]
+      },
+      {
+        "id": "fantasy.broker",
+        "label": "契约与资源",
+        "summary": "通过契约、交易和资源网络在魔潮中站稳，同时承担交换关系的反噬。",
+        "focusTags": ["resource", "network", "relationship", "negotiation"],
+        "factionIds": ["broker"],
+        "openingThreadIds": ["fantasy.network_commitment"],
+        "closureTags": ["resource", "relationship", "legacy"]
+      },
+      {
+        "id": "fantasy.mentor",
+        "label": "知识与传承",
+        "summary": "追索秘法、遗产与师承，决定所得力量将被封存、继承还是用于改变秩序。",
+        "focusTags": ["study", "legacy", "exploration", "teaching"],
+        "factionIds": ["mentor"],
+        "openingThreadIds": ["fantasy.study_commitment"],
+        "closureTags": ["study", "legacy", "closure"]
+      },
+      {
+        "id": "fantasy.institution",
+        "label": "秩序与权柄",
+        "summary": "进入学院、公会、宗门或王国体系，在规则、权柄和灾厄责任之间作出选择。",
+        "focusTags": ["institution", "authority", "career", "integrity"],
+        "factionIds": ["institution"],
+        "openingThreadIds": ["fantasy.institution_commitment"],
+        "closureTags": ["institution", "authority", "legacy"]
+      },
+      {
+        "id": "fantasy.outsider",
+        "label": "秘境与异路",
+        "summary": "从秘境、边境和禁忌遗产中开辟道路，决定探索、封印或飞升的代价。",
+        "focusTags": ["exploration", "risk", "closure", "power"],
+        "factionIds": ["outsider"],
+        "openingThreadIds": ["fantasy.outsider_commitment"],
+        "closureTags": ["exploration", "closure", "legacy"]
+      }
     ],
     "factionTone": "高幻想但逻辑自洽，强调奇迹的代价与长期后果"
   }

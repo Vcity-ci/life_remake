@@ -22,7 +22,8 @@ const providerSchema: z.ZodType<ProviderConfig> = z.object({
   temperature: z.number().min(providerLimits.temperature.min).max(providerLimits.temperature.max),
   maxTokens: z.number().int().min(providerLimits.maxTokens.min).max(providerLimits.maxTokens.max),
   timeoutMs: z.number().int().min(providerLimits.timeoutMs.min).max(providerLimits.timeoutMs.max),
-  reasoningEffort: z.enum(["minimal", "low", "medium", "high"]).optional()
+  reasoningEffort: z.enum(["minimal", "low", "medium", "high"]).optional(),
+  directorMode: z.enum(["legacy", "tool-fast", "auto"]).optional()
 });
 
 export const adminConfigSchema: z.ZodType<AdminConfigPayload> = z.object({
@@ -51,9 +52,24 @@ export const startRunSchema = z.object({
 export const stepRunSchema = z.object({
   runId: z.string().min(1),
   action: z.enum(["consume", "decide"]).optional(),
-  decision: z.enum(["safe", "balanced", "risky"]).optional(),
+  decision: z.string().min(8).max(128).optional(),
   decisionAge: z.number().int().min(0).max(160).optional(),
+  sceneId: z.string().min(8).max(128).optional(),
+  sceneRevision: z.number().int().min(0).max(10000).optional(),
   requestId: z.string().max(128).optional()
+});
+
+export const createSaveSchema = z.object({
+  runId: z.string().min(1),
+  title: z.string().trim().min(1).max(40).optional()
+});
+
+export const restoreSaveSchema = z.object({
+  saveId: z.string().min(1).max(100)
+});
+
+export const recoverSaveSchema = z.object({
+  recoveryCode: z.string().trim().min(16).max(220)
 });
 
 const ageThresholdSchema = z.object({
@@ -104,9 +120,18 @@ const cardSchema = z.object({
     intelligence: z.number().int().min(-5).max(5).optional(),
     charisma: z.number().int().min(-5).max(5).optional(),
     family: z.number().int().min(-5).max(5).optional(),
-    fortune: z.number().int().min(-5).max(5).optional()
+    fortune: z.number().int().min(-5).max(5).optional(),
+    physique: z.number().int().min(-5).max(5).optional()
   }),
-  tags: z.array(z.string().min(1))
+  tags: z.array(z.string().min(1)),
+  effects: z.array(z.object({
+    type: z.enum(["candidate_weight", "negative_reduce", "death_risk_reduce", "reward_bonus", "unlock_event"]),
+    stat: z.enum(["intelligence", "charisma", "family", "fortune", "physique"]).optional(),
+    tags: z.array(z.string().min(1)).optional(),
+    amount: z.number().min(0).max(20).optional(),
+    eventIds: z.array(z.string().min(1)).optional(),
+    description: z.string().min(1)
+  })).optional()
 });
 
 const difficultySchema = z.object({

@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="420" viewBox="0 0 1200 420" role="img" aria-labelledby="hero-title hero-desc">
+  <title id="hero-title">Life Remake — 可控叙事 Agent</title>
+  <desc id="hero-desc">引擎控规则、模型写故事。一款不会漂移的 AI 叙事 TRPG，当前世界：古代权谋。</desc>
+  <style>
+    .canvas { fill: #111416; }
+    .accent { fill: #c69a4b; }
+    .light { fill: #edf0ed; font-family: "Microsoft YaHei", Arial, sans-serif; font-weight: 700; }
+    .muted { fill: #afbab8; font-family: "Microsoft YaHei", Arial, sans-serif; }
+    .dim { fill: #8b949e; font-family: "Microsoft YaHei", Arial, sans-serif; }
+    .title { fill: #c69a4b; font-family: Georgia, "Times New Roman", "Microsoft YaHei", serif; font-weight: 700; }
+    .line { stroke: #c69a4b; fill: none; }
+    .seal { fill: none; stroke: #c69a4b; stroke-width: 1.5; }
+    .seal-text { fill: #c69a4b; font-family: "Microsoft YaHei", serif; }
+    .panel { fill: #1a1f22; }
+  </style>
+
+  <rect class="canvas" width="1200" height="420" rx="10"/>
+
+  <!-- 顶部分割线 -->
+  <path class="line" opacity=".3" d="M100 48 H1100"/>
+
+  <!-- 四角点缀 -->
+  <path class="line" opacity=".35" d="M100 48 L100 64 M100 48 L116 48"/>
+  <path class="line" opacity=".35" d="M1100 48 L1100 64 M1100 48 L1084 48"/>
+  <path class="line" opacity=".35" d="M100 372 L100 356 M100 372 L116 372"/>
+  <path class="line" opacity=".35" d="M1100 372 L1100 356 M1100 372 L1084 372"/>
+
+  <!-- 英文标题 -->
+  <text x="600" y="175" text-anchor="middle" class="title" font-size="68" letter-spacing="6">Life Remake</text>
+
+  <!-- 标题下方金线 -->
+  <path class="line" opacity=".5" d="M430 198 H770"/>
+
+  <!-- 中文主标语 -->
+  <text x="600" y="252" text-anchor="middle" class="light" font-size="30" letter-spacing="8">真正可控的叙事 Agent</text>
+
+  <!-- 副标语 -->
+  <text x="600" y="296" text-anchor="middle" class="dim" font-size="18" letter-spacing="3">引擎控规则 · 模型写故事 · 让每一段 TRPG 人生不再漂移</text>
+
+  <!-- 底部分割线 -->
+  <path class="line" opacity=".3" d="M100 372 H1100"/>
+
+  <!-- 印章：古代权谋 -->
+  <g transform="translate(1020, 258)" opacity=".5">
+    <rect class="seal" width="72" height="72" rx="4"/>
+    <text x="36" y="32" text-anchor="middle" class="seal-text" font-size="17">古代</text>
+    <text x="36" y="54" text-anchor="middle" class="seal-text" font-size="17">权谋</text>
+  </g>
+</svg>

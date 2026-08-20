@@ -6,6 +6,7 @@ import type {
   NarrativeComponentRunState,
   NarrativeComponentStatus,
   NarrativeEndingState,
+  NarrativeRouteProgress,
   NarrativeRunState,
   NarrativeThreadState,
   NarrativeWorldDefinition,
@@ -43,6 +44,22 @@ export interface NarrativePromptPlan {
   scene: string;
   authorNote: string;
   ending: string;
+  /**
+   * Route detail is deliberately absent from the planning call. It is attached
+   * only after the model selects a route, so a previous foreground route never
+   * narrows the next planning choice.
+   */
+  selectedRoute?: {
+    label: string;
+    summary: string;
+    perspective?: string;
+    escalation?: string;
+    crisis?: string;
+    payoffFocus?: string;
+    characters: string[];
+    lore: string[];
+    materials: string[];
+  };
   /** Local, deterministic context budget. Never exposes identifiers to the model. */
   contextLayers?: {
     essentials: string[];
@@ -82,15 +99,22 @@ function defaultScene() {
 
 export function createNarrativeRunState(enabled = false): NarrativeRunState {
   return {
-    version: 2,
+    version: 4,
     enabled,
     arcPhase: "setup",
     climaxCount: 0,
     payoffCount: 0,
     threads: [],
+    routeProgress: [],
     components: [],
     activeCharacterIds: [],
     scene: defaultScene(),
+    sceneClock: {
+      mode: "advance",
+      sameAgeTurnCount: 0,
+      maxSameAgeTurns: 3
+    },
+    completedScenes: [],
     endingState: "open",
     setbackCount: 0
   };
@@ -98,25 +122,38 @@ export function createNarrativeRunState(enabled = false): NarrativeRunState {
 
 export function ensureNarrativeRunState(
   state: NarrativeRunState | undefined,
-  enabled = state?.enabled ?? false
+  enabled = state?.enabled ?? false,
+  currentAge?: number
 ): NarrativeRunState {
   const defaults = createNarrativeRunState(enabled);
-  if (!state || (state.version !== 1 && state.version !== 2)) return defaults;
+  if (!state || (state.version !== 1 && state.version !== 2 && state.version !== 3 && state.version !== 4)) return defaults;
+  const normalizeAge = (value: unknown): number => {
+    const age = Number(value);
+    if (!Number.isFinite(age)) return 0;
+    // Earlier versions persisted several narrative timestamps as 120 after
+    // the calendar continued. An active legacy timestamp cannot be recovered
+    // exactly, so treat it as current rather than as a fictitious long idle.
+    if (state.version !== 3 && age === 120 && (currentAge ?? 0) > 120) return Math.max(0, currentAge ?? 0);
+    return Math.max(0, Math.trunc(age));
+  };
   const endingStates: NarrativeEndingState[] = ["open", "eligible", "locked", "guiding", "finished"];
   const phase: NarrativeArcPhase[] = ["setup", "rising", "pressure", "climax", "aftermath", "ending"];
   const sceneBeats: Exclude<EventDefinition["narrativeBeat"], "ending" | undefined>[] = [
     "setup", "escalation", "pressure", "climax", "payoff"
   ];
+  const routeBeats: NarrativeRouteProgress["phase"][] = ["setup", "escalation", "pressure", "climax"];
   const activeScene = state.activeScene &&
     typeof state.activeScene.id === "string" &&
     typeof state.activeScene.threadId === "string" &&
     sceneBeats.includes(state.activeScene.phase)
-    ? {
+      ? {
         id: compactText(state.activeScene.id, 120),
         threadId: compactText(state.activeScene.threadId, 120),
         phase: state.activeScene.phase,
-        openedAge: Math.max(0, Math.min(120, Number(state.activeScene.openedAge) || 0)),
-        lastTouchedAge: Math.max(0, Math.min(120, Number(state.activeScene.lastTouchedAge) || 0))
+        openedAge: normalizeAge(state.activeScene.openedAge),
+        lastTouchedAge: normalizeAge(state.activeScene.lastTouchedAge),
+        mainlineActId: state.activeScene.mainlineActId?.trim() || undefined,
+        decisionCount: Math.max(0, Math.min(16, Number(state.activeScene.decisionCount) || 0))
       }
     : undefined;
   const componentStatuses: Array<Exclude<NarrativeComponentStatus, "dormant">> = [
@@ -131,8 +168,8 @@ export function ensureNarrativeRunState(
       .map((component) => ({
         id: compactText(component.id, 120),
         status: component.status,
-        introducedAge: Math.max(0, Math.min(120, Number(component.introducedAge) || 0)),
-        lastTouchedAge: Math.max(0, Math.min(120, Number(component.lastTouchedAge) || 0)),
+        introducedAge: normalizeAge(component.introducedAge),
+        lastTouchedAge: normalizeAge(component.lastTouchedAge),
         facts: Array.isArray(component.facts)
           ? uniqueRecent(component.facts.map((fact) => compactText(String(fact), 120)), 6)
           : []
@@ -148,10 +185,49 @@ export function ensureNarrativeRunState(
   const components = Array.from(componentsById.values())
     .sort((a, b) => a.introducedAge - b.introducedAge || a.id.localeCompare(b.id))
     .slice(-32);
+  const completedScenes = Array.isArray(state.completedScenes)
+    ? state.completedScenes
+      .filter((scene): scene is NonNullable<NarrativeRunState["completedScenes"]>[number] => Boolean(scene?.id && scene?.threadId))
+      .slice(-12)
+      .map((scene) => ({
+        id: compactText(scene.id, 120),
+        experienceId: scene.experienceId?.trim() || undefined,
+        threadId: compactText(scene.threadId, 120),
+        mainlineActId: scene.mainlineActId?.trim() || undefined,
+        openedAge: normalizeAge(scene.openedAge),
+        resolvedAge: normalizeAge(scene.resolvedAge),
+        decisionCount: Math.max(0, Math.min(16, Number(scene.decisionCount) || 0))
+      }))
+    : [];
+  const routeProgressById = new Map<string, NarrativeRouteProgress>();
+  for (const progress of Array.isArray(state.routeProgress) ? state.routeProgress : []) {
+    if (!progress?.routeId || !routeBeats.includes(progress.phase)) continue;
+    const normalized: NarrativeRouteProgress = {
+      routeId: compactText(progress.routeId, 120),
+      phase: progress.phase,
+      lastTouchedAge: normalizeAge(progress.lastTouchedAge),
+      lastEventId: progress.lastEventId ? compactText(progress.lastEventId, 120) : undefined
+    };
+    const previous = routeProgressById.get(normalized.routeId);
+    if (!previous || normalized.lastTouchedAge >= previous.lastTouchedAge) {
+      routeProgressById.set(normalized.routeId, normalized);
+    }
+  }
+  const routeProgress = Array.from(routeProgressById.values())
+    .sort((a, b) => a.lastTouchedAge - b.lastTouchedAge || a.routeId.localeCompare(b.routeId))
+    .slice(-32);
+  const rawClock = state.sceneClock;
+  const sceneClock = rawClock && (rawClock.mode === "advance" || rawClock.mode === "hold")
+    ? {
+        mode: rawClock.mode,
+        sameAgeTurnCount: Math.max(0, Math.min(8, Number(rawClock.sameAgeTurnCount) || 0)),
+        maxSameAgeTurns: Math.max(1, Math.min(5, Number(rawClock.maxSameAgeTurns) || defaults.sceneClock.maxSameAgeTurns))
+      }
+    : defaults.sceneClock;
   return {
     ...defaults,
     ...state,
-    version: 2,
+    version: 4,
     enabled: enabled && state.enabled !== false,
     arcPhase: phase.includes(state.arcPhase) ? state.arcPhase : defaults.arcPhase,
     climaxCount: Math.max(0, Math.min(8, Number(state.climaxCount) || 0)),
@@ -161,6 +237,7 @@ export function ensureNarrativeRunState(
         .filter((thread): thread is NarrativeThreadState => Boolean(thread?.id))
         .slice(-12)
       : [],
+    routeProgress,
     activeCharacterIds: uniqueRecent(Array.isArray(state.activeCharacterIds) ? state.activeCharacterIds : [], 8),
     components,
     scene: {
@@ -168,8 +245,11 @@ export function ensureNarrativeRunState(
       ...(state.scene ?? {})
     },
     activeScene,
+    sceneClock,
+    completedScenes,
+    activeMainlineActId: state.activeMainlineActId?.trim() || activeScene?.mainlineActId || undefined,
     lastResolvedSceneAge: Number.isFinite(state.lastResolvedSceneAge)
-      ? Math.max(0, Math.min(120, Number(state.lastResolvedSceneAge)))
+      ? normalizeAge(state.lastResolvedSceneAge)
       : undefined,
     endingState: endingStates.includes(state.endingState) ? state.endingState : defaults.endingState,
     endingBlueprintId: state.endingBlueprintId?.trim() || undefined,
@@ -179,6 +259,23 @@ export function ensureNarrativeRunState(
     endingScore: typeof state.endingScore === "number" ? state.endingScore : undefined,
     setbackCount: Math.max(0, Math.min(8, Number(state.setbackCount) || 0))
   };
+}
+
+export function getNarrativeRouteProgress(
+  state: NarrativeRunState,
+  routeId: string
+): NarrativeRouteProgress | undefined {
+  return state.routeProgress.find((progress) => progress.routeId === routeId);
+}
+
+export function resetNarrativeRouteProgress(
+  state: NarrativeRunState,
+  routeId: string
+): NarrativeRunState {
+  if (!state.enabled) return state;
+  const next = ensureNarrativeRunState(state);
+  next.routeProgress = next.routeProgress.filter((progress) => progress.routeId !== routeId);
+  return next;
 }
 
 function componentActivationMatches(
@@ -191,7 +288,8 @@ function componentActivationMatches(
   const activation = definition.activation;
   if (!activation) return true;
   if (activation.minAge !== undefined && age < activation.minAge) return false;
-  if (activation.maxAge !== undefined && age > activation.maxAge) return false;
+  // Narrative worlds have no terminal age. Authoring maxAge remains useful for
+  // event ranking, but it must not silently retire a core component in a long run.
   if (activation.phases?.length && (!phase || !activation.phases.includes(phase))) return false;
   if (activation.requiresFlags?.some((flag) => !storyFlags.includes(flag))) return false;
   if (activation.requiresThreadIds?.some((id) => !state.threads.some((thread) => thread.id === id && thread.status !== "resolved"))) {
@@ -289,7 +387,8 @@ export function applyNarrativeEvent(
   definition: EventDefinition,
   age: number,
   componentDefinitions?: NarrativeComponentDefinition[],
-  storyFlags: string[] = []
+  storyFlags: string[] = [],
+  options?: { mainlineActId?: string; experienceId?: string; routeId?: string }
 ): NarrativeRunState {
   if (!state.enabled) return state;
   const next = ensureNarrativeRunState(state);
@@ -317,7 +416,7 @@ export function applyNarrativeEvent(
     }
   }
   if (beat === "climax") {
-    let reachedClimax = false;
+    let reachedClimax = targets.length === 0;
     for (const id of targets) {
       const thread = next.threads.find((item) => item.id === id);
       if (thread && thread.status !== "resolved") {
@@ -330,7 +429,7 @@ export function applyNarrativeEvent(
   }
   if (beat === "payoff") {
     const payoffTargets = resolved.length > 0 ? resolved : targets;
-    let paid = false;
+    let paid = payoffTargets.length === 0;
     for (const id of payoffTargets) {
       const thread = next.threads.find((item) => item.id === id);
       if (thread && thread.status === "climax") paid = true;
@@ -339,24 +438,48 @@ export function applyNarrativeEvent(
     if (paid) next.payoffCount = Math.min(8, next.payoffCount + 1);
   }
 
-  const sceneThreadId = targets[0];
-  if (beat === "setup" && sceneThreadId) {
-    next.activeScene = {
-      id: `${definition.id}:${age}`,
-      threadId: sceneThreadId,
-      phase: "setup",
-      openedAge: age,
-      lastTouchedAge: age
-    };
-  } else if (next.activeScene && sceneThreadId === next.activeScene.threadId && beat && beat !== "ending") {
+  const sceneThreadId = targets[0] ?? options?.routeId;
+  if (sceneThreadId && beat && beat !== "ending") {
+    const previousScene = next.activeScene?.threadId === sceneThreadId
+      ? next.activeScene
+      : undefined;
     if (beat === "payoff") {
+      const completedScene = previousScene ?? {
+        id: `${definition.id}:${age}`,
+        threadId: sceneThreadId,
+        phase: "climax" as const,
+        openedAge: age,
+        lastTouchedAge: age,
+        mainlineActId: options?.mainlineActId ?? next.activeMainlineActId,
+        decisionCount: 0
+      };
       next.lastResolvedSceneAge = age;
+      next.completedScenes = [
+        ...next.completedScenes,
+        {
+          id: completedScene.id,
+          experienceId: options?.experienceId,
+          threadId: completedScene.threadId,
+          mainlineActId: completedScene.mainlineActId ?? next.activeMainlineActId,
+          openedAge: completedScene.openedAge,
+          resolvedAge: age,
+          decisionCount: completedScene.decisionCount ?? 0
+        }
+      ].slice(-12);
+      next.sceneClock = { ...next.sceneClock, mode: "advance", sameAgeTurnCount: 0 };
       next.activeScene = undefined;
     } else {
+      // This is a presentation and clock projection for the route selected on
+      // this turn. Eligibility comes from routeProgress, so selecting another
+      // route cannot erase or advance the previous route's local beat.
       next.activeScene = {
-        ...next.activeScene,
+        id: previousScene?.id ?? `${definition.id}:${age}`,
+        threadId: sceneThreadId,
         phase: beat,
-        lastTouchedAge: age
+        openedAge: previousScene?.openedAge ?? age,
+        lastTouchedAge: age,
+        mainlineActId: options?.mainlineActId ?? previousScene?.mainlineActId ?? next.activeMainlineActId,
+        decisionCount: previousScene?.decisionCount ?? 0
       };
     }
   }
@@ -374,6 +497,29 @@ export function applyNarrativeEvent(
     lastEventId: definition.id
   };
   applyNarrativeComponentTransitions(next, definition, age, componentDefinitions, storyFlags);
+  if (options?.routeId && beat && beat !== "payoff" && beat !== "ending") {
+    const progress: NarrativeRouteProgress = {
+      routeId: options.routeId,
+      phase: beat,
+      lastTouchedAge: age,
+      lastEventId: definition.id
+    };
+    next.routeProgress = [
+      ...next.routeProgress.filter((item) => item.routeId !== progress.routeId),
+      progress
+    ].slice(-32);
+  }
+  return next;
+}
+
+export function recordNarrativeSceneDecision(state: NarrativeRunState): NarrativeRunState {
+  if (!state.enabled || !state.activeScene) return state;
+  const next = ensureNarrativeRunState(state);
+  if (!next.activeScene) return next;
+  next.activeScene = {
+    ...next.activeScene,
+    decisionCount: Math.min(16, (next.activeScene.decisionCount ?? 0) + 1)
+  };
   return next;
 }
 
@@ -391,7 +537,9 @@ export function recordNarrativeSetback(state: NarrativeRunState, cause: string):
 }
 
 function currentDirectionId(source: NarrativePromptSource): string | undefined {
-  return source.story.activeDirectionId ?? source.story.contract.initialDirectionId;
+  return source.story.foregroundExperienceId
+    ?? source.story.activeDirectionId
+    ?? source.story.contract.initialDirectionId;
 }
 
 function hasDecisionConsequence(ledger: StoryFactLedger | undefined): boolean {
@@ -404,16 +552,21 @@ function hasResolvedCoreFacts(
   source: NarrativePromptSource,
   world: NarrativeWorldDefinition
 ): boolean {
-  const directionId = currentDirectionId(source);
+  const directionId = source.story.closureExperienceId ?? currentDirectionId(source);
   const coreThreadIds = world.routeArcs.find((route) => route.directionId === directionId)?.coreThreadIds
     ?? source.story.contract.coreThreadIds;
   if (coreThreadIds.length === 0) return false;
   const resolvedThreads = new Set(source.narrative.threads
     .filter((thread) => thread.status === "resolved")
     .map((thread) => thread.id));
-  return coreThreadIds.every((threadId) => (
+  const experienceResolved = coreThreadIds.every((threadId) => (
     resolvedThreads.has(threadId) && resolvedFactsForThreads(source.story.factLedger, [threadId])
   ));
+  const mainlineFacts = world.mainlineFacts ?? [];
+  const mainlineEstablished = mainlineFacts.every((definition) => (
+    source.story.factLedger?.facts.some((fact) => fact.id === definition.id && fact.status === "resolved")
+  ));
+  return experienceResolved && mainlineEstablished;
 }
 
 /**
@@ -432,6 +585,37 @@ export function isNarrativeStageReady(
     ?.gates?.[stage];
   if (!gate || !source.stats) return true;
   return weightedStatScore(source.stats, gate.weights) >= gate.threshold;
+}
+
+/**
+ * A world-act gate is satisfied when the character has enough preparation to
+ * advance through at least one of its open life perspectives. This keeps the
+ * six routes selectable without turning a route-specific score into a route
+ * lock, while retaining attribute-driven pacing.
+ */
+export function isNarrativeWorldStageReady(
+  source: NarrativePromptSource,
+  world: NarrativeWorldDefinition | null | undefined,
+  stage: "opening" | "pressure" | "climax"
+): boolean {
+  const routes = world?.progression?.routes ?? [];
+  if (routes.length === 0) return isNarrativeStageReady(source, world, stage);
+  return routes.some((route) => isNarrativeStageReady(source, world, stage, route.directionId));
+}
+
+/**
+ * A world act may have a different admission threshold from the pressure and
+ * climax beats inside the scene it starts. The act controls when its material
+ * may enter the story; the scene still follows its own five-beat pacing.
+ */
+export function isNarrativeMainlineActEntryReady(
+  source: NarrativePromptSource,
+  world: NarrativeWorldDefinition | null | undefined
+): boolean {
+  const activeAct = source.narrative.activeMainlineActId
+    ? world?.mainlineActs?.find((act) => act.id === source.narrative.activeMainlineActId)
+    : undefined;
+  return isNarrativeWorldStageReady(source, world, activeAct?.readinessStage ?? "opening");
 }
 
 /**
@@ -458,6 +642,12 @@ export function refreshNarrativeMainlineCompletion(
       source.story.mainlineCompletedAge = source.age;
     }
     return complete;
+  }
+  const completedScenes = source.narrative.completedScenes.filter((scene) => scene.decisionCount > 0);
+  if (completedScenes.length < Math.max(1, rule.minCompletedSceneInstances ?? 1)) return false;
+  if (rule.requireAllMainlineActs !== false && world?.mainlineActs?.length) {
+    const completedActIds = new Set(completedScenes.map((scene) => scene.mainlineActId));
+    if (world.mainlineActs.some((act) => !completedActIds.has(act.id))) return false;
   }
   if (rule.requireCommittedDirection !== false && source.story.committedDirectionIds.length === 0) return false;
   if (rule.requireDecisionConsequence !== false && !hasDecisionConsequence(source.story.factLedger)) return false;
@@ -501,7 +691,7 @@ export function assessClosureReadiness(
   source: NarrativePromptSource,
   world: NarrativeWorldDefinition | null
 ): ClosureReadiness {
-  const directionId = source.story.activeDirectionId ?? source.story.contract.initialDirectionId;
+  const directionId = source.story.closureExperienceId ?? currentDirectionId(source);
   if (!source.narrative.enabled) return { eligible: true, directionId };
   if (!directionId || !source.story.contract.initialDirectionId) return { eligible: false, reason: "no_mainline" };
   if (!refreshNarrativeMainlineCompletion(source, world)) return { eligible: false, reason: "mainline_incomplete" };
@@ -668,10 +858,16 @@ function factContextEntries(source: NarrativePromptSource, directionId: string |
 
 export function buildNarrativePromptPlan(
   source: NarrativePromptSource,
-  world: NarrativeWorldDefinition | null
+  world: NarrativeWorldDefinition | null,
+  selectedRouteId?: string | null
 ): NarrativePromptPlan | undefined {
   if (!source.narrative.enabled || !world || world.worldId !== source.worldId) return undefined;
-  const directionId = source.story.activeDirectionId ?? source.story.contract.initialDirectionId;
+  // `undefined` preserves the caller's current-route view for ordinary and
+  // ending narration; `null` deliberately means global-only planning context.
+  const directionId = selectedRouteId === undefined ? currentDirectionId(source) : selectedRouteId;
+  const selectedRoute = directionId
+    ? world.routeArcs.find((route) => route.directionId === directionId)
+    : undefined;
   const threadIds = new Set(source.narrative.threads.filter((thread) => thread.status !== "resolved").map((thread) => thread.id));
   const activeThreads = source.narrative.threads
     .filter((thread) => thread.status !== "resolved")
@@ -685,6 +881,11 @@ export function buildNarrativePromptPlan(
     .filter((character): character is NonNullable<typeof character> => Boolean(character))
     .map((character) => `${character.label}(${character.role})：${character.description}`)
     .slice(-4);
+  const routeCharacters = (selectedRoute?.characterIds ?? [])
+    .map((id) => world.characters.find((character) => character.id === id))
+    .filter((character): character is NonNullable<typeof character> => Boolean(character))
+    .map((character) => `${character.label}(${character.role})：${character.description}`)
+    .slice(0, 3);
   const activeLore = world.lore
     .filter((entry) => {
       const directionMatches = !entry.directionIds?.length || Boolean(directionId && entry.directionIds.includes(directionId));
@@ -722,9 +923,24 @@ export function buildNarrativePromptPlan(
     })
     .slice(0, 4);
   const plotEssentials = activeComponents.map(({ definition, state }) => componentPromptText(definition, state));
-  const factEssentials = factContextEntries(source, directionId);
+  const factEssentials = factContextEntries(source, directionId ?? undefined);
   const ending = source.narrative.endingBlueprintId
     ? world.endingBlueprints.find((item) => item.id === source.narrative.endingBlueprintId)
+    : undefined;
+  const idleSkeletonFocus = !world.mainlineSkeleton
+    ? ""
+    : source.narrative.arcPhase === "setup"
+      ? world.mainlineSkeleton.opening
+      : source.narrative.arcPhase === "rising"
+        ? world.mainlineSkeleton.pressure
+        : source.narrative.arcPhase === "pressure"
+          ? world.mainlineSkeleton.climax
+          : source.narrative.arcPhase === "climax" || source.narrative.arcPhase === "aftermath"
+      ? world.mainlineSkeleton.payoff
+            : world.mainlineSkeleton.payoff;
+  const activeActId = source.narrative.activeMainlineActId;
+  const activeMainlineAct = activeActId
+    ? world.mainlineActs?.find((act) => act.id === activeActId)
     : undefined;
   const skeletonFocus = !world.mainlineSkeleton
     ? ""
@@ -736,25 +952,45 @@ export function buildNarrativePromptPlan(
           ? world.mainlineSkeleton.climax
           : source.narrative.activeScene
             ? world.mainlineSkeleton.pressure
-            : world.mainlineSkeleton.opening;
+            : idleSkeletonFocus;
+  const routeLore = (selectedRoute?.loreIds ?? [])
+    .map((id) => world.lore.find((entry) => entry.id === id)?.text)
+    .filter((entry): entry is string => Boolean(entry))
+    .slice(0, 2);
+  const routeMaterials = (selectedRoute?.materialEventIds ?? [])
+    .map((eventId) => world.eventBindings.find((binding) => binding.eventId === eventId)?.sceneHint)
+    .filter((hint): hint is string => Boolean(hint))
+    .slice(0, 4);
   return {
     storyBible: world.storyBible,
     mainlineSkeleton: world.mainlineSkeleton
       ? compactText([
         `总冲突：${world.mainlineSkeleton.premise}`,
-        `当前骨架节点：${skeletonFocus}`
+        `当前骨架节点：${skeletonFocus}`,
+        activeMainlineAct ? `当前世界推进：${activeMainlineAct.prompt}` : ""
       ].join("\n"), 380)
       : undefined,
     styleRules: world.styleRules.slice(0, 4),
     activeLore,
     plotEssentials: Array.from(new Set([...factEssentials, ...plotEssentials])).slice(0, 6),
     activeThreads,
-    activeCharacters,
+    activeCharacters: Array.from(new Set([...activeCharacters, ...routeCharacters])).slice(0, 5),
     scene: `场景=${source.narrative.scene.place}；冲突=${source.narrative.scene.conflict}；余波=${source.narrative.scene.aftermath}`,
     authorNote: buildAuthorNote(source, activeComponents[0]),
     ending: ending
       ? `结局大纲=${ending.title}/${ending.polarity}；终局冲突=${ending.finalConflict}；回收=${ending.payoffFocus}；余响=${ending.epilogueFocus}`
       : "",
+    selectedRoute: selectedRoute ? {
+      label: selectedRoute.label || selectedRoute.directionId,
+      summary: selectedRoute.summary,
+      perspective: selectedRoute.perspective,
+      escalation: selectedRoute.escalation,
+      crisis: selectedRoute.crisis,
+      payoffFocus: selectedRoute.payoffFocus,
+      characters: routeCharacters,
+      lore: routeLore,
+      materials: routeMaterials
+    } : undefined,
     contextLayers: {
       essentials: Array.from(new Set([...factEssentials, ...activeThreads])).slice(0, 5),
       shortTerm: [source.narrative.scene.conflict, source.narrative.scene.aftermath].filter(Boolean).slice(0, 2),
@@ -779,6 +1015,17 @@ export function formatNarrativePromptPlan(
   const shortTerm = compactText((plan.contextLayers?.shortTerm ?? []).map((entry) => compactText(entry, 100)).join("；"), 200);
   const threads = compactText(plan.activeThreads.map((entry) => compactText(entry, 88)).join("；"), 220);
   const characters = compactText(plan.activeCharacters.map((entry) => compactText(entry, 72)).join("；"), 220);
+  const route = plan.selectedRoute;
+  const routeDetail = route && projection !== "planning"
+    ? compactText([
+      `当前路线视角：${route.summary}`,
+      route.perspective ? `人物落点：${route.perspective}` : "",
+      route.escalation ? `可加重的矛盾：${route.escalation}` : "",
+      route.crisis ? `与世界危机的连接：${route.crisis}` : "",
+      route.payoffFocus ? `可回收方向：${route.payoffFocus}` : "",
+      route.materials.length ? `既有素材：${route.materials.join("；")}` : ""
+    ].filter(Boolean).join("\n"), 520)
+    : "";
   return [
     plan.mainlineSkeleton ? `必须遵循的主线因果：${plan.mainlineSkeleton}` : "",
     lore ? `相关世界事实：${lore}` : "",
@@ -787,6 +1034,7 @@ export function formatNarrativePromptPlan(
     characters ? `此刻相关的人物：${characters}` : "",
     plan.scene ? compactText(plan.scene, 180) : "",
     shortTerm ? `近期余波：${shortTerm}` : "",
+    routeDetail,
     plan.authorNote ? `写作重点：${compactText(plan.authorNote, 140)}` : "",
     projection === "ending" && plan.ending ? compactText(plan.ending, 220) : ""
   ].filter(Boolean).join("\n");

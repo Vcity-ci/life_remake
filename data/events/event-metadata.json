@@ -101,7 +101,7 @@
     "events": [
       { "kind": "milestone", "storyPosition": "turn", "focusTags": ["career", "military", "integrity"], "primaryStat": "intelligence", "secondaryStat": "fortune", "outcomeProfileId": "strategy", "setsFlags": ["ancient.false_merit"], "blocksFlags": ["ancient.clean_name"], "baseWeight": 11, "cooldownYears": 16, "minAge": 22 },
       { "storyPosition": "pressure", "focusTags": ["resource", "career", "integrity"], "primaryStat": "family", "secondaryStat": "intelligence", "outcomeProfileId": "resource", "setsFlags": ["ancient.salt_account"], "minAge": 22 },
-      { "kind": "milestone", "storyPosition": "turn", "focusTags": ["family", "military", "relationship"], "primaryStat": "family", "secondaryStat": "charisma", "outcomeProfileId": "authority", "setsFlags": ["ancient.marriage_alliance"], "baseWeight": 10, "cooldownYears": 16, "minAge": 20 },
+      { "kind": "milestone", "storyPosition": "turn", "focusTags": ["family", "military", "relationship"], "primaryStat": "family", "secondaryStat": "charisma", "outcomeProfileId": "authority", "setsFlags": ["ancient.marriage_alliance"], "baseWeight": 10, "cooldownYears": 16, "minAge": 15 },
       { "storyPosition": "turn", "focusTags": ["career", "network", "pressure"], "primaryStat": "charisma", "secondaryStat": "intelligence", "outcomeProfileId": "network", "setsFlags": ["ancient.faction_tie"], "minAge": 20 },
       { "storyPosition": "pressure", "focusTags": ["military", "career", "integrity"], "primaryStat": "physique", "secondaryStat": "fortune", "outcomeProfileId": "combat", "setsFlags": ["ancient.border_merit"], "minAge": 22 },
       { "storyPosition": "turn", "focusTags": ["institution", "career", "integrity"], "primaryStat": "intelligence", "secondaryStat": "charisma", "outcomeProfileId": "strategy", "setsFlags": ["ancient.palace_message"], "minAge": 22 },
@@ -119,7 +119,7 @@
       { "storyPosition": "turn", "focusTags": ["network", "institution", "resource"], "primaryStat": "charisma", "secondaryStat": "family", "outcomeProfileId": "network", "setsFlags": ["ancient.prince_contact"], "minAge": 22 },
       { "storyPosition": "pressure", "focusTags": ["institution", "strategy", "career"], "primaryStat": "intelligence", "secondaryStat": "fortune", "outcomeProfileId": "strategy", "setsFlags": ["ancient.court_balance"], "minAge": 20 },
       { "storyPosition": "accumulation", "focusTags": ["resource", "network", "governance"], "primaryStat": "family", "secondaryStat": "charisma", "outcomeProfileId": "resource", "setsFlags": ["ancient.trade_alliance"], "minAge": 22 },
-      { "kind": "milestone", "storyRole": "branch", "storyPosition": "turn", "focusTags": ["family", "career", "relationship"], "primaryStat": "family", "secondaryStat": "charisma", "outcomeProfileId": "network", "setsFlags": ["ancient.dual_patronage"], "baseWeight": 10, "cooldownYears": 14, "minAge": 18 },
+      { "kind": "milestone", "storyRole": "branch", "storyPosition": "turn", "focusTags": ["family", "career", "relationship"], "primaryStat": "family", "secondaryStat": "charisma", "outcomeProfileId": "network", "setsFlags": ["ancient.dual_patronage"], "baseWeight": 10, "cooldownYears": 14, "minAge": 15 },
       { "storyPosition": "pressure", "focusTags": ["resource", "risk", "institution"], "primaryStat": "family", "secondaryStat": "fortune", "outcomeProfileId": "resource", "setsFlags": ["ancient.old_ledger"], "minAge": 22 },
       { "storyPosition": "pressure", "focusTags": ["resource", "governance", "integrity"], "primaryStat": "family", "secondaryStat": "charisma", "outcomeProfileId": "resource", "setsFlags": ["ancient.river_claim"], "minAge": 20 },
       { "storyPosition": "pressure", "focusTags": ["resource", "network", "risk"], "primaryStat": "family", "secondaryStat": "fortune", "outcomeProfileId": "resource", "setsFlags": ["ancient.salt_credit"], "minAge": 20 },
@@ -150,7 +150,7 @@
     "factionId": "institution",
     "defaults": { "minAge": 18, "maxAge": 64, "cooldownYears": 10, "baseWeight": 8, "storyRole": "branch", "storyDirectionIds": ["ancient.institution"] },
     "events": [
-      { "kind": "milestone", "storyPosition": "pressure", "focusTags": ["study", "institution", "integrity"], "primaryStat": "intelligence", "secondaryStat": "fortune", "outcomeProfileId": "compliance", "setsFlags": ["ancient.exam_inquiry"], "baseWeight": 11, "cooldownYears": 15, "minAge": 18 },
+      { "kind": "milestone", "storyPosition": "pressure", "focusTags": ["study", "institution", "integrity"], "primaryStat": "intelligence", "secondaryStat": "fortune", "outcomeProfileId": "compliance", "setsFlags": ["ancient.exam_inquiry"], "baseWeight": 11, "cooldownYears": 15, "minAge": 15 },
       { "storyPosition": "turn", "focusTags": ["institution", "relationship", "integrity"], "primaryStat": "charisma", "secondaryStat": "intelligence", "outcomeProfileId": "integrity", "setsFlags": ["ancient.censure_order"], "minAge": 22 },
       { "kind": "milestone", "storyPosition": "pressure", "focusTags": ["family", "resource", "governance"], "primaryStat": "family", "secondaryStat": "intelligence", "outcomeProfileId": "resource", "setsFlags": ["ancient.land_measure"], "baseWeight": 10, "cooldownYears": 14, "minAge": 25 },
       { "storyPosition": "pressure", "focusTags": ["governance", "career", "resource"], "primaryStat": "intelligence", "secondaryStat": "charisma", "outcomeProfileId": "authority", "setsFlags": ["ancient.tax_reform"], "minAge": 25 },
@@ -168,7 +168,7 @@
     "defaults": { "minAge": 16, "maxAge": 60, "cooldownYears": 11, "baseWeight": 7, "storyRole": "branch", "storyDirectionIds": ["ancient.outsider"] },
     "events": [
       { "kind": "milestone", "storyPosition": "turn", "focusTags": ["military", "integrity", "risk"], "primaryStat": "fortune", "secondaryStat": "intelligence", "outcomeProfileId": "frontier", "setsFlags": ["ancient.border_truth"], "baseWeight": 10, "cooldownYears": 15, "minAge": 20 },
-      { "storyPosition": "accumulation", "focusTags": ["study", "risk", "turn"], "primaryStat": "intelligence", "secondaryStat": "fortune", "outcomeProfileId": "study", "setsFlags": ["ancient.forbidden_book"], "minAge": 16 },
+      { "storyPosition": "accumulation", "focusTags": ["study", "risk", "turn"], "primaryStat": "intelligence", "secondaryStat": "fortune", "outcomeProfileId": "study", "setsFlags": ["ancient.forbidden_book"], "minAge": 15 },
       { "kind": "milestone", "storyPosition": "turn", "focusTags": ["governance", "military", "integrity"], "primaryStat": "charisma", "secondaryStat": "fortune", "outcomeProfileId": "negotiation", "setsFlags": ["ancient.refugee_parley"], "baseWeight": 11, "cooldownYears": 16, "minAge": 22 },
       { "storyPosition": "pressure", "focusTags": ["family", "legacy", "risk"], "primaryStat": "family", "secondaryStat": "fortune", "outcomeProfileId": "legacy", "setsFlags": ["ancient.old_dynasty_debt"], "minAge": 20 },
       { "storyPosition": "turn", "focusTags": ["resource", "military", "risk"], "primaryStat": "fortune", "secondaryStat": "physique", "outcomeProfileId": "frontier", "setsFlags": ["ancient.smuggling_evidence"], "minAge": 22 },

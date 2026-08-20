@@ -12,6 +12,7 @@ import type {
   DifficultyConfig,
   GameplayTuning,
   GameEnvConfigRequest,
+  NarrativeIntent,
   NarrativeComponentDefinition,
   NarrativeWorldDefinition,
   PublicMilestoneChoice,
@@ -29,6 +30,8 @@ import type {
 import { createDefaultGameplayTuning } from "@reroll/shared";
 import {
   generateEndingNarrative,
+  generateBackgroundNarrativeOutcome,
+  generateDirectedDecisionNarrativeOutcome,
   generateMilestoneOptions,
   generateYearNarrative,
   isDirectedToolAvailable,
@@ -53,6 +56,7 @@ import {
 import { buildNarrativePromptPlan } from "./narrative.js";
 import {
   attachTimelineChunk,
+  applyDirectedMilestonePresentation,
   advanceWithDirectedEvent,
   autoAdvanceToCheckpoint,
   applyMilestoneDecisionAndAdvance,
@@ -61,10 +65,11 @@ import {
   buildDirectedDecisionDirections,
   buildDirectedStoryDirections,
   buildDirectedNarrativeComponentFocuses,
-  buildDirectedNarrativeIntents,
-  beginDirectedClosureGuidance,
   canRequestDirectedClosure,
   createRun,
+  createDirectedMilestoneChoice,
+  getPendingDirectedDecisionPolicy,
+  getDirectedEventAttributePolicy,
   hasPendingRequestId,
   markRunPhase,
   queueTimelineEntries,
@@ -77,6 +82,8 @@ import {
   toPresentationTimelineEntries,
   resolvePublicDecisionOption,
   resolveTurnRecordChoice,
+  settleNarrativeBackgroundOutcomes,
+  selectDirectedCandidateForIntent,
   ensureVisibleTurnRecords,
   type InternalRunState
 } from "./engine.js";
@@ -674,10 +681,25 @@ async function narrateBackgroundPassage(
   const first = chunk[0]!;
   const last = chunk[chunk.length - 1]!;
   const historyBeforeChunk = run.history.slice(0, Math.max(0, run.history.length - chunk.length));
+  const background = {
+    ageFrom: first.age,
+    ageTo: last.age,
+    progressionGoal: backgroundProgressionGoal(run),
+    aftermath: run.narrative.scene.aftermath.trim() || "此前的经历仍在日常中留下痕迹",
+    livingDetails: backgroundLivingDetails(chunk)
+  };
   const passageEvent: YearEvent = {
-    ...last,
+    age: last.age,
+    title: `${first.age}岁至${last.age}岁的岁月余波`,
     summary: `${first.age}岁至${last.age}岁间的经历需要被写成同一段自然推进的人生余波。`,
-    tags: [...last.tags, "background_segment"]
+    statChanges: chunk.reduce<YearEvent["statChanges"]>((total, event) => {
+      for (const [key, value] of Object.entries(event.statChanges)) {
+        const statKey = key as keyof YearEvent["statChanges"];
+        total[statKey] = (total[statKey] ?? 0) + (value ?? 0);
+      }
+      return total;
+    }, {}),
+    tags: ["background_segment"]
   };
   const promptRun: InternalRunState = {
     ...run,
@@ -685,17 +707,16 @@ async function narrateBackgroundPassage(
     ageStage: resolveAgeStageForStream(last.age, world),
     history: [...historyBeforeChunk, passageEvent]
   };
-  let narrative = "";
-  try {
-    narrative = await generateYearNarrative(promptRun, world, passageEvent, narrativeCtx, {
-      avoidNarratives: historyBeforeChunk.slice(-6).map((event) => event.summary).filter(Boolean)
-    });
-  } catch {
-    narrative = "";
+  const outcome = await generateBackgroundNarrativeOutcome(promptRun, world, {
+    ages: chunk.map((event) => event.age),
+    progressionGoal: background.progressionGoal,
+    aftermath: background.aftermath,
+    livingDetails: background.livingDetails
+  }, narrativeCtx);
+  if (!settleNarrativeBackgroundOutcomes(run, world, outcome.years)) {
+    throw new Error("background_outcome_rejected");
   }
-  const resolvedSummary = narrative.trim() && !isLikelyLowQualityNarrative(narrative)
-    ? narrative.trim()
-    : buildBackgroundPassageFallback(run, first, last);
+  const resolvedSummary = outcome.narrative.trim();
   return chunk.map((event, index) => index === chunk.length - 1
     ? { ...event, summary: resolvedSummary, tags: [...event.tags, "background_segment"] }
     : { ...event, summary: "", tags: [...event.tags, "presentation_hidden"] });
@@ -953,10 +974,39 @@ function buildBackgroundPassageFallback(run: InternalRunState, first: YearEvent,
   return `${first.age}岁至${last.age}岁间，${aftermath}。你在日常奔忙中慢慢积累，也察觉有些事情尚未真正结束。`;
 }
 
+function backgroundProgressionGoal(run: InternalRunState): string {
+  const conflict = run.narrative.scene.conflict.trim();
+  const scene = run.narrative.activeScene;
+  if (scene) {
+    if (scene.phase === "setup") return `让“${conflict}”从初见端倪逐渐落到人物的日常选择上。`;
+    if (scene.phase === "escalation") return `让“${conflict}”在日常往来中显出更具体的牵连与代价。`;
+    if (scene.phase === "pressure") return `让“${conflict}”的压力持续累积，使人物难以继续回避。`;
+    if (scene.phase === "climax") return `承接“${conflict}”前的紧张余波，为关键选择保留足够的现实压力。`;
+    return `让“${conflict}”留下可被后续回应的余波，不仓促结束。`;
+  }
+  const phaseGoals: Record<InternalRunState["narrative"]["arcPhase"], string> = {
+    setup: "让人物的处境、关系或愿望逐渐具体，为下一条主线矛盾积累现实基础。",
+    rising: "让既有愿望和关系继续积累，隐约显出下一次冲突的代价。",
+    pressure: "承接已发生的压力，在生活细节里让人物感到局势正在收紧。",
+    climax: "保留关键转折后的余震，让人物和相关关系出现可见变化。",
+    aftermath: "让已解决的矛盾留下后果，并为下一阶段主线自然腾出空间。",
+    ending: "承接既有结果，不开启新的主线冲突。"
+  };
+  return phaseGoals[run.narrative.arcPhase];
+}
+
+function backgroundLivingDetails(chunk: YearEvent[]): string[] {
+  const source = chunk.filter((event) => event.tags.includes("special"));
+  const selected = [...source, ...chunk.slice(-1)].slice(-2);
+  return Array.from(new Set(selected.map((event) => {
+    const title = event.title.replace(/^\d+岁[·\s]*/, "").trim();
+    const summary = event.summary.replace(/^(这一年里|这一年出现了)/, "").trim();
+    return [title, summary].filter(Boolean).join("：");
+  }).filter(Boolean)));
+}
+
 function resolveNarrativeBackgroundYears(
   run: InternalRunState,
-  world: WorldConfig,
-  eventDefinitions: Awaited<ReturnType<typeof loadEventDefinitions>>,
   hasSceneCandidate: boolean,
   narrativeWorld?: NarrativeWorldDefinition | null
 ): number | undefined {
@@ -965,23 +1015,13 @@ function resolveNarrativeBackgroundYears(
   const maxYears = Math.max(minYears, Math.trunc(pacing?.maxYears ?? run.tuningSnapshot.pacing.maxYearsPerChunk));
   const rng = seedrandom(`${run.seed}:narrative-background:${run.age}:${run.history.length}`);
   const configuredSpan = minYears + Math.floor(rng() * (maxYears - minYears + 1));
-  const lastSceneAge = run.narrative.activeScene?.lastTouchedAge ?? run.narrative.lastResolvedSceneAge;
+  const lastSceneAge = run.narrative.lastResolvedSceneAge;
   if (lastSceneAge !== undefined && run.age - lastSceneAge < configuredSpan) {
     return Math.max(1, configuredSpan - (run.age - lastSceneAge));
   }
   if (hasSceneCandidate) return undefined;
 
-  const nextSetupAge = run.narrative.activeScene
-    ? undefined
-    : eventDefinitions
-      .filter((event) => event.worldId === world.id && event.narrativeBeat === "setup" && event.minAge > run.age)
-      .map((event) => event.minAge)
-      .sort((a, b) => a - b)[0];
-  if (nextSetupAge === undefined) return configuredSpan;
-
-  // Candidate eligibility is evaluated for age + 1. Stop the passage one year
-  // before a setup becomes legal so that it is narrated at its declared age.
-  return Math.max(1, Math.min(configuredSpan, nextSetupAge - run.age - 1));
+  return configuredSpan;
 }
 
 async function generateApprovedDirectedEnding(
@@ -995,6 +1035,8 @@ async function generateApprovedDirectedEnding(
   run.aiConversation = run.aiConversation ?? {};
   const endingCtx: NarrativeCallContext = {
     ...narrativeCtx,
+    // Ending is rendered only after the engine has locked its route and may use
+    // that route's detailed world material.
     narrativePlan: buildNarrativePromptPlan(run, narrativeWorld ?? null),
     conversation: run.aiConversation.ending
   };
@@ -1032,20 +1074,6 @@ async function generateDirectedSegmentForRun(options: DirectedSegmentOptions): P
     return await generateDirectedSegmentForRunUnsafe(options);
   } catch (error) {
     Object.assign(options.run, runBeforeTurn);
-    // Once the engine has recognized a complete mainline, a malformed or
-    // unavailable tool response must not leak into an unrelated extra year.
-    // Preserve the run in ending guidance for the next approved settlement.
-    if (options.run.narrative.enabled && options.run.story.mainlineCompleted &&
-      beginDirectedClosureGuidance(options.run, options.narrativeWorld ?? null)) {
-      markRunPhase(options.run, "ready");
-      return {
-        run: options.run,
-        generatedChunk: [],
-        fromAge: options.run.age,
-        toAge: options.run.age,
-        rawChunkCount: 0
-      };
-    }
     throw error;
   }
 }
@@ -1085,10 +1113,9 @@ async function generateDirectedSegmentForRunUnsafe(options: DirectedSegmentOptio
     factionSummary,
     eventPoolSummary,
     talentHookSummary,
-    narrativePlan: buildNarrativePromptPlan(run, narrativeWorld ?? null),
+    narrativePlan: buildNarrativePromptPlan(run, narrativeWorld ?? null, null),
     conversation: run.aiConversation?.year
   };
-  // Route mapping is a deterministic engine responsibility, not a model decision.
   // The readiness check may latch `mainlineCompleted` for a migrated or
   // freshly recovered run, so it must execute before we decide the tool set.
   const closureRequestEligible = canRequestDirectedClosure(run, narrativeWorld ?? null);
@@ -1098,42 +1125,102 @@ async function generateDirectedSegmentForRunUnsafe(options: DirectedSegmentOptio
   const decisionDirections = candidates.some((candidate) => candidate.kind === "milestone")
     ? buildDirectedDecisionDirections(run, directionOptions, storyDirections)
     : undefined;
-  const allowedIntents = closureRequired ? [] : buildDirectedNarrativeIntents(run, candidates, narrativeWorld);
   const focusOptions = closureRequired ? [] : buildDirectedNarrativeComponentFocuses(run, candidates, narrativeWorld ?? null);
+  const routeOptions = (narrativeWorld?.routeArcs ?? []).map((route) => ({
+    id: route.directionId,
+    label: route.label || route.directionId,
+    summary: route.summary
+  }));
+  const allowedIntents: NarrativeIntent[] = closureRequired
+    ? []
+    : ["continue", "pressure", "payoff"];
   const canRequestClosure = closureRequired || closureRequestEligible;
-  const turnInput = {
-    allowedIntents,
-    focusOptions,
-    allowClosureRequest: canRequestClosure,
-    closureRequired
-  };
-  const turn = await generateNarrativeTurn({ run, world, input: turnInput, context: narrativeCtx });
-  const closureOutcome = approveStoryClosure(run, turn.closureRequest, narrativeWorld ?? null);
-  const approvedIntent = approveStoryIntent(run, candidates, allowedIntents, turn, focusOptions, narrativeWorld);
-  const closureCandidates = closureOutcome === "guiding"
-    ? buildDirectedEventCandidates(run, world, difficulty, eventDefinitions, itemDefinitions, storyDirections, narrativeWorld)
-    : candidates;
-  const selected = closureOutcome === "guiding"
-    ? closureCandidates.find((candidate) => candidate.definition.narrativeBeat === "ending")
-    : approvedIntent.candidate;
+  const rejectedRouteIds = new Set<string>();
+  let turn: Awaited<ReturnType<typeof generateNarrativeTurn>>;
+  let closureOutcome: ReturnType<typeof approveStoryClosure>;
+  let approvedIntent: ReturnType<typeof approveStoryIntent>;
+  let selectedDirection: StoryDirectionDefinition | undefined;
+  let selected: ReturnType<typeof selectDirectedCandidateForIntent>;
+  while (true) {
+    const turnInput = {
+      allowedIntents,
+      routeOptions,
+      focusOptions,
+      allowClosureRequest: canRequestClosure,
+      closureRequired,
+      allowScenePacing: run.narrative.enabled && !run.narrative.activeScene && !closureRequired,
+      rejectedRouteIds: Array.from(rejectedRouteIds)
+    };
+    turn = await generateNarrativeTurn({ run, world, input: turnInput, context: narrativeCtx });
+    closureOutcome = approveStoryClosure(run, turn.closureRequest, narrativeWorld ?? null);
+    approvedIntent = approveStoryIntent(run, allowedIntents, turn, focusOptions, routeOptions);
+    const closureCandidates = closureOutcome === "guiding"
+      ? buildDirectedEventCandidates(run, world, difficulty, eventDefinitions, itemDefinitions, storyDirections, narrativeWorld)
+      : candidates;
+    selectedDirection = approvedIntent.routeId
+      ? storyDirections.find((direction) => direction.id === approvedIntent.routeId)
+      : undefined;
+    selected = closureOutcome === "guiding"
+      ? closureCandidates.find((candidate) => candidate.definition.narrativeBeat === "ending")
+      : selectedDirection
+        ? selectDirectedCandidateForIntent(
+          run,
+          candidates,
+          approvedIntent.intent,
+          approvedIntent.focusComponentId,
+          undefined,
+          narrativeWorld,
+          approvedIntent.routeId
+        )
+        : undefined;
+    if (selected || closureOutcome === "guiding" || !approvedIntent.routeId) break;
+    rejectedRouteIds.add(approvedIntent.routeId);
+    if (rejectedRouteIds.size >= routeOptions.length) {
+      throw new Error("directed_route_selection_exhausted");
+    }
+  }
   if (!selected) {
     markRunPhase(run, "ready");
     return { run, generatedChunk: [], fromAge: run.age, toAge: run.age, rawChunkCount: 0 };
   }
-  const selectedDirection = resolveEventStoryDirection(run, selected, storyDirections);
+  const eventDirection = selectedDirection ?? resolveEventStoryDirection(run, selected, storyDirections);
+  // A decision changes how the current experience is handled. It must not
+  // silently select an unrelated life route simply because the option is risky.
+  const selectedDecisionDirections = eventDirection
+    ? { safe: eventDirection, balanced: eventDirection, risky: eventDirection }
+    : decisionDirections;
   const focus = closureOutcome === "guiding"
     ? undefined
     : resolveDirectedNarrativeFocus(run, narrativeWorld, approvedIntent.focusComponentId);
+  const decisionSeed = selected.kind === "milestone"
+    ? createDirectedMilestoneChoice(run.age + 1, selected.definition, run.tuningSnapshot)
+    : undefined;
+  if (approvedIntent.routeId) {
+    narrativeCtx.narrativePlan = buildNarrativePromptPlan(run, narrativeWorld ?? null, approvedIntent.routeId);
+  }
   const rendered = await generateNarrativeRender({
     run,
     world,
     input: {
       kind: selected.kind,
       intent: approvedIntent.intent,
+      eventId: selected.definition.id,
+      eventTitle: selected.definition.title,
       premise: selected.definition.promptHook || selected.definition.title,
       outcomeHint: focus?.hint || "这件事会留下需要在后续面对的真实后果。",
       sceneHint: run.narrative.scene.conflict,
       focus: focus ? { label: focus.label, hint: focus.hint } : undefined,
+      decision: decisionSeed ? {
+        background: decisionSeed.background ?? (selected.definition.promptHook || selected.definition.title),
+        options: decisionSeed.options.map((option) => ({
+          id: option.id,
+          label: option.label,
+          description: option.description
+        }))
+      } : undefined,
+      attributePolicy: selected.kind === "normal" && selected.definition.narrativeBeat !== "ending"
+        ? getDirectedEventAttributePolicy(selected.definition)
+        : undefined,
       turn
     },
     context: narrativeCtx
@@ -1143,10 +1230,17 @@ async function generateDirectedSegmentForRunUnsafe(options: DirectedSegmentOptio
     world,
     selected,
     rendered.narrative,
-    selectedDirection,
-    decisionDirections,
-    narrativeWorld ?? null
+    eventDirection,
+    selectedDecisionDirections,
+    narrativeWorld ?? null,
+    {
+      attributeOutcome: rendered.attributeEffects ? { effects: rendered.attributeEffects } : undefined,
+      experienceId: approvedIntent.routeId,
+      sceneClockMode: approvedIntent.scenePacing === "continuous" ? "hold" : approvedIntent.scenePacing === "spanning" ? "advance" : undefined,
+      completeMainlineAct: selected.definition.narrativeBeat === "payoff" && Boolean(approvedIntent.routeId)
+    }
   );
+  applyDirectedMilestonePresentation(advanced.updated, rendered.milestoneCopy);
   const engineApprovedClosureBeat = selected.definition.narrativeBeat === "ending" &&
     run.story.closureState === "guiding";
   const settledClosureOutcome = engineApprovedClosureBeat
@@ -1249,7 +1343,7 @@ async function generateSegmentForRun(
         narrativeWorld
       });
     }
-    const sceneCandidates = buildDirectedEventCandidates(
+    const hasSceneCandidate = buildDirectedEventCandidates(
       run,
       world,
       difficulty,
@@ -1257,44 +1351,50 @@ async function generateSegmentForRun(
       itemDefinitions,
       storyDirections,
       narrativeWorld
-    );
-    const hasSceneCandidate = sceneCandidates.some((candidate) => Boolean(candidate.definition.narrativeBeat));
-    const backgroundYears = resolveNarrativeBackgroundYears(run, world, eventDefinitions, hasSceneCandidate, narrativeWorld);
+    ).length > 0;
+    const backgroundYears = resolveNarrativeBackgroundYears(run, hasSceneCandidate, narrativeWorld);
     if (backgroundYears !== undefined) {
-      markRunPhase(run, "generating");
-      const advanced = autoAdvanceToCheckpoint(run, world, difficulty, {
-        milestoneEventPool,
-        targetYears: backgroundYears,
-        maxTargetYears: narrativeWorld?.progression?.backgroundPacing.maxYears,
-        allowRandomMilestone: false
-      });
-      rawChunk = advanced.chunk;
-      fromAge = advanced.fromAge;
-      toAge = advanced.toAge;
-      const flow = await runYearFlow({
-        branch: "step",
-        rawChunk,
-        currentRun: advanced.updated,
-        world,
-        providerConfig,
-        apiKey,
-        promptPack,
-        worldlineSummary,
-        factionSummary,
-        eventPoolSummary,
-        talentHookSummary,
-        narrativeWorld,
-        presentation: "background"
-      });
-      queueTimelineEntries(flow.updatedRun, flow.timelineChunk);
-      syncRunPhase(flow.updatedRun);
-      return {
-        run: flow.updatedRun,
-        generatedChunk: flow.timelineChunk,
-        fromAge,
-        toAge,
-        rawChunkCount: rawChunk.length
-      };
+      const runBeforeBackground = structuredClone(run);
+      try {
+        markRunPhase(run, "generating");
+        const advanced = autoAdvanceToCheckpoint(run, world, difficulty, {
+          milestoneEventPool,
+          targetYears: backgroundYears,
+          maxTargetYears: narrativeWorld?.progression?.backgroundPacing.maxYears,
+          allowRandomMilestone: false,
+          deferNarrativeAttributeEffects: true
+        });
+        rawChunk = advanced.chunk;
+        fromAge = advanced.fromAge;
+        toAge = advanced.toAge;
+        const flow = await runYearFlow({
+          branch: "step",
+          rawChunk,
+          currentRun: advanced.updated,
+          world,
+          providerConfig,
+          apiKey,
+          promptPack,
+          worldlineSummary,
+          factionSummary,
+          eventPoolSummary,
+          talentHookSummary,
+          narrativeWorld,
+          presentation: "background"
+        });
+        queueTimelineEntries(flow.updatedRun, flow.timelineChunk);
+        syncRunPhase(flow.updatedRun);
+        return {
+          run: flow.updatedRun,
+          generatedChunk: flow.timelineChunk,
+          fromAge,
+          toAge,
+          rawChunkCount: rawChunk.length
+        };
+      } catch (error) {
+        Object.assign(run, runBeforeBackground);
+        throw error;
+      }
     }
   }
   if (useDirectedTurn) {
@@ -1597,19 +1697,13 @@ async function runStepFlowUnlocked(
       description: selectedOption.description
     } : undefined;
     await createDecisionCheckpoint(sessionId, run);
-    const stepped = applyMilestoneDecisionAndAdvance(
-      run,
-      world,
-      difficulty,
-      resolvedDecision,
-      { milestoneEventPool }
-    );
-    resolveTurnRecordChoice(run, publicChoice, selectedOption);
-    if (debugModel) {
-      console.log("[model-debug:step-branch]", { branch: "decision", chunkCount: stepped.chunk.length });
-    }
+    let directedDecisionNarrative: string | undefined;
+    let directedDecisionContext: NarrativeCallContext | undefined;
+    let narrativeOutcome: { effects: import("@reroll/shared").NarrativeAttributeEffect[] } | undefined;
     if (wasDirectedMilestone && usesStoryDirectionDecision) {
-      const closureCtx: NarrativeCallContext = {
+      const policy = getPendingDirectedDecisionPolicy(run, resolvedDecision);
+      if (!policy) throw new Error("decision_outcome_policy_missing");
+      directedDecisionContext = {
         providerConfig,
         apiKey,
         promptPack: content.promptPack,
@@ -1617,13 +1711,39 @@ async function runStepFlowUnlocked(
         factionSummary,
         eventPoolSummary,
         talentHookSummary,
-        narrativePlan: buildNarrativePromptPlan(stepped.updated, narrativeWorld),
-        conversation: stepped.updated.aiConversation?.year
+        narrativePlan: buildNarrativePromptPlan(run, narrativeWorld),
+        conversation: run.aiConversation?.year
       };
+      const outcome = await generateDirectedDecisionNarrativeOutcome(run, world, {
+        decision: resolvedDecision,
+        label: selectedOption?.label ?? "已选抉择",
+        description: selectedOption?.description ?? "人物作出了会改变后续处境的取舍。",
+        allowedStats: policy.allowedStats,
+        maxBand: policy.maxBand
+      }, directedDecisionContext);
+      directedDecisionNarrative = outcome.narrative;
+      narrativeOutcome = { effects: outcome.effects };
+    }
+    const stepped = applyMilestoneDecisionAndAdvance(
+      run,
+      world,
+      difficulty,
+      resolvedDecision,
+      { milestoneEventPool, narrativeOutcome }
+    );
+    resolveTurnRecordChoice(run, publicChoice, selectedOption);
+    if (directedDecisionNarrative) {
+      stepped.decisionEvent.summary = directedDecisionNarrative;
+    }
+    if (debugModel) {
+      console.log("[model-debug:step-branch]", { branch: "decision", chunkCount: stepped.chunk.length });
+    }
+    if (wasDirectedMilestone && usesStoryDirectionDecision) {
+      const closureCtx = directedDecisionContext!;
       recordDirectedDecisionOutcome(closureCtx, stepped.updated, {
         decision: resolvedDecision,
         label: selectedOption?.label ?? "已选抉择",
-        narrative: stepped.decisionEvent.summary
+        narrative: directedDecisionNarrative ?? stepped.decisionEvent.summary
       });
       stepped.updated.aiConversation = stepped.updated.aiConversation ?? {};
       stepped.updated.aiConversation.year = closureCtx.conversation;

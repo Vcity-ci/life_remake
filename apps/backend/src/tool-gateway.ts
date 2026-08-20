@@ -2,32 +2,28 @@ import type { NarrativeIntent, NarrativeWorldDefinition } from "@reroll/shared";
 import type { DirectedStoryTurnResult } from "./ai.js";
 import {
   applyDirectedClosureRequest,
-  candidateAdvancesNarrativeComponent,
-  selectDirectedCandidateForIntent,
   type DirectedClosureOutcome,
-  type DirectedEventCandidate,
   type InternalRunState
 } from "./engine.js";
 
 export interface ApprovedStoryIntent {
   intent: NarrativeIntent;
+  routeId?: string;
   focusComponentId?: string;
-  candidate?: DirectedEventCandidate;
+  scenePacing?: "continuous" | "spanning";
   source: "model";
 }
 
 export function approveStoryIntent(
   run: InternalRunState,
-  candidates: DirectedEventCandidate[],
   allowedIntents: NarrativeIntent[],
   turn: DirectedStoryTurnResult,
   focusOptions: Array<{ id: string }> = [],
-  narrativeWorld?: NarrativeWorldDefinition | null
+  routeOptions: Array<{ id: string }> = []
 ): ApprovedStoryIntent {
   if (run.narrative.enabled && run.story.closureState === "guiding") {
     return {
       intent: "payoff",
-      candidate: candidates.find((candidate) => candidate.definition.narrativeBeat === "ending"),
       source: "model"
     };
   }
@@ -40,17 +36,17 @@ export function approveStoryIntent(
     return { intent: "continue", source: "model" };
   }
   const intent = turn.intent;
+  const route = turn.routeId ? routeOptions.find((option) => option.id === turn.routeId) : undefined;
+  const routeId = route?.id;
+  if (!routeId) return { intent: "continue", source: "model" };
   const focusComponentId = turn?.focusComponentId && focusOptions.some((option) => option.id === turn.focusComponentId)
     ? turn.focusComponentId
     : undefined;
-  const candidate = selectDirectedCandidateForIntent(run, candidates, intent, focusComponentId, narrativeWorld);
-  const appliedFocusComponentId = focusComponentId && candidate && candidateAdvancesNarrativeComponent(run, candidate, focusComponentId)
-    ? focusComponentId
-    : undefined;
   return {
     intent,
-    focusComponentId: appliedFocusComponentId,
-    candidate,
+    routeId,
+    focusComponentId,
+    scenePacing: turn.scenePacing,
     source: "model"
   };
 }

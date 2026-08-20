@@ -125,3 +125,12 @@ docs/
 - `apps/backend/src/ai.ts` 的常规导演工具为 `propose_story_intent`；主线完成后的强制工具为 `request_story_closure`。两者只传递意图，不传递事件 ID、数值或结局极性。
 - 叙事世界包中的 `endingBlueprints` 提供路线的好/坏结局大纲。引擎先锁定蓝图，再请求最终结局文本；最终文本调用失败时保留引擎结算摘要。
 - 古代叙事世界的最终 outcome 可为 `completed`；死亡仍是立即中断，旧的 `ascended` 仅保留给未启用叙事世界包的兼容路径。
+
+## 11. 路线局部进度实现（2026-08-21 01:29 +08:00，增量）
+
+- 共享契约新增 `NarrativeRouteProgress`；`NarrativeRunState.version` 为 `4`，以 `routeProgress[]` 保存世界包路线的局部拍点。旧存档没有该字段时，运行态仍可读取同线程 `activeScene` 作为一次迁移兼容视图。
+- `buildDirectedEventCandidates` 先保留既有事件的 `narrativeBeat` 与路线素材绑定，再为每个当前可用路线投影候选。模型选择的是 `routeId`，不是事件 ID、数值或下一幕。
+- `selectDirectedCandidateForIntent` 直接接收字符串路线 ID，不再依赖旧 `StoryDirectionDefinition` 才能选材；新世界只需配置世界包路线即可进入同一引擎路径。
+- `applyNarrativeEvent` 仅更新本回合实际选择路线的 `routeProgress`。`activeScene` 同步为该路线的展示/停表投影，不承担全局状态机职责。
+- `recordMainlineActPayoff` 仅清除完成 payoff 的路线记录；共享世界幕前进与世界事实结算不清除其它路线。
+- 年龄没有叙事终止上限。普通年份、场景停表和属性门槛沿用既有逻辑；路线局部进度不改变这些模块。

@@ -74,3 +74,10 @@ git remote add origin <你的仓库地址>
 git branch -M main
 git push -u origin main
 ```
+
+## 5. 当前叙事改动提交检查（2026-08-21 01:29 +08:00，增量）
+
+- 路线局部进度涉及 `packages/shared/src/index.ts`、`apps/backend/src/narrative.ts`、`apps/backend/src/engine.ts` 和 `apps/backend/src/index.ts`；提交时应确保这组契约与实现一起进入版本库。
+- 回归测试位于 `apps/backend/src/engine.test.ts`，覆盖并行路线保留与 payoff 后仅重置获胜路线。
+- 文档同步包含架构、技术、使用、配置、蒸馏、变更与开发日志；`docs/DEPLOYMENT.md` 不属于本次叙事变更范围。
+- 发布前至少执行 `npm run test -w @reroll/backend` 与 `npm run build -w @reroll/backend`。若共享包 `dist` 被本地进程占用，不要强制杀进程；先确认源码和后端类型构建结果，再在空闲时重建共享产物。

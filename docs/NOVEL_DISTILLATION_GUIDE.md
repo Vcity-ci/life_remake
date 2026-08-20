@@ -405,3 +405,14 @@ drafts/novel-distill/chapter-002.json
 9. 再同步 `data/worlds/{worldId}.json` 作为种子备份
 
 这样做的好处是先保证 AI 上下文有主线和阵营，再让前端世界选项与开局卡池跟上。
+
+## 13. 叙事世界包落地补充（2026-08-21 01:29 +08:00，增量）
+
+本节补充当前已启用的世界包结构。它不改变前述蒸馏原则：提取可复用冲突与因果，不复刻原作剧情。
+
+1. 新世界需要单独新增 `data/narratives/{worldId}.story.json`。引擎不识别“古代权谋”“修仙”或“现代”的名称，只读取世界包数据。
+2. `mainlineActs` 描述该世界递进的独立高潮。每幕应提供世界层面的 `prompt`，可选 `introduceFactIds`、`requiredFactIds` 和 `resolveFactIds`；不要用年龄范围替代主线完成条件。
+3. `routeArcs` 描述角色经历视角，而不是六条互斥主线。每条路线至少提供 `directionId`、`summary`、`coreThreadIds` 与 `materialEventIds`；可补充人物、Lore、危机与回收方向。模型每回合可从全部路线中选择一条。
+4. 每条路线的素材要覆盖 `setup -> escalation -> pressure -> climax -> payoff`。这不是要求同一路线独占一幕：世界幕可由任一路线的 payoff 推进，未完成路线保留局部进度并进入下一幕上下文。
+5. `eventBindings` 只负责把已有事件素材关联到世界包叙事信息。事件的具体文本、数值后果和基础权重仍放在原事件数据，不要在模型提示词中复制整池素材。
+6. 结局蓝图应围绕所有世界幕的最终后果设计。属性、天赋、道具和历史代价用于决定好/坏结局及代价，不应直接以年龄或单一路线完成作为终局开关。

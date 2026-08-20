@@ -414,7 +414,7 @@ export async function loadNarrativeWorldDefinition(worldId: string): Promise<Nar
     readJsonFile<NarrativeComponentCatalog>(path.resolve(narrativeWorldDir, `${worldId}.components.json`)).catch(() => null)
   ])
     .then(([definition, catalog]) => {
-      const valid = (definition.version === 1 || definition.version === 2) && definition.worldId === worldId
+      const valid = (definition.version === 1 || definition.version === 2 || definition.version === 3) && definition.worldId === worldId
         ? mergeNarrativeComponentCatalog(definition, catalog, worldId)
         : null;
       narrativeWorldCache.set(worldId, valid);
@@ -458,7 +458,6 @@ function normalizeEventDefinition(
     kind: "any",
     tags: defaultTagsForFaction(factionId),
     minAge: 5,
-    maxAge: 120,
     cooldownYears: 8,
     baseWeight: 10,
     outcomeProfileId: factionId,
@@ -499,6 +498,19 @@ function applyNarrativeEventBinding(
 ): EventDefinition {
   const binding = narrativeWorld?.eventBindings.find((item) => item.eventId === definition.id);
   const componentBinding = narrativeWorld?.componentEventBindings?.find((item) => item.eventId === definition.id);
+  const inferredSceneArchetypeId = (() => {
+    if (binding?.sceneArchetypeId) return binding.sceneArchetypeId;
+    const beat = binding?.beat ?? definition.narrativeBeat;
+    const profile = definition.outcomeProfileId;
+    if (beat === "setup") return profile === "duty" || profile === "care" ? "ally_request" : "third_party_request";
+    if (beat === "escalation") return "hidden_evidence";
+    if (beat === "pressure") return profile === "burden" || profile === "care" || profile === "teaching"
+      ? "relationship_fracture"
+      : "institutional_obstruction";
+    if (beat === "climax") return "public_commitment";
+    if (beat === "payoff") return "witness_return";
+    return definition.sceneArchetypeId;
+  })();
   const routeThreadIds = (definition.storyDirectionIds ?? []).flatMap((directionId) => (
     narrativeWorld?.routeArcs.find((arc) => arc.directionId === directionId)?.coreThreadIds ?? []
   ));
@@ -630,6 +642,7 @@ function applyNarrativeEventBinding(
   return {
     ...definition,
     narrativeBeat: binding?.beat ?? definition.narrativeBeat,
+    sceneArchetypeId: inferredSceneArchetypeId,
     narrativeThreadIds: threadIds,
     narrativeCharacterIds: Array.from(new Set([
       ...(definition.narrativeCharacterIds ?? []),
@@ -690,6 +703,23 @@ function validateNarrativeFactContract(worldId: string, definitions: EventDefini
   return definitions;
 }
 
+function validateNarrativeRouteBeatContract(
+  worldId: string,
+  definitions: EventDefinition[],
+  narrativeWorld: NarrativeWorldDefinition
+): EventDefinition[] {
+  const requiredBeats = ["setup", "escalation", "pressure", "climax", "payoff"] as const;
+  for (const route of narrativeWorld.routeArcs) {
+    const missing = requiredBeats.filter((beat) => !definitions.some((definition) => (
+      definition.storyDirectionIds?.includes(route.directionId) && definition.narrativeBeat === beat
+    )));
+    if (missing.length > 0) {
+      throw new Error(`${worldId}_route_beat_contract_invalid:${route.directionId}:${missing.join(",")}`);
+    }
+  }
+  return definitions;
+}
+
 export async function loadEventDefinitions(worldId: string): Promise<EventDefinition[]> {
   const [groups, metadataGroups, narrativeWorld] = await Promise.all([
     loadFactionEvents(worldId),
@@ -718,7 +748,9 @@ export async function loadEventDefinitions(worldId: string): Promise<EventDefini
       ))
       .filter((event) => event.title.trim().length > 0)
   );
-  return narrativeWorld ? validateNarrativeFactContract(worldId, definitions) : definitions;
+  return narrativeWorld
+    ? validateNarrativeRouteBeatContract(worldId, validateNarrativeFactContract(worldId, definitions), narrativeWorld)
+    : definitions;
 }
 
 export async function loadItemDefinitions(): Promise<ItemDefinition[]> {

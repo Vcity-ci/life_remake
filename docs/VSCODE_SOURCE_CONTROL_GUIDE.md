@@ -72,3 +72,9 @@ git config --global user.email "你的邮箱"
 ```powershell
 git restore --staged apps/backend/.env
 ```
+
+## 8. 叙事运行时变更的暂存范围（2026-08-21 01:29 +08:00，增量）
+
+- 本轮路线局部节拍的核心文件为：`packages/shared/src/index.ts`、`apps/backend/src/narrative.ts`、`apps/backend/src/engine.ts`、`apps/backend/src/index.ts` 和 `apps/backend/src/engine.test.ts`。
+- 文档变更集中在 `docs/`；`storage/` 中的匿名存档和运行期配置仍不应加入提交。
+- 在 VS Code 的 diff 中确认没有误把 `packages/shared/dist/` 的占用失败或其他本地生成物纳入暂存；以源码和已通过的后端测试、构建结果为准。

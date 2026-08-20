@@ -36,6 +36,14 @@ export interface Stats {
     fortune: number;
     physique: number;
 }
+/** Semantic attribute consequences proposed by the narrator and settled by the engine. */
+export type NarrativeAttributeBand = "light" | "medium" | "heavy";
+export type NarrativeAttributeDirection = "up" | "down";
+export interface NarrativeAttributeEffect {
+    stat: StatKey;
+    direction: NarrativeAttributeDirection;
+    band: NarrativeAttributeBand;
+}
 export interface BackgroundCard {
     id: string;
     name: string;
@@ -93,7 +101,11 @@ export interface EventDefinition {
     kind: EventKind;
     tags: string[];
     minAge: number;
-    maxAge: number;
+    /**
+     * Source-material age preference. The narrative director treats this as a
+     * ranking hint rather than a terminal eligibility boundary.
+     */
+    maxAge?: number;
     cooldownYears: number;
     baseWeight: number;
     outcomeProfileId: string;
@@ -112,6 +124,8 @@ export interface EventDefinition {
     resolvesThreads?: string[];
     followUpIds?: string[];
     narrativeBeat?: NarrativeBeat;
+    /** A reusable dramatic situation above this concrete source event. */
+    sceneArchetypeId?: string;
     narrativeCharacterIds?: string[];
     narrativeComponentTransitions?: NarrativeComponentTransition[];
     /** Facts that must already exist before this event can be selected. */
@@ -174,7 +188,41 @@ export interface NarrativeEventBinding {
     opensThreads?: string[];
     resolvesThreads?: string[];
     characterIds?: string[];
+    sceneArchetypeId?: string;
     sceneHint?: string;
+}
+/**
+ * A world-defined dramatic act. The engine only understands ordering and fact
+ * requirements; each world supplies its own dramatic meaning.
+ */
+export interface NarrativeMainlineActDefinition {
+    id: string;
+    label: string;
+    prompt: string;
+    requiredFactIds?: string[];
+    introduceFactIds?: string[];
+    resolveFactIds?: string[];
+    readinessStage?: "opening" | "pressure" | "climax";
+}
+/**
+ * A reusable dramatic situation. It gives the director usable material even
+ * after a very specific local event has aged out or is on cooldown.
+ */
+export interface NarrativeSceneArchetype {
+    id: string;
+    label: string;
+    description: string;
+    beats: NarrativeBeat[];
+    focusTags?: string[];
+    outcomeProfileId?: string;
+    baseWeight?: number;
+}
+/** A world-level fact shared by all parallel life experiences. */
+export interface NarrativeMainlineFactDefinition {
+    id: string;
+    kind: StoryFactKind;
+    label: string;
+    priority?: number;
 }
 export interface NarrativeThreadDefinition {
     id: string;
@@ -237,6 +285,10 @@ export interface NarrativeCompletionRule {
     requirePayoff?: boolean;
     requireResolvedCoreFacts?: boolean;
     requireNoActiveScene?: boolean;
+    /** Number of resolved scene instances. Repeated experiences are allowed. */
+    minCompletedSceneInstances?: number;
+    /** A world may require all configured acts without naming their semantics in code. */
+    requireAllMainlineActs?: boolean;
 }
 /** Reserved for a later age-stage decline/death rule; the engine does not enforce it yet. */
 export interface NarrativeSurvivalRule {
@@ -265,18 +317,38 @@ export interface NarrativeMainlineSkeleton {
     goodEndingDirection: string;
     badEndingDirection: string;
 }
+/**
+ * A world-owned route catalog entry. The engine treats the identifier as data:
+ * it never assumes a fixed route count or knows a world's route names.
+ */
+export interface NarrativeRouteDefinition {
+    directionId: string;
+    label?: string;
+    summary: string;
+    coreThreadIds: string[];
+    perspective?: string;
+    escalation?: string;
+    crisis?: string;
+    payoffFocus?: string;
+    characterIds?: string[];
+    loreIds?: string[];
+    materialEventIds?: string[];
+}
 export interface NarrativeWorldDefinition {
-    version: 1 | 2;
+    version: 1 | 2 | 3;
     worldId: WorldId;
     storyBible: string;
     styleRules: string[];
     mainlineSkeleton?: NarrativeMainlineSkeleton;
     progression?: NarrativeWorldProgression;
-    routeArcs: Array<{
-        directionId: string;
-        summary: string;
-        coreThreadIds: string[];
-    }>;
+    /** Facts required by the world plot, independent from an individual route. */
+    mainlineFacts?: NarrativeMainlineFactDefinition[];
+    /** Ordered, world-owned dramatic acts; never rendered as player-facing chapters. */
+    mainlineActs?: NarrativeMainlineActDefinition[];
+    /** General-purpose scenes used when no concrete material is currently fit. */
+    sceneArchetypes?: NarrativeSceneArchetype[];
+    /** Complete route catalog projected to the model from world data. */
+    routeArcs: NarrativeRouteDefinition[];
     threads: NarrativeThreadDefinition[];
     characters: NarrativeCharacterDefinition[];
     lore: NarrativeLoreEntry[];
@@ -315,9 +387,26 @@ export interface ActiveNarrativeScene {
     phase: Exclude<NarrativeBeat, "ending">;
     openedAge: number;
     lastTouchedAge: number;
+    mainlineActId?: string;
+    decisionCount?: number;
+}
+export interface NarrativeSceneClock {
+    mode: "advance" | "hold";
+    sameAgeTurnCount: number;
+    maxSameAgeTurns: number;
+}
+/** Immutable proof that a concrete scene, rather than merely a route label, was completed. */
+export interface CompletedNarrativeScene {
+    id: string;
+    experienceId?: string;
+    threadId: string;
+    mainlineActId?: string;
+    openedAge: number;
+    resolvedAge: number;
+    decisionCount: number;
 }
 export interface NarrativeRunState {
-    version: 1 | 2;
+    version: 1 | 2 | 3;
     enabled: boolean;
     arcPhase: NarrativeArcPhase;
     climaxCount: number;
@@ -327,6 +416,9 @@ export interface NarrativeRunState {
     activeCharacterIds: string[];
     scene: NarrativeSceneState;
     activeScene?: ActiveNarrativeScene;
+    sceneClock: NarrativeSceneClock;
+    completedScenes: CompletedNarrativeScene[];
+    activeMainlineActId?: string;
     lastResolvedSceneAge?: number;
     endingState: NarrativeEndingState;
     endingBlueprintId?: string;
@@ -374,6 +466,10 @@ export interface StoryDirectorState {
     openThreads: string[];
     resolvedThreadIds: string[];
     factionTension: Record<string, number>;
+    /** Current foreground experience; activeDirectionId remains for old saves. */
+    foregroundExperienceId?: string;
+    /** The first experience that reaches payoff; it determines ending texture. */
+    closureExperienceId?: string;
     activeDirectionId?: string;
     committedDirectionIds: string[];
     lastDirectionCommitAge?: number;

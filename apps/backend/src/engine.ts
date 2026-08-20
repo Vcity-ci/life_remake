@@ -11,7 +11,9 @@ import type {
   ItemDefinition,
   ItemInstance,
   NarrativeComponentDefinition,
+  NarrativeAttributeEffect,
   NarrativeIntent,
+  NarrativeSceneArchetype,
   MilestoneChoice,
   NarrativeRunState,
   NarrativeThreadState,
@@ -46,11 +48,16 @@ import {
   canAdvanceNarrativeComponent,
   createNarrativeRunState,
   ensureNarrativeRunState,
+  getNarrativeRouteProgress,
+  isNarrativeMainlineActEntryReady,
   isNarrativeStageReady,
+  isNarrativeWorldStageReady,
   isNarrativeEndingEligible,
   lockNarrativeEnding,
+  recordNarrativeSceneDecision,
   recordNarrativeSetback,
   refreshNarrativeMainlineCompletion,
+  resetNarrativeRouteProgress,
   setNarrativeEndingState
 } from "./narrative.js";
 
@@ -73,6 +80,22 @@ interface NarrativeReservoirState {
   pendingRequestIds: string[];
 }
 
+export interface ApprovedNarrativeAttributeOutcome {
+  effects: NarrativeAttributeEffect[];
+}
+
+export interface PendingDirectedDecisionPolicy {
+  allowedStats: StatKey[];
+  maxBand: "medium" | "heavy";
+}
+
+export function getPendingDirectedDecisionPolicy(
+  run: InternalRunState,
+  decision: DecisionType
+): PendingDirectedDecisionPolicy | undefined {
+  return run.pendingDirectedDecisionPolicy?.[decision];
+}
+
 interface DirectedDecisionEffect {
   success: Partial<Record<StatKey, number>>;
   failure: Partial<Record<StatKey, number>>;
@@ -81,6 +104,8 @@ interface DirectedDecisionEffect {
 
 export interface DirectedEventCandidate {
   definition: EventDefinition;
+  /** Route selected by the model for this concrete material. */
+  routeId?: string;
   kind: "normal" | "milestone";
   score: number;
   preview: {
@@ -103,6 +128,22 @@ export interface DirectedNarrativeComponentFocus {
   hint: string;
   candidateCount: number;
   weight: number;
+}
+
+export interface DirectedSceneArchetypeOption {
+  id: string;
+  label: string;
+  description: string;
+  candidateCount: number;
+}
+
+export interface DirectedMilestonePresentation {
+  background: string;
+  optionOverrides: Array<{
+    id: DecisionType;
+    label: string;
+    description: string;
+  }>;
 }
 
 export interface DirectedStoryDirection {
@@ -140,6 +181,7 @@ export interface InternalRunState extends RunState {
   /** The world package which enabled the narrative runtime for this run. */
   narrativeWorldId?: string;
   pendingDirectedDecisionEffects?: Record<DecisionType, DirectedDecisionEffect>;
+  pendingDirectedDecisionPolicy?: Record<DecisionType, PendingDirectedDecisionPolicy>;
   pendingDirectedDecisionDirections?: Record<DecisionType, StoryDirectionDefinition>;
   pendingDirectedDecisionFactEffects?: Partial<Record<DecisionType, StoryFactEffect>>;
   narrativeReservoir: NarrativeReservoirState;
@@ -151,7 +193,7 @@ const defaultAgeThresholds: AgeThreshold[] = [
   { id: "youth", label: "青年", min: 13, max: 29 },
   { id: "prime", label: "壮年", min: 30, max: 44 },
   { id: "middle", label: "中年", min: 45, max: 59 },
-  { id: "elder", label: "老年", min: 60, max: 120 }
+  { id: "elder", label: "老年", min: 60, max: Number.MAX_SAFE_INTEGER }
 ];
 
 function clamp(num: number, min: number, max: number): number {
@@ -211,8 +253,8 @@ function normalizeStoryFactLedger(input: StoryFactLedger | undefined): StoryFact
         id: fact.id.trim().slice(0, 120),
         label: fact.label.trim().slice(0, 160),
         sourceEventId: fact.sourceEventId.trim().slice(0, 120),
-        introducedAge: Math.max(0, Math.min(120, Number(fact.introducedAge) || 0)),
-        lastTouchedAge: Math.max(0, Math.min(120, Number(fact.lastTouchedAge) || 0)),
+        introducedAge: Math.max(0, Number(fact.introducedAge) || 0),
+        lastTouchedAge: Math.max(0, Number(fact.lastTouchedAge) || 0),
         routeIds: Array.from(new Set(fact.routeIds ?? [])).slice(0, 6),
         characterIds: Array.from(new Set(fact.characterIds ?? [])).slice(0, 6)
       }))
@@ -412,7 +454,7 @@ function ensureStoryDirectorState(run: InternalRunState): StoryDirectorState {
   const narrativeEnabled = run.narrativeWorldId === run.worldId || (
     run.narrativeWorldId === undefined && run.narrative?.enabled === true
   );
-  run.narrative = ensureNarrativeRunState(run.narrative, narrativeEnabled);
+  run.narrative = ensureNarrativeRunState(run.narrative, narrativeEnabled, run.age);
   run.turnRecords ??= [];
   if (!run.story) {
     run.story = createStoryDirectorState(run.worldId);
@@ -433,6 +475,8 @@ function ensureStoryDirectorState(run: InternalRunState): StoryDirectorState {
   story.resolvedThreadIds ??= [];
   story.factionTension ??= {};
   story.committedDirectionIds ??= [];
+  story.foregroundExperienceId ??= story.activeDirectionId;
+  story.closureExperienceId ??= undefined;
   story.blockedFlags ??= [];
   story.factLedger = normalizeStoryFactLedger(story.factLedger);
   hydrateFactLedgerFromLegacyState(story, run.narrative);
@@ -445,12 +489,14 @@ function ensureStoryDirectorState(run: InternalRunState): StoryDirectorState {
   };
   story.mainlineCompleted = story.mainlineCompleted === true;
   story.mainlineCompletedAge = Number.isFinite(story.mainlineCompletedAge)
-    ? Math.max(0, Math.min(120, Number(story.mainlineCompletedAge)))
+    ? Math.max(0, Number(story.mainlineCompletedAge))
     : undefined;
   if (story.lastStoryPosition && !storyPositions.includes(story.lastStoryPosition)) {
     story.lastStoryPosition = undefined;
   }
-  story.closureEligible = isClosureEligible(story, run.narrative);
+  story.closureEligible = run.narrative.enabled
+    ? Boolean(story.mainlineCompleted)
+    : isClosureEligible(story, run.narrative);
   if (story.closureEligible && run.narrative.enabled && run.narrative.endingState === "open") {
     run.narrative.endingState = "eligible";
   }
@@ -557,7 +603,8 @@ function resolveAgeThresholds(world: WorldConfig): AgeThreshold[] {
 function resolveAgeStage(age: number, world: WorldConfig): AgeThreshold {
   const thresholds = resolveAgeThresholds(world);
   const found = thresholds.find((t) => age >= t.min && age <= t.max);
-  return found ?? thresholds[thresholds.length - 1];
+  const last = thresholds[thresholds.length - 1];
+  return found ?? { ...last, max: Number.MAX_SAFE_INTEGER };
 }
 
 export function resolveAgeStageByWorld(world: WorldConfig, age: number): AgeThreshold {
@@ -787,6 +834,103 @@ function applyChanges(stats: Stats, changes: Partial<Record<StatKey, number>>): 
   }
   next.physique = clamp(next.physique + (changes.physique ?? 0), 0, STAT_MAX);
   return next;
+}
+
+function attributeBandMagnitude(band: NarrativeAttributeEffect["band"]): number {
+  if (band === "heavy") return 3;
+  if (band === "medium") return 2;
+  return 1;
+}
+
+function isKnownStatKey(value: string): value is StatKey {
+  return allStatKeys.includes(value as StatKey);
+}
+
+function resolveNarrativeAttributeChanges(
+  run: InternalRunState,
+  world: WorldConfig,
+  effects: NarrativeAttributeEffect[],
+  mode: "background" | "decision",
+  decision?: DecisionType
+): Partial<Record<StatKey, number>> | null {
+  if (!Array.isArray(effects) || effects.length === 0) return {};
+  const unique = new Set<StatKey>();
+  const policy = decision ? run.pendingDirectedDecisionPolicy?.[decision] : undefined;
+  const maxEffects = mode === "background" ? 1 : 2;
+  if (effects.length > maxEffects) return null;
+  const changes: Partial<Record<StatKey, number>> = {};
+  for (const effect of effects) {
+    if (!effect || !isKnownStatKey(effect.stat) || unique.has(effect.stat)) return null;
+    if (effect.direction !== "up" && effect.direction !== "down") return null;
+    if (effect.band !== "light" && effect.band !== "medium" && effect.band !== "heavy") return null;
+    if (mode === "background" && effect.band === "heavy") return null;
+    if (policy && (!policy.allowedStats.includes(effect.stat) || (policy.maxBand === "medium" && effect.band === "heavy"))) {
+      return null;
+    }
+    unique.add(effect.stat);
+    const sign = effect.direction === "up" ? 1 : -1;
+    changes[effect.stat] = sign * attributeBandMagnitude(effect.band);
+  }
+  const stageCap = resolveStageDeltaCap(resolveAgeStage(run.age, world).id, run.tuningSnapshot);
+  return reduceNegativeChanges(run, clampYearlyChangesByStage(changes, stageCap));
+}
+
+export function approveNarrativeAttributeOutcome(
+  run: InternalRunState,
+  world: WorldConfig,
+  outcome: ApprovedNarrativeAttributeOutcome,
+  mode: "background" | "decision",
+  decision?: DecisionType
+): Partial<Record<StatKey, number>> | null {
+  return resolveNarrativeAttributeChanges(run, world, outcome.effects, mode, decision);
+}
+
+/** Applies one model-proposed outcome per background year after its narration is valid. */
+export function settleNarrativeBackgroundOutcomes(
+  run: InternalRunState,
+  world: WorldConfig,
+  outcomes: Array<{ age: number; effects: NarrativeAttributeEffect[] }>
+): boolean {
+  const byAge = new Map(outcomes.map((outcome) => [outcome.age, outcome]));
+  const pending = run.history.filter((event) => event.tags.includes("background_pending"));
+  if (pending.length === 0 || byAge.size !== pending.length || pending.some((event) => !byAge.has(event.age))) return false;
+  const finalAge = run.age;
+  for (const event of pending) {
+    run.age = event.age;
+    const outcome = byAge.get(event.age)!;
+    const changes = approveNarrativeAttributeOutcome(run, world, outcome, "background");
+    if (changes === null) return false;
+    const recentPositive = run.history
+      .filter((item) => item.tags.includes("model_background_effect"))
+      .slice(-2)
+      .filter((item) => Object.values(item.statChanges).some((value) => (value ?? 0) > 0))
+      .length;
+    const hasPositive = Object.values(changes).some((value) => (value ?? 0) > 0);
+    const applied = hasPositive && recentPositive >= 2 ? {} : changes;
+    event.statChanges = applied;
+    event.tags = event.tags.filter((tag) => tag !== "background_pending").concat("model_background_effect");
+    run.stats = applyChanges(run.stats, applied);
+    run.ageStage = resolveAgeStage(run.age, world);
+    run.fame = computeFameWithTuning(run.stats, run.tuningSnapshot);
+    updateNegativeStreaks(run);
+    const rng = seedrandom(`${run.seed}:background-model-resolve:${run.age}:${event.title}`);
+    const deathCheck = calcDeathRisk(run, world, 0);
+    const adjustedDeathRisk = reduceDeathRisk(run, deathCheck.risk);
+    if (adjustedDeathRisk > 0 && rng() < adjustedDeathRisk) {
+      const cause = deathCheck.cause ?? "意外灾祸";
+      if (!deferNarrativeCatastrophe(run, cause)) {
+        run.ended = true;
+        run.outcome = "dead";
+        run.deathCause = cause;
+        run.endingSummary = calcEnding(run);
+        break;
+      }
+    }
+  }
+  run.age = finalAge;
+  run.ageStage = resolveAgeStage(run.age, world);
+  run.fame = computeFameWithTuning(run.stats, run.tuningSnapshot);
+  return true;
 }
 
 function generateMilestoneChoice(age: number, seedEvent: string, tuning: GameplayTuning): MilestoneChoice {
@@ -1113,7 +1257,12 @@ export function createRun(ctx: EngineContext, req: StartRunRequest): InternalRun
     stats = applyChanges(stats, card.modifiers);
   }
 
-  const endAge = randomInt(rng, ctx.world.endAgeRange.min, ctx.world.endAgeRange.max);
+  // Narrative worlds end only through the approved story closure. Keep the
+  // legacy random end age for non-directed worlds without leaving a latent
+  // calendar stop in the narrative runtime.
+  const endAge = ctx.narrativeEnabled
+    ? Number.MAX_SAFE_INTEGER
+    : randomInt(rng, ctx.world.endAgeRange.min, ctx.world.endAgeRange.max);
 
   return {
     runId: `run_${seed}`,
@@ -1419,6 +1568,16 @@ function resolveDirectorTurnKind(run: InternalRunState, world: WorldConfig): "no
     : "normal";
 }
 
+function shouldHoldSceneAge(run: InternalRunState): boolean {
+  const clock = run.narrative.sceneClock;
+  return Boolean(
+    run.narrative.enabled &&
+    run.narrative.activeScene &&
+    clock.mode === "hold" &&
+    clock.sameAgeTurnCount < clock.maxSameAgeTurns
+  );
+}
+
 function eventStatsForProfile(profileId: string): [StatKey, StatKey] {
   const profiles: Record<string, [StatKey, StatKey]> = {
     guardian: ["charisma", "physique"],
@@ -1436,6 +1595,14 @@ function eventStatsForDefinition(definition: EventDefinition): [StatKey, StatKey
     return [definition.primaryStat, definition.secondaryStat];
   }
   return eventStatsForProfile(definition.outcomeProfileId);
+}
+
+export function getDirectedEventAttributePolicy(definition: EventDefinition): {
+  allowedStats: StatKey[];
+  allowedBands: NarrativeAttributeEffect["band"][];
+} {
+  const [primary, secondary] = eventStatsForDefinition(definition);
+  return { allowedStats: [primary, secondary], allowedBands: ["light", "medium"] };
 }
 
 function candidateWeight(run: InternalRunState, definition: EventDefinition): number {
@@ -1456,6 +1623,12 @@ function candidateWeight(run: InternalRunState, definition: EventDefinition): nu
   }
   if (run.story.activeFocusTag && definition.focusTags?.includes(run.story.activeFocusTag)) {
     weight += 2;
+  }
+  // maxAge is a source-material preference. Do not turn an older protagonist
+  // into an empty event pool merely because a concrete incident was written
+  // for an earlier life stage.
+  if (definition.maxAge !== undefined && run.age + 1 > definition.maxAge) {
+    weight -= Math.min(6, Math.ceil((run.age + 1 - definition.maxAge) / 8));
   }
   return weight;
 }
@@ -1508,7 +1681,16 @@ function buildDirectedDecisionEffects(definition: EventDefinition): Record<Decis
   };
 }
 
-function buildDirectedMilestoneChoice(
+function buildDirectedDecisionPolicy(definition: EventDefinition): Record<DecisionType, PendingDirectedDecisionPolicy> {
+  const [primary, secondary] = eventStatsForDefinition(definition);
+  return {
+    safe: { allowedStats: [primary, secondary], maxBand: "medium" },
+    balanced: { allowedStats: [primary, secondary], maxBand: "medium" },
+    risky: { allowedStats: [primary, secondary], maxBand: "heavy" }
+  };
+}
+
+export function createDirectedMilestoneChoice(
   age: number,
   definition: EventDefinition,
   tuning: GameplayTuning
@@ -1542,6 +1724,26 @@ function buildDirectedMilestoneChoice(
   return base;
 }
 
+export function applyDirectedMilestonePresentation(
+  run: InternalRunState,
+  presentation: DirectedMilestonePresentation | undefined
+): void {
+  const choice = run.nextMilestoneChoice;
+  if (!choice || !presentation) return;
+  const background = presentation.background.trim();
+  if (background) choice.background = background;
+  const overrides = new Map(presentation.optionOverrides.map((option) => [option.id, option]));
+  choice.options = choice.options.map((option) => {
+    const override = overrides.get(option.id);
+    if (!override) return option;
+    return {
+      ...option,
+      label: override.label.trim() || option.label,
+      description: override.description.trim() || option.description
+    };
+  });
+}
+
 function fallbackEventDefinition(
   world: WorldConfig,
   age: number,
@@ -1555,7 +1757,6 @@ function fallbackEventDefinition(
     kind: "normal",
     tags: ["ordinary", "fortune"],
     minAge: 0,
-    maxAge: 120,
     cooldownYears: 0,
     baseWeight: 1,
     outcomeProfileId: "ordinary",
@@ -1573,7 +1774,6 @@ function narrativeClosureEventDefinition(run: InternalRunState, world: WorldConf
     kind: "normal",
     tags: ["narrative_closure"],
     minAge: run.age + 1,
-    maxAge: run.age + 1,
     cooldownYears: 0,
     baseWeight: 100,
     outcomeProfileId: "ordinary",
@@ -1585,6 +1785,172 @@ function narrativeClosureEventDefinition(run: InternalRunState, world: WorldConf
   };
 }
 
+function storyPositionForNarrativeBeat(beat: NonNullable<EventDefinition["narrativeBeat"]>): EventDefinition["storyPosition"] {
+  if (beat === "setup") return "origin";
+  if (beat === "escalation") return "accumulation";
+  if (beat === "pressure") return "pressure";
+  if (beat === "climax") return "turn";
+  if (beat === "payoff" || beat === "ending") return "resolution";
+  return undefined;
+}
+
+/**
+ * Build a legal scene from a world-owned archetype only when the concrete
+ * event material for the required beat is exhausted. The generated definition
+ * still uses the same thread, fact ledger and stage gates as normal material.
+ */
+function buildNarrativeArchetypeCandidates(
+  run: InternalRunState,
+  world: WorldConfig,
+  narrativeWorld: NarrativeWorldDefinition,
+  nextAge: number,
+  beat: NonNullable<EventDefinition["narrativeBeat"]>
+): EventDefinition[] {
+  const archetypes = (narrativeWorld.sceneArchetypes ?? []).filter((archetype) => archetype.beats.includes(beat));
+  if (archetypes.length === 0) return [];
+
+  const activeScene = run.narrative.activeScene;
+  const experiences = activeScene
+    ? (() => {
+        const thread = narrativeWorld.threads.find((item) => item.id === activeScene.threadId);
+        const directionId = thread?.directionIds[0] ?? run.story.foregroundExperienceId ?? run.story.activeDirectionId;
+        return directionId ? [{ directionId, threadId: activeScene.threadId }] : [];
+      })()
+    : narrativeWorld.routeArcs
+      .map((route) => ({ directionId: route.directionId, threadId: route.coreThreadIds[0] }))
+      .filter((experience): experience is { directionId: string; threadId: string } => Boolean(experience.threadId))
+      .filter((experience) => {
+        const thread = run.narrative.threads.find((item) => item.id === experience.threadId);
+        return (!thread || thread.status === "resolved") && isNarrativeStageReady(
+          narrativePromptSourceForRun(run),
+          narrativeWorld,
+          "opening",
+          experience.directionId
+        );
+      });
+  const mainlineFacts = narrativeWorld.mainlineFacts ?? [];
+  const introducedFactCount = beat === "setup" || beat === "escalation"
+    ? 1
+    : beat === "pressure"
+      ? 2
+      : beat === "climax"
+        ? 3
+        : 0;
+
+  return experiences.flatMap(({ directionId, threadId }) => archetypes.map((archetype) => {
+    const thread = narrativeWorld.threads.find((item) => item.id === threadId);
+    const introducedMainlineFacts = mainlineFacts.slice(0, introducedFactCount).map((fact) => ({
+      id: fact.id,
+      kind: fact.kind,
+      label: fact.label,
+      priority: fact.priority ?? 3
+    }));
+    const opensThread = beat === "setup";
+    const resolvesThread = beat === "payoff";
+    const threadFact: StoryFactDefinition | undefined = opensThread
+      ? {
+          id: `thread:${threadId}`,
+          kind: "open_question",
+          label: thread?.label ?? "一条需要继续面对的旧事",
+          priority: 2,
+          threadId,
+          routeIds: [directionId]
+        }
+      : undefined;
+    return {
+      id: `${world.id}_archetype_${archetype.id}_${directionId.replace(/[^a-z0-9]+/gi, "_")}_${nextAge}`,
+      worldId: world.id,
+      factionId: directionId.split(".")[1],
+      title: archetype.label,
+      kind: beat === "setup" || beat === "pressure" || beat === "climax" ? "milestone" : "normal",
+      tags: Array.from(new Set(["narrative_archetype", ...(archetype.focusTags ?? [])])),
+      minAge: 0,
+      cooldownYears: 0,
+      baseWeight: archetype.baseWeight ?? 10,
+      outcomeProfileId: archetype.outcomeProfileId ?? directionId.split(".")[1] ?? "ordinary",
+      storyPosition: storyPositionForNarrativeBeat(beat),
+      storyDirectionIds: [directionId],
+      narrativeThreadIds: [threadId],
+      opensThreads: opensThread ? [threadId] : undefined,
+      resolvesThreads: resolvesThread ? [threadId] : undefined,
+      narrativeBeat: beat,
+      sceneArchetypeId: archetype.id,
+      factEffect: {
+        introduce: [...(threadFact ? [threadFact] : []), ...introducedMainlineFacts],
+        modifyFactIds: [
+          ...(beat !== "setup" && beat !== "payoff" ? [`thread:${threadId}`] : []),
+          ...(beat === "payoff" ? mainlineFacts.map((fact) => fact.id) : [])
+        ],
+        resolveFactIds: resolvesThread ? [`thread:${threadId}`] : undefined
+      },
+      reclaimableFactIds: resolvesThread ? [`thread:${threadId}`] : undefined,
+      promptHook: `${archetype.description} ${thread?.premise ?? ""}`.trim()
+    };
+  }));
+}
+
+function narrativeRouteIdsForDefinition(
+  definition: EventDefinition,
+  narrativeWorld?: NarrativeWorldDefinition | null
+): string[] {
+  const configuredRoutes = new Set((narrativeWorld?.routeArcs ?? []).map((route) => route.directionId));
+  return Array.from(new Set(definition.storyDirectionIds ?? [])).filter((routeId) => (
+    configuredRoutes.size === 0 || configuredRoutes.has(routeId)
+  ));
+}
+
+function desiredNarrativeBeatsForRoute(
+  run: InternalRunState,
+  routeId: string,
+  narrativeWorld?: NarrativeWorldDefinition | null,
+  legacyThreadIds: readonly string[] = []
+): Array<NonNullable<EventDefinition["narrativeBeat"]>> {
+  const localProgress = getNarrativeRouteProgress(run.narrative, routeId);
+  // Existing saves from the single-scene implementation have no routeProgress
+  // yet. Read that scene only when its actual thread matches this route's
+  // source material; never use it to block another route.
+  const phase = localProgress?.phase ?? (
+    run.narrative.activeScene && legacyThreadIds.includes(run.narrative.activeScene.threadId)
+      ? run.narrative.activeScene.phase
+      : undefined
+  );
+  if (!phase) return ["setup"];
+  if (phase === "setup") return ["escalation"];
+  if (phase === "escalation") {
+    return isNarrativeWorldStageReady(narrativePromptSourceForRun(run), narrativeWorld, "pressure")
+      ? ["pressure"]
+      : ["escalation"];
+  }
+  if (phase === "pressure") {
+    return isNarrativeWorldStageReady(narrativePromptSourceForRun(run), narrativeWorld, "climax")
+      ? ["climax"]
+      : ["pressure"];
+  }
+  return ["payoff"];
+}
+
+function isNarrativeRouteEventEligible(
+  run: InternalRunState,
+  definition: EventDefinition,
+  routeId: string,
+  narrativeWorld?: NarrativeWorldDefinition | null
+): boolean {
+  const beat = definition.narrativeBeat;
+  if (!beat || beat === "ending") return false;
+  if (!narrativeRouteIdsForDefinition(definition, narrativeWorld).includes(routeId)) return false;
+  if (run.story.closureState === "guiding") return beat === "payoff";
+  if (beat === "setup" && !isNarrativeMainlineActEntryReady(
+    narrativePromptSourceForRun(run),
+    narrativeWorld
+  )) return false;
+  return desiredNarrativeBeatsForRoute(
+    run,
+    routeId,
+    narrativeWorld,
+    definition.narrativeThreadIds ?? []
+  ).includes(beat);
+}
+
 function isDirectedStoryPositionEligible(
   run: InternalRunState,
   definition: EventDefinition,
@@ -1592,48 +1958,12 @@ function isDirectedStoryPositionEligible(
 ): boolean {
   if (run.narrative.enabled && definition.narrativeBeat) {
     const beat = definition.narrativeBeat;
-    const activeScene = run.narrative.activeScene;
-    const activeDirection = run.story.activeDirectionId;
-    const belongsToActiveDirection = !activeDirection || !definition.storyDirectionIds?.length || definition.storyDirectionIds.includes(activeDirection);
-    const threadIds = Array.from(new Set([
-      ...(definition.narrativeThreadIds ?? []),
-      ...(definition.opensThreads ?? []),
-      ...(definition.resolvesThreads ?? [])
-    ]));
-    const targetThreads = threadIds
-      .map((id) => run.narrative.threads.find((thread) => thread.id === id))
-      .filter((thread): thread is NarrativeThreadState => Boolean(thread));
     if (run.story.closureState === "guiding") {
-      return (beat === "payoff" || beat === "ending") && targetThreads.some((thread) => thread.status === "climax");
+      return beat === "ending" || narrativeRouteIdsForDefinition(definition, narrativeWorld)
+        .some((routeId) => desiredNarrativeBeatsForRoute(run, routeId, narrativeWorld).includes("payoff"));
     }
-    if (activeScene) {
-      const expectedBeat = desiredNarrativeBeats(run, "continue", narrativeWorld)[0];
-      if (
-        beat !== expectedBeat ||
-        !threadIds.includes(activeScene.threadId)
-      ) return false;
-    }
-    if (!belongsToActiveDirection && (run.narrative.activeScene || definition.kind !== "milestone")) return false;
-    if (!activeDirection && definition.kind !== "milestone" && beat !== "setup") return false;
-    if (beat === "setup") {
-      if (!isNarrativeStageReady(
-        narrativePromptSourceForRun(run),
-        narrativeWorld,
-        "opening",
-        definition.storyDirectionIds?.[0]
-      )) return false;
-      // A resolved thread may seed a later conflict after its event cooldown.
-      // This preserves a continuing life narrative without reopening a live scene.
-      return threadIds.length > 0 && (
-        targetThreads.length === 0 || targetThreads.every((thread) => thread.status === "resolved")
-      );
-    }
-    if (beat === "escalation" || beat === "pressure") {
-      return targetThreads.some((thread) => thread.status === "seeded" || thread.status === "escalating");
-    }
-    if (beat === "climax") return targetThreads.some((thread) => thread.status === "escalating");
-    if (beat === "payoff") return targetThreads.some((thread) => thread.status === "climax");
-    return false;
+    return narrativeRouteIdsForDefinition(definition, narrativeWorld)
+      .some((routeId) => isNarrativeRouteEventEligible(run, definition, routeId, narrativeWorld));
   }
   const position = definition.storyPosition;
   if (!position) return true;
@@ -1654,15 +1984,61 @@ function hasDirectedEventPrerequisites(run: InternalRunState, definition: EventD
   const flags = new Set(run.story.flags);
   const blockedFlags = new Set(run.story.blockedFlags);
   if (!(definition.requiresFlags ?? []).every((flag) => flags.has(flag) && !blockedFlags.has(flag))) return false;
-  if (!(definition.requiresFactIds ?? []).every((factId) => hasOpenFact(run.story, factId))) return false;
-  if ((definition.reclaimableFactIds ?? []).some((factId) => !hasOpenFact(run.story, factId))) return false;
-  if ((definition.modifiesFactIds ?? []).some((factId) => !hasEstablishedFact(run.story, factId))) return false;
+  const routeFact = (factId: string) => run.narrative.enabled && Boolean(definition.narrativeBeat) && factId.startsWith("thread:");
+  if (!(definition.requiresFactIds ?? []).filter((factId) => !routeFact(factId)).every((factId) => hasOpenFact(run.story, factId))) return false;
+  if ((definition.reclaimableFactIds ?? []).filter((factId) => !routeFact(factId)).some((factId) => !hasOpenFact(run.story, factId))) return false;
+  if ((definition.modifiesFactIds ?? []).filter((factId) => !routeFact(factId)).some((factId) => !hasEstablishedFact(run.story, factId))) return false;
+  if (run.narrative.enabled && definition.narrativeBeat) return true;
   if (!definition.followUpIds?.length) return true;
   return definition.followUpIds.some((eventId) => run.story.seenEventIds.includes(eventId));
 }
 
 function focusTagForCandidate(candidate: DirectedEventCandidate): string {
   return candidate.definition.focusTags?.[0]?.trim() || candidate.definition.outcomeProfileId || "ordinary";
+}
+
+function materializeDirectedCandidates(
+  run: InternalRunState,
+  difficulty: DifficultyConfig,
+  definitions: EventDefinition[],
+  items: ItemDefinition[],
+  defaultKind: "normal" | "milestone"
+): DirectedEventCandidate[] {
+  const nextAge = run.age + (shouldHoldSceneAge(run) ? 0 : 1);
+  const ranked = definitions
+    .map((definition) => ({
+      definition,
+      score: candidateWeight(run, definition),
+      tie: seedrandom(`${run.seed}:candidate:${nextAge}:${definition.id}`)()
+    }))
+    .sort((a, b) => b.score - a.score || b.tie - a.tie || a.definition.id.localeCompare(b.definition.id))
+    .slice(0, DIRECTOR_EVENT_POOL_SIZE);
+
+  return ranked.map(({ definition, score }) => {
+    const candidateKind: "normal" | "milestone" = definition.kind === "milestone" ? "milestone" : defaultKind;
+    const rng = seedrandom(`${run.seed}:event-preview:${nextAge}:${definition.id}`);
+    const [primary, secondary] = eventStatsForDefinition(definition);
+    const rewardBonus = collectPassiveEffects(run)
+      .filter((effect) => effect.type === "reward_bonus")
+      .reduce((sum, effect) => sum + Math.max(0, effect.amount ?? 0), 0);
+    const positive = rng() < clamp(0.56 + difficulty.growthBias + rewardBonus, 0.2, 0.82);
+    const magnitude = candidateKind === "milestone" ? 2 : 1;
+    const statChanges = definition.narrativeBeat === "ending" || candidateKind === "milestone" || run.narrative.enabled
+      ? {}
+      : positive
+        ? { [primary]: magnitude, [secondary]: 1 }
+        : { [primary]: -magnitude, [secondary]: -1 };
+    return {
+      definition,
+      kind: candidateKind,
+      score,
+      preview: {
+        statChanges,
+        item: positive ? pickItemReward(run, definition, items, rng) : undefined,
+        decisionEffects: candidateKind === "milestone" ? buildDirectedDecisionEffects(definition) : undefined
+      }
+    };
+  });
 }
 
 export function buildDirectedEventCandidates(
@@ -1681,49 +2057,55 @@ export function buildDirectedEventCandidates(
   if (run.narrative.enabled && run.story.mainlineCompleted && run.story.closureState === "open") {
     return [];
   }
-  const nextAge = run.age + 1;
+  const nextAge = run.age + (shouldHoldSceneAge(run) ? 0 : 1);
+  const narrativeEnabled = run.narrative.enabled;
   let kind = resolveDirectorTurnKind(run, world);
   let forcedOpeningScene = false;
   let forcedSceneMilestone = false;
-  const activeSceneBeat = run.narrative.activeScene
+  const activeSceneBeat = !narrativeEnabled && run.narrative.activeScene
     ? desiredNarrativeBeats(run, "continue", narrativeWorld)[0]
     : undefined;
-  if (activeSceneBeat) {
-    // Scene milestones happen at the irreversible choice, not by an unrelated
-    // yearly roll. The ordinary beats remain engine-driven passages.
-    kind = activeSceneBeat === "pressure" || activeSceneBeat === "climax" ? "milestone" : "normal";
-    forcedSceneMilestone = activeSceneBeat === "pressure" || activeSceneBeat === "climax";
+  if (!narrativeEnabled && run.narrative.activeScene) {
+    // The legacy path still uses one active scene. Narrative mode projects the
+    // most recently selected route for presentation only; it is not a global
+    // eligibility gate.
+    const entersDecisionBeat = (
+      (activeSceneBeat === "pressure" && run.narrative.activeScene?.phase === "escalation") ||
+      (activeSceneBeat === "climax" && run.narrative.activeScene?.phase === "pressure")
+    );
+    kind = entersDecisionBeat ? "milestone" : "normal";
+    forcedSceneMilestone = entersDecisionBeat;
   }
-  if (run.narrative.enabled && !run.narrative.activeScene) {
+  if (!narrativeEnabled && !run.narrative.activeScene) {
     const canOpenScene = definitions.some((definition) => (
       definition.worldId === world.id &&
       definition.narrativeBeat === "setup" &&
-      nextAge >= definition.minAge &&
-      nextAge <= definition.maxAge &&
       hasDirectedEventPrerequisites(run, definition) &&
       isDirectedStoryPositionEligible(run, definition, narrativeWorld)
     ));
     if (canOpenScene) {
-      kind = "milestone";
+      // The first trace of a world conflict is lived as an ordinary year. A
+      // player decision begins only after the scene has developed pressure.
+      kind = "normal";
       forcedOpeningScene = true;
     }
   }
   const eligible = definitions.filter((definition) => {
     if (definition.worldId !== world.id) return false;
-    if (nextAge < definition.minAge || nextAge > definition.maxAge) return false;
-    if (
+    if (!narrativeEnabled && (
       definition.kind !== "any" &&
       definition.kind !== kind &&
       !(forcedOpeningScene && definition.narrativeBeat === "setup") &&
       !(forcedSceneMilestone && (definition.narrativeBeat === "pressure" || definition.narrativeBeat === "climax")) &&
       !(activeSceneBeat && definition.narrativeBeat === activeSceneBeat)
-    ) return false;
+    )) return false;
     const availableAt = run.story.cooldowns[definition.id] ?? 0;
     if (availableAt > nextAge) return false;
     if (!hasDirectedEventPrerequisites(run, definition)) return false;
     return isDirectedStoryPositionEligible(run, definition, narrativeWorld);
   });
-  const resolutionCandidates = eligible.filter((definition) => definition.storyPosition === "resolution");
+  const legalCandidates = eligible;
+  const resolutionCandidates = legalCandidates.filter((definition) => definition.storyPosition === "resolution");
   // Eligibility authorizes a model request only. The terminal scene exists
   // exclusively after that request has been approved into the guiding state.
   const shouldBuildClosureScene = run.narrative.enabled && !run.narrative.activeScene &&
@@ -1732,40 +2114,71 @@ export function buildDirectedEventCandidates(
     ? [narrativeClosureEventDefinition(run, world)]
     : run.story.closureState === "guiding" && resolutionCandidates.length > 0
       ? resolutionCandidates
-      : eligible.length > 0
-        ? eligible
-        : [fallbackEventDefinition(world, nextAge, storyDirections)];
-  const candidateKind: "normal" | "milestone" = !shouldBuildClosureScene && eligible.length > 0 ? kind : "normal";
-  const ranked = source
-    .map((definition) => ({
+      : legalCandidates.length > 0
+        ? legalCandidates
+        : run.narrative.enabled
+          ? []
+          : [fallbackEventDefinition(world, nextAge, storyDirections)];
+  const candidateKind: "normal" | "milestone" = !shouldBuildClosureScene && legalCandidates.length > 0 ? kind : "normal";
+  const routedSource: Array<{
+    definition: EventDefinition;
+    routeId?: string;
+    kind: "normal" | "milestone";
+  }> = [];
+  for (const definition of source) {
+    if (!narrativeEnabled || !definition.narrativeBeat || definition.narrativeBeat === "ending") {
+      routedSource.push({ definition, kind: candidateKind });
+      continue;
+    }
+    for (const routeId of narrativeRouteIdsForDefinition(definition, narrativeWorld)) {
+      if (!isNarrativeRouteEventEligible(run, definition, routeId, narrativeWorld)) continue;
+      const progress = getNarrativeRouteProgress(run.narrative, routeId);
+      const entersDecisionBeat = (
+        (definition.narrativeBeat === "pressure" && progress?.phase === "escalation") ||
+        (definition.narrativeBeat === "climax" && progress?.phase === "pressure")
+      );
+      routedSource.push({
+        definition,
+        routeId,
+        kind: entersDecisionBeat ? "milestone" : "normal"
+      });
+    }
+  }
+  const ranked = routedSource
+    .map(({ definition, routeId, kind: routeKind }) => ({
       definition,
+      routeId,
+      kind: routeKind,
       score: candidateWeight(run, definition),
-      tie: seedrandom(`${run.seed}:candidate:${nextAge}:${definition.id}`)()
+      tie: seedrandom(`${run.seed}:candidate:${nextAge}:${routeId ?? "legacy"}:${definition.id}`)()
     }))
     .sort((a, b) => b.score - a.score || b.tie - a.tie || a.definition.id.localeCompare(b.definition.id))
-    .slice(0, DIRECTOR_EVENT_POOL_SIZE);
+    // The model chooses a route after this pool is built. Truncating globally
+    // here can silently erase a legal route before the model ever sees it.
+    // Focus projections still apply their own small limits.
 
-  return ranked.map(({ definition, score }) => {
+  return ranked.map(({ definition, routeId, kind: routeKind, score }) => {
     const rng = seedrandom(`${run.seed}:event-preview:${nextAge}:${definition.id}`);
     const [primary, secondary] = eventStatsForDefinition(definition);
     const rewardBonus = collectPassiveEffects(run)
       .filter((effect) => effect.type === "reward_bonus")
       .reduce((sum, effect) => sum + Math.max(0, effect.amount ?? 0), 0);
     const positive = rng() < clamp(0.56 + difficulty.growthBias + rewardBonus, 0.2, 0.82);
-    const magnitude = candidateKind === "milestone" ? 2 : 1;
-    const statChanges = definition.narrativeBeat === "ending"
+    const magnitude = routeKind === "milestone" ? 2 : 1;
+    const statChanges = definition.narrativeBeat === "ending" || routeKind === "milestone" || narrativeEnabled
       ? {}
       : positive
       ? { [primary]: magnitude, [secondary]: 1 }
       : { [primary]: -magnitude, [secondary]: -1 };
     return {
       definition,
-      kind: candidateKind,
+      routeId,
+      kind: routeKind,
       score,
       preview: {
         statChanges,
         item: positive ? pickItemReward(run, definition, items, rng) : undefined,
-        decisionEffects: candidateKind === "milestone" ? buildDirectedDecisionEffects(definition) : undefined
+        decisionEffects: routeKind === "milestone" ? buildDirectedDecisionEffects(definition) : undefined
       }
     };
   });
@@ -1816,6 +2229,7 @@ function candidateSupportsStoryDirection(
   candidate: DirectedEventCandidate,
   direction: StoryDirectionDefinition
 ): boolean {
+  if (candidate.routeId) return candidate.routeId === direction.id;
   if (candidate.definition.storyDirectionIds?.includes(direction.id)) return true;
   const candidateTags = new Set([
     ...candidate.definition.tags,
@@ -1880,12 +2294,12 @@ function desiredNarrativeBeats(
   // next legal beat, but may not jump ahead and abandon its current conflict.
   if (phase === "setup") return ["escalation"];
   if (phase === "escalation") {
-    return isNarrativeStageReady(narrativePromptSourceForRun(run), narrativeWorld, "pressure")
+    return isNarrativeWorldStageReady(narrativePromptSourceForRun(run), narrativeWorld, "pressure")
       ? ["pressure"]
       : ["escalation"];
   }
   if (phase === "pressure") {
-    return isNarrativeStageReady(narrativePromptSourceForRun(run), narrativeWorld, "climax")
+    return isNarrativeWorldStageReady(narrativePromptSourceForRun(run), narrativeWorld, "climax")
       ? ["climax"]
       : ["pressure"];
   }
@@ -1897,6 +2311,12 @@ export function buildDirectedNarrativeIntents(
   candidates: DirectedEventCandidate[],
   narrativeWorld?: NarrativeWorldDefinition | null
 ): NarrativeIntent[] {
+  if (run.narrative.enabled) {
+    // Intent remains part of the existing tool contract, but route-local
+    // progress decides the permitted beat. Do not turn it into a second
+    // global state machine that can contradict the selected route.
+    return candidates.length > 0 ? ["continue", "pressure", "payoff"] : ["continue"];
+  }
   if (run.narrative.activeScene) {
     return ["continue"];
   }
@@ -1978,24 +2398,66 @@ export function buildDirectedNarrativeComponentFocuses(
     .map(({ status: _status, priority: _priority, lastTouchedAge: _lastTouchedAge, ...focus }) => focus);
 }
 
+/** Only expose scene categories that the engine can realize this turn. */
+export function buildDirectedSceneArchetypeOptions(
+  candidates: DirectedEventCandidate[],
+  narrativeWorld?: NarrativeWorldDefinition | null
+): DirectedSceneArchetypeOption[] {
+  const definitions = new Map((narrativeWorld?.sceneArchetypes ?? []).map((item) => [item.id, item]));
+  const counts = new Map<string, number>();
+  for (const candidate of candidates) {
+    const id = candidate.definition.sceneArchetypeId;
+    if (!id || !definitions.has(id)) continue;
+    counts.set(id, (counts.get(id) ?? 0) + 1);
+  }
+  return Array.from(counts.entries())
+    .map(([id, candidateCount]) => {
+      const definition = definitions.get(id)!;
+      return { id, label: definition.label, description: definition.description, candidateCount };
+    })
+    .sort((a, b) => b.candidateCount - a.candidateCount || a.id.localeCompare(b.id))
+    .slice(0, DIRECTOR_FOCUS_OPTION_LIMIT);
+}
+
 export function selectDirectedCandidateForIntent(
   run: InternalRunState,
   candidates: DirectedEventCandidate[],
   intent: NarrativeIntent,
   focusComponentId?: string,
-  narrativeWorld?: NarrativeWorldDefinition | null
+  sceneArchetypeId?: string,
+  narrativeWorld?: NarrativeWorldDefinition | null,
+  routeId?: string
 ): DirectedEventCandidate | undefined {
-  const desired = new Set(desiredNarrativeBeats(
-    run,
-    run.narrative.activeScene ? "continue" : intent,
-    narrativeWorld
-  ));
-  const scoped = candidates.filter((candidate) => desired.has(candidate.definition.narrativeBeat ?? "setup"));
-  const basePool = scoped.length > 0 ? scoped : candidates;
-  const focused = focusComponentId
-    ? basePool.filter((candidate) => candidateAdvancesNarrativeComponent(run, candidate, focusComponentId))
+  const routeCandidates = routeId
+    ? candidates.filter((candidate) => candidate.routeId
+      ? candidate.routeId === routeId
+      : candidate.definition.storyDirectionIds?.includes(routeId))
+    : candidates;
+  const scoped = routeId && run.narrative.enabled
+    ? routeCandidates.filter((candidate) => desiredNarrativeBeatsForRoute(
+      run,
+      routeId,
+      narrativeWorld,
+      candidate.definition.narrativeThreadIds ?? []
+    ).includes(candidate.definition.narrativeBeat ?? "setup"))
+    : routeCandidates.filter((candidate) => new Set(desiredNarrativeBeats(
+      run,
+      run.narrative.activeScene ? "continue" : intent,
+      narrativeWorld
+    )).has(candidate.definition.narrativeBeat ?? "setup"));
+  // A missing beat must not silently jump to another causal beat or route.
+  // The same candidate pool is also used to decide whether background years
+  // should advance, so this exposes data/state inconsistencies before a model
+  // request can produce an empty turn.
+  const basePool = scoped;
+  const archetypeScoped = sceneArchetypeId
+    ? basePool.filter((candidate) => candidate.definition.sceneArchetypeId === sceneArchetypeId)
     : [];
-  const pool = focused.length > 0 ? focused : basePool;
+  const archetypePool = archetypeScoped.length > 0 ? archetypeScoped : basePool;
+  const focused = focusComponentId
+    ? archetypePool.filter((candidate) => candidateAdvancesNarrativeComponent(run, candidate, focusComponentId))
+    : [];
+  const pool = focused.length > 0 ? focused : archetypePool;
   if (pool.length === 0) return undefined;
   const totalWeight = pool.reduce((sum, candidate) => sum + Math.max(1, candidate.score), 0);
   const rng = seedrandom(`${run.seed}:narrative-intent:${run.age + 1}:${intent}:${run.history.length}`);
@@ -2050,6 +2512,7 @@ function applyStoryDirection(
     ]));
     story.openThreads = Array.from(new Set([...story.openThreads, ...direction.openingThreadIds])).slice(-8);
   }
+  story.foregroundExperienceId = direction.id;
   story.activeDirectionId = direction.id;
   story.committedDirectionIds = [
     ...story.committedDirectionIds.filter((id) => id !== direction.id),
@@ -2057,17 +2520,122 @@ function applyStoryDirection(
   ].slice(-12);
   story.lastDirectionCommitAge = run.age;
   story.openThreads = Array.from(new Set([...story.openThreads, ...direction.openingThreadIds])).slice(-8);
-  story.closureEligible = isClosureEligible(story, run.narrative);
+  story.closureEligible = run.narrative.enabled ? Boolean(story.mainlineCompleted) : isClosureEligible(story, run.narrative);
+}
+
+/**
+ * Keep a route-selection history without treating any selected route as an
+ * exclusive branch. The first selection only anchors legacy ending metadata;
+ * subsequent selections remain equally available.
+ */
+function recordNarrativeRouteSelection(
+  run: InternalRunState,
+  routeId: string,
+  narrativeWorld?: NarrativeWorldDefinition | null
+): void {
+  const story = ensureStoryDirectorState(run);
+  const route = narrativeWorld?.routeArcs.find((item) => item.directionId === routeId);
+  if (!story.contract.initialDirectionId) {
+    story.contract.initialDirectionId = routeId;
+    story.contract.coreThreadIds = Array.from(new Set([
+      ...story.contract.coreThreadIds,
+      ...(route?.coreThreadIds ?? [])
+    ])).slice(-12);
+  }
+  story.foregroundExperienceId = routeId;
+  story.activeDirectionId = routeId;
+  story.committedDirectionIds = [
+    ...story.committedDirectionIds.filter((id) => id !== routeId),
+    routeId
+  ].slice(-12);
+  story.lastDirectionCommitAge = run.age;
+}
+
+function introduceMainlineActFacts(
+  story: StoryDirectorState,
+  act: NonNullable<NarrativeWorldDefinition["mainlineActs"]>[number],
+  narrativeWorld: NarrativeWorldDefinition | null | undefined,
+  age: number,
+  sourceEventId: string
+): void {
+  const factById = new Map((narrativeWorld?.mainlineFacts ?? []).map((fact) => [fact.id, fact]));
+  applyStoryFactEffect(story, {
+    introduce: (act.introduceFactIds ?? [])
+      .map((id) => factById.get(id))
+      .filter((fact): fact is NonNullable<typeof fact> => Boolean(fact))
+      .map((fact) => ({ id: fact.id, kind: fact.kind, label: fact.label, priority: fact.priority ?? 3 }))
+  }, age, sourceEventId);
+}
+
+function recordMainlineActPayoff(
+  run: InternalRunState,
+  act: NonNullable<NarrativeWorldDefinition["mainlineActs"]>[number],
+  mainlineActs: NonNullable<NarrativeWorldDefinition["mainlineActs"]>,
+  definition: EventDefinition,
+  experienceId: string | undefined,
+  story: StoryDirectorState
+): void {
+  const alreadyCompleted = run.narrative.completedScenes.some((scene) => scene.mainlineActId === act.id);
+  if (!alreadyCompleted) {
+    const activeScene = run.narrative.activeScene;
+    run.narrative.completedScenes = [
+      ...run.narrative.completedScenes,
+      {
+        id: `mainline:${act.id}:${definition.id}:${run.age}`,
+        experienceId,
+        threadId: activeScene?.threadId ?? definition.narrativeThreadIds?.[0] ?? experienceId ?? act.id,
+        mainlineActId: act.id,
+        openedAge: activeScene?.openedAge ?? run.age,
+        resolvedAge: run.age,
+        // The payoff event itself is an irreversible scene; its player choice
+        // is recorded separately by the existing milestone path.
+        decisionCount: Math.max(1, activeScene?.decisionCount ?? 0)
+      }
+    ].slice(-12);
+  }
+  run.narrative.lastResolvedSceneAge = run.age;
+  run.narrative.activeScene = undefined;
+  run.narrative.sceneClock = { ...run.narrative.sceneClock, mode: "advance", sameAgeTurnCount: 0 };
+  const actIndex = mainlineActs.findIndex((item) => item.id === act.id);
+  const nextAct = actIndex >= 0 ? mainlineActs[actIndex + 1] : undefined;
+  run.narrative.activeMainlineActId = nextAct?.id;
+  if (nextAct && experienceId) {
+    // A payoff advances the shared world act. Only the route that actually
+    // reached it begins a fresh local pass; every other route keeps its
+    // accumulated five-beat progress.
+    run.narrative = resetNarrativeRouteProgress(run.narrative, experienceId);
+  }
+  if (!nextAct && experienceId) {
+    story.closureExperienceId = experienceId;
+  }
 }
 
 function updateStoryAfterEvent(
   run: InternalRunState,
   candidate: DirectedEventCandidate,
   direction?: StoryDirectionDefinition,
-  narrativeWorld?: NarrativeWorldDefinition | null
+  narrativeWorld?: NarrativeWorldDefinition | null,
+  experienceIdOverride?: string,
+  completeMainlineAct = false
 ): void {
   const { definition } = candidate;
   const story = ensureStoryDirectorState(run);
+  const mainlineActs = narrativeWorld?.mainlineActs ?? [];
+  const isEndingEvent = definition.narrativeBeat === "ending";
+  let mainlineActId = isEndingEvent
+    ? undefined
+    : run.narrative.activeScene?.mainlineActId ?? run.narrative.activeMainlineActId;
+  if (!isEndingEvent && !mainlineActId && mainlineActs.length > 0) {
+    let actIndex = Math.min(run.narrative.completedScenes.length, mainlineActs.length - 1);
+    // A migrated or damaged save may have completed a scene without its prerequisite fact.
+    // Reopen the nearest compatible act instead of progressing into an unreachable one.
+    while (actIndex > 0 && (mainlineActs[actIndex].requiredFactIds ?? []).some((id) => !hasEstablishedFact(story, id))) {
+      actIndex -= 1;
+    }
+    mainlineActId = mainlineActs[actIndex]?.id;
+  }
+  const mainlineAct = mainlineActs.find((act) => act.id === mainlineActId);
+  if (mainlineActId) run.narrative.activeMainlineActId = mainlineActId;
   story.seenEventIds = [...story.seenEventIds.filter((id) => id !== definition.id), definition.id].slice(-24);
   if (definition.cooldownYears > 0) {
     story.cooldowns[definition.id] = run.age + definition.cooldownYears;
@@ -2100,6 +2668,10 @@ function updateStoryAfterEvent(
   if (definition.focusTags?.length) {
     story.activeFocusTag = definition.focusTags[0];
   }
+  // A director route is model-selected world data. It may differ from the
+  // event metadata used for balance, and must not be replaced by that metadata.
+  const eventExperienceId = candidate.routeId ?? experienceIdOverride ?? definition.storyDirectionIds?.[0];
+  if (eventExperienceId) recordNarrativeRouteSelection(run, eventExperienceId, narrativeWorld);
   if (direction) applyStoryDirection(run, direction, false);
   story.lastStoryPosition = definition.storyPosition;
   if (definition.storyPosition) {
@@ -2113,15 +2685,27 @@ function updateStoryAfterEvent(
     definition,
     run.age,
     narrativeWorld?.components,
-    story.flags
+    story.flags,
+    { mainlineActId, experienceId: eventExperienceId, routeId: eventExperienceId }
   );
   applyStoryFactEffect(story, definition.factEffect, run.age, definition.id);
   applyStoryFactEffect(story, {
     modifyFactIds: definition.modifiesFactIds,
     resolveFactIds: definition.reclaimableFactIds
   }, run.age, definition.id);
+  if (mainlineAct) {
+    // A world act starts from the first model-selected scene, not from a
+    // particular legacy setup event. This lets all routes remain open.
+    introduceMainlineActFacts(story, mainlineAct, narrativeWorld, run.age, definition.id);
+  }
+  if (completeMainlineAct && definition.narrativeBeat === "payoff" && mainlineAct) {
+    applyStoryFactEffect(story, {
+      resolveFactIds: mainlineAct.resolveFactIds
+    }, run.age, definition.id);
+    recordMainlineActPayoff(run, mainlineAct, mainlineActs, definition, eventExperienceId, story);
+  }
   refreshNarrativeMainlineCompletion(narrativePromptSourceForRun(run), narrativeWorld);
-  story.closureEligible = isClosureEligible(story, run.narrative);
+  story.closureEligible = run.narrative.enabled ? Boolean(story.mainlineCompleted) : isClosureEligible(story, run.narrative);
   if (story.closureEligible && run.narrative.enabled && run.narrative.endingState === "open") {
     run.narrative.endingState = "eligible";
   }
@@ -2248,17 +2832,31 @@ export function advanceWithDirectedEvent(
   narrative: string,
   storyDirection?: StoryDirectionDefinition,
   decisionDirections?: Record<DecisionType, StoryDirectionDefinition>,
-  narrativeWorld?: NarrativeWorldDefinition | null
+  narrativeWorld?: NarrativeWorldDefinition | null,
+  options?: {
+    attributeOutcome?: ApprovedNarrativeAttributeOutcome;
+    experienceId?: string;
+    sceneClockMode?: "advance" | "hold";
+    /** Only an actual payoff event may complete the current world act. */
+    completeMainlineAct?: boolean;
+  }
 ): { updated: InternalRunState; fromAge: number; toAge: number; chunk: YearEvent[] } {
   if (run.ended || run.nextMilestoneChoice) {
     return { updated: run, fromAge: run.age, toAge: run.age, chunk: [] };
   }
   const fromAge = run.age;
-  run.age += 1;
+  const heldAge = shouldHoldSceneAge(run);
+  if (!heldAge) run.age += 1;
   const tuning = run.tuningSnapshot ?? createDefaultGameplayTuning();
   const stage = resolveAgeStage(run.age, world);
   const stageCap = resolveStageDeltaCap(stage.id, tuning);
-  const changes = reduceNegativeChanges(run, clampYearlyChangesByStage(candidate.preview.statChanges, stageCap));
+  const modelChanges = options?.attributeOutcome
+    ? approveNarrativeAttributeOutcome(run, world, options.attributeOutcome, "background")
+    : undefined;
+  if (run.narrative.enabled && candidate.kind === "normal" && candidate.definition.narrativeBeat !== "ending" && !modelChanges) {
+    throw new Error("scene_outcome_required");
+  }
+  const changes = modelChanges ?? reduceNegativeChanges(run, clampYearlyChangesByStage(candidate.preview.statChanges, stageCap));
   const tone = classifyEventTone(changes, stageCap, tuning);
   run.stats = applyChanges(run.stats, changes);
   run.ageStage = stage;
@@ -2283,31 +2881,55 @@ export function advanceWithDirectedEvent(
     ]
   };
   run.history.push(event);
-  updateStoryAfterEvent(run, candidate, storyDirection, narrativeWorld);
+  updateStoryAfterEvent(
+    run,
+    candidate,
+    storyDirection,
+    narrativeWorld,
+    options?.experienceId,
+    options?.completeMainlineAct
+  );
+  if (candidate.definition.narrativeBeat === "setup" && options?.sceneClockMode) {
+    run.narrative.sceneClock = {
+      ...run.narrative.sceneClock,
+      mode: options.sceneClockMode,
+      sameAgeTurnCount: 0
+    };
+  }
+  if (heldAge && run.narrative.activeScene) {
+    run.narrative.sceneClock = {
+      ...run.narrative.sceneClock,
+      sameAgeTurnCount: run.narrative.sceneClock.sameAgeTurnCount + 1
+    };
+  }
 
-  const rng = seedrandom(`${run.seed}:director-resolve:${run.age}:${candidate.definition.id}`);
-  const deathCheck = calcDeathRisk(run, world, 0);
-  if (reduceDeathRisk(run, deathCheck.risk) > 0 && rng() < reduceDeathRisk(run, deathCheck.risk)) {
-    const cause = deathCheck.cause ?? "命运反噬";
-    if (!deferNarrativeCatastrophe(run, cause)) {
-      run.ended = true;
-      run.outcome = "dead";
-      run.deathCause = cause;
-      run.endingSummary = calcEnding(run);
+  if (!heldAge) {
+    const rng = seedrandom(`${run.seed}:director-resolve:${run.age}:${candidate.definition.id}`);
+    const deathCheck = calcDeathRisk(run, world, 0);
+    if (reduceDeathRisk(run, deathCheck.risk) > 0 && rng() < reduceDeathRisk(run, deathCheck.risk)) {
+      const cause = deathCheck.cause ?? "命运反噬";
+      if (!deferNarrativeCatastrophe(run, cause)) {
+        run.ended = true;
+        run.outcome = "dead";
+        run.deathCause = cause;
+        run.endingSummary = calcEnding(run);
+      }
+    } else {
+      run.ascension = maybeUnlockAscension(run, rng);
     }
-  } else {
-    run.ascension = maybeUnlockAscension(run, rng);
   }
 
   if (!run.ended && candidate.kind === "milestone") {
-    run.nextMilestoneChoice = buildDirectedMilestoneChoice(run.age, candidate.definition, tuning);
+    run.nextMilestoneChoice = createDirectedMilestoneChoice(run.age, candidate.definition, tuning);
     run.pendingDirectedDecisionEffects = candidate.preview.decisionEffects;
+    run.pendingDirectedDecisionPolicy = buildDirectedDecisionPolicy(candidate.definition);
     run.pendingDirectedDecisionDirections = decisionDirections;
     run.pendingDirectedDecisionFactEffects = candidate.definition.decisionFactEffects;
     run.yearsSinceLastMilestone = 0;
   } else if (!run.ended) {
     run.pendingDirectedDecisionDirections = undefined;
     run.pendingDirectedDecisionFactEffects = undefined;
+    run.pendingDirectedDecisionPolicy = undefined;
     run.yearsSinceLastMilestone += 1;
   }
   return { updated: run, fromAge, toAge: run.age, chunk: [event] };
@@ -2317,7 +2939,13 @@ export function autoAdvanceToCheckpoint(
   run: InternalRunState,
   world: WorldConfig,
   difficulty: DifficultyConfig,
-  options?: { milestoneEventPool?: string[]; targetYears?: number; maxTargetYears?: number; allowRandomMilestone?: boolean }
+  options?: {
+    milestoneEventPool?: string[];
+    targetYears?: number;
+    maxTargetYears?: number;
+    allowRandomMilestone?: boolean;
+    deferNarrativeAttributeEffects?: boolean;
+  }
 ): { updated: InternalRunState; fromAge: number; toAge: number; chunk: YearEvent[] } {
   if (run.ended || run.nextMilestoneChoice) {
     return { updated: run, fromAge: run.age, toAge: run.age, chunk: [] };
@@ -2340,7 +2968,9 @@ export function autoAdvanceToCheckpoint(
     const stageCap = resolveStageDeltaCap(currentStage.id, tuning);
 
     const special = rng() < tuning.pacing.specialYearChance;
-    const rawChanges = special
+    const rawChanges = options?.deferNarrativeAttributeEffects
+      ? {}
+      : special
       ? calcSpecialEventChanges(run.stats, difficulty, rng, tuning)
       : calcBaseGrowth(run.stats, difficulty, rng, tuning);
     const changes = reduceNegativeChanges(run, clampYearlyChangesByStage(rawChanges, stageCap));
@@ -2348,10 +2978,12 @@ export function autoAdvanceToCheckpoint(
     const deltaTags = buildDeltaBinTags(changes, stageCap, tuning);
     const worldGuides = worldNegativeGuideTags(world.id, tone, rng);
 
-    run.stats = applyChanges(run.stats, changes);
+    if (!options?.deferNarrativeAttributeEffects) {
+      run.stats = applyChanges(run.stats, changes);
+    }
     run.ageStage = resolveAgeStage(run.age, world);
     run.fame = computeFameWithTuning(run.stats, tuning);
-    updateNegativeStreaks(run);
+    if (!options?.deferNarrativeAttributeEffects) updateNegativeStreaks(run);
 
     const yearlyEvent: YearEvent = {
       age: run.age,
@@ -2366,6 +2998,7 @@ export function autoAdvanceToCheckpoint(
         special ? "special" : "normal",
         `stage_cap_${stageCap}`,
         `tone_${tone}`,
+        ...(options?.deferNarrativeAttributeEffects ? ["background_pending"] : []),
         ...deltaTags,
         ...worldGuides
       ]
@@ -2373,18 +3006,19 @@ export function autoAdvanceToCheckpoint(
 
     run.history.push(yearlyEvent);
     chunk.push(yearlyEvent);
-    run.ascension = maybeUnlockAscension(run, rng);
-
-    const deathCheck = calcDeathRisk(run, world, 0);
-    const adjustedDeathRisk = reduceDeathRisk(run, deathCheck.risk);
-    if (adjustedDeathRisk > 0 && rng() < adjustedDeathRisk) {
-      const cause = deathCheck.cause ?? "意外灾祸";
-      if (!deferNarrativeCatastrophe(run, cause)) {
-        run.ended = true;
-        run.outcome = "dead";
-        run.deathCause = cause;
-        run.endingSummary = calcEnding(run);
-        break;
+    if (!options?.deferNarrativeAttributeEffects) {
+      run.ascension = maybeUnlockAscension(run, rng);
+      const deathCheck = calcDeathRisk(run, world, 0);
+      const adjustedDeathRisk = reduceDeathRisk(run, deathCheck.risk);
+      if (adjustedDeathRisk > 0 && rng() < adjustedDeathRisk) {
+        const cause = deathCheck.cause ?? "意外灾祸";
+        if (!deferNarrativeCatastrophe(run, cause)) {
+          run.ended = true;
+          run.outcome = "dead";
+          run.deathCause = cause;
+          run.endingSummary = calcEnding(run);
+          break;
+        }
       }
     }
 
@@ -2423,7 +3057,7 @@ export function applyMilestoneDecisionAndAdvance(
   world: WorldConfig,
   difficulty: DifficultyConfig,
   decision: DecisionType,
-  _options?: { milestoneEventPool?: string[] }
+  options?: { milestoneEventPool?: string[]; narrativeOutcome?: ApprovedNarrativeAttributeOutcome }
 ): { updated: InternalRunState; fromAge: number; toAge: number; chunk: YearEvent[]; decisionEvent: YearEvent } {
   if (!run.nextMilestoneChoice) {
     throw new Error("当前没有可用的关键抉择");
@@ -2438,7 +3072,15 @@ export function applyMilestoneDecisionAndAdvance(
     tuning.decision.successRateClampMin,
     tuning.decision.successRateClampMax
   );
-  const decisionResult = directedEffect
+  const modelChanges = options?.narrativeOutcome
+    ? approveNarrativeAttributeOutcome(run, world, options.narrativeOutcome, "decision", decision)
+    : undefined;
+  if (isDirectedDecision && !modelChanges) {
+    throw new Error("decision_outcome_required");
+  }
+  const decisionResult = modelChanges
+    ? { statChanges: modelChanges, deathRollBonus: 0 }
+    : directedEffect
     ? {
         statChanges: rng() < directedSuccessRate
           ? directedEffect.success
@@ -2493,8 +3135,10 @@ export function applyMilestoneDecisionAndAdvance(
       routeIds: committedDirection ? [committedDirection.id] : undefined
     }]
   }, run.age, sourceEventId);
+  run.narrative = recordNarrativeSceneDecision(run.narrative);
   run.nextMilestoneChoice = undefined;
   run.pendingDirectedDecisionEffects = undefined;
+  run.pendingDirectedDecisionPolicy = undefined;
   run.pendingDirectedDecisionDirections = undefined;
   run.pendingDirectedDecisionFactEffects = undefined;
 
@@ -2553,7 +3197,7 @@ export function toClientRun(run: InternalRunState): PublicRunState {
   const visibleTurn = run.turnRecords?.at(-1);
   const visibleAge = visibleTurn?.age ?? run.narrativeReservoir.revealedAge;
   const visibleStage = visibleTurn
-    ? { id: run.narrativeReservoir.revealedAgeStage.id, label: visibleTurn.ageStage.label, min: 0, max: 120 }
+    ? { id: run.narrativeReservoir.revealedAgeStage.id, label: visibleTurn.ageStage.label, min: 0, max: Number.MAX_SAFE_INTEGER }
     : run.narrativeReservoir.revealedAgeStage;
   const visibleChoice = [...(run.turnRecords ?? [])]
     .reverse()

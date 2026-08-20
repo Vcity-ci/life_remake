@@ -132,3 +132,12 @@
 1. 一次只改一个分组（例如只改 `milestone`）
 2. 每次改完至少跑 10 局看分布（抉择年龄、死亡年龄、飞升率）
 3. 异常可回滚 `storage/backups/content-*.json`
+
+## 8. 叙事世界包配置（2026-08-21 01:29 +08:00，增量）
+
+- 当前叙事世界包源为 `data/narratives/<worldId>.story.json`；古代包是已完整接入的示例。世界包定义 `mainlineSkeleton`、`mainlineActs`、`routeArcs`、人物、Lore、事实和结局蓝图。
+- `routeArcs` 的 `directionId` 是导演工具可选路线 ID。路线数量由该数组决定，不是引擎常量；新世界应同时提供路线摘要、核心线程和对应素材 ID。
+- 事件仍在 `data/events/faction-events.json` 与 `data/events/event-metadata.json` 中定义。加载时按同一事件 ID 合并世界包 `eventBindings`，得到 `storyDirectionIds` 与 `narrativeBeat`。
+- 当前内容加载校验要求每条已配置路线均有 `setup/escalation/pressure/climax/payoff` 五种已绑定素材，防止模型选择路线后没有可渲染事件。这个约束来自内容完整性校验，不代表路线之间互斥。
+- `maxAge` 是素材权重偏好而非叙事终止条件；世界主线与结局不会因年龄达到某个上限自动结束。
+- 本地 Provider 默认值为 `https://api.deepseek.com`、`deepseek-v4-flash`、`/chat/completions` 与 `reasoningEffort=minimal`。这些值可被 `DEFAULT_PROVIDER_*` 环境变量或会话配置覆盖。

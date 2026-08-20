@@ -1,7 +1,7 @@
 {
-  "version": 2,
+  "version": 3,
   "worldId": "ancient",
-  "storyBible": "景朝中后段，一场北境败仗被改写成凯报，随后的灾赈、军饷与户籍账目又被各方拆散掩埋。宗族、门第、科举、军功与皇权共同塑造命运；人物的名节、人情和功业都要付出代价。叙事以称谓、行动和后果呈现权力关系，不使用现代制度与现代口语。",
+  "storyBible": "景朝中后段，北境一场败仗被改写成凯报，败军、军饷、灾赈与户籍账目先后被拆散掩埋。故事由三次递进的国家危机组成：先让旧案显形，再让朝野阵营为真相和利益周旋，最后使边关战事、民生与责任归属同时逼近。宗族、门第、科举、军功与皇权共同塑造命运；人物的名节、人情和功业都要付出代价。叙事以称谓、行动和后果呈现权力关系，不使用现代制度与现代口语。",
   "styleRules": [
     "使用第二人称，文风凝练克制，避免章回标题与前情提要。",
     "常驻人物优先使用既定称谓，不凭空新增关键亲属、官职或势力。",
@@ -9,33 +9,75 @@
     "高潮必须使既有关系、身份或声名发生不可逆变化；回收必须点明此前伏笔的后果。"
   ],
   "mainlineSkeleton": {
-    "premise": "北境败仗的实数被改成凯报，亏空先后藏入军饷、灾赈、盐引、田亩和考功文书。一本被拆开的旧册与数名证人的去向，指向同一件事：谁该为那场败仗与其后的饥民负责，谁又有权解释景朝仍能维持的秩序。",
-    "opening": "玩家从自身路线的具体困境入局，只先接触旧册的一页、一个名字或一笔异常人情；必须先做出一次立场抉择，才获得进入更深处的资格。",
-    "pressure": "已获得的位置、关系或证物反过来要求代价。不同路线揭出的是同一隐案的不同断面，不能把真相一次说尽；每次推进都要留下可追索的承诺、损失或关系变化。",
-    "climax": "在清查、朝议、钦使问案或军府追责中，证据链终于合拢。玩家必须决定证据交给谁、替谁署名、牺牲什么，不能同时保住清名、靠山与所有人。",
-    "payoff": "旧册、证人和先前抉择的后果被兑现：真相被公开、被改写或被带离朝堂。核心路线的具体人和制度后果必须得到回答，主线才算完成。",
+    "premise": "北境败仗的实数被改成凯报，亏空先后藏入军饷、灾赈、盐引、田亩和考功文书。一本被拆开的旧册与数名证人的去向，最终把人物推向同一件事：谁该为败仗、饥民与正在逼近的再一次边患负责，谁又有权解释景朝仍能维持的秩序。",
+    "opening": "第一幕是旧案显形。人物从自身经历接触一页旧册、一个名字或一笔异常人情；高潮不是得到全部答案，而是必须公开站队、保全证人或交出证物，使隐案第一次进入无法回避的视野。",
+    "pressure": "第二幕是阵营冲突与周旋。宗族、朝堂、军府、商路和地方势力开始争夺证据的去向；已获得的位置、关系或证物反过来要求代价。高潮必须是一场结盟、背叛、借势反制或自污担责，而非重复查问同一份旧案。",
+    "climax": "第三幕是北境战事救国。旧案后果落实为兵源、粮道、流民与军令的现实危机，人物必须在救援、用兵、民生与责任归属之间作出不可逆决定；不能同时保住清名、靠山与所有人。",
+    "payoff": "三次高潮留下的证据、人物和代价终于被兑现：真相被公开、被改写或被带离朝堂，边地和朝局都必须出现实际后果。核心路线的人与制度后果得到回答，主线才算完成。",
     "goodEndingDirection": "以真实证据承担责任并留下可延续的秩序，得到的不是无代价的胜利，而是有人因此被保全、制度或关系得以继续。",
     "badEndingDirection": "为自保、权位或亲族切断真相，或虽说出真相却无力保住代价；结局应呈现失势、流放、破裂或带着污点存活，而不是凭空翻盘。"
   },
+  "mainlineFacts": [
+    { "id": "ancient.mainline.discrepant_record", "kind": "open_question", "label": "北境败报、军饷与民生账目之间存在无法忽略的矛盾。", "priority": 4 },
+    { "id": "ancient.mainline.faction_cost", "kind": "stake", "label": "围绕旧案的阵营周旋已把人情、功名、商路和官位变成必须偿还的代价。", "priority": 4 },
+    { "id": "ancient.mainline.border_crisis", "kind": "stake", "label": "被遮蔽的败报终于化为逼近的北境战事、粮道危机与无处安置的百姓。", "priority": 5 },
+    { "id": "ancient.mainline.accountability", "kind": "commitment", "label": "证据与责任的去向必须由人物亲自承担，不能再交给旁人决定。", "priority": 5 }
+  ],
+  "mainlineActs": [
+    {
+      "id": "ancient.record_surface",
+      "label": "旧案显形",
+      "prompt": "让人物从自身经历接触败报隐案的一处可追索裂缝，并在证人、证物或公开立场上完成第一次无法回避的高潮；先打开权力的裂口，而非给出全部答案。",
+      "introduceFactIds": ["ancient.mainline.discrepant_record"],
+      "readinessStage": "opening"
+    },
+    {
+      "id": "ancient.faction_contest",
+      "label": "阵营周旋",
+      "prompt": "让旧案进入宗族、朝堂、军府、商路或地方势力的博弈。人物必须结盟、背叛、借势反制或承担污名，使第二次高潮改变真实的权力关系。",
+      "requiredFactIds": ["ancient.mainline.discrepant_record"],
+      "introduceFactIds": ["ancient.mainline.faction_cost"],
+      "readinessStage": "pressure"
+    },
+    {
+      "id": "ancient.border_reckoning",
+      "label": "北境救国",
+      "prompt": "让已揭开的旧案化为正在发生的北境战事、粮道与流民危机。人物必须在救援、用兵、民生与责任归属之间承担第三次高潮，并回收世界主线事实。",
+      "requiredFactIds": ["ancient.mainline.discrepant_record", "ancient.mainline.faction_cost"],
+      "introduceFactIds": ["ancient.mainline.border_crisis", "ancient.mainline.accountability"],
+      "resolveFactIds": ["ancient.mainline.discrepant_record", "ancient.mainline.faction_cost", "ancient.mainline.border_crisis", "ancient.mainline.accountability"],
+      "readinessStage": "climax"
+    }
+  ],
+  "sceneArchetypes": [
+    { "id": "ally_request", "label": "旧人求助", "description": "一位已有关系的人带来具体请求；回应会加深承诺，也会暴露新的代价。", "beats": ["setup", "escalation"], "focusTags": ["relationship", "commitment"], "baseWeight": 12 },
+    { "id": "third_party_request", "label": "外来请求", "description": "陌生来客、书信或口信要求人物介入一件与自身处境相连的事。", "beats": ["setup", "escalation"], "focusTags": ["opportunity", "evidence"], "baseWeight": 11 },
+    { "id": "hidden_evidence", "label": "证据浮现", "description": "账页、名册、口供或旧物出现新的矛盾，只提供下一步可追索的线索。", "beats": ["escalation", "pressure"], "focusTags": ["evidence", "truth"], "baseWeight": 12 },
+    { "id": "relationship_fracture", "label": "关系裂痕", "description": "亲友、师门或同僚的立场开始分裂，任何选择都会改变彼此的信任。", "beats": ["pressure"], "focusTags": ["relationship", "cost"], "baseWeight": 12 },
+    { "id": "institutional_obstruction", "label": "规制阻拦", "description": "一道程序、命令或权势阻断了原本的处理方式，人物必须选择绕行、妥协或承担。", "beats": ["pressure"], "focusTags": ["institution", "cost"], "baseWeight": 12 },
+    { "id": "public_commitment", "label": "公开署名", "description": "证据、关系与名声被迫在众目之下交汇，人物需要作出不可逆的承担。", "beats": ["climax"], "focusTags": ["commitment", "reputation"], "baseWeight": 16 },
+    { "id": "witness_return", "label": "旧证归来", "description": "被遗漏的证人、旧物或后果重新出现，要求人物兑现此前承诺并给出归宿。", "beats": ["payoff"], "focusTags": ["payoff", "consequence"], "baseWeight": 16 },
+    { "id": "aftermath_choice", "label": "余波取舍", "description": "冲突已经留下伤痕，人物仍要决定如何安置受影响的人与自己承担的名声。", "beats": ["pressure", "payoff"], "focusTags": ["aftermath", "cost"], "baseWeight": 10 }
+  ],
   "progression": {
     "backgroundPacing": { "minYears": 1, "maxYears": 3 },
     "routes": [
-      { "directionId": "ancient.guardian", "gates": { "opening": { "weights": { "charisma": 0.55, "family": 0.3, "physique": 0.15 }, "threshold": 6 }, "pressure": { "weights": { "charisma": 0.55, "family": 0.3, "physique": 0.15 }, "threshold": 9 }, "climax": { "weights": { "charisma": 0.55, "family": 0.3, "physique": 0.15 }, "threshold": 12 } } },
-      { "directionId": "ancient.ambition", "gates": { "opening": { "weights": { "intelligence": 0.55, "charisma": 0.25, "fortune": 0.2 }, "threshold": 7 }, "pressure": { "weights": { "intelligence": 0.55, "charisma": 0.25, "fortune": 0.2 }, "threshold": 10 }, "climax": { "weights": { "intelligence": 0.55, "charisma": 0.25, "fortune": 0.2 }, "threshold": 14 } } },
-      { "directionId": "ancient.broker", "gates": { "opening": { "weights": { "family": 0.45, "charisma": 0.35, "fortune": 0.2 }, "threshold": 7 }, "pressure": { "weights": { "family": 0.45, "charisma": 0.35, "fortune": 0.2 }, "threshold": 10 }, "climax": { "weights": { "family": 0.45, "charisma": 0.35, "fortune": 0.2 }, "threshold": 13 } } },
-      { "directionId": "ancient.mentor", "gates": { "opening": { "weights": { "intelligence": 0.7, "charisma": 0.3 }, "threshold": 7 }, "pressure": { "weights": { "intelligence": 0.7, "charisma": 0.3 }, "threshold": 10 }, "climax": { "weights": { "intelligence": 0.7, "charisma": 0.3 }, "threshold": 14 } } },
-      { "directionId": "ancient.institution", "gates": { "opening": { "weights": { "intelligence": 0.55, "charisma": 0.35, "family": 0.1 }, "threshold": 7 }, "pressure": { "weights": { "intelligence": 0.55, "charisma": 0.35, "family": 0.1 }, "threshold": 10 }, "climax": { "weights": { "intelligence": 0.55, "charisma": 0.35, "family": 0.1 }, "threshold": 14 } } },
-      { "directionId": "ancient.outsider", "gates": { "opening": { "weights": { "fortune": 0.4, "physique": 0.35, "intelligence": 0.25 }, "threshold": 7 }, "pressure": { "weights": { "fortune": 0.4, "physique": 0.35, "intelligence": 0.25 }, "threshold": 10 }, "climax": { "weights": { "fortune": 0.4, "physique": 0.35, "intelligence": 0.25 }, "threshold": 13 } } }
+      { "directionId": "ancient.guardian", "gates": { "opening": { "weights": { "charisma": 0.55, "family": 0.3, "physique": 0.15 }, "threshold": 5 }, "pressure": { "weights": { "charisma": 0.55, "family": 0.3, "physique": 0.15 }, "threshold": 9 }, "climax": { "weights": { "charisma": 0.55, "family": 0.3, "physique": 0.15 }, "threshold": 12 } } },
+      { "directionId": "ancient.ambition", "gates": { "opening": { "weights": { "intelligence": 0.55, "charisma": 0.25, "fortune": 0.2 }, "threshold": 5 }, "pressure": { "weights": { "intelligence": 0.55, "charisma": 0.25, "fortune": 0.2 }, "threshold": 10 }, "climax": { "weights": { "intelligence": 0.55, "charisma": 0.25, "fortune": 0.2 }, "threshold": 14 } } },
+      { "directionId": "ancient.broker", "gates": { "opening": { "weights": { "family": 0.45, "charisma": 0.35, "fortune": 0.2 }, "threshold": 5 }, "pressure": { "weights": { "family": 0.45, "charisma": 0.35, "fortune": 0.2 }, "threshold": 10 }, "climax": { "weights": { "family": 0.45, "charisma": 0.35, "fortune": 0.2 }, "threshold": 13 } } },
+      { "directionId": "ancient.mentor", "gates": { "opening": { "weights": { "intelligence": 0.7, "charisma": 0.3 }, "threshold": 5 }, "pressure": { "weights": { "intelligence": 0.7, "charisma": 0.3 }, "threshold": 10 }, "climax": { "weights": { "intelligence": 0.7, "charisma": 0.3 }, "threshold": 14 } } },
+      { "directionId": "ancient.institution", "gates": { "opening": { "weights": { "intelligence": 0.55, "charisma": 0.35, "family": 0.1 }, "threshold": 5 }, "pressure": { "weights": { "intelligence": 0.55, "charisma": 0.35, "family": 0.1 }, "threshold": 10 }, "climax": { "weights": { "intelligence": 0.55, "charisma": 0.35, "family": 0.1 }, "threshold": 14 } } },
+      { "directionId": "ancient.outsider", "gates": { "opening": { "weights": { "fortune": 0.4, "physique": 0.35, "intelligence": 0.25 }, "threshold": 5 }, "pressure": { "weights": { "fortune": 0.4, "physique": 0.35, "intelligence": 0.25 }, "threshold": 10 }, "climax": { "weights": { "fortune": 0.4, "physique": 0.35, "intelligence": 0.25 }, "threshold": 13 } } }
     ],
-    "completion": { "requireCommittedDirection": true, "requireDecisionConsequence": true, "requireClimax": true, "requirePayoff": true, "requireResolvedCoreFacts": true, "requireNoActiveScene": true }
+    "completion": { "requireCommittedDirection": true, "requireDecisionConsequence": true, "requireClimax": true, "requirePayoff": true, "requireResolvedCoreFacts": true, "requireNoActiveScene": true, "minCompletedSceneInstances": 3, "requireAllMainlineActs": true }
   },
   "routeArcs": [
-    { "directionId": "ancient.guardian", "summary": "从赈册、遗属与宗族田产看见败仗后的饥民，最终决定灾情实数该由谁承担。", "coreThreadIds": ["ancient.guardian_relief"] },
-    { "directionId": "ancient.ambition", "summary": "从功名、伪功与朝中靠山摸到凯报的造假链，最终决定把仕途押在何种证词上。", "coreThreadIds": ["ancient.ambition_name"] },
-    { "directionId": "ancient.broker", "summary": "从盐引、漕运和旧账发现军饷亏空的去向，最终决定账本替谁保命或定罪。", "coreThreadIds": ["ancient.broker_ledger"] },
-    { "directionId": "ancient.mentor", "summary": "从书院、禁讲与门生案接触被删改的战事记录，最终决定让何种学问与人承担真相。", "coreThreadIds": ["ancient.mentor_learning"] },
-    { "directionId": "ancient.institution", "summary": "从试卷、弹章、清丈和考功文书拼合隐案，最终决定法度是替权势抹平责任还是留下证据。", "coreThreadIds": ["ancient.institution_reform"] },
-    { "directionId": "ancient.outsider", "summary": "从败报、流民与密册取得朝廷叙述之外的证据，最终决定真相交给朝堂、边地还是沉默的人。", "coreThreadIds": ["ancient.outsider_truth"] }
+    { "directionId": "ancient.guardian", "label": "赈济与家门", "summary": "从赈册、遗属与宗族田产看见败仗后的饥民：先保住具体证人和名单，再在地方与朝局的拉扯中承担人情债，最后把粮道和安民之责带到北境战事之前。", "perspective": "让国家危机始终落到遗属、流民、书吏和家门的具体命运上。", "escalation": "宗族田产、疫病囤药和地方豪强会把救人与保全家声推向冲突。", "crisis": "北境粮道断绝后，先前被忽略的名册将决定谁能得到救援。", "payoffFocus": "回应粮册、遗属与家门承诺，让秩序是否真正保全人有明确后果。", "coreThreadIds": ["ancient.guardian_relief"], "characterIds": ["ancient.guardian_elder", "ancient.guardian_clerk"], "loreIds": ["ancient.guardian"], "materialEventIds": ["ancient_guardian_04", "ancient_guardian_01", "ancient_guardian_05", "ancient_guardian_09", "ancient_guardian_10"] },
+    { "directionId": "ancient.ambition", "label": "功名与朝局", "summary": "从功名、伪功与朝中靠山摸到凯报的造假链：先以仕途接近证据，再在党争中决定污点归谁，最后以官位、军功或名节回应边关责任。", "perspective": "让上升机会始终附着于证词、派系交换与会被追问的功业来处。", "escalation": "同年、靠山和军功会逼迫人物把私人情义变成政治立场。", "crisis": "北境再起时，旧日伪功与真实将领的去留会直接影响用兵。", "payoffFocus": "让人物亲口解释功业的来处，以及愿意为此承担何种清算。", "coreThreadIds": ["ancient.ambition_name"], "characterIds": ["ancient.ambition_peer", "ancient.ambition_patron"], "loreIds": ["ancient.ambition"], "materialEventIds": ["ancient_ambition_03", "ancient_ambition_01", "ancient_ambition_05", "ancient_ambition_09", "ancient_ambition_10"] },
+    { "directionId": "ancient.broker", "label": "账本与商路", "summary": "从盐引、漕运和旧账发现军饷亏空的去向：先拿到能伤人的账页，再在多方交易中衡量信誉与自保，最后让商路、军粮和账本决定谁能渡过边关危机。", "perspective": "让资源流向、契约、人情与信誉成为看得见的权力筹码。", "escalation": "两府、商会和旧友会要求人物把账本、桥税或密信换成站队。", "crisis": "北境军粮与漕运相继受阻时，账外的损失会变成人命。", "payoffFocus": "说明账本究竟保住谁、定罪谁，以及信誉还能否留下。", "coreThreadIds": ["ancient.broker_ledger"], "characterIds": ["ancient.broker_merchant", "ancient.broker_envoy"], "loreIds": ["ancient.broker"], "materialEventIds": ["ancient_broker_04", "ancient_broker_01", "ancient_broker_03", "ancient_broker_05", "ancient_broker_09", "ancient_broker_10"] },
+    { "directionId": "ancient.mentor", "label": "师门与新学", "summary": "从书院、禁讲与门生案接触被删改的战事记录：先让一段文字或一名门生带来疑问，再让师门在清议与朝局之间分裂，最后使学问、人才和边地教化进入救国的实际选择。", "perspective": "让师承、门生和被禁止的知识始终与现实责任相连。", "escalation": "查禁、受劾和门生任事会让清议必须接受现实后果的审视。", "crisis": "战事迫近后，书院培养的人和被删改的战史都将成为军政资源。", "payoffFocus": "回应恩师、门生或边地少年的去留，证明所学是否真的承担现实。", "coreThreadIds": ["ancient.mentor_learning"], "characterIds": ["ancient.mentor_teacher", "ancient.mentor_student"], "loreIds": ["ancient.mentor"], "materialEventIds": ["ancient_mentor_01", "ancient_mentor_02", "ancient_mentor_04", "ancient_mentor_05", "ancient_mentor_09", "ancient_mentor_10"] },
+    { "directionId": "ancient.institution", "label": "法度与署名", "summary": "从试卷、弹章、清丈和考功文书拼合隐案：先看见程序的裂缝，再在改制与人情的碰撞中作出署名，最后用制度、军令和救济的实际效果回应北境危机。", "perspective": "让文书与程序既是权力的遮蔽，也是留下责任的证据。", "escalation": "御史、地方官和宗族会要求人物在法度正确与具体代价之间取舍。", "crisis": "战时征发、军府考功和粮道调度会让每一笔署名都有救亡或害民的结果。", "payoffFocus": "让一项法度或政令留下可以追问的责任，而非抽象的清名。", "coreThreadIds": ["ancient.institution_reform"], "characterIds": ["ancient.institution_censor", "ancient.institution_magistrate"], "loreIds": ["ancient.institution"], "materialEventIds": ["ancient_institution_01", "ancient_institution_02", "ancient_institution_04", "ancient_institution_05", "ancient_institution_09", "ancient_institution_10"] },
+    { "directionId": "ancient.outsider", "label": "边地真相", "summary": "从败报、流民与密册取得朝廷叙述之外的证据：先听见被遮蔽的消息，再在禁书、密令与边地势力之间决定信谁，最后亲自面对再起的北境战事与真相的去处。", "perspective": "让朝廷叙述外的边军、流民、禁书和密册持续纠正人物的视野。", "escalation": "密令、旧朝遗债和流民谈判会使真相的传递本身成为危险。", "crisis": "边关再次告急后，人物必须决定把真相交给谁、以谁的性命换取行动。", "payoffFocus": "让密册、败报和边地同伴的命运得到公开、埋没或带走的明确结论。", "coreThreadIds": ["ancient.outsider_truth"], "characterIds": ["ancient.outsider_scholar", "ancient.outsider_scout"], "loreIds": ["ancient.outsider"], "materialEventIds": ["ancient_outsider_02", "ancient_outsider_01", "ancient_outsider_03", "ancient_outsider_05", "ancient_outsider_09", "ancient_outsider_10"] }
   ],
   "threads": [
     { "id": "ancient.guardian_relief", "label": "赈济与名册", "premise": "灾年粮道、流民与阵亡遗属的处置，考验你是否能把责任落到具体的人身上。", "directionIds": ["ancient.guardian"], "payoffHint": "回收时必须回应粮道、遗属或旧案中至少一人的命运。" },

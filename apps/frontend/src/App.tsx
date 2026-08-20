@@ -936,9 +936,13 @@ export default function App(): React.JSX.Element {
                   followLatestTimelineRef.current = target.scrollHeight - target.scrollTop - target.clientHeight < 24;
                 }}
               >
-                {timeline.map((item) => (
+                {timeline.map((item, index) => (
                   <article className="narrative" key={timelineKey(item)}>
-                    <header><strong>{item.ageFrom && item.ageFrom < item.age ? `${item.ageFrom}-${item.age}岁` : `${item.age}岁`}</strong></header>
+                    <header><strong>{item.ageFrom && item.ageFrom < item.age
+                      ? `${item.ageFrom}-${item.age}岁`
+                      : timeline[index - 1]?.age === item.age
+                        ? "同年"
+                        : `${item.age}岁`}</strong></header>
                     <p>{item.narrative}</p>
                     <div className="delta-row">{extractDeltaLabels(item).map((label, idx) => <small key={`${timelineKey(item)}-${idx}`}>{label}</small>)}</div>
                   </article>

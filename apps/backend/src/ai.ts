@@ -2,7 +2,7 @@ import OpenAI from "openai";
 import { createHash } from "node:crypto";
 import type { InternalRunState } from "./engine.js";
 import type { ChatConversationState, ChatHistoryMessage, StoryConversationState, ToolCallRecord } from "./conversation.js";
-import type { AiMilestoneOptions, DecisionType, EventStoryPosition, NarrativeAttributeEffect, NarrativeIntent, ProviderConfig, StatKey, Stats, WorldConfig, YearEvent } from "@reroll/shared";
+import type { AiMilestoneOptions, DecisionType, EventStoryPosition, NarrativeAttributeEffect, NarrativeAttributePolicy, NarrativeBeat, NarrativeFactResolution, NarrativeIntent, NarrativeStatTier, ProviderConfig, StatKey, Stats, WorldConfig, YearEvent } from "@reroll/shared";
 import { formatNarrativePromptPlan, type NarrativePromptPlan } from "./narrative.js";
 
 export interface NarrativeContext {
@@ -160,10 +160,7 @@ export interface DirectedStoryRenderInput {
       description: string;
     }>;
   };
-  attributePolicy?: {
-    allowedStats: StatKey[];
-    allowedBands: NarrativeAttributeEffect["band"][];
-  };
+  attributePolicy?: NarrativeAttributePolicy;
   turn: DirectedStoryTurnResult;
 }
 
@@ -189,6 +186,35 @@ export interface BackgroundNarrativeOutcome {
 export interface DirectedDecisionNarrativeOutcome {
   narrative: string;
   effects: NarrativeAttributeEffect[];
+  factResolution?: NarrativeFactResolution;
+}
+
+export interface DynamicNarrativeSceneInput {
+  act: { id: string; label: string; prompt: string; factLabel?: string };
+  beat: Exclude<NarrativeBeat, "ending">;
+  decisionMode: "none" | "optional" | "required";
+  allowedTurnKinds: Array<"scene" | "background">;
+  backgroundYearRange: { min: number; max: number };
+  routes: Array<{ id: string; label: string; summary: string; perspective?: string }>;
+  factions: Array<{ id: string; label: string; summary: string }>;
+  knownCharacters: Array<{ name: string; factionId?: string; role: string; description: string }>;
+  attributePolicy?: NarrativeAttributePolicy;
+  backgroundAttributePolicy: NarrativeAttributePolicy;
+  statTiers: Record<StatKey, NarrativeStatTier>;
+}
+
+export interface DynamicNarrativeSceneResult {
+  turnKind: "scene" | "background";
+  routeId?: string;
+  factionId?: string;
+  narrative: string;
+  scenePacing?: "continuous" | "spanning";
+  participants: Array<{ name: string; factionId?: string; role: string; description: string; recurring: boolean }>;
+  milestoneCopy?: DirectedNarrativeResult["milestoneCopy"];
+  createsDecision?: boolean;
+  attributeEffects?: NarrativeAttributeEffect[];
+  backgroundYears?: number;
+  backgroundAttributeEffects?: Array<{ offset: number; effects: NarrativeAttributeEffect[] }>;
 }
 
 export class DirectedStoryTurnError extends Error {
@@ -206,10 +232,17 @@ export class DirectedStoryRenderError extends Error {
 }
 
 export class NarrativeOutcomeError extends Error {
-  constructor(code: "narrative_outcome_unavailable" | "narrative_outcome_invalid") {
+  constructor(
+    code: "narrative_outcome_unavailable" | "narrative_outcome_invalid",
+    public readonly reason?: string
+  ) {
     super(code);
     this.name = "NarrativeOutcomeError";
   }
+}
+
+function invalidNarrativeOutcome(reason: string): NarrativeOutcomeError {
+  return new NarrativeOutcomeError("narrative_outcome_invalid", reason);
 }
 
 interface PromptPackResolved {
@@ -1340,7 +1373,12 @@ function fallbackEndingSummary(run: InternalRunState): string {
     return `你触发了“${title}”，在人世规则之外延展了命运。`;
   }
   if (run.outcome === "completed") {
-    return `你在${run.age}岁走到这段人生的收束处。最终名望：${run.fame}。`;
+    const quality = run.narrative.endingPolarity === "good"
+      ? "好结局"
+      : run.narrative.endingPolarity === "normal"
+        ? "普通结局"
+        : "坏结局";
+    return `你在${run.age}岁走到这段人生的收束处。引擎已裁定为${quality}，最终名望：${run.fame}。`;
   }
   return `你在${run.age}岁走完此生。最终名望：${run.fame}。`;
 }
@@ -1350,12 +1388,17 @@ function buildEndingPrompt(run: InternalRunState, baseEnding: string, narrativeP
   const ascensionInfo = run.ascension.unlocked
     ? `${run.ascension.title ?? "未知称号"} / ${run.ascension.type ?? "unknown"} / ${run.ascension.unlockedAge ?? run.age}岁`
     : "未触发";
+  const endingQuality = run.narrative.endingPolarity === "good"
+    ? "好结局：人物克服主要代价，留下明确且可被后人承接的成果。"
+    : run.narrative.endingPolarity === "normal"
+      ? "普通结局：人物完成主线但保留真实遗憾，收获有限而可信。"
+      : "坏结局：人物完成主线却未能化解核心代价，不得将其写成死亡。";
   const outcomeRule = run.outcome === "dead"
     ? "必须明确死亡原因，不得改写死亡年龄与名望。"
     : run.outcome === "ascended"
       ? "必须点明飞升称号或类型；重点写原因而非结果：结合系统BG中的世界背景、主线冲突、阶段目标，以及最近经历/属性/天赋，解释为何此人会走到飞升；结果一句带过并写出代价或余韵。"
       : run.outcome === "completed"
-        ? "必须按结局大纲写出人生收束与总体评价；不得把坏结局擅自写成死亡，也不得新增支线。"
+        ? `必须按引擎锁定的${endingQuality}写出人生收束与总体评价；不得更改结局等级，不得把坏结局擅自写成死亡，也不得新增支线。`
         : "必须点明人生收束与总体评价。";
   const lengthRule = run.outcome === "ascended"
     ? "R:ELEN 110-170字，2-3句；只输出结算文案；先写飞升原因，再一句带过结果；不做同义重复。"
@@ -1363,7 +1406,7 @@ function buildEndingPrompt(run: InternalRunState, baseEnding: string, narrativeP
 
   return [
     "T:E 结局收束任务。",
-    `S0 type=${run.outcome} age=${run.age} fame=${run.fame}(${fameGrade(run.fame)})`,
+    `S0 type=${run.outcome} age=${run.age} fame=${run.fame}(${fameGrade(run.fame)}) ending=${run.narrative.endingPolarity ?? "none"} score=${run.narrative.endingScore ?? "none"}`,
     `S1 stats=${summarizeStatsShort(run.stats)} death=${compactText(run.deathCause ?? "none", 32)} asc=${compactText(ascensionInfo, 56)}`,
     `S2 cards=${compactText(cards, 52)} key=${compactText(summarizeEndingRecent(run.history), 120)}`,
     `S3 base=${compactText(baseEnding, 70)}`,
@@ -1728,12 +1771,13 @@ function directedStoryRenderTool(input: DirectedStoryRenderInput): Record<string
   if (input.kind === "normal" && input.attributePolicy) {
     properties.effects = {
       type: "array",
-      maxItems: 1,
+      minItems: input.attributePolicy.minEffects,
+      maxItems: input.attributePolicy.maxEffects,
       items: {
         type: "object",
         additionalProperties: false,
         required: ["stat", "direction", "band"],
-        properties: narrativeEffectProperties(input.attributePolicy.allowedStats, input.attributePolicy.allowedBands)
+        properties: narrativeEffectProperties(input.attributePolicy)
       }
     };
     required.push("effects");
@@ -1789,15 +1833,15 @@ function directedStoryRenderResponseTool(input: DirectedStoryRenderInput): Recor
   };
 }
 
-function narrativeEffectProperties(allowedStats: StatKey[], allowedBands: NarrativeAttributeEffect["band"][]): Record<string, unknown> {
+function narrativeEffectProperties(policy: NarrativeAttributePolicy): Record<string, unknown> {
   return {
-    stat: { type: "string", enum: allowedStats },
-    direction: { type: "string", enum: ["up", "down"] },
-    band: { type: "string", enum: allowedBands }
+    stat: { type: "string", enum: policy.allowedStats },
+    direction: { type: "string", enum: policy.allowedDirections },
+    band: { type: "string", enum: policy.allowedBands }
   };
 }
 
-function narrativeBackgroundOutcomeTool(ages: number[]): Record<string, unknown> {
+function narrativeBackgroundOutcomeTool(ages: number[], policy: NarrativeAttributePolicy): Record<string, unknown> {
   return {
     type: "function",
     function: {
@@ -1808,7 +1852,7 @@ function narrativeBackgroundOutcomeTool(ages: number[]): Record<string, unknown>
         additionalProperties: false,
         required: ["narrative", "years"],
         properties: {
-          narrative: { type: "string" },
+          narrative: { type: "string", minLength: 10 },
           years: {
             type: "array",
             minItems: ages.length,
@@ -1821,12 +1865,13 @@ function narrativeBackgroundOutcomeTool(ages: number[]): Record<string, unknown>
                 age: { type: "number", enum: ages },
                 effects: {
                   type: "array",
-                  maxItems: 1,
+                  minItems: policy.minEffects,
+                  maxItems: policy.maxEffects,
                   items: {
                     type: "object",
                     additionalProperties: false,
                     required: ["stat", "direction", "band"],
-                    properties: narrativeEffectProperties(["intelligence", "charisma", "family", "fortune", "physique"], ["light", "medium"])
+                    properties: narrativeEffectProperties(policy)
                   }
                 }
               }
@@ -1838,10 +1883,7 @@ function narrativeBackgroundOutcomeTool(ages: number[]): Record<string, unknown>
   };
 }
 
-function narrativeDecisionOutcomeTool(
-  allowedStats: StatKey[],
-  allowedBands: NarrativeAttributeEffect["band"][]
-): Record<string, unknown> {
+function narrativeDecisionOutcomeTool(policy: NarrativeAttributePolicy): Record<string, unknown> {
   return {
     type: "function",
     function: {
@@ -1852,22 +1894,175 @@ function narrativeDecisionOutcomeTool(
         additionalProperties: false,
         required: ["narrative", "effects"],
         properties: {
-          narrative: { type: "string" },
+          narrative: { type: "string", minLength: 10 },
           effects: {
             type: "array",
-            minItems: 1,
-            maxItems: 2,
+            minItems: policy.minEffects,
+            maxItems: policy.maxEffects,
             items: {
               type: "object",
               additionalProperties: false,
               required: ["stat", "direction", "band"],
-              properties: narrativeEffectProperties(allowedStats, allowedBands)
+              properties: narrativeEffectProperties(policy)
             }
           }
         }
       }
     }
   };
+}
+
+type DynamicNarrativeToolName = "render_background_segment" | "render_scene" | "render_choice_scene";
+
+interface DynamicNarrativeToolSet {
+  tools: Record<string, unknown>[];
+  names: DynamicNarrativeToolName[];
+}
+
+function dynamicNarrativeSceneTools(input: DynamicNarrativeSceneInput): DynamicNarrativeToolSet {
+  const routeIds = input.routes.map((route) => route.id);
+  const factionIds = input.factions.map((faction) => faction.id);
+  const offsets = Array.from(
+    { length: Math.max(1, input.backgroundYearRange.max) },
+    (_value, index) => index + 1
+  );
+  const effectsSchema = (policy: NarrativeAttributePolicy): Record<string, unknown> => ({
+    type: "array",
+    minItems: policy.minEffects,
+    maxItems: policy.maxEffects,
+    items: {
+      type: "object",
+      additionalProperties: false,
+      required: ["stat", "direction", "band"],
+      properties: narrativeEffectProperties(policy)
+    }
+  });
+  const participants = {
+    type: "array",
+    maxItems: 3,
+    items: {
+      type: "object",
+      additionalProperties: false,
+      required: ["name", "factionId", "role", "description", "recurring"],
+      properties: {
+        name: { type: "string" },
+        factionId: { type: "string", enum: factionIds },
+        role: { type: "string" },
+        description: { type: "string" },
+        recurring: { type: "boolean" }
+      }
+    }
+  };
+  const scenePacing = { type: "string", enum: ["none", "continuous", "spanning"] };
+  const optionOverrides = {
+    type: "array",
+    minItems: 3,
+    maxItems: 3,
+    items: {
+      type: "object",
+      additionalProperties: false,
+      required: ["id", "label", "description"],
+      properties: {
+        id: { type: "string", enum: ["safe", "balanced", "risky"] },
+        label: { type: "string" },
+        description: { type: "string" }
+      }
+    }
+  };
+  const backgroundTool: Record<string, unknown> = {
+    type: "function",
+    function: {
+      name: "render_background_segment",
+      description: "提交一段不推进主线的普通人生背景及逐年属性成长。",
+      parameters: {
+        type: "object",
+        additionalProperties: false,
+        required: ["narrative", "backgroundYears", "backgroundEffects"],
+        properties: {
+          narrative: { type: "string" },
+          backgroundYears: {
+            type: "number",
+            enum: Array.from(
+              { length: Math.max(1, input.backgroundYearRange.max - input.backgroundYearRange.min + 1) },
+              (_value, index) => input.backgroundYearRange.min + index
+            )
+          },
+          backgroundEffects: {
+            type: "array",
+            minItems: input.backgroundYearRange.min,
+            maxItems: input.backgroundYearRange.max,
+            items: {
+              type: "object",
+              additionalProperties: false,
+              required: ["offset", "effects"],
+              properties: {
+                offset: { type: "number", enum: offsets },
+                effects: effectsSchema(input.backgroundAttributePolicy)
+              }
+            }
+          }
+        }
+      }
+    }
+  };
+  const sceneTool = (attributePolicy: NarrativeAttributePolicy): Record<string, unknown> => ({
+    type: "function",
+    function: {
+      name: "render_scene",
+      description: "提交一段推进当前世界幕节拍、但不出现抉择的场景。",
+      parameters: {
+        type: "object",
+        additionalProperties: false,
+        required: ["routeId", "factionId", "narrative", "scenePacing", "participants", "effects"],
+        properties: {
+          routeId: { type: "string", enum: routeIds },
+          factionId: { type: "string", enum: factionIds },
+          narrative: { type: "string" },
+          scenePacing,
+          participants,
+          effects: effectsSchema(attributePolicy)
+        }
+      }
+    }
+  });
+  const choiceSceneTool: Record<string, unknown> = {
+    type: "function",
+    function: {
+      name: "render_choice_scene",
+      description: "提交一段推进当前世界幕节拍、并要求玩家作出取舍的场景。",
+      parameters: {
+        type: "object",
+        additionalProperties: false,
+        required: ["routeId", "factionId", "narrative", "scenePacing", "participants", "background", "optionOverrides"],
+        properties: {
+          routeId: { type: "string", enum: routeIds },
+          factionId: { type: "string", enum: factionIds },
+          narrative: { type: "string" },
+          scenePacing,
+          participants,
+          background: { type: "string", minLength: 10 },
+          optionOverrides
+        }
+      }
+    }
+  };
+  const tools: Record<string, unknown>[] = [];
+  const names: DynamicNarrativeToolName[] = [];
+  if (input.allowedTurnKinds.includes("background")) {
+    tools.push(backgroundTool);
+    names.push("render_background_segment");
+  }
+  if (input.allowedTurnKinds.includes("scene")) {
+    if (input.decisionMode !== "required" && input.attributePolicy) {
+      tools.push(sceneTool(input.attributePolicy));
+      names.push("render_scene");
+    }
+    if (input.decisionMode !== "none") {
+      tools.push(choiceSceneTool);
+      names.push("render_choice_scene");
+    }
+  }
+  return { tools, names };
 }
 
 function responseTool(tool: Record<string, unknown>): Record<string, unknown> {
@@ -2440,7 +2635,7 @@ function buildDirectedStoryRenderPrompt(run: InternalRunState, input: DirectedSt
     input.kind === "milestone"
       ? "必须调用 render_story_turn：narrative 写场景正文；background 写人物来到取舍前的自然引导；三个选项必须分别对应引擎锁定的 safe、balanced、risky 语义，但可依据当前人物处境改写为具体行动。"
       : input.attributePolicy
-        ? `必须调用 render_story_turn，提交正文和 effects。effects 最多一项，只能使用${input.attributePolicy.allowedStats.join("、")}，幅度只能为${input.attributePolicy.allowedBands.join("、")}；不在正文中写数值。`
+        ? `必须调用 render_story_turn，提交正文和 effects。effects 需提交${input.attributePolicy.minEffects}-${input.attributePolicy.maxEffects}项，只能影响${input.attributePolicy.allowedStats.join("、")}，方向只能为${input.attributePolicy.allowedDirections.join("、")}，幅度只能为${input.attributePolicy.allowedBands.join("、")}${input.attributePolicy.requirePositive ? "，且至少一项为正向" : ""}；不在正文中写数值。`
         : "必须调用 render_story_turn，提交这段经历的正文；不写总结或人生结论。"
   ].filter(Boolean).join("\n");
 }
@@ -2448,9 +2643,13 @@ function buildDirectedStoryRenderPrompt(run: InternalRunState, input: DirectedSt
 const INTERNAL_NARRATIVE_ARTIFACT = /(?:system\s*prompt|prompt\s*injection|tool[_\s-]?call|function[_\s-]?call|closurerequest|allowed[_\s-]?intents|focus[_\s-]?components|json\s*(?:schema|格式)|状态机|系统提示|提示词|工具调用|函数调用|内部标签|创作说明|\b[NTSDCMRTYWE][0-9]+\b|\b[A-Z]:[A-Z0-9]+)/i;
 const PREMATURE_NARRATIVE_CONCLUSION = /(?:故事|人生|此生|命运).{0,12}(?:已经|终于|至此)?(?:结束|终结|完结|落幕|收束)|(?:这便是|这就是).{0,8}(?:结局|终局)|(?:至此|从此).{0,8}(?:再无(?:后续|转机)|尘埃落定|一切结束)|(?:最终结局|人生结局|故事结局)/;
 
-function isSafePlayerNarrative(text: string): boolean {
+function isSafePlayerText(text: string, minLength: number): boolean {
   const normalized = text.replace(/\s+/g, " ").trim();
-  return normalized.length >= 10 && !INTERNAL_NARRATIVE_ARTIFACT.test(normalized) && !PREMATURE_NARRATIVE_CONCLUSION.test(normalized);
+  return normalized.length >= minLength && !INTERNAL_NARRATIVE_ARTIFACT.test(normalized) && !PREMATURE_NARRATIVE_CONCLUSION.test(normalized);
+}
+
+function isSafePlayerNarrative(text: string): boolean {
+  return isSafePlayerText(text, 10);
 }
 
 export function isDirectedStoryRenderSafe(
@@ -2469,7 +2668,7 @@ function parseDirectedStoryRender(raw: unknown, input: DirectedStoryRenderInput)
   if (!isDirectedStoryRenderSafe(result, input)) return null;
   if (input.kind !== "milestone") {
     if (!input.attributePolicy) return result;
-    const effects = parseNarrativeEffects(parsed.effects, input.attributePolicy.allowedStats, input.attributePolicy.allowedBands, 1);
+    const effects = parseNarrativeEffects(parsed.effects, input.attributePolicy);
     return effects ? { ...result, attributeEffects: effects } : null;
   }
   const background = typeof parsed.background === "string" ? parsed.background.trim() : "";
@@ -2578,22 +2777,23 @@ export async function generateDirectedStoryRender(
   }
 }
 
-function parseNarrativeEffects(
-  raw: unknown,
-  allowedStats: StatKey[],
-  allowedBands: NarrativeAttributeEffect["band"][],
-  maxItems: number
-): NarrativeAttributeEffect[] | null {
-  if (!Array.isArray(raw) || raw.length > maxItems) return null;
+function parseNarrativeEffects(raw: unknown, policy: NarrativeAttributePolicy): NarrativeAttributeEffect[] | null {
+  if (!Array.isArray(raw) || raw.length < policy.minEffects || raw.length > policy.maxEffects) return null;
   const used = new Set<StatKey>();
   const effects: NarrativeAttributeEffect[] = [];
   for (const item of raw) {
     const value = item as { stat?: unknown; direction?: unknown; band?: unknown };
-    if (typeof value.stat !== "string" || !allowedStats.includes(value.stat as StatKey) || used.has(value.stat as StatKey)) return null;
-    if ((value.direction !== "up" && value.direction !== "down") || typeof value.band !== "string" || !allowedBands.includes(value.band as NarrativeAttributeEffect["band"])) return null;
+    if (typeof value.stat !== "string" || !policy.allowedStats.includes(value.stat as StatKey) || used.has(value.stat as StatKey)) return null;
+    if (
+      (value.direction !== "up" && value.direction !== "down") ||
+      !policy.allowedDirections.includes(value.direction) ||
+      typeof value.band !== "string" ||
+      !policy.allowedBands.includes(value.band as NarrativeAttributeEffect["band"])
+    ) return null;
     used.add(value.stat as StatKey);
     effects.push({ stat: value.stat as StatKey, direction: value.direction, band: value.band as NarrativeAttributeEffect["band"] });
   }
+  if (policy.requirePositive && !effects.some((effect) => effect.direction === "up")) return null;
   return effects;
 }
 
@@ -2601,14 +2801,21 @@ async function requestNarrativeOutcomeTool(
   run: InternalRunState,
   world: WorldConfig,
   ctx: NarrativeContext,
-  tool: Record<string, unknown>,
+  toolInput: Record<string, unknown> | Record<string, unknown>[],
   prompt: string
-): Promise<{ raw: Record<string, unknown>; toolCall: ToolCallRecord }> {
+): Promise<{ raw: Record<string, unknown>; toolCall: ToolCallRecord; toolName: string }> {
   if (!ctx.apiKey.trim()) throw new NarrativeOutcomeError("narrative_outcome_unavailable");
   const systemPrompt = buildSystemPrompt(normalizePromptPackForModel(ctx.promptPack), world, ctx, "year");
   const conversation = ensureConversationState(ctx.conversation, hashSystemPrompt(systemPrompt), systemPrompt);
   ctx.conversation = conversation;
-  const toolName = (tool.function as { name: string }).name;
+  const tools = Array.isArray(toolInput) ? toolInput : [toolInput];
+  const toolNames = tools.map((tool) => (tool.function as { name?: unknown }).name).filter((name): name is string => typeof name === "string");
+  if (tools.length === 0 || toolNames.length !== tools.length) {
+    throw new NarrativeOutcomeError("narrative_outcome_invalid");
+  }
+  const toolChoice = tools.length === 1
+    ? { type: "function", function: { name: toolNames[0] } }
+    : "required";
   try {
     compactConversationWindow(ctx, conversation);
     const client = getOpenAIClient(ctx);
@@ -2620,8 +2827,8 @@ async function requestNarrativeOutcomeTool(
           input: [...buildConversationHistoryMessages(conversation), { role: "user", content: prompt }],
           temperature: ctx.providerConfig.temperature,
           max_output_tokens: ctx.providerConfig.maxTokens,
-          tools: [responseTool(tool)] as never,
-          tool_choice: { type: "function", name: toolName },
+          tools: tools.map(responseTool) as never,
+          tool_choice: tools.length === 1 ? { type: "function", name: toolNames[0] } : "required",
           parallel_tool_calls: false
         } as never)
       : await client.chat.completions.create({
@@ -2631,18 +2838,18 @@ async function requestNarrativeOutcomeTool(
           messages: [{ role: "system", content: buildSystemMessage(conversation) }, ...buildConversationHistoryMessages(conversation), { role: "user", content: prompt }],
           thinking: { type: "disabled" },
           reasoning_effort: reasoningEffortForSdk(ctx.providerConfig.reasoningEffort),
-          tools: [tool as never],
-          tool_choice: { type: "function", function: { name: toolName } },
+          tools: tools as never,
+          tool_choice: toolChoice as never,
           parallel_tool_calls: false
         } as never);
     const call = isResponsesApi
-      ? findResponseFunctionCall(completion as { output?: unknown[] }, toolName)
-      : findDirectedToolCall((completion as { choices?: Array<{ message?: unknown }> }).choices?.[0]?.message, toolName);
+      ? toolNames.map((toolName) => findResponseFunctionCall(completion as { output?: unknown[] }, toolName)).find(Boolean)
+      : toolNames.map((toolName) => findDirectedToolCall((completion as { choices?: Array<{ message?: unknown }> }).choices?.[0]?.message, toolName)).find(Boolean);
     const raw = call ? parseDirectedToolArguments(call.rawArguments) : null;
     if (!call || !raw) throw new NarrativeOutcomeError("narrative_outcome_invalid");
     pushHistory(conversation, "user", projectConversationUserPrompt(prompt));
     pushToolCall(conversation, call.toolCall);
-    return { raw, toolCall: call.toolCall };
+    return { raw, toolCall: call.toolCall, toolName: call.toolCall.name };
   } catch (error) {
     debugError("narrative-outcome", error);
     if (error instanceof NarrativeOutcomeError) throw error;
@@ -2653,26 +2860,28 @@ async function requestNarrativeOutcomeTool(
 export async function generateBackgroundNarrativeOutcome(
   run: InternalRunState,
   world: WorldConfig,
-  input: { ages: number[]; progressionGoal: string; aftermath: string; livingDetails: string[] },
+  input: {
+    ages: number[];
+    aftermath: string;
+    attributePolicy: NarrativeAttributePolicy;
+  },
   ctx: NarrativeContext
 ): Promise<BackgroundNarrativeOutcome> {
   const ages = Array.from(new Set(input.ages)).sort((a, b) => a - b);
   const prompt = [
     `请写${ages[0]}岁至${ages[ages.length - 1]}岁的一段连贯人生背景。`,
     `需要承接：${compactText(input.aftermath, 140)}`,
-    `本段推进：${compactText(input.progressionGoal, 140)}`,
-    input.livingDetails.length ? `生活细节：${input.livingDetails.map((item) => compactText(item, 60)).join("；")}` : "",
-    "不得写结局、规则、数值或内部标签。每年最多选择一项轻度或中度属性后果；没有明显变化时 effects 可为空。",
+    `不得写结局、规则、数值或内部标签。每年提交${input.attributePolicy.minEffects}-${input.attributePolicy.maxEffects}项属性后果，只能影响${input.attributePolicy.allowedStats.join("、")}，方向只能为${input.attributePolicy.allowedDirections.join("、")}，幅度只能为${input.attributePolicy.allowedBands.join("、")}。`,
     "必须调用 render_background_turn。"
   ].filter(Boolean).join("\n");
-  const result = await requestNarrativeOutcomeTool(run, world, ctx, narrativeBackgroundOutcomeTool(ages), prompt);
+  const result = await requestNarrativeOutcomeTool(run, world, ctx, narrativeBackgroundOutcomeTool(ages, input.attributePolicy), prompt);
   const narrative = typeof result.raw.narrative === "string" ? result.raw.narrative.trim() : "";
   const rows = Array.isArray(result.raw.years) ? result.raw.years : [];
   if (!isSafePlayerNarrative(narrative) || rows.length !== ages.length) throw new NarrativeOutcomeError("narrative_outcome_invalid");
   const years = rows.map((row) => {
     const value = row as { age?: unknown; effects?: unknown };
     const age = typeof value.age === "number" ? value.age : NaN;
-    const effects = parseNarrativeEffects(value.effects, ["intelligence", "charisma", "family", "fortune", "physique"], ["light", "medium"], 1);
+    const effects = parseNarrativeEffects(value.effects, input.attributePolicy);
     return Number.isFinite(age) && effects ? { age, effects } : null;
   });
   if (years.some((row) => !row) || new Set(years.map((row) => row!.age)).size !== ages.length || years.some((row) => !ages.includes(row!.age))) {
@@ -2687,23 +2896,167 @@ export async function generateBackgroundNarrativeOutcome(
 export async function generateDirectedDecisionNarrativeOutcome(
   run: InternalRunState,
   world: WorldConfig,
-  input: { decision: DecisionType; label: string; description: string; allowedStats: StatKey[]; maxBand: "medium" | "heavy" },
+  input: { decision: DecisionType; label: string; description: string; attributePolicy: NarrativeAttributePolicy; factResolutionModes?: NarrativeFactResolution[] },
   ctx: NarrativeContext
 ): Promise<DirectedDecisionNarrativeOutcome> {
-  const bands: NarrativeAttributeEffect["band"][] = input.maxBand === "heavy" ? ["light", "medium", "heavy"] : ["light", "medium"];
   const prompt = [
     `人物在${run.age}岁选择了“${compactText(input.label, 36)}”：${compactText(input.description, 90)}。`,
-    `只能影响：${input.allowedStats.join("、")}；可用幅度：${bands.join("、")}。`,
+    `只能影响：${input.attributePolicy.allowedStats.join("、")}；方向只能为：${input.attributePolicy.allowedDirections.join("、")}；可用幅度：${input.attributePolicy.allowedBands.join("、")}；必须提交${input.attributePolicy.minEffects}-${input.attributePolicy.maxEffects}项后果${input.attributePolicy.requirePositive ? "，且至少一项为正向" : ""}。`,
     "写选择已发生后的自然后果，不写数值、规则、结局或工具。后果必须保留可被后续承接的代价或收获。",
+    input.factResolutionModes?.length ? `本次正处于世界幕高潮，必须同时选择一个事实收束方式：${input.factResolutionModes.join("、")}。` : "",
     "必须调用 resolve_decision_outcome。"
   ].join("\n");
-  const result = await requestNarrativeOutcomeTool(run, world, ctx, narrativeDecisionOutcomeTool(input.allowedStats, bands), prompt);
+  const tool = narrativeDecisionOutcomeTool(input.attributePolicy);
+  if (input.factResolutionModes?.length) {
+    const parameters = (tool.function as { parameters: { required: string[]; properties: Record<string, unknown> } }).parameters;
+    parameters.properties.factResolution = { type: "string", enum: input.factResolutionModes };
+    parameters.required.push("factResolution");
+  }
+  const result = await requestNarrativeOutcomeTool(run, world, ctx, tool, prompt);
   const narrative = typeof result.raw.narrative === "string" ? result.raw.narrative.trim() : "";
-  const effects = parseNarrativeEffects(result.raw.effects, input.allowedStats, bands, 2);
-  if (!isSafePlayerNarrative(narrative) || !effects || effects.length === 0) throw new NarrativeOutcomeError("narrative_outcome_invalid");
+  const effects = parseNarrativeEffects(result.raw.effects, input.attributePolicy);
+  const rawResolution = typeof result.raw.factResolution === "string" ? result.raw.factResolution : undefined;
+  const factResolution = input.factResolutionModes?.includes(rawResolution as NarrativeFactResolution)
+    ? rawResolution as NarrativeFactResolution
+    : undefined;
+  if (!isSafePlayerNarrative(narrative) || !effects || (input.factResolutionModes?.length && !factResolution)) throw new NarrativeOutcomeError("narrative_outcome_invalid");
   pushToolResult(ctx.conversation!, result.toolCall, "抉择后果已由引擎审核并写入人生记录。");
   compactConversationWindow(ctx, ctx.conversation!);
-  return { narrative, effects };
+  return { narrative, effects, factResolution };
+}
+
+function parseDynamicNarrativeParticipants(
+  raw: unknown,
+  factions: DynamicNarrativeSceneInput["factions"]
+): DynamicNarrativeSceneResult["participants"] | null {
+  if (!Array.isArray(raw) || raw.length > 3) return null;
+  const participants: DynamicNarrativeSceneResult["participants"] = [];
+  for (const value of raw) {
+    if (!value || typeof value !== "object") return null;
+    const item = value as Record<string, unknown>;
+    const name = typeof item.name === "string" ? compactText(item.name, 60) : "";
+    const factionId = typeof item.factionId === "string" ? item.factionId.trim() : "";
+    const role = typeof item.role === "string" ? compactText(item.role, 100) : "";
+    const description = typeof item.description === "string" ? compactText(item.description, 220) : "";
+    if (!isSafePlayerText(name, 1) || !isSafePlayerText(role, 1) || !isSafePlayerText(description, 1) || !factions.some((faction) => faction.id === factionId)) {
+      return null;
+    }
+    participants.push({ name, factionId, role, description, recurring: item.recurring === true });
+  }
+  return participants;
+}
+
+export async function generateDynamicNarrativeScene(
+  run: InternalRunState,
+  world: WorldConfig,
+  input: DynamicNarrativeSceneInput,
+  ctx: NarrativeContext
+): Promise<DynamicNarrativeSceneResult> {
+  const sceneAllowed = input.allowedTurnKinds.includes("scene");
+  if (sceneAllowed && (input.routes.length === 0 || input.factions.length === 0)) {
+    throw invalidNarrativeOutcome("dynamic_scene_catalog_missing");
+  }
+  const toolSet = dynamicNarrativeSceneTools(input);
+  if (toolSet.tools.length === 0) throw invalidNarrativeOutcome("dynamic_scene_tools_missing");
+  const canRenderBackground = toolSet.names.includes("render_background_segment");
+  const canRenderScene = toolSet.names.includes("render_scene");
+  const canRenderChoice = toolSet.names.includes("render_choice_scene");
+  const prompt = [
+    `当前世界幕：${compactText(input.act.label, 36)}。${compactText(input.act.prompt, 180)}`,
+    `当前节拍：${input.beat}。${input.act.factLabel ? `本幕事实：${compactText(input.act.factLabel, 120)}` : ""}`,
+    input.beat === "setup" ? "这是本幕开场。正文应先让世界变化、传闻或他人处境进入人物视野，不要求人物立刻亲自解决冲突。" : "",
+    `人物能力档位（仅用于判断，不写入正文）：${Object.entries(input.statTiers).map(([stat, tier]) => `${stat}=${tier}`).join("；")}`,
+    sceneAllowed ? `可选路线（场景时必须选一条）：${input.routes.map((route) => `${route.id}=${route.label}：${compactText(route.summary, 88)}`).join(" | ")}` : "",
+    sceneAllowed ? `可选阵营（场景时必须选一方）：${input.factions.map((faction) => `${faction.id}=${faction.label}：${compactText(faction.summary, 60)}`).join(" | ")}` : "",
+    input.knownCharacters.length ? `可回归人物：${input.knownCharacters.map((character) => `${character.name}(${character.role})`).join("；")}` : "",
+    ctx.recentNarratives?.length ? `按需召回的已发生片段：${ctx.recentNarratives.map((entry) => compactText(entry, 110)).join("；")}` : "",
+    canRenderBackground
+      ? `render_background_segment 表示${input.backgroundYearRange.min}-${input.backgroundYearRange.max}年的平静人生片段；不得借背景推进、解释或收束当前主线，逐年提交轻度或中度成长${input.backgroundAttributePolicy.preferredStats?.length ? `，优先影响${input.backgroundAttributePolicy.preferredStats.join("、")}` : ""}。`
+      : "",
+    canRenderScene
+      ? `render_scene 表示推进当前节拍的场景，必须提交${input.attributePolicy?.minEffects ?? 1}-${input.attributePolicy?.maxEffects ?? 2}项受控属性后果。`
+      : "",
+    canRenderChoice
+      ? "render_choice_scene 表示真正影响人物关系、资源、立场或后续处境的取舍，必须写正文、抉择背景和三个自然语言选项；不要写风险标签。"
+      : "",
+    input.decisionMode === "required" && canRenderChoice ? "本拍必须调用 render_choice_scene。" : "",
+    input.decisionMode === "none" && canRenderScene ? "本拍必须调用 render_scene。" : "",
+    "路线是观察和人物经历的视角，不是独占分支；不得生成世界包之外的路线或阵营 ID。场景可让既有人物回归，也可提出新人物；只有 recurring=true 的人物才会进入命运人物档案。",
+    `不得写结局、内部标签、系统说明、数值或工具。必须调用以下允许工具之一：${toolSet.names.join("、")}。`
+  ].filter(Boolean).join("\n");
+  const result = await requestNarrativeOutcomeTool(run, world, ctx, toolSet.tools, prompt);
+  const narrative = typeof result.raw.narrative === "string" ? result.raw.narrative.trim() : "";
+  if (!isSafePlayerNarrative(narrative)) throw invalidNarrativeOutcome("dynamic_scene_narrative_unsafe");
+
+  if (result.toolName === "render_background_segment") {
+    if (!canRenderBackground) throw invalidNarrativeOutcome("dynamic_background_tool_disallowed");
+    const backgroundYears = typeof result.raw.backgroundYears === "number" ? result.raw.backgroundYears : NaN;
+    const rows = Array.isArray(result.raw.backgroundEffects) ? result.raw.backgroundEffects : [];
+    const effects = rows.map((row) => {
+      const value = row as { offset?: unknown; effects?: unknown };
+      const offset = typeof value.offset === "number" ? value.offset : NaN;
+      const parsed = parseNarrativeEffects(value.effects, input.backgroundAttributePolicy);
+      return Number.isInteger(offset) && parsed ? { offset, effects: parsed } : null;
+    });
+    const isValidBackgroundYears = Number.isInteger(backgroundYears) && backgroundYears >= input.backgroundYearRange.min && backgroundYears <= input.backgroundYearRange.max;
+    const expectedOffsets = isValidBackgroundYears
+      ? Array.from({ length: backgroundYears }, (_value, index) => index + 1)
+      : [];
+    if (effects.length !== expectedOffsets.length || effects.some((row) => !row) ||
+      new Set(effects.map((row) => row!.offset)).size !== expectedOffsets.length ||
+      expectedOffsets.some((offset) => !effects.some((row) => row?.offset === offset))) {
+      throw invalidNarrativeOutcome("dynamic_background_effects_invalid");
+    }
+    pushToolResult(ctx.conversation!, result.toolCall, "背景叙事与年度后果已由引擎接收。");
+    compactConversationWindow(ctx, ctx.conversation!);
+    return {
+      turnKind: "background",
+      narrative,
+      participants: [],
+      backgroundYears,
+      backgroundAttributeEffects: effects as Array<{ offset: number; effects: NarrativeAttributeEffect[] }>
+    };
+  }
+
+  const routeId = typeof result.raw.routeId === "string" ? result.raw.routeId.trim() : "";
+  const factionId = typeof result.raw.factionId === "string" ? result.raw.factionId.trim() : "";
+  const participants = parseDynamicNarrativeParticipants(result.raw.participants, input.factions);
+  const scenePacing = result.raw.scenePacing === "continuous" || result.raw.scenePacing === "spanning"
+    ? result.raw.scenePacing
+    : undefined;
+  if (!sceneAllowed || !input.routes.some((route) => route.id === routeId) || !input.factions.some((faction) => faction.id === factionId) || !participants) {
+    throw invalidNarrativeOutcome("dynamic_scene_identity_or_participants_invalid");
+  }
+
+  if (result.toolName === "render_scene") {
+    const attributeEffects = input.attributePolicy ? parseNarrativeEffects(result.raw.effects, input.attributePolicy) : null;
+    if (!canRenderScene || !attributeEffects) throw invalidNarrativeOutcome("dynamic_scene_effects_invalid");
+    pushToolResult(ctx.conversation!, result.toolCall, "世界幕场景、人物提议与受控后果已由引擎接收。");
+    compactConversationWindow(ctx, ctx.conversation!);
+    return { turnKind: "scene", routeId, factionId, narrative, scenePacing, participants, createsDecision: false, attributeEffects };
+  }
+
+  if (result.toolName === "render_choice_scene") {
+    const background = typeof result.raw.background === "string" ? result.raw.background.trim() : "";
+    const optionOverrides = normalizeMilestoneOptionOverrides(result.raw.optionOverrides);
+    if (!canRenderChoice || !isSafePlayerNarrative(background) || !optionOverrides) {
+      throw invalidNarrativeOutcome("dynamic_choice_presentation_invalid");
+    }
+    pushToolResult(ctx.conversation!, result.toolCall, "世界幕抉择、人物提议与待结算后果已由引擎接收。");
+    compactConversationWindow(ctx, ctx.conversation!);
+    return {
+      turnKind: "scene",
+      routeId,
+      factionId,
+      narrative,
+      scenePacing,
+      participants,
+      createsDecision: true,
+      milestoneCopy: { background, optionOverrides }
+    };
+  }
+
+  throw invalidNarrativeOutcome("dynamic_scene_tool_unknown");
 }
 
 export function recordDirectedStoryTurnOutcome(
@@ -3028,7 +3381,7 @@ function normalizeMilestoneOptionOverrides(raw: unknown): AiMilestoneOptions["op
     const maybe = item as { id?: unknown; label?: unknown; description?: unknown };
     const label = typeof maybe.label === "string" ? maybe.label.trim() : "";
     const description = typeof maybe.description === "string" ? maybe.description.trim() : "";
-    if (!label || !description) return null;
+    if (!isSafePlayerText(label, 1) || !isSafePlayerText(description, 1)) return null;
     const normalizedId = normalizeDecisionId(maybe.id) ?? normalizeDecisionId(label);
 
     if (normalizedId && !byId.has(normalizedId)) {

@@ -141,3 +141,11 @@
 - 当前内容加载校验要求每条已配置路线均有 `setup/escalation/pressure/climax/payoff` 五种已绑定素材，防止模型选择路线后没有可渲染事件。这个约束来自内容完整性校验，不代表路线之间互斥。
 - `maxAge` 是素材权重偏好而非叙事终止条件；世界主线与结局不会因年龄达到某个上限自动结束。
 - 本地 Provider 默认值为 `https://api.deepseek.com`、`deepseek-v4-flash`、`/chat/completions` 与 `reasoningEffort=minimal`。这些值可被 `DEFAULT_PROVIDER_*` 环境变量或会话配置覆盖。
+
+## 9. 叙事属性与结局调参（2026-08-22 01:34 +08:00，增量）
+
+- 导演模式下，`growth` 与 `decision.profiles` 仍保留给旧非叙事链路；当前叙事链路的属性数值来自模型工具结果，经 `NarrativeAttributePolicy` 审批后落盘。
+- 普通背景段只能落入轻/中度正向属性变化。导演抉择的风险梯度不由 `decision.profiles.gain/loss` 直接决定：稳健仅轻度正收益，适中允许轻/中度且必须至少一项正收益，冒险允许重度正负结果。
+- `fame` 新增：`mainlineActBonus`、`stableChoiceBonus`、`balancedChoiceBonus`、`riskyBreakthroughBonus`、`riskySetbackPenalty`。它们分别影响世界幕完成、三类抉择后果的名望增减；`maxStatValue` 仍是属性名望基数的归一上限。
+- `ending.narrativeNormalScore` 与 `ending.narrativeGoodScore` 控制主线完成后的普通/好结局分界，`narrativeFameWeight` 为名望在结局分数中的有限修正。约束为 `narrativeGoodScore >= narrativeNormalScore`。
+- 每个叙事世界包的每条 `routeArcs.directionId` 必须配置 `good`、`normal`、`bad` 三张结局蓝图，并与原有五步素材完整性校验一起在内容加载期检查。

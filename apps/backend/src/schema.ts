@@ -51,7 +51,8 @@ export const startRunSchema = z.object({
 
 export const stepRunSchema = z.object({
   runId: z.string().min(1),
-  action: z.enum(["consume", "decide"]).optional(),
+  action: z.enum(["consume", "decide", "select_growth_focus"]).optional(),
+  growthFocusId: z.string().min(1).max(80).optional(),
   decision: z.string().min(8).max(128).optional(),
   decisionAge: z.number().int().min(0).max(160).optional(),
   sceneId: z.string().min(8).max(128).optional(),
@@ -267,13 +268,21 @@ const gameplayTuningSchema = z.object({
     fortuneWeight: z.number().min(0).max(3),
     physiqueWeight: z.number().min(0).max(3),
     maxStatValue: z.number().int().min(1).max(100),
+    mainlineActBonus: z.number().min(0).max(30),
+    stableChoiceBonus: z.number().min(0).max(10),
+    balancedChoiceBonus: z.number().min(0).max(10),
+    riskyBreakthroughBonus: z.number().min(0).max(20),
+    riskySetbackPenalty: z.number().min(0).max(20),
     min: z.number().min(0).max(100),
     max: z.number().min(0).max(100)
   }),
   ending: z.object({
     greatScore: z.number().min(0).max(200),
     goodScore: z.number().min(0).max(200),
-    normalScore: z.number().min(0).max(200)
+    normalScore: z.number().min(0).max(200),
+    narrativeNormalScore: z.number().min(0).max(200),
+    narrativeGoodScore: z.number().min(0).max(200),
+    narrativeFameWeight: z.number().min(0).max(2)
   })
 }).superRefine((value, ctx) => {
   if (value.bootstrap.talentPointMax < value.bootstrap.talentPointMin) {
@@ -314,6 +323,9 @@ const gameplayTuningSchema = z.object({
   }
   if (value.ending.greatScore < value.ending.goodScore || value.ending.goodScore < value.ending.normalScore) {
     ctx.addIssue({ code: "custom", message: "ending 阈值必须满足 great >= good >= normal" });
+  }
+  if (value.ending.narrativeGoodScore < value.ending.narrativeNormalScore) {
+    ctx.addIssue({ code: "custom", message: "叙事结局阈值必须满足 good >= normal" });
   }
 });
 

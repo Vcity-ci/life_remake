@@ -118,13 +118,21 @@ export function createDefaultGameplayTuning() {
             fortuneWeight: 1,
             physiqueWeight: 1,
             maxStatValue: 100,
+            mainlineActBonus: 8,
+            stableChoiceBonus: 0.75,
+            balancedChoiceBonus: 1,
+            riskyBreakthroughBonus: 2.5,
+            riskySetbackPenalty: 2,
             min: 0,
             max: 100
         },
         ending: {
             greatScore: 34,
             goodScore: 27,
-            normalScore: 20
+            normalScore: 20,
+            narrativeNormalScore: 15,
+            narrativeGoodScore: 21,
+            narrativeFameWeight: 0.05
         }
     };
 }

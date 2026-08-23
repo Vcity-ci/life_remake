@@ -402,6 +402,41 @@ function mergeNarrativeComponentCatalog(
   };
 }
 
+/**
+ * World-act facts are engine contracts. A missing reference would otherwise
+ * become an unreachable closure condition only after a long-running game.
+ */
+export function validateNarrativeWorldFactContract(
+  definition: NarrativeWorldDefinition
+): NarrativeWorldDefinition {
+  const factIds = new Set<string>();
+  for (const fact of definition.mainlineFacts ?? []) {
+    if (!fact.id?.trim() || factIds.has(fact.id)) {
+      throw new Error(`${definition.worldId}_mainline_fact_definition_invalid:${fact.id || "unknown"}`);
+    }
+    factIds.add(fact.id);
+  }
+
+  const actIds = new Set<string>();
+  for (const act of definition.mainlineActs ?? []) {
+    if (!act.id?.trim() || actIds.has(act.id)) {
+      throw new Error(`${definition.worldId}_mainline_act_definition_invalid:${act.id || "unknown"}`);
+    }
+    actIds.add(act.id);
+    const references = Array.from(new Set([
+      ...(act.requiredFactIds ?? []),
+      ...(act.introduceFactIds ?? []),
+      ...(act.resolveFactIds ?? []),
+      ...(act.factId ? [act.factId] : [])
+    ]));
+    const unresolved = references.find((id) => !factIds.has(id));
+    if (unresolved) {
+      throw new Error(`${definition.worldId}_mainline_act_fact_reference_invalid:${act.id}:${unresolved}`);
+    }
+  }
+  return definition;
+}
+
 export async function loadNarrativeWorldDefinition(worldId: string): Promise<NarrativeWorldDefinition | null> {
   if (narrativeWorldCache.has(worldId)) {
     return narrativeWorldCache.get(worldId) ?? null;
@@ -414,13 +449,19 @@ export async function loadNarrativeWorldDefinition(worldId: string): Promise<Nar
     readJsonFile<NarrativeComponentCatalog>(path.resolve(narrativeWorldDir, `${worldId}.components.json`)).catch(() => null)
   ])
     .then(([definition, catalog]) => {
-      const valid = (definition.version === 1 || definition.version === 2 || definition.version === 3) && definition.worldId === worldId
+      const merged = (definition.version === 1 || definition.version === 2 || definition.version === 3 || definition.version === 4 || definition.version === 5) && definition.worldId === worldId
         ? mergeNarrativeComponentCatalog(definition, catalog, worldId)
         : null;
+      const valid = merged ? validateNarrativeWorldFactContract(merged) : null;
       narrativeWorldCache.set(worldId, valid);
       return valid;
     })
-    .catch(() => {
+    .catch((error) => {
+      // Keep malformed authoring data out of the runtime without exposing
+      // internal validation details to the player-facing API.
+      if ((error as NodeJS.ErrnoException | undefined)?.code !== "ENOENT") {
+        console.error(`[narrative-world:load:${worldId}]`, error);
+      }
       narrativeWorldCache.set(worldId, null);
       return null;
     })
@@ -703,21 +744,19 @@ function validateNarrativeFactContract(worldId: string, definitions: EventDefini
   return definitions;
 }
 
-function validateNarrativeRouteBeatContract(
+function validateNarrativeEndingBlueprintContract(
   worldId: string,
-  definitions: EventDefinition[],
   narrativeWorld: NarrativeWorldDefinition
-): EventDefinition[] {
-  const requiredBeats = ["setup", "escalation", "pressure", "climax", "payoff"] as const;
+): void {
+  const requiredEndingPolarities = ["good", "normal", "bad"] as const;
   for (const route of narrativeWorld.routeArcs) {
-    const missing = requiredBeats.filter((beat) => !definitions.some((definition) => (
-      definition.storyDirectionIds?.includes(route.directionId) && definition.narrativeBeat === beat
+    const missingEndings = requiredEndingPolarities.filter((polarity) => !narrativeWorld.endingBlueprints.some((blueprint) => (
+      blueprint.directionId === route.directionId && blueprint.polarity === polarity
     )));
-    if (missing.length > 0) {
-      throw new Error(`${worldId}_route_beat_contract_invalid:${route.directionId}:${missing.join(",")}`);
+    if (missingEndings.length > 0) {
+      throw new Error(`${worldId}_ending_blueprint_contract_invalid:${route.directionId}:${missingEndings.join(",")}`);
     }
   }
-  return definitions;
 }
 
 export async function loadEventDefinitions(worldId: string): Promise<EventDefinition[]> {
@@ -748,9 +787,10 @@ export async function loadEventDefinitions(worldId: string): Promise<EventDefini
       ))
       .filter((event) => event.title.trim().length > 0)
   );
-  return narrativeWorld
-    ? validateNarrativeRouteBeatContract(worldId, validateNarrativeFactContract(worldId, definitions), narrativeWorld)
-    : definitions;
+  // Dynamic scenes use the world package directly. Old static material remains
+  // available to content tooling but cannot make a world fail to load.
+  if (narrativeWorld) validateNarrativeEndingBlueprintContract(worldId, narrativeWorld);
+  return definitions;
 }
 
 export async function loadItemDefinitions(): Promise<ItemDefinition[]> {

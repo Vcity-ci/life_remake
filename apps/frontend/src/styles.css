@@ -735,6 +735,11 @@ button.danger:hover { background: #8a4b41; }
 .stat-list > div { display: flex; justify-content: space-between; gap: 8px; padding: 9px 0; border-bottom: 1px solid #33342f; }
 .stat-list dt { color: #c6bda9; font-size: 13px; }
 .stat-list dd { margin: 0; color: #ecd9aa; font-size: 16px; font-weight: 700; }
+.stat-list dd { display: flex; align-items: center; gap: 8px; }
+.stat-tier { display: inline-flex; align-items: center; min-height: 18px; padding: 0 6px; border: 1px solid; border-radius: 4px; font-size: 10px; font-weight: 600; line-height: 1; white-space: nowrap; }
+.stat-tier-low { color: #d6a69b; border-color: #704b43; background: #2b1d1b; }
+.stat-tier-steady { color: #d7c28a; border-color: #65583e; background: #28251d; }
+.stat-tier-high { color: #9ecbbc; border-color: #42675d; background: #172622; }
 
 .rail-meta { display: grid; gap: 8px; color: #9f9685; font-size: 13px; }
 .rail-meta span { padding-left: 9px; border-left: 2px solid #7d6940; }
@@ -810,6 +815,12 @@ button.danger:hover { background: #8a4b41; }
 
 .modal-mask { background: rgba(5, 7, 8, 0.76); }
 .modal { border-color: #65583e; border-radius: 5px; background: #171b1c; color: #ddd3bf; }
+.growth-focus-modal { width: min(760px, 100%); }
+.growth-focus-options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 16px; }
+.growth-focus-options button { min-height: 130px; display: grid; align-content: start; gap: 9px; padding: 16px; border: 1px solid #5a503d; border-radius: 5px; background: #1d2121; color: #e1d5bd; text-align: left; }
+.growth-focus-options button:hover:not(:disabled) { border-color: #b99c5d; background: #242722; }
+.growth-focus-options button strong { color: #e3c87f; font-size: 15px; }
+.growth-focus-options button small { color: #b9b09e; font-size: 12px; line-height: 1.55; }
 .editor-card { border-color: #4f4a3e; border-radius: 4px; background: #1d2121; }
 .repo-link { color: #968b72; }
 .repo-link:hover { color: #e0c98f; border-bottom-color: #e0c98f; }
@@ -855,6 +866,7 @@ button.danger:hover { background: #8a4b41; }
   .rail-section { padding-bottom: 15px; margin-bottom: 15px; border-bottom: 1px solid #423f36; }
   .decision-options { grid-template-columns: 1fr; }
   .stats-grid, .cards { grid-template-columns: 1fr; }
+  .growth-focus-options { grid-template-columns: 1fr; }
   .start-panel { margin: 20px auto; padding: 18px; }
   .save-item { align-items: flex-start; flex-direction: column; }
   .save-actions { width: 100%; }

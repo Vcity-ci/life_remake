@@ -63,6 +63,7 @@ const defaultStats: Stats = {
   physique: 0
 };
 const statKeys: StatKey[] = ["intelligence", "charisma", "family", "fortune", "physique"];
+const statTierLabels = { low: "积累中", steady: "可用", high: "出众" } as const;
 
 function rarityClass(r: PublicBackgroundCard["rarity"]): string {
   return `rarity-${r}`;
@@ -695,6 +696,10 @@ export default function App(): React.JSX.Element {
       setStatus("请先完成当前抉择。");
       return;
     }
+    if (run.growthFocus && !run.growthFocus.selectedId) {
+      setStatus("请先确定这一阶段的成长方向。");
+      return;
+    }
     try {
       setStatus("推进年份中...");
       if (isGeneratingRef.current) {
@@ -739,6 +744,35 @@ export default function App(): React.JSX.Element {
       } else {
         setStatus("暂时无法完成抉择，请稍后重试。");
       }
+    }
+  }
+
+  async function onSelectGrowthFocus(focusId: string): Promise<void> {
+    const currentRun = runRef.current;
+    if (!currentRun || isStreaming || isGeneratingRef.current) return;
+    isGeneratingRef.current = true;
+    setIsGenerating(true);
+    try {
+      await stepRunStream({
+        runId: currentRun.runId,
+        action: "select_growth_focus",
+        growthFocusId: focusId,
+        requestId: makeStepRequestId(currentRun.runId, "select_growth_focus", ++requestNonceRef.current, focusId)
+      }, async (event: GameStreamEvent) => {
+        if (event.type === "done") {
+          if (event.data.turns) setTurns(event.data.turns);
+          setRun(event.data.run);
+          runRef.current = event.data.run;
+          setStatus("成长方向已确定。");
+          return;
+        }
+        if (event.type === "error") throw new Error(event.data.message);
+      });
+    } catch {
+      setStatus("暂时无法确认成长方向，请稍后重试。");
+    } finally {
+      isGeneratingRef.current = false;
+      setIsGenerating(false);
     }
   }
 
@@ -921,7 +955,10 @@ export default function App(): React.JSX.Element {
             <aside className="reader-rail character-rail">
               <div className="rail-title"><small>此生行至</small><strong>{run.age} 岁</strong><span>{run.ageStage.label}</span></div>
               <dl className="stat-list">
-                {statKeys.map((key) => <div key={key}><dt>{statIcons[key]} {statLabels[key]}</dt><dd>{run.stats[key]}</dd></div>)}
+                {statKeys.map((key) => {
+                  const tier = run.statTiers?.[key] ?? "steady";
+                  return <div key={key}><dt>{statIcons[key]} {statLabels[key]}</dt><dd><span>{run.stats[key]}</span><small className={`stat-tier stat-tier-${tier}`}>{statTierLabels[tier]}</small></dd></div>;
+                })}
               </dl>
               <div className="rail-meta"><span>名望 {run.fame}</span><span>{run.outcome === "ongoing" ? "命途未定" : outcomeLabel(run.outcome)}</span></div>
             </aside>
@@ -976,7 +1013,7 @@ export default function App(): React.JSX.Element {
 
             <aside className="reader-rail fate-rail" aria-label="命运档案">
               <section className="rail-section"><h3>天赋</h3><div className="asset-list">{run.cards.map((card) => <span className={`asset-chip ${rarityClass(card.rarity)}`} key={card.id} title={card.description}>{card.name}</span>)}</div></section>
-              <section className="rail-section"><h3>命运道具</h3><div className="asset-list">{run.items.length === 0 ? <small>尚无命运物件</small> : run.items.map((item) => <span className={`asset-chip item-chip ${rarityClass(item.rarity)}`} key={item.id} title={item.description}>{item.name}</span>)}</div></section>
+              <section className="rail-section"><h3>命运人物</h3><div className="asset-list">{(run.narrativeCharacters?.length ?? 0) === 0 ? <small>尚无常驻人物</small> : run.narrativeCharacters!.map((character) => <span className="asset-chip item-chip" key={character.id} title={`${character.role}：${character.description}`}>{character.name}</span>)}</div></section>
               <section className="decision-history">
                 <div className="decision-history-head"><h3>已作抉择</h3></div>
                 {decisionHistory.length === 0 ? <p className="decision-history-empty">尚未走到分岔处。</p> : (
@@ -1011,6 +1048,22 @@ export default function App(): React.JSX.Element {
           difficultyId={difficultyId}
           setDifficultyId={setDifficultyId}
         />
+      ) : null}
+
+      {run?.growthFocus && !run.growthFocus.selectedId && !run.ended ? (
+        <div className="modal-mask" role="dialog" aria-modal="true" aria-label="选择成长方向">
+          <div className="modal growth-focus-modal">
+            <h2>此阶段的积累</h2>
+            <div className="growth-focus-options">
+              {run.growthFocus.options.map((focus) => (
+                <button key={focus.id} disabled={isStreaming || isGenerating} onClick={() => void onSelectGrowthFocus(focus.id)}>
+                  <strong>{focus.label}</strong>
+                  <small>{focus.description}</small>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
       ) : null}
 
       {run?.ended && showEndingModal ? (

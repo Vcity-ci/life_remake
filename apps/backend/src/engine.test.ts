@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createDefaultGameplayTuning } from "@reroll/shared";
-import type { BackgroundCard, DifficultyConfig, EventDefinition, ItemDefinition, NarrativeWorldDefinition, StoryDirectionDefinition, WorldConfig } from "@reroll/shared";
+import type { BackgroundCard, DifficultyConfig, EventDefinition, ItemDefinition, NarrativeAttributePolicy, NarrativeWorldDefinition, StoryDirectionDefinition, WorldConfig } from "@reroll/shared";
 import {
   advanceWithDirectedEvent,
+  advanceWithDynamicNarrativeScene,
   applyDirectedClosureRequest,
   applyDirectedMilestonePresentation,
   appendPublicTurnRecord,
@@ -11,6 +12,7 @@ import {
   applyMilestoneDecisionAndAdvance,
   autoAdvanceToCheckpoint,
   buildDirectedEventCandidates,
+  canRequestDirectedClosure,
   selectDirectedCandidateForIntent,
   createDirectedMilestoneChoice,
   createRun,
@@ -19,8 +21,8 @@ import {
   toPublicTimelineEntryFromEvent,
   toClientRun
 } from "./engine.js";
-import { assessClosureReadiness, ensureNarrativeRunState, getNarrativeRouteProgress, refreshNarrativeMainlineCompletion } from "./narrative.js";
-import { loadEventDefinitions, loadNarrativeWorldDefinition } from "./content.js";
+import { assessClosureReadiness, assessEnding, ensureNarrativeRunState, getNarrativeRouteProgress, refreshNarrativeMainlineCompletion } from "./narrative.js";
+import { loadEventDefinitions, loadNarrativeWorldDefinition, validateNarrativeWorldFactContract } from "./content.js";
 
 const world: WorldConfig = {
   id: "test-world",
@@ -135,6 +137,7 @@ const narrativeWorld: NarrativeWorldDefinition = {
   eventBindings: [],
   endingBlueprints: [
     { id: "test.good", worldId: world.id, directionId: "test.guardian", polarity: "good", title: "善终", premise: "测试", finalConflict: "测试", payoffFocus: "测试", epilogueFocus: "测试", statWeights: { intelligence: 1 }, requiredThreadIds: ["test.thread"] },
+    { id: "test.normal", worldId: world.id, directionId: "test.guardian", polarity: "normal", title: "余温", premise: "测试", finalConflict: "测试", payoffFocus: "测试", epilogueFocus: "测试", statWeights: { intelligence: 1 }, requiredThreadIds: ["test.thread"] },
     { id: "test.bad", worldId: world.id, directionId: "test.guardian", polarity: "bad", title: "苦果", premise: "测试", finalConflict: "测试", payoffFocus: "测试", epilogueFocus: "测试", statWeights: { intelligence: 1 }, requiredThreadIds: ["test.thread"] }
   ]
 };
@@ -343,12 +346,12 @@ test("世界幕入口不会覆盖场景内部的压力与高潮门槛", () => {
   const setup = candidateFor("setup");
   assert.equal(setup?.kind, "normal");
   advanceWithDirectedEvent(run, world, setup!, "旧档先在日常细节中露出痕迹。", undefined, undefined, pacedWorld, {
-    attributeOutcome: { effects: [{ stat: "intelligence", direction: "up", band: "light" }] }
+    attributeOutcome: { effects: [{ stat: "charisma", direction: "up", band: "light" }] }
   });
   const escalation = candidateFor("escalation");
   assert.equal(escalation?.kind, "normal");
   advanceWithDirectedEvent(run, world, escalation!, "你逐渐察觉到证词彼此抵触。", undefined, undefined, pacedWorld, {
-    attributeOutcome: { effects: [{ stat: "intelligence", direction: "up", band: "light" }] }
+    attributeOutcome: { effects: [{ stat: "charisma", direction: "up", band: "light" }] }
   });
 
   // 入口阈值已满足，但压力阈值尚未满足，故仍是普通加压而非抉择。
@@ -488,7 +491,7 @@ test("模型选定路线后由旧高潮状态机在该路线选择当前拍点�
   assert.equal(parallelOpening?.definition.id, parallelSetup.id);
   advanceWithDirectedEvent(run, world, parallelOpening!, "另一段经历先留下了未解的余波。", parallelDirection, undefined, worldWithActs, {
     experienceId: parallelDirection.id,
-    attributeOutcome: { effects: [{ stat: "intelligence", direction: "up", band: "light" }] }
+    attributeOutcome: { effects: [{ stat: "charisma", direction: "up", band: "light" }] }
   });
   assert.equal(getNarrativeRouteProgress(run.narrative, parallelDirection.id)?.phase, "setup");
 
@@ -508,7 +511,7 @@ test("模型选定路线后由旧高潮状态机在该路线选择当前拍点�
       advanceWithDirectedEvent(run, world, candidate!, "旧档的代价终于落到你面前。", direction, undefined, worldWithActs, {
       experienceId: "test.guardian",
         attributeOutcome: candidate?.kind === "normal"
-          ? { effects: [{ stat: "intelligence", direction: "up", band: "light" }] }
+          ? { effects: [{ stat: "charisma", direction: "up", band: "light" }] }
           : undefined,
         completeMainlineAct: candidate?.definition.narrativeBeat === "payoff"
       });
@@ -646,7 +649,7 @@ test("古代世界包的具体素材均有可用情境层与世界主线事实",
   )));
 });
 
-test("古代世界可在初始年份以普通叙事接触旧案，六条路线均可由状态机选材", async () => {
+test("古代世界在 opening 属性门槛不足时不会由旧候选器提前启动 setup", async () => {
   const [definitions, ancientWorld] = await Promise.all([
     loadEventDefinitions("ancient"),
     loadNarrativeWorldDefinition("ancient")
@@ -678,8 +681,7 @@ test("古代世界可在初始年份以普通叙事接触旧案，六条路线�
       ancientWorld,
       direction.id
     );
-    assert.equal(selected?.definition.narrativeBeat, "setup", `${route.directionId} 缺少初始年份的开场承接`);
-    assert.equal(selected?.kind, "normal", `${route.directionId} 的旧案接触不应成为早期抉择`);
+    assert.equal(selected, undefined, `${route.directionId} 不应绕过普通年份缓冲提前进入 setup`);
   }
 });
 
@@ -708,6 +710,41 @@ test("普通年份只接受轻度或中度模型属性后果", () => {
     }, "background")?.intelligence,
     2
   );
+});
+
+test("导演抉择按稳健、适中、冒险分别审批属性后果", () => {
+  const run = makeRun();
+  run.age = 17;
+  run.ageStage = world.ageThresholds?.[1] ?? run.ageStage;
+  const candidate = buildDirectedEventCandidates(run, world, difficulty, [event], [item])[0];
+  assert.ok(candidate);
+  advanceWithDirectedEvent(run, world, candidate!, "旧约将你推到必须表态的关口。");
+  const policies = run.pendingDirectedDecisionPolicy!;
+
+  assert.equal(
+    approveNarrativeAttributeOutcome(run, world, {
+      effects: [{ stat: "charisma", direction: "up", band: "medium" }]
+    }, "decision", policies.safe),
+    null
+  );
+  assert.equal(
+    approveNarrativeAttributeOutcome(run, world, {
+      effects: [{ stat: "charisma", direction: "up", band: "light" }]
+    }, "decision", policies.safe)?.charisma,
+    1
+  );
+  const balanced = approveNarrativeAttributeOutcome(run, world, {
+      effects: [
+        { stat: "charisma", direction: "up", band: "medium" },
+        { stat: "physique", direction: "down", band: "light" }
+      ]
+    }, "decision", policies.balanced);
+  assert.equal(balanced?.charisma, 2);
+  assert.equal(balanced?.physique, -1);
+  const risky = approveNarrativeAttributeOutcome(run, world, {
+      effects: [{ stat: "charisma", direction: "down", band: "heavy" }]
+    }, "decision", policies.risky);
+  assert.equal(risky?.charisma, -3);
 });
 
 test("连续场景停表时不会重复推进年龄", () => {
@@ -759,7 +796,7 @@ test("背景段延后结算后才写入模型提出的年度属性变化", () =>
   assert.equal(settleNarrativeBackgroundOutcomes(run, world, [{
     age: advanced.chunk[0]!.age,
     effects: [{ stat: "intelligence", direction: "up", band: "medium" }]
-  }]), true);
+  }], advanced.chunk.map((event) => event.age)), true);
   assert.equal(run.stats.intelligence, before + 2);
 });
 
@@ -800,4 +837,258 @@ test("三个已完成场景可复用同一经历，但必须覆盖世界定义�
   };
   const source = { worldId: run.worldId, age: run.age, personaPrompt: run.personaPrompt, stats: run.stats, cards: run.cards, items: run.items, story: run.story, narrative: run.narrative };
   assert.equal(refreshNarrativeMainlineCompletion(source, worldWithActs), true);
+});
+
+test("叙事结局以主线完成为前提，并稳定区分好、普通、坏三档", () => {
+  const evaluate = (intelligence: number, tags: string[], fame: number) => {
+    const run = createRun(
+      { world, difficulty, cards: [card], tuning: createDefaultGameplayTuning(), narrativeEnabled: true },
+      {
+        clientId: `ending-${intelligence}-${tags.join("-") || "plain"}`,
+        worldId: world.id,
+        difficultyId: difficulty.id,
+        personaPrompt: "愿意承担旧档代价的人",
+        talentPointTotal: 25,
+        stats: { intelligence: 5, charisma: 5, family: 5, fortune: 5, physique: 5 },
+        selectedCardIds: [card.id]
+      }
+    );
+    run.age = 36;
+    run.stats.intelligence = intelligence;
+    run.fame = fame;
+    run.story.contract.initialDirectionId = "test.guardian";
+    run.story.contract.coreThreadIds = ["test.thread"];
+    run.story.activeDirectionId = "test.guardian";
+    run.story.committedDirectionIds = ["test.guardian"];
+    run.story.factLedger!.facts = [
+      { id: "decision:ending", kind: "commitment", label: "承担旧档", status: "open", introducedAge: 20, lastTouchedAge: 20, sourceEventId: "test" },
+      { id: "thread:test.thread", kind: "open_question", label: "旧档", threadId: "test.thread", status: "resolved", introducedAge: 18, lastTouchedAge: 36, resolvedAge: 36, sourceEventId: "test" }
+    ];
+    run.narrative.climaxCount = 1;
+    run.narrative.payoffCount = 1;
+    run.narrative.threads = [{ id: "test.thread", status: "resolved", openedAge: 18, lastTouchedAge: 36 }];
+    run.narrative.completedScenes = [{
+      id: "ending-scene",
+      experienceId: "test.guardian",
+      threadId: "test.thread",
+      openedAge: 18,
+      resolvedAge: 36,
+      decisionCount: 1
+    }];
+    const history = tags.length ? [{ age: 30, title: "抉择", summary: "后果已留下。", statChanges: {}, tags: ["milestone", ...tags] }] : [];
+    const source = {
+      worldId: run.worldId,
+      age: run.age,
+      personaPrompt: run.personaPrompt,
+      stats: run.stats,
+      fame: run.fame,
+      history,
+      tuning: run.tuningSnapshot,
+      cards: run.cards,
+      items: run.items,
+      story: run.story,
+      narrative: run.narrative,
+      difficultyId: run.difficultyId
+    };
+    assert.equal(refreshNarrativeMainlineCompletion(source, narrativeWorld), true);
+    return assessEnding(source, narrativeWorld);
+  };
+
+  assert.equal(evaluate(26, ["decision_outcome_breakthrough"], 66).polarity, "good");
+  assert.equal(evaluate(17, ["decision_outcome_stable"], 52).polarity, "normal");
+  assert.equal(evaluate(9, ["decision_outcome_setback"], 26).polarity, "bad");
+});
+
+test("动态世界幕以单一五拍推进，路线可切换且常驻人物进入公开投影", () => {
+  const run = createRun(
+    { world, difficulty, cards: [card], tuning: createDefaultGameplayTuning(), narrativeEnabled: true },
+    {
+      clientId: "dynamic-world-client",
+      worldId: world.id,
+      difficultyId: difficulty.id,
+      personaPrompt: "在旧案中寻找出路的人",
+      talentPointTotal: 25,
+      stats: { intelligence: 5, charisma: 5, family: 5, fortune: 5, physique: 5 },
+      selectedCardIds: [card.id]
+    }
+  );
+  const dynamicWorld: NarrativeWorldDefinition = {
+    ...narrativeWorld,
+    version: 4,
+    mainlineFacts: [{ id: "act.fact", kind: "open_question", label: "一份旧档的矛盾" }],
+    mainlineActs: [{ id: "act.one", label: "旧案显形", prompt: "让旧档进入人物生活", factId: "act.fact" }],
+    narrativeFactions: [{ id: "court", label: "朝局", summary: "掌握文书与人情" }],
+    routeArcs: [
+      { directionId: "route.one", label: "家门", summary: "从家门看见旧案", coreThreadIds: ["thread.one"] },
+      { directionId: "route.two", label: "朝局", summary: "从朝局看见旧案", coreThreadIds: ["thread.two"] }
+    ]
+  };
+  const setup = advanceWithDynamicNarrativeScene(run, world, dynamicWorld, {
+    routeId: "route.one",
+    factionId: "court",
+    beat: "setup",
+    narrative: "你从一页被改写的账目里，看见家门旧事与朝局之间的裂缝。",
+    participants: [{ name: "沈衡", factionId: "court", role: "递来旧档的书吏", description: "谨慎地试探你的立场", recurring: true }],
+    attributeOutcome: { effects: [{ stat: "intelligence", direction: "up", band: "light" }] },
+    attributePolicy: { allowedStats: ["intelligence"], allowedBands: ["light"], allowedDirections: ["up"], minEffects: 1, maxEffects: 1 }
+  });
+  assert.equal(setup.updated.narrative.actRuntime?.beat, "escalation");
+  assert.equal(setup.updated.narrative.dynamicCharacters[0]?.name, "沈衡");
+  const escalation = advanceWithDynamicNarrativeScene(run, world, dynamicWorld, {
+    routeId: "route.two",
+    factionId: "court",
+    beat: "escalation",
+    narrative: "沈衡带来的口供迫使你把家门的隐忧放到朝局的目光之下。",
+    participants: [{ name: "沈衡", factionId: "court", role: "递来旧档的书吏", description: "开始要求你给出承诺", recurring: true }],
+    attributeOutcome: { effects: [{ stat: "charisma", direction: "up", band: "light" }] },
+    attributePolicy: { allowedStats: ["charisma"], allowedBands: ["light"], allowedDirections: ["up"], minEffects: 1, maxEffects: 1 }
+  });
+  assert.equal(escalation.updated.narrative.actRuntime?.beat, "pressure");
+  assert.deepEqual(escalation.updated.narrative.actRuntime?.selectedRouteIds, ["route.one", "route.two"]);
+  assert.equal(toClientRun(run).narrativeCharacters?.[0]?.name, "沈衡");
+  advanceWithDynamicNarrativeScene(run, world, dynamicWorld, {
+    routeId: "route.one", factionId: "court", beat: "pressure",
+    narrative: "旧档牵连的人被带到堂前，你必须决定先保全谁的性命与名节。",
+    participants: [],
+    sceneClockMode: "hold",
+    createsDecision: true
+  });
+  applyMilestoneDecisionAndAdvance(run, world, difficulty, "safe", {
+    narrativeOutcome: { effects: [{ stat: "family", direction: "up", band: "light" }] },
+    narrativeWorld: dynamicWorld
+  });
+  assert.equal(run.narrative.actRuntime?.beat, "climax");
+  advanceWithDynamicNarrativeScene(run, world, dynamicWorld, {
+    routeId: "route.two", factionId: "court", beat: "climax",
+    narrative: "证词与账册终于合在一处，任何署名都会改变此后谁还能开口。",
+    participants: [],
+    createsDecision: true
+  });
+  applyMilestoneDecisionAndAdvance(run, world, difficulty, "balanced", {
+    narrativeOutcome: { effects: [{ stat: "intelligence", direction: "up", band: "medium" }] },
+    factResolution: "exposed",
+    narrativeWorld: dynamicWorld
+  });
+  assert.equal(run.narrative.actRuntime?.beat, "payoff");
+  assert.equal(run.story.factLedger?.facts.find((fact) => fact.id === "act.fact")?.status, "resolved");
+});
+
+test("动态三幕只各自结算一次，并在最终 payoff 后进入结局申请", () => {
+  const run = createRun(
+    { world, difficulty, cards: [card], tuning: createDefaultGameplayTuning(), narrativeEnabled: true },
+    {
+      clientId: "three-act-dynamic-world-client",
+      worldId: world.id,
+      difficultyId: difficulty.id,
+      personaPrompt: "愿意承担旧案后果的人",
+      talentPointTotal: 25,
+      stats: { intelligence: 5, charisma: 5, family: 5, fortune: 5, physique: 5 },
+      selectedCardIds: [card.id]
+    }
+  );
+  const dynamicWorld: NarrativeWorldDefinition = {
+    ...narrativeWorld,
+    version: 4,
+    mainlineFacts: [
+      { id: "act.fact.one", kind: "open_question", label: "第一幕的旧档" },
+      { id: "act.fact.two", kind: "stake", label: "第二幕的人情代价" },
+      { id: "act.fact.three", kind: "stake", label: "第三幕的边地危机" }
+    ],
+    mainlineActs: [
+      { id: "act.one", label: "旧案显形", prompt: "让旧档进入人物生活", factId: "act.fact.one", introduceFactIds: ["act.fact.one"] },
+      { id: "act.two", label: "阵营周旋", prompt: "让旧档进入阵营博弈", factId: "act.fact.two", introduceFactIds: ["act.fact.two"], requiredFactIds: ["act.fact.one"] },
+      { id: "act.three", label: "边地危机", prompt: "让旧案后果化为现实危机", factId: "act.fact.three", introduceFactIds: ["act.fact.three"], requiredFactIds: ["act.fact.one", "act.fact.two"], resolveFactIds: ["act.fact.three"] }
+    ],
+    narrativeFactions: [{ id: "court", label: "朝局", summary: "掌握文书与人情" }],
+    routeArcs: [
+      { directionId: "route.one", label: "家门", summary: "从家门看见旧案", coreThreadIds: ["thread.one"] },
+      { directionId: "route.two", label: "朝局", summary: "从朝局看见旧案", coreThreadIds: ["thread.two"] }
+    ],
+    endingBlueprints: (["good", "normal", "bad"] as const).map((polarity) => ({
+      id: `route.one.${polarity}`,
+      worldId: world.id,
+      directionId: "route.one",
+      polarity,
+      title: `${polarity}结局`,
+      premise: "旧案的后果终于落定。",
+      finalConflict: "人物必须承担最后的责任。",
+      payoffFocus: "回应三幕留下的事实。",
+      epilogueFocus: "交代人物与秩序的去处。",
+      statWeights: { intelligence: 1 },
+      requiredThreadIds: []
+    }))
+  };
+  const growthPolicy: NarrativeAttributePolicy = {
+    allowedStats: ["intelligence"],
+    allowedBands: ["light"],
+    allowedDirections: ["up"],
+    minEffects: 1,
+    maxEffects: 1
+  };
+  const scene = (
+    routeId: "route.one" | "route.two",
+    beat: "setup" | "escalation" | "pressure" | "climax" | "payoff"
+  ) => advanceWithDynamicNarrativeScene(run, world, dynamicWorld, {
+    routeId,
+    factionId: "court",
+    beat,
+    narrative: `这是${beat}阶段，旧案的后果迫使你作出新的承担。`,
+    participants: [],
+    ...(beat === "pressure" || beat === "climax" ? { createsDecision: true } : {}),
+    ...(beat === "setup" || beat === "escalation" || beat === "payoff"
+      ? {
+          attributeOutcome: { effects: [{ stat: "intelligence" as const, direction: "up" as const, band: "light" as const }] },
+          attributePolicy: growthPolicy
+        }
+      : {})
+  });
+  const playAct = (setupRoute: "route.one" | "route.two", climaxRoute: "route.one" | "route.two") => {
+    scene(setupRoute, "setup");
+    scene(climaxRoute, "escalation");
+    scene(setupRoute, "pressure");
+    applyMilestoneDecisionAndAdvance(run, world, difficulty, "safe", {
+      narrativeOutcome: { effects: [{ stat: "family", direction: "up", band: "light" }] },
+      narrativeWorld: dynamicWorld
+    });
+    scene(climaxRoute, "climax");
+    applyMilestoneDecisionAndAdvance(run, world, difficulty, "balanced", {
+      narrativeOutcome: { effects: [{ stat: "intelligence", direction: "up", band: "medium" }] },
+      factResolution: "exposed",
+      narrativeWorld: dynamicWorld
+    });
+    scene(setupRoute, "payoff");
+  };
+
+  playAct("route.one", "route.two");
+  assert.equal(run.narrative.actRuntime?.actId, "act.two");
+  assert.equal(run.narrative.actRuntime?.beat, "setup");
+  playAct("route.two", "route.one");
+  assert.equal(run.narrative.actRuntime?.actId, "act.three");
+  assert.equal(run.narrative.actRuntime?.beat, "setup");
+  playAct("route.one", "route.two");
+
+  assert.equal(run.narrative.completedScenes.length, 3);
+  assert.deepEqual(run.narrative.completedScenes.map((item) => item.mainlineActId), ["act.one", "act.two", "act.three"]);
+  assert.equal(run.narrative.climaxCount, 3);
+  assert.equal(run.narrative.payoffCount, 3);
+  assert.equal(run.story.mainlineCompleted, true);
+  assert.equal(run.narrative.endingState, "eligible");
+  assert.equal(canRequestDirectedClosure(run, dynamicWorld), true);
+  assert.throws(() => scene("route.one", "payoff"), /dynamic_scene_after_mainline_complete/);
+});
+
+test("世界幕引用不存在的事实会在内容加载前被拒绝", () => {
+  const invalid: NarrativeWorldDefinition = {
+    ...narrativeWorld,
+    version: 4,
+    mainlineFacts: [{ id: "known.fact", kind: "open_question", label: "已知事实" }],
+    mainlineActs: [{
+      id: "invalid.act",
+      label: "错误幕",
+      prompt: "不应进入运行态",
+      factId: "missing.fact",
+      introduceFactIds: ["missing.fact"]
+    }]
+  };
+  assert.throws(() => validateNarrativeWorldFactContract(invalid), /mainline_act_fact_reference_invalid/);
 });

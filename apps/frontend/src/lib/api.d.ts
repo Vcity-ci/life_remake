@@ -77,6 +77,7 @@ export declare function startRun(payload: {
 export declare function stepRun(payload: {
     runId: string;
     action?: StepAction;
+    growthFocusId?: string;
     decision?: string;
     decisionAge?: number;
     sceneId?: string;
@@ -95,6 +96,7 @@ export declare function startRunStream(payload: {
 export declare function stepRunStream(payload: {
     runId: string;
     action?: StepAction;
+    growthFocusId?: string;
     decision?: string;
     decisionAge?: number;
     sceneId?: string;

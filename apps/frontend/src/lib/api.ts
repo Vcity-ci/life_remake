@@ -166,6 +166,7 @@ export async function startRun(payload: {
 export async function stepRun(payload: {
   runId: string;
   action?: StepAction;
+  growthFocusId?: string;
   decision?: string;
   decisionAge?: number;
   sceneId?: string;
@@ -254,6 +255,7 @@ export async function stepRunStream(
   payload: {
     runId: string;
     action?: StepAction;
+    growthFocusId?: string;
     decision?: string;
     decisionAge?: number;
     sceneId?: string;

@@ -7,6 +7,7 @@ import path from "node:path";
 import type {
   AgeThreshold,
   AdminConfigPayload,
+  BackgroundCard,
   ContentBundle,
   DecisionType,
   DifficultyConfig,
@@ -34,8 +35,10 @@ import {
   generateDynamicNarrativeScene,
   generateDirectedDecisionNarrativeOutcome,
   generateMilestoneOptions,
+  generateNarrativeOrigin,
   generateYearNarrative,
   isDirectedToolAvailable,
+  NarrativeOutcomeError,
   recordDirectedDecisionOutcome,
   recordDirectedStoryTurnOutcome
 } from "./ai.js";
@@ -49,12 +52,11 @@ import {
   loadEventDefinitions,
   loadItemDefinitions,
   loadNarrativeWorldDefinition,
-  loadTalentPromptHooks,
   loadWorldlineSetting,
   readContentBundle,
   writeContentBundle
 } from "./content.js";
-import { buildNarrativePromptPlan, ensureNarrativeActRuntime, isNarrativeMainlineActEntryReady, isNarrativeWorldStageReady, retrieveNarrativeMemories, selectNarrativeGrowthFocus } from "./narrative.js";
+import { buildNarrativePromptPlan, ensureNarrativeActRuntime, isNarrativeEarlyLife, isNarrativeMainlineActEntryReady, isNarrativeWorldStageReady, retrieveNarrativeMemories, selectNarrativeGrowthFocus } from "./narrative.js";
 import {
   attachTimelineChunk,
   applyDirectedMilestonePresentation,
@@ -86,6 +88,7 @@ import {
   toPresentationTimelineEntries,
   resolvePublicDecisionOption,
   resolveNarrativeStatTiers,
+  resolveSurvivalCrisis,
   resolveTurnRecordChoice,
   settleNarrativeBackgroundOutcomes,
   selectDirectedCandidateForIntent,
@@ -472,6 +475,22 @@ function logGameFlowError(operation: string, error: unknown): void {
   console.error(`[game-flow:${operation}]`, error);
 }
 
+function logNarrativeOutcomeFailure(
+  options: Pick<DirectedSegmentOptions, "run" | "providerConfig">,
+  error: unknown,
+  tool = "dynamic_narrative_scene"
+): void {
+  if (!debugModel || !(error instanceof NarrativeOutcomeError)) return;
+  console.error("[model-debug:narrative-outcome]", {
+    reason: error.reason ?? "unspecified",
+    tool,
+    model: options.providerConfig.model,
+    apiPath: options.providerConfig.apiPath,
+    actId: options.run.narrative.actRuntime?.actId,
+    beat: options.run.narrative.actRuntime?.beat
+  });
+}
+
 function summarizeFactions(
   factions: Array<{ name: string; values: string[]; behavior: string; eventBias?: string[]; intelStyle?: string }>
 ): string {
@@ -505,13 +524,15 @@ function flattenMilestoneEventPool(events: Array<{ events: Array<string | { titl
     .filter((x) => x.length > 0);
 }
 
-function summarizeTalentHooks(
-  selectedCardIds: string[],
-  hooks: Array<{ id: string; name: string; promptHooks: { narrativeBias: string; eventAffinity: string[]; riskTone: string } }>
-): string {
-  const selected = hooks.filter((h) => selectedCardIds.includes(h.id));
-  return selected
-    .map((h) => `${h.name}:叙事=${h.promptHooks.narrativeBias};事件=${h.promptHooks.eventAffinity.join("/")};风险=${h.promptHooks.riskTone}`)
+function summarizeTalentHooks(cards: BackgroundCard[]): string {
+  return cards
+    .slice(0, 3)
+    .map((card) => {
+      const narrative = card.narrative;
+      const affinity = narrative?.affinities?.length ? `；倾向=${narrative.affinities.join("/")}` : "";
+      const riskTone = narrative?.riskTone ? `；取舍=${narrative.riskTone}` : "";
+      return `${card.name}：${narrative?.bias ?? card.description}${affinity}${riskTone}`;
+    })
     .join(" | ");
 }
 
@@ -523,12 +544,11 @@ interface GameResources {
   factionEvents: Awaited<ReturnType<typeof loadFactionEvents>>;
   eventDefinitions: Awaited<ReturnType<typeof loadEventDefinitions>>;
   itemDefinitions: Awaited<ReturnType<typeof loadItemDefinitions>>;
-  talentHooks: Awaited<ReturnType<typeof loadTalentPromptHooks>>;
   narrativeWorld: NarrativeWorldDefinition | null;
 }
 
 async function loadGameResources(worldId: string): Promise<GameResources> {
-  const [content, runtime, worldline, factions, factionEvents, eventDefinitions, itemDefinitions, talentHooks, narrativeWorld] = await Promise.all([
+  const [content, runtime, worldline, factions, factionEvents, eventDefinitions, itemDefinitions, narrativeWorld] = await Promise.all([
     readContentBundle(),
     readRuntimeConfig(),
     loadWorldlineSetting(worldId),
@@ -536,7 +556,6 @@ async function loadGameResources(worldId: string): Promise<GameResources> {
     loadFactionEvents(worldId),
     loadEventDefinitions(worldId),
     loadItemDefinitions(),
-    loadTalentPromptHooks(),
     loadNarrativeWorldDefinition(worldId)
   ]);
   return {
@@ -547,7 +566,6 @@ async function loadGameResources(worldId: string): Promise<GameResources> {
     factionEvents,
     eventDefinitions,
     itemDefinitions,
-    talentHooks,
     narrativeWorld
   };
 }
@@ -872,6 +890,10 @@ function revealOneEntryFromReservoir(
 }
 
 function syncRunPhase(run: InternalRunState): void {
+  if (run.survivalCrisis) {
+    markRunPhase(run, "waiting_decision");
+    return;
+  }
   if (run.narrativeReservoir.queued.length > 0) {
     markRunPhase(run, "ready");
     return;
@@ -984,11 +1006,74 @@ interface DirectedSegmentOptions {
   narrativeWorld?: NarrativeWorldDefinition | null;
 }
 
+interface OpeningGenerationOptions {
+  run: InternalRunState;
+  world: WorldConfig;
+  narrativeWorld?: NarrativeWorldDefinition | null;
+  providerConfig: ProviderConfig;
+  apiKey: string;
+  promptPack: Record<string, string>;
+  worldlineSummary: string;
+  factionSummary: string;
+  eventPoolSummary: string;
+  talentHookSummary: string;
+}
+
+async function generateOpeningForRun(options: OpeningGenerationOptions): Promise<TurnRecord | undefined> {
+  const {
+    run,
+    world,
+    narrativeWorld,
+    providerConfig,
+    apiKey,
+    promptPack,
+    worldlineSummary,
+    factionSummary,
+    eventPoolSummary,
+    talentHookSummary
+  } = options;
+  if (!narrativeWorld || !run.narrative.enabled || run.narrative.opening?.status === "ready") return undefined;
+
+  const narrativeCtx: NarrativeCallContext = {
+    providerConfig,
+    apiKey,
+    promptPack,
+    worldlineSummary,
+    factionSummary,
+    eventPoolSummary,
+    talentHookSummary,
+    narrativePlan: buildNarrativePromptPlan(run, narrativeWorld, null),
+    conversation: run.aiConversation?.year
+  };
+  let opening: Awaited<ReturnType<typeof generateNarrativeOrigin>>;
+  try {
+    opening = await generateNarrativeOrigin(run, world, narrativeCtx);
+  } catch (error) {
+    logNarrativeOutcomeFailure(options, error, "render_origin");
+    throw error;
+  }
+  run.narrative = {
+    ...run.narrative,
+    opening: { status: "ready", profile: opening.profile }
+  };
+  run.aiConversation = run.aiConversation ?? {};
+  run.aiConversation.year = narrativeCtx.conversation;
+  return appendPublicTurnRecord(run, {
+    entryId: "origin",
+    age: 0,
+    ageStage: { label: resolveAgeStageForStream(0, world).label },
+    kind: "origin",
+    narrative: opening.narrative,
+    statChanges: {}
+  });
+}
+
 async function generateDirectedSegmentForRun(options: DirectedSegmentOptions): Promise<GenerationOutput> {
   const runBeforeTurn = structuredClone(options.run);
   try {
     return await generateDirectedSegmentForRunUnsafe(options);
   } catch (error) {
+    logNarrativeOutcomeFailure(options, error);
     Object.assign(options.run, runBeforeTurn);
     throw error;
   }
@@ -1271,7 +1356,8 @@ async function generateDirectedSegmentForRunUnsafe(options: DirectedSegmentOptio
     story: run.story,
     narrative: run.narrative
   };
-  const canEnterAct = isNarrativeMainlineActEntryReady(narrativeSource, narrativeWorld);
+  const earlyLife = isNarrativeEarlyLife(narrativeWorld, run.age);
+  const canEnterAct = !earlyLife && isNarrativeMainlineActEntryReady(narrativeSource, narrativeWorld);
   const gateStage = runtime.beat === "escalation"
     ? "escalation"
     : runtime.beat === "pressure"
@@ -1283,8 +1369,16 @@ async function generateDirectedSegmentForRunUnsafe(options: DirectedSegmentOptio
     ? canEnterAct
     : runtime.beat === "payoff" || !gateStage || isNarrativeWorldStageReady(narrativeSource, narrativeWorld, gateStage);
   const backgroundPacing = narrativeWorld.progression?.backgroundPacing ?? { minYears: 1, maxYears: 1 };
+  const backgroundMinYears = Math.max(1, Math.trunc(backgroundPacing.minYears));
+  const configuredBackgroundMaxYears = Math.max(backgroundMinYears, Math.trunc(backgroundPacing.maxYears));
+  const earlyLifeMaxAge = narrativeWorld.opening?.earlyLife?.maxAge;
+  const backgroundMaxYears = earlyLife && Number.isInteger(earlyLifeMaxAge)
+    ? Math.max(1, Math.min(configuredBackgroundMaxYears, (earlyLifeMaxAge as number) - run.age))
+    : configuredBackgroundMaxYears;
   const backgroundAttributePolicy = dynamicBackgroundAttributePolicy(run);
-  const decisionMode = runtime.beat === "pressure" || runtime.beat === "climax"
+  const decisionMode = earlyLife
+    ? "none"
+    : runtime.beat === "pressure" || runtime.beat === "climax"
     ? "required"
     : runtime.beat === "escalation"
       ? "optional"
@@ -1307,14 +1401,16 @@ async function generateDirectedSegmentForRunUnsafe(options: DirectedSegmentOptio
     act: { id: act.id, label: act.label, prompt: act.prompt, factLabel },
     beat: runtime.beat,
     decisionMode,
-    allowedTurnKinds: runtime.beat === "setup"
-      ? canEnterAct ? ["scene"] : ["background"]
-      : canAdvanceBeat
-        ? ["background", "scene"]
-        : ["background"],
+    allowedTurnKinds: earlyLife
+      ? ["background"]
+      : runtime.beat === "setup"
+        ? canEnterAct ? ["scene"] : ["background"]
+        : canAdvanceBeat
+          ? ["background", "scene"]
+          : ["background"],
     backgroundYearRange: {
-      min: Math.max(1, Math.trunc(backgroundPacing.minYears)),
-      max: Math.max(Math.max(1, Math.trunc(backgroundPacing.minYears)), Math.trunc(backgroundPacing.maxYears))
+      min: Math.min(backgroundMinYears, backgroundMaxYears),
+      max: backgroundMaxYears
     },
     routes: narrativeWorld.routeArcs.map((route) => ({
       id: route.directionId,
@@ -1330,18 +1426,22 @@ async function generateDirectedSegmentForRunUnsafe(options: DirectedSegmentOptio
     knownCharacters: run.narrative.dynamicCharacters
       .filter((character) => character.status === "active")
       .slice(-6)
-      .map((character) => ({ name: character.name, factionId: character.factionId, role: character.role, description: character.description })),
+      .map((character) => ({ id: character.id, name: character.name, factionId: character.factionId, role: character.role, description: character.description })),
     attributePolicy: runtime.beat === "pressure" || runtime.beat === "climax" ? undefined : dynamicSceneAttributePolicy(),
     backgroundAttributePolicy,
-    statTiers: resolveNarrativeStatTiers(run.stats, run.narrative.statTierConfig)
+    statTiers: resolveNarrativeStatTiers(run.stats, run.narrative.statTierConfig),
+    lifeStage: earlyLife && Number.isInteger(earlyLifeMaxAge)
+      ? { label: "早年依赖期", maxAge: earlyLifeMaxAge as number }
+      : undefined
   }, narrativeCtx);
   if (scene.turnKind === "background") {
     if (!scene.backgroundYears || !scene.backgroundAttributeEffects) throw new Error("dynamic_background_outcome_missing");
     const advanced = autoAdvanceToCheckpoint(run, world, difficulty, {
       targetYears: scene.backgroundYears,
-      maxTargetYears: backgroundPacing.maxYears,
+      maxTargetYears: backgroundMaxYears,
       allowRandomMilestone: false,
-      deferNarrativeAttributeEffects: true
+      deferNarrativeAttributeEffects: true,
+      narrativeWorld
     });
     const effectsByOffset = new Map(scene.backgroundAttributeEffects.map((outcome) => [outcome.offset, outcome.effects]));
     const outcomes = advanced.chunk.map((event, index) => ({
@@ -1349,8 +1449,13 @@ async function generateDirectedSegmentForRunUnsafe(options: DirectedSegmentOptio
       effects: effectsByOffset.get(index + 1) ?? []
     }));
     const policiesByAge = new Map(advanced.chunk.map((event) => [event.age, backgroundAttributePolicy]));
-    if (!settleNarrativeBackgroundOutcomes(run, world, outcomes, advanced.chunk.map((event) => event.age), policiesByAge)) {
+    if (!settleNarrativeBackgroundOutcomes(run, world, outcomes, advanced.chunk.map((event) => event.age), policiesByAge, narrativeWorld)) {
       throw new Error("dynamic_background_outcome_rejected");
+    }
+    if (run.survivalCrisis) {
+      const resolvedChunk = advanced.chunk.filter((event) => event.age <= run.age);
+      advanced.chunk.splice(0, advanced.chunk.length, ...resolvedChunk);
+      advanced.toAge = run.age;
     }
     advanced.chunk.forEach((event, index) => {
       event.summary = index === advanced.chunk.length - 1 ? scene.narrative : "";
@@ -1386,6 +1491,7 @@ async function generateDirectedSegmentForRunUnsafe(options: DirectedSegmentOptio
     participants: scene.participants,
     attributeOutcome: scene.attributeEffects ? { effects: scene.attributeEffects } : undefined,
     attributePolicy: runtime.beat === "pressure" || runtime.beat === "climax" ? undefined : dynamicSceneAttributePolicy(),
+    actHandoff: scene.actHandoff,
     sceneClockMode: scene.scenePacing === "continuous" ? "hold" : scene.scenePacing === "spanning" ? "advance" : undefined,
     createsDecision: scene.createsDecision
   });
@@ -1452,6 +1558,10 @@ async function generateSegmentForRun(
   const usesNarrativeDirector = Boolean(narrativeWorld && run.narrative.enabled && narrativeWorld.routeArcs.length > 0);
   if (usesNarrativeDirector && narrativeWorld) {
     run.narrative = ensureNarrativeActRuntime(run.narrative, narrativeWorld, run.age);
+    if (run.narrative.opening?.status === "pending") {
+      markRunPhase(run, "ready");
+      return { run, generatedChunk: [], fromAge, toAge, rawChunkCount: 0 };
+    }
     const runtime = run.narrative.actRuntime;
     if (runtime && (runtime.growthFocusOptions?.length ?? 0) > 0 && !runtime.growthFocusId) {
       markRunPhase(run, "ready");
@@ -1541,6 +1651,7 @@ async function runStartFlow(
   sessionId: string,
   hooks?: {
     onStarted?: (run: ReturnType<typeof toClientRun>) => Promise<void> | void;
+    onTurn?: (record: TurnRecord) => Promise<void> | void;
   }
 ): Promise<StartFlowResult> {
   return withSessionLock(sessionId, () => runStartFlowUnlocked(body, sessionId, hooks));
@@ -1551,6 +1662,7 @@ async function runStartFlowUnlocked(
   sessionId: string,
   hooks?: {
     onStarted?: (run: ReturnType<typeof toClientRun>) => Promise<void> | void;
+    onTurn?: (record: TurnRecord) => Promise<void> | void;
   }
 ): Promise<StartFlowResult> {
   const env = await getGameEnv(sessionId);
@@ -1562,7 +1674,7 @@ async function runStartFlowUnlocked(
   }
 
   const resources = await loadGameResources(body.worldId);
-  const { content, runtime, worldline, factions, factionEvents, eventDefinitions, itemDefinitions, talentHooks, narrativeWorld } = resources;
+  const { content, runtime, worldline, factions, factionEvents, eventDefinitions, itemDefinitions, narrativeWorld } = resources;
   const tuning = resolveGameplayTuning(content);
   const allocation = toStartAllocationConfig(tuning);
   const world = resolveWorld(content.worlds, body.worldId);
@@ -1596,8 +1708,13 @@ async function runStartFlowUnlocked(
   const worldlineSummary = summarizeWorldline(worldline);
   const factionSummary = summarizeFactions(factions);
   const eventPoolSummary = summarizeFactionEvents(factionEvents);
-  const talentHookSummary = summarizeTalentHooks(body.selectedCardIds, talentHooks);
+  const talentHookSummary = summarizeTalentHooks(run.cards);
 
+  if (narrativeWorld) {
+    run.narrative = ensureNarrativeActRuntime(run.narrative, narrativeWorld, run.age);
+  }
+  markRunPhase(run, "generating");
+  await saveRun(run, sessionId);
   const startedRun = toClientRun(run);
   if (hooks?.onStarted) {
     await hooks.onStarted({
@@ -1606,7 +1723,27 @@ async function runStartFlowUnlocked(
     });
   }
   const timelineChunk: PublicTimelineEntry[] = [];
-  markRunPhase(run, "ready");
+  try {
+    const openingRecord = await generateOpeningForRun({
+      run,
+      world,
+      narrativeWorld,
+      providerConfig,
+      apiKey,
+      promptPack: content.promptPack,
+      worldlineSummary,
+      factionSummary,
+      eventPoolSummary,
+      talentHookSummary
+    });
+    if (openingRecord && hooks?.onTurn) {
+      await hooks.onTurn(openingRecord);
+    }
+  } catch (error) {
+    markRunPhase(run, "ready");
+    await saveRun(run, sessionId);
+    throw error;
+  }
   syncRunPhase(run);
   await saveRun(run, sessionId);
   return {
@@ -1659,7 +1796,7 @@ async function runStepFlowUnlocked(
     throw new Error("deploy_mode_env_mismatch");
   }
 
-  const action: StepAction = body.decision ? "decide" : (body.action ?? "consume");
+  const action: StepAction = body.action ?? (body.decision ? "decide" : "consume");
   if (hasPendingRequestId(run, body.requestId)) {
     const tuning = resolveGameplayTuning((await loadGameResources(run.worldId)).content);
     return {
@@ -1673,7 +1810,7 @@ async function runStepFlowUnlocked(
     };
   }
   const resources = await loadGameResources(run.worldId);
-  const { content, runtime, worldline, factions, factionEvents, eventDefinitions, itemDefinitions, talentHooks, narrativeWorld } = resources;
+  const { content, runtime, worldline, factions, factionEvents, eventDefinitions, itemDefinitions, narrativeWorld } = resources;
   const tuning = resolveGameplayTuning(content);
   const allocation = toStartAllocationConfig(tuning);
   if (run.ended && run.narrativeReservoir.queued.length === 0) {
@@ -1686,6 +1823,7 @@ async function runStepFlowUnlocked(
 
   if (action === "select_growth_focus") {
     if (!body.growthFocusId) throw new Error("growth_focus_required");
+    if (run.narrative.opening?.status === "pending") throw new Error("opening_not_ready");
     run.narrative = selectNarrativeGrowthFocus(run.narrative, narrativeWorld, body.growthFocusId);
     syncRunPhase(run);
     rememberRequestId(run, body.requestId);
@@ -1717,8 +1855,45 @@ async function runStepFlowUnlocked(
   const worldlineSummary = summarizeWorldline(worldline);
   const factionSummary = summarizeFactions(factions);
   const eventPoolSummary = summarizeFactionEvents(factionEvents);
-  const selectedCardIds = run.cards.map((c) => c.id);
-  const talentHookSummary = summarizeTalentHooks(selectedCardIds, talentHooks);
+  const talentHookSummary = summarizeTalentHooks(run.cards);
+
+  if (action === "generate_opening") {
+    if (!narrativeWorld || !run.narrative.enabled) throw new Error("opening_unavailable");
+    run.narrative = ensureNarrativeActRuntime(run.narrative, narrativeWorld, run.age);
+    markRunPhase(run, "generating");
+    let openingRecord: TurnRecord | undefined;
+    try {
+      openingRecord = await generateOpeningForRun({
+        run,
+        world,
+        narrativeWorld,
+        providerConfig,
+        apiKey,
+        promptPack: content.promptPack,
+        worldlineSummary,
+        factionSummary,
+        eventPoolSummary,
+        talentHookSummary
+      });
+    } catch (error) {
+      markRunPhase(run, "ready");
+      await saveRun(run, sessionId);
+      throw error;
+    }
+    syncRunPhase(run);
+    rememberRequestId(run, body.requestId);
+    await saveRun(run, sessionId);
+    if (openingRecord && onTurn) await onTurn(openingRecord, 0, 1);
+    return {
+      updatedRun: run,
+      timelineChunk: [],
+      rawChunkCount: 0,
+      fromAge: run.age,
+      toAge: run.age,
+      tuning: allocation,
+      action
+    };
+  }
   let generatedChunk: TimelineEntryChunk = [];
   let fromAge = run.age;
   let toAge = run.age;
@@ -1726,7 +1901,40 @@ async function runStepFlowUnlocked(
   let resolvedChoice: PublicMilestoneChoice | undefined;
   let resolvedChoiceOutcome: TurnRecord["choiceOutcome"] | undefined;
 
-  if (action === "decide") {
+  if (action === "resolve_survival") {
+    if (!body.survivalChoice) throw new Error("survival_choice_required");
+    if (!run.survivalCrisis) throw new Error("survival_crisis_unavailable");
+    // A rescue is a real branch: preserve the state immediately before the player commits.
+    await createDecisionCheckpoint(sessionId, run);
+    run.narrativeReservoir.queued = [];
+    const resolution = resolveSurvivalCrisis(run, narrativeWorld, body.survivalChoice, body.survivalCrisisId);
+    run.history.push(resolution.event);
+    if (!resolution.recovered) {
+      try {
+        const endingCtx: NarrativeCallContext = {
+          providerConfig,
+          apiKey,
+          promptPack: content.promptPack,
+          worldlineSummary,
+          factionSummary,
+          eventPoolSummary,
+          talentHookSummary,
+          narrativePlan: buildNarrativePromptPlan(run, narrativeWorld),
+          conversation: run.aiConversation?.ending
+        };
+        const endingNarrative = await generateEndingNarrative(run, world, endingCtx);
+        run.aiConversation = run.aiConversation ?? {};
+        run.aiConversation.ending = endingCtx.conversation;
+        if (endingNarrative.trim()) run.endingSummary = endingNarrative.trim();
+      } catch {
+        // The deterministic cause and engine ending remain valid when narration is unavailable.
+      }
+    }
+    generatedChunk = publishTimelineChunk(run, world, [resolution.event]);
+    fromAge = run.age;
+    toAge = run.age;
+    rawChunkCount = 1;
+  } else if (action === "decide") {
     if (run.narrativeReservoir.queued.length > 0) {
       // Decision flow should render immediately; stale queued entries would block reveal order.
       run.narrativeReservoir.queued = [];
@@ -1888,7 +2096,7 @@ async function runStepFlowUnlocked(
       toAge = stepped.toAge;
       rawChunkCount = stepped.chunk.length;
     }
-  } else if (run.narrativeReservoir.queued.length === 0 && !run.nextMilestoneChoice && !run.ended) {
+  } else if (run.narrativeReservoir.queued.length === 0 && !run.nextMilestoneChoice && !run.survivalCrisis && !run.ended) {
     const generated = await generateSegmentForRun(
       run,
       world,
@@ -2320,6 +2528,12 @@ app.post("/api/game/start/stream", async (req, res) => {
         await writeNdjsonEvent(res, {
           type: "started",
           data: { run }
+        });
+      },
+      onTurn: async (record) => {
+        await writeNdjsonEvent(res, {
+          type: "turn",
+          data: { index: 0, total: 1, record }
         });
       }
     });

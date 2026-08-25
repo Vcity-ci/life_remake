@@ -1,57 +1,42 @@
 {
-  "version": 5,
+  "version": 6,
   "worldId": "ancient",
-  "storyBible": "景朝中后段，北境一场败仗被改写成凯报，败军、军饷、灾赈与户籍账目先后被拆散掩埋。故事由三次递进的国家危机组成：先让旧案显形，再让朝野阵营为真相和利益周旋，最后使边关战事、民生与责任归属同时逼近。宗族、门第、科举、军功与皇权共同塑造命运；人物的名节、人情和功业都要付出代价。叙事以称谓、行动和后果呈现权力关系，不使用现代制度与现代口语。",
+  "storyBible": "景朝中后段，宗族、门第、科举、军功、商路、地方秩序与皇权共同塑造命运。人生不预设某一份案卷或唯一的敌人：一桩被掩盖的旧事、一次地方失序、一段被改写的功劳或一笔足以伤人的人情，都可能成为人物入局的起点。此后，人物会因前事的后果进入阵营、取得位置或失去依靠，并在更大范围的政局、民生、军事或外患危机中承担与自身身份相称的责任。叙事以称谓、行动和后果呈现权力关系，不使用现代制度与现代口语。",
   "styleRules": [
     "使用第二人称，文风凝练克制，避免章回标题与前情提要。",
     "常驻人物优先使用既定称谓，不凭空新增关键亲属、官职或势力。",
     "普通年份承接前一场景的余波，只推进一条主要因果。",
     "高潮必须使既有关系、身份或声名发生不可逆变化；回收必须点明此前伏笔的后果。"
   ],
-  "mainlineSkeleton": {
-    "premise": "北境败仗的实数被改成凯报，亏空先后藏入军饷、灾赈、盐引、田亩和考功文书。一本被拆开的旧册与数名证人的去向，最终把人物推向同一件事：谁该为败仗、饥民与正在逼近的再一次边患负责，谁又有权解释景朝仍能维持的秩序。",
-    "opening": "第一幕是旧案显形。人物从自身经历接触一页旧册、一个名字或一笔异常人情；高潮不是得到全部答案，而是必须公开站队、保全证人或交出证物，使隐案第一次进入无法回避的视野。",
-    "pressure": "第二幕是阵营冲突与周旋。宗族、朝堂、军府、商路和地方势力开始争夺证据的去向；已获得的位置、关系或证物反过来要求代价。高潮必须是一场结盟、背叛、借势反制或自污担责，而非重复查问同一份旧案。",
-    "climax": "第三幕是北境战事救国。旧案后果落实为兵源、粮道、流民与军令的现实危机，人物必须在救援、用兵、民生与责任归属之间作出不可逆决定；不能同时保住清名、靠山与所有人。",
-    "payoff": "三次高潮留下的证据、人物和代价终于被兑现：真相被公开、被改写或被带离朝堂，边地和朝局都必须出现实际后果。核心路线的人与制度后果得到回答，主线才算完成。",
-    "goodEndingDirection": "以真实证据承担责任并留下可延续的秩序，得到的不是无代价的胜利，而是有人因此被保全、制度或关系得以继续。",
-    "badEndingDirection": "为自保、权位或亲族切断真相，或虽说出真相却无力保住代价；结局应呈现失势、流放、破裂或带着污点存活，而不是凭空翻盘。"
+  "opening": {
+    "earlyLife": { "maxAge": 3 }
   },
-  "mainlineFacts": [
-    { "id": "ancient.mainline.discrepant_record", "kind": "open_question", "label": "北境败报、军饷与民生账目之间存在无法忽略的矛盾。", "priority": 4, "resolutionModes": ["exposed", "concealed", "compromised", "sacrificed"] },
-    { "id": "ancient.mainline.faction_cost", "kind": "stake", "label": "围绕旧案的阵营周旋已把人情、功名、商路和官位变成必须偿还的代价。", "priority": 4, "resolutionModes": ["exposed", "concealed", "compromised", "sacrificed"] },
-    { "id": "ancient.mainline.border_crisis", "kind": "stake", "label": "被遮蔽的败报终于化为逼近的北境战事、粮道危机与无处安置的百姓。", "priority": 5, "resolutionModes": ["exposed", "concealed", "compromised", "sacrificed"] },
-    { "id": "ancient.mainline.accountability", "kind": "stake", "label": "战事、军饷与流民安置的责任终于必须由具体的人和制度承担。", "priority": 5, "resolutionModes": ["exposed", "concealed", "compromised", "sacrificed"] }
-  ],
+  "mainlineSkeleton": {
+    "premise": "三幕共享同一座景朝，却不复述同一宗案子。第一幕打开人物尚未能置身事外的旧事或裂缝；第二幕由此带来新的阵营位置、关系债务或权力机会；第三幕把人物推入更大范围的危机。前一幕留下的人、后果与责任必须成为后一幕的来处，但具体案由、阵营关系、危机形态和人物身份均由已发生的叙事决定。",
+    "opening": "第一幕让人物从自身经历撞见一桩既存而被遮蔽的矛盾。它可以关乎地方、家门、功名、商路、法度、军政或被遗忘的人；高潮要使人物作出不可逆的站位，而不是穷尽所有真相。",
+    "pressure": "第二幕承接第一幕的实际后果。人物获得或失去进入某个阵营、组织、地方势力或人际网络的机会；高潮要解决这一新位置中的独立挑战，让关系、权力或身份真正改变，而非重复追查原来的线索。",
+    "climax": "第三幕以已积累的身份与代价面对更大范围的危机。它可以是战事、外患、灾乱、政局崩裂、民生失序或其他迫使人物承担责任的局面；人物可以居于主将、谋士、官员、商人、教习或普通人的位置，必须写出相称的行动尺度。",
+    "payoff": "三次高潮的选择、人物和代价在结局前共同兑现。必须回答人为何走到此处、留下了什么可延续或无法挽回的后果，而不是回到一个预设案件的标准答案。",
+    "goodEndingDirection": "人物以承担、判断与行动留下可延续的秩序、关系或生路；胜利必须带着已付出的代价。",
+    "badEndingDirection": "人物因失势、误判、代价或所处位置的局限失去重要之物；结局仍应承认其曾经作出的真实选择。"
+  },
   "mainlineActs": [
     {
-      "id": "ancient.record_surface",
-      "label": "旧案显形",
-      "prompt": "让人物从自身经历接触败报隐案的一处可追索裂缝，并在证人、证物或公开立场上完成第一次无法回避的高潮；先打开权力的裂口，而非给出全部答案。",
-      "introduceFactIds": ["ancient.mainline.discrepant_record"],
-      "factId": "ancient.mainline.discrepant_record",
-      "resolutionModes": ["exposed", "concealed", "compromised", "sacrificed"],
+      "id": "ancient.entry_conflict",
+      "label": "案起入局",
+      "prompt": "让人物从自身年龄、身份与既有生活中接触一桩案件、被遮蔽的旧事、制度裂缝或未被承担的现实矛盾。它可以是新近发生的事，也可以带着更早的线索；案由不可预设为特定账册、战报、旧物或地名。用具体人物和代价把它带入视野。高潮要形成一次真实站位，并留下能把人物带向新位置的后果。",
       "readinessStage": "opening"
     },
     {
-      "id": "ancient.faction_contest",
-      "label": "阵营周旋",
-      "prompt": "让旧案进入宗族、朝堂、军府、商路或地方势力的博弈。人物必须结盟、背叛、借势反制或承担污名，使第二次高潮改变真实的权力关系。",
-      "requiredFactIds": ["ancient.mainline.discrepant_record"],
-      "introduceFactIds": ["ancient.mainline.faction_cost"],
-      "factId": "ancient.mainline.faction_cost",
-      "resolutionModes": ["exposed", "concealed", "compromised", "sacrificed"],
+      "id": "ancient.position_trial",
+      "label": "立身周旋",
+      "prompt": "承接前一幕已经发生的后果，让人物得到或失去进入一个阵营、组织、地方势力或关系网络的机会。此幕必须围绕新的位置展开独立矛盾：举荐、结盟、背叛、资源争夺、制度冲突或承担污名皆可。高潮要改变真实的人际或权力关系，不得把前一幕的案由原样再查一遍。",
       "readinessStage": "pressure"
     },
     {
-      "id": "ancient.border_reckoning",
-      "label": "北境救国",
-      "prompt": "让已揭开的旧案化为正在发生的北境战事、粮道与流民危机。人物必须在救援、用兵、民生与责任归属之间承担第三次高潮，并回收世界主线事实。",
-      "requiredFactIds": ["ancient.mainline.discrepant_record", "ancient.mainline.faction_cost"],
-      "introduceFactIds": ["ancient.mainline.border_crisis", "ancient.mainline.accountability"],
-      "resolveFactIds": ["ancient.mainline.border_crisis", "ancient.mainline.accountability"],
-      "factId": "ancient.mainline.border_crisis",
-      "resolutionModes": ["exposed", "concealed", "compromised", "sacrificed"],
+      "id": "ancient.wider_crisis",
+      "label": "大局担当",
+      "prompt": "让前两幕积累的身份、人物与代价进入更大范围的危机。危机可以是外患、战事、灾乱、政局失序、地方崩裂或民生困局，不预设方向、地域或主角职位；根据人物当前的社会位置决定其能承担的尺度。高潮必须让此前关系与责任得到实质兑现，为人生结局留下可回收的后果。",
       "readinessStage": "climax"
     }
   ],
@@ -68,6 +53,32 @@
   "progression": {
     "backgroundPacing": { "minYears": 1, "maxYears": 3 },
     "statTiers": { "lowMax": 8, "highMin": 22 },
+    "statTierPresentation": {
+      "intelligence": { "low": "学思未定", "steady": "明察善断", "high": "洞见如炬" },
+      "charisma": { "low": "未谙人情", "steady": "善解人意", "high": "长袖善舞" },
+      "family": { "low": "根基未稳", "steady": "家道可凭", "high": "门庭煊赫" },
+      "fortune": { "low": "时运未至", "steady": "逢凶化吉", "high": "天眷所归" },
+      "physique": { "low": "体弱未成", "steady": "筋骨康健", "high": "龙精虎健" }
+    },
+    "survival": {
+      "startAge": 4,
+      "graceYears": 3,
+      "stages": [
+        { "id": "child", "label": "幼年", "ageStageIds": ["child"], "dangerBelowPhysique": 1, "baseCrisisRisk": 0.04, "additionalYearRisk": 0.03, "maxCrisisRisk": 0.14 },
+        { "id": "youth", "label": "青年", "ageStageIds": ["youth"], "dangerBelowPhysique": 2, "baseCrisisRisk": 0.06, "additionalYearRisk": 0.04, "maxCrisisRisk": 0.22 },
+        { "id": "adult", "label": "成年", "ageStageIds": ["prime", "middle"], "dangerBelowPhysique": 3, "baseCrisisRisk": 0.08, "additionalYearRisk": 0.05, "maxCrisisRisk": 0.3 },
+        { "id": "elder", "label": "老年", "ageStageIds": ["elder"], "dangerBelowPhysique": 5, "baseCrisisRisk": 0.12, "additionalYearRisk": 0.06, "maxCrisisRisk": 0.42 }
+      ],
+      "recovery": {
+        "successRateByTier": { "low": 0.25, "steady": 0.55, "high": 1 },
+        "restoreBuffer": 5
+      },
+      "familyPhysiqueSupport": {
+        "low": { "outcomes": [{ "delta": -1, "weight": 20 }, { "delta": 0, "weight": 60 }, { "delta": 1, "weight": 20 }] },
+        "steady": { "outcomes": [{ "delta": 0, "weight": 60 }, { "delta": 1, "weight": 40 }] },
+        "high": { "outcomes": [{ "delta": 0, "weight": 45 }, { "delta": 1, "weight": 45 }, { "delta": 2, "weight": 10 }] }
+      }
+    },
     "growthFocuses": [
       { "id": "insight", "label": "见识与谋断", "description": "将日常积累更多放在判断、学习与把握机会之上。", "primaryStats": ["intelligence", "fortune"], "secondaryStats": ["charisma"] },
       { "id": "bond", "label": "人情与根基", "description": "将日常积累更多放在人情、家门与可依靠的关系之上。", "primaryStats": ["charisma", "family"], "secondaryStats": ["fortune"] },
@@ -92,12 +103,12 @@
     { "id": "outsider", "label": "边地与异路", "summary": "带来塘报之外的真相、流民与边军的现实代价。", "conflictFactionIds": ["ambition", "broker"] }
   ],
   "routeArcs": [
-    { "directionId": "ancient.guardian", "label": "赈济与家门", "summary": "从赈册、遗属与宗族田产看见败仗后的饥民：先保住具体证人和名单，再在地方与朝局的拉扯中承担人情债，最后把粮道和安民之责带到北境战事之前。", "perspective": "让国家危机始终落到遗属、流民、书吏和家门的具体命运上。", "escalation": "宗族田产、疫病囤药和地方豪强会把救人与保全家声推向冲突。", "crisis": "北境粮道断绝后，先前被忽略的名册将决定谁能得到救援。", "payoffFocus": "回应粮册、遗属与家门承诺，让秩序是否真正保全人有明确后果。", "coreThreadIds": ["ancient.guardian_relief"], "characterIds": ["ancient.guardian_elder", "ancient.guardian_clerk"], "loreIds": ["ancient.guardian"], "materialEventIds": ["ancient_guardian_04", "ancient_guardian_01", "ancient_guardian_05", "ancient_guardian_09", "ancient_guardian_10"] },
-    { "directionId": "ancient.ambition", "label": "功名与朝局", "summary": "从功名、伪功与朝中靠山摸到凯报的造假链：先以仕途接近证据，再在党争中决定污点归谁，最后以官位、军功或名节回应边关责任。", "perspective": "让上升机会始终附着于证词、派系交换与会被追问的功业来处。", "escalation": "同年、靠山和军功会逼迫人物把私人情义变成政治立场。", "crisis": "北境再起时，旧日伪功与真实将领的去留会直接影响用兵。", "payoffFocus": "让人物亲口解释功业的来处，以及愿意为此承担何种清算。", "coreThreadIds": ["ancient.ambition_name"], "characterIds": ["ancient.ambition_peer", "ancient.ambition_patron"], "loreIds": ["ancient.ambition"], "materialEventIds": ["ancient_ambition_03", "ancient_ambition_01", "ancient_ambition_05", "ancient_ambition_09", "ancient_ambition_10"] },
-    { "directionId": "ancient.broker", "label": "账本与商路", "summary": "从盐引、漕运和旧账发现军饷亏空的去向：先拿到能伤人的账页，再在多方交易中衡量信誉与自保，最后让商路、军粮和账本决定谁能渡过边关危机。", "perspective": "让资源流向、契约、人情与信誉成为看得见的权力筹码。", "escalation": "两府、商会和旧友会要求人物把账本、桥税或密信换成站队。", "crisis": "北境军粮与漕运相继受阻时，账外的损失会变成人命。", "payoffFocus": "说明账本究竟保住谁、定罪谁，以及信誉还能否留下。", "coreThreadIds": ["ancient.broker_ledger"], "characterIds": ["ancient.broker_merchant", "ancient.broker_envoy"], "loreIds": ["ancient.broker"], "materialEventIds": ["ancient_broker_04", "ancient_broker_01", "ancient_broker_03", "ancient_broker_05", "ancient_broker_09", "ancient_broker_10"] },
-    { "directionId": "ancient.mentor", "label": "师门与新学", "summary": "从书院、禁讲与门生案接触被删改的战事记录：先让一段文字或一名门生带来疑问，再让师门在清议与朝局之间分裂，最后使学问、人才和边地教化进入救国的实际选择。", "perspective": "让师承、门生和被禁止的知识始终与现实责任相连。", "escalation": "查禁、受劾和门生任事会让清议必须接受现实后果的审视。", "crisis": "战事迫近后，书院培养的人和被删改的战史都将成为军政资源。", "payoffFocus": "回应恩师、门生或边地少年的去留，证明所学是否真的承担现实。", "coreThreadIds": ["ancient.mentor_learning"], "characterIds": ["ancient.mentor_teacher", "ancient.mentor_student"], "loreIds": ["ancient.mentor"], "materialEventIds": ["ancient_mentor_01", "ancient_mentor_02", "ancient_mentor_04", "ancient_mentor_05", "ancient_mentor_09", "ancient_mentor_10"] },
-    { "directionId": "ancient.institution", "label": "法度与署名", "summary": "从试卷、弹章、清丈和考功文书拼合隐案：先看见程序的裂缝，再在改制与人情的碰撞中作出署名，最后用制度、军令和救济的实际效果回应北境危机。", "perspective": "让文书与程序既是权力的遮蔽，也是留下责任的证据。", "escalation": "御史、地方官和宗族会要求人物在法度正确与具体代价之间取舍。", "crisis": "战时征发、军府考功和粮道调度会让每一笔署名都有救亡或害民的结果。", "payoffFocus": "让一项法度或政令留下可以追问的责任，而非抽象的清名。", "coreThreadIds": ["ancient.institution_reform"], "characterIds": ["ancient.institution_censor", "ancient.institution_magistrate"], "loreIds": ["ancient.institution"], "materialEventIds": ["ancient_institution_01", "ancient_institution_02", "ancient_institution_04", "ancient_institution_05", "ancient_institution_09", "ancient_institution_10"] },
-    { "directionId": "ancient.outsider", "label": "边地真相", "summary": "从败报、流民与密册取得朝廷叙述之外的证据：先听见被遮蔽的消息，再在禁书、密令与边地势力之间决定信谁，最后亲自面对再起的北境战事与真相的去处。", "perspective": "让朝廷叙述外的边军、流民、禁书和密册持续纠正人物的视野。", "escalation": "密令、旧朝遗债和流民谈判会使真相的传递本身成为危险。", "crisis": "边关再次告急后，人物必须决定把真相交给谁、以谁的性命换取行动。", "payoffFocus": "让密册、败报和边地同伴的命运得到公开、埋没或带走的明确结论。", "coreThreadIds": ["ancient.outsider_truth"], "characterIds": ["ancient.outsider_scholar", "ancient.outsider_scout"], "loreIds": ["ancient.outsider"], "materialEventIds": ["ancient_outsider_02", "ancient_outsider_01", "ancient_outsider_03", "ancient_outsider_05", "ancient_outsider_09", "ancient_outsider_10"] }
+    { "directionId": "ancient.guardian", "label": "家门与人情", "summary": "从亲族、地方、照拂与具体人的生计观察大局；人物可以是守护者、被照顾者或夹在家门与公义之间的人。", "perspective": "让每一场制度或权力冲突都落到相识之人的处境、承诺与归处。", "escalation": "家门、人情、地方资源和名声会让善意变成必须兑现的选择。", "crisis": "更大危机来临时，谁得到照拂、谁被牺牲、谁仍能归家都应成为真实后果。", "payoffFocus": "回应人物曾经承担的照料、名分或保全之责。", "coreThreadIds": ["ancient.guardian_relief"], "characterIds": ["ancient.guardian_elder", "ancient.guardian_clerk"], "loreIds": ["ancient.guardian"], "materialEventIds": ["ancient_guardian_04", "ancient_guardian_01", "ancient_guardian_05", "ancient_guardian_09", "ancient_guardian_10"] },
+    { "directionId": "ancient.ambition", "label": "功名与朝局", "summary": "从才能、功名、位置与朝局关系观察大局；人物既可以寻求上升，也可能被权力的门槛推着选择。", "perspective": "让获得位置的机会始终伴随人情、立场与会被追问的代价。", "escalation": "同侪、靠山、功绩与声名会把私人情义变成政治判断。", "crisis": "大局失序时，人物的职位、名望或被拒绝的位置都应决定其能承担什么。", "payoffFocus": "让人物说明自己为何取得或失去位置，并承担由此而来的后果。", "coreThreadIds": ["ancient.ambition_name"], "characterIds": ["ancient.ambition_peer", "ancient.ambition_patron"], "loreIds": ["ancient.ambition"], "materialEventIds": ["ancient_ambition_03", "ancient_ambition_01", "ancient_ambition_05", "ancient_ambition_09", "ancient_ambition_10"] },
+    { "directionId": "ancient.broker", "label": "商路与周转", "summary": "从资源、契约、往来与信誉观察大局；人物可以经营、借贷、运送、调停，或只是在交易的代价中求生。", "perspective": "让资源流向、人情、契约与信誉成为看得见的权力筹码。", "escalation": "多方需求会要求人物用物资、消息、承诺或信用换取立足之处。", "crisis": "大局危机下，资源的断绝与重新分配要落到具体人的生路。", "payoffFocus": "说明人物的周转与信誉最终保住、伤害或改变了谁。", "coreThreadIds": ["ancient.broker_ledger"], "characterIds": ["ancient.broker_merchant", "ancient.broker_envoy"], "loreIds": ["ancient.broker"], "materialEventIds": ["ancient_broker_04", "ancient_broker_01", "ancient_broker_03", "ancient_broker_05", "ancient_broker_09", "ancient_broker_10"] },
+    { "directionId": "ancient.mentor", "label": "师门与学问", "summary": "从师承、学问、门生与清议观察大局；人物可以教人、求学、传递见识，或被知识与名声共同塑造。", "perspective": "让师承、门生和知识如何进入现实始终成为可追问的选择。", "escalation": "清议、查禁、任事与师门关系会要求人物证明所学能否承担现实。", "crisis": "大局危机下，知识、人才与教化可以成为行动资源，也可能成为需要保护的东西。", "payoffFocus": "回应一段师承、教导或由知识引出的责任。", "coreThreadIds": ["ancient.mentor_learning"], "characterIds": ["ancient.mentor_teacher", "ancient.mentor_student"], "loreIds": ["ancient.mentor"], "materialEventIds": ["ancient_mentor_01", "ancient_mentor_02", "ancient_mentor_04", "ancient_mentor_05", "ancient_mentor_09", "ancient_mentor_10"] },
+    { "directionId": "ancient.institution", "label": "法度与署名", "summary": "从文书、命令、制度与署名观察大局；人物可以执行、质疑、修补或承受制度留下的缺口。", "perspective": "让程序既成为权力的遮蔽，也成为追问责任的凭据。", "escalation": "同僚、上司、地方与宗族会要求人物在规则正确和具体代价之间取舍。", "crisis": "大局危机下，每一项命令、调度或署名都应产生救人、伤人或失效的后果。", "payoffFocus": "让一项判断、法度或署名留下可被承担的责任。", "coreThreadIds": ["ancient.institution_reform"], "characterIds": ["ancient.institution_censor", "ancient.institution_magistrate"], "loreIds": ["ancient.institution"], "materialEventIds": ["ancient_institution_01", "ancient_institution_02", "ancient_institution_04", "ancient_institution_05", "ancient_institution_09", "ancient_institution_10"] },
+    { "directionId": "ancient.outsider", "label": "异路与远方", "summary": "从边地、游历、异见与官方叙述之外的生活观察大局；人物可以远行、从军、避乱、求学或在陌生秩序中寻找位置。", "perspective": "让人物的视野持续被陌生消息、不同规则与被忽略的人纠正。", "escalation": "传言、密令、迁徙、异见与陌生关系会使判断和传递本身变得危险。", "crisis": "更大危机到来时，远方的消息与边缘人的处境要成为实际行动的一部分。", "payoffFocus": "回应人物选择相信、带走、公开或守住的那条异路。", "coreThreadIds": ["ancient.outsider_truth"], "characterIds": ["ancient.outsider_scholar", "ancient.outsider_scout"], "loreIds": ["ancient.outsider"], "materialEventIds": ["ancient_outsider_02", "ancient_outsider_01", "ancient_outsider_03", "ancient_outsider_05", "ancient_outsider_09", "ancient_outsider_10"] }
   ],
   "threads": [
     { "id": "ancient.guardian_relief", "label": "赈济与名册", "premise": "灾年粮道、流民与阵亡遗属的处置，考验你是否能把责任落到具体的人身上。", "directionIds": ["ancient.guardian"], "payoffHint": "回收时必须回应粮道、遗属或旧案中至少一人的命运。" },

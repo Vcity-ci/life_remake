@@ -779,11 +779,36 @@ button.danger:hover { background: #8a4b41; }
 .delta-row small { padding: 0; border: 0; border-radius: 0; background: transparent; color: #9eb3a4; }
 .delta-row small::before { content: "· "; color: #786d56; }
 
+.narrative-origin { margin: 4px 0 32px; padding: 18px 22px 20px; border-top: 1px solid #76623c; border-right: 1px solid #4f4735; border-bottom: 1px solid #4f4735; border-left-color: #b99a57; background: #171b1b; }
+.narrative-origin::before { left: -5px; top: 24px; width: 9px; height: 9px; border-radius: 0; background: #d1af63; transform: rotate(45deg); }
+.narrative-origin header { min-height: 22px; padding-bottom: 11px; border-bottom: 1px solid #554a34; }
+.narrative-origin header small { color: #9f8754; font-size: 11px; letter-spacing: 0; }
+.narrative-origin header strong { color: #edd79b; font-size: 19px; }
+.narrative-origin p { max-width: 48em; margin-top: 16px; color: #ddd3c0; font-size: 15px; line-height: 2; }
+.origin-talent-tags { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 17px; padding-top: 13px; border-top: 1px solid #4a4435; }
+.origin-talent-tags .asset-chip { margin: 0; }
+.origin-toggle { width: 26px; min-width: 26px; height: 24px; margin-left: auto; padding: 0; border: 0; border-radius: 0; background: transparent; color: #c9aa68; font-size: 18px; line-height: 1; }
+.origin-toggle:hover:not(:disabled) { background: #24251f; color: #f1d996; }
+.origin-action { display: flex; justify-content: flex-end; margin-top: 19px; padding-top: 14px; border-top: 1px solid #4a4435; }
+.origin-action button { min-width: 148px; }
+.opening-pending { margin: 30px 0; padding: 4px 0 4px 23px; border-left: 1px solid #665a40; color: #bdb3a0; }
+.opening-pending small { color: #bca166; }
+.opening-pending p { margin: 9px 0 0; line-height: 1.8; }
+.opening-pending button { margin-top: 14px; }
+
 .decision-dock { flex: 0 0 auto; margin-top: 0; padding: 18px 0 0; border-top: 1px solid #665a40; }
 .decision-dock p { margin: 0 0 12px; color: #e0d6c1; line-height: 1.7; }
 .decision-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .decision-options button { display: grid; gap: 5px; min-height: 78px; padding: 12px 14px; text-align: left; }
 .decision-options button small { color: #2b271d; line-height: 1.4; }
+.survival-dock { flex: 0 0 auto; margin-top: 0; padding: 18px 0 0; border-top: 1px solid #73504a; }
+.survival-dock > p { margin: 0 0 10px; color: #e2d2c6; line-height: 1.7; }
+.survival-dock .survival-kicker { color: #c98770; font-size: 12px; letter-spacing: 0; }
+.survival-options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.survival-options button { display: grid; gap: 6px; min-height: 108px; padding: 13px 14px; border-color: #73504a; background: #2a2422; color: #ead9ca; text-align: left; }
+.survival-options button:hover:not(:disabled) { border-color: #c98770; background: #342824; }
+.survival-options button small { color: #d7a993; line-height: 1.4; }
+.survival-options button span { color: #bfb0a3; font-size: 12px; line-height: 1.55; }
 .advance-bar { display: flex; flex: 0 0 auto; justify-content: center; padding: 16px 0 2px; }
 .advance-bar button { min-width: 148px; }
 
@@ -865,6 +890,9 @@ button.danger:hover { background: #8a4b41; }
   .fate-rail { display: block; padding-top: 18px; }
   .rail-section { padding-bottom: 15px; margin-bottom: 15px; border-bottom: 1px solid #423f36; }
   .decision-options { grid-template-columns: 1fr; }
+  .survival-options { grid-template-columns: 1fr; }
+  .narrative-origin { padding: 16px 16px 18px; }
+  .narrative-origin p { font-size: 14px; line-height: 1.92; }
   .stats-grid, .cards { grid-template-columns: 1fr; }
   .growth-focus-options { grid-template-columns: 1fr; }
   .start-panel { margin: 20px auto; padding: 18px; }

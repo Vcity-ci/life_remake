@@ -2,7 +2,7 @@ import OpenAI from "openai";
 import { createHash } from "node:crypto";
 import type { InternalRunState } from "./engine.js";
 import type { ChatConversationState, ChatHistoryMessage, StoryConversationState, ToolCallRecord } from "./conversation.js";
-import type { AiMilestoneOptions, DecisionType, EventStoryPosition, NarrativeAttributeEffect, NarrativeAttributePolicy, NarrativeBeat, NarrativeFactResolution, NarrativeIntent, NarrativeStatTier, ProviderConfig, StatKey, Stats, WorldConfig, YearEvent } from "@reroll/shared";
+import type { AiMilestoneOptions, DecisionType, EventStoryPosition, NarrativeActHandoff, NarrativeAttributeEffect, NarrativeAttributePolicy, NarrativeBeat, NarrativeFactResolution, NarrativeIntent, NarrativeStatTier, ProviderConfig, StatKey, Stats, WorldConfig, YearEvent } from "@reroll/shared";
 import { formatNarrativePromptPlan, type NarrativePromptPlan } from "./narrative.js";
 
 export interface NarrativeContext {
@@ -189,6 +189,14 @@ export interface DirectedDecisionNarrativeOutcome {
   factResolution?: NarrativeFactResolution;
 }
 
+export interface NarrativeOriginOutcome {
+  narrative: string;
+  profile: {
+    summary: string;
+    seedHints: string[];
+  };
+}
+
 export interface DynamicNarrativeSceneInput {
   act: { id: string; label: string; prompt: string; factLabel?: string };
   beat: Exclude<NarrativeBeat, "ending">;
@@ -197,10 +205,14 @@ export interface DynamicNarrativeSceneInput {
   backgroundYearRange: { min: number; max: number };
   routes: Array<{ id: string; label: string; summary: string; perspective?: string }>;
   factions: Array<{ id: string; label: string; summary: string }>;
-  knownCharacters: Array<{ name: string; factionId?: string; role: string; description: string }>;
+  knownCharacters: Array<{ id: string; name: string; factionId?: string; role: string; description: string }>;
   attributePolicy?: NarrativeAttributePolicy;
   backgroundAttributePolicy: NarrativeAttributePolicy;
   statTiers: Record<StatKey, NarrativeStatTier>;
+  lifeStage?: {
+    label: string;
+    maxAge: number;
+  };
 }
 
 export interface DynamicNarrativeSceneResult {
@@ -209,10 +221,11 @@ export interface DynamicNarrativeSceneResult {
   factionId?: string;
   narrative: string;
   scenePacing?: "continuous" | "spanning";
-  participants: Array<{ name: string; factionId?: string; role: string; description: string; recurring: boolean }>;
+  participants: Array<{ characterRef: string; name: string; factionId?: string; role: string; description: string; recurring: boolean }>;
   milestoneCopy?: DirectedNarrativeResult["milestoneCopy"];
   createsDecision?: boolean;
   attributeEffects?: NarrativeAttributeEffect[];
+  actHandoff?: NarrativeActHandoff;
   backgroundYears?: number;
   backgroundAttributeEffects?: Array<{ offset: number; effects: NarrativeAttributeEffect[] }>;
 }
@@ -948,13 +961,14 @@ function writePromptCache(key: string, text: string): void {
 
 function debugError(tag: string, error: unknown): void {
   if (!debugModel) return;
-  const maybe = error as { message?: string; status?: number; code?: string; name?: string; type?: string; error?: unknown };
+  const maybe = error as { message?: string; status?: number; code?: string; name?: string; type?: string; reason?: string; error?: unknown };
   console.log(`[model-debug:${tag}:error]`, {
     message: maybe?.message ?? String(error),
     status: maybe?.status,
     code: maybe?.code,
     name: maybe?.name,
-    type: maybe?.type
+    type: maybe?.type,
+    reason: maybe?.reason
   });
 }
 
@@ -1054,7 +1068,7 @@ function buildSystemPrompt(
     maxTotalLen: milestoneMode ? 150 : 72
   });
   const talentHookSummary = compactPipeSummary(ctx.talentHookSummary, {
-    maxSegments: 2,
+    maxSegments: 3,
     maxSegmentLen: 40,
     maxTotalLen: 120
   });
@@ -1841,6 +1855,15 @@ function narrativeEffectProperties(policy: NarrativeAttributePolicy): Record<str
   };
 }
 
+function describeAttributePolicyLimits(policy: NarrativeAttributePolicy): string {
+  const limits: string[] = [];
+  if (policy.forbidNegativeStats?.length) limits.push(`${policy.forbidNegativeStats.join("、")}不可提交负向后果`);
+  for (const [stat, band] of Object.entries(policy.maxNegativeBandByStat ?? {})) {
+    limits.push(`${stat}的负向后果至多为${band}`);
+  }
+  return limits.length ? `；另外${limits.join("，")}` : "";
+}
+
 function narrativeBackgroundOutcomeTool(ages: number[], policy: NarrativeAttributePolicy): Record<string, unknown> {
   return {
     type: "function",
@@ -1876,6 +1899,31 @@ function narrativeBackgroundOutcomeTool(ages: number[], policy: NarrativeAttribu
                 }
               }
             }
+          }
+        }
+      }
+    }
+  };
+}
+
+function narrativeOriginOutcomeTool(): Record<string, unknown> {
+  return {
+    type: "function",
+    function: {
+      name: "render_origin",
+      description: "提交玩家可见的身世正文，以及供后续叙事使用的精炼身世摘要。",
+      parameters: {
+        type: "object",
+        additionalProperties: false,
+        required: ["narrative", "summary", "seedHints"],
+        properties: {
+          narrative: { type: "string", minLength: 80, maxLength: 560 },
+          summary: { type: "string", minLength: 20, maxLength: 180 },
+          seedHints: {
+            type: "array",
+            minItems: 0,
+            maxItems: 2,
+            items: { type: "string", minLength: 8 }
           }
         }
       }
@@ -1922,6 +1970,7 @@ interface DynamicNarrativeToolSet {
 function dynamicNarrativeSceneTools(input: DynamicNarrativeSceneInput): DynamicNarrativeToolSet {
   const routeIds = input.routes.map((route) => route.id);
   const factionIds = input.factions.map((faction) => faction.id);
+  const characterRefs = ["new", ...input.knownCharacters.map((character) => character.id)];
   const offsets = Array.from(
     { length: Math.max(1, input.backgroundYearRange.max) },
     (_value, index) => index + 1
@@ -1943,8 +1992,9 @@ function dynamicNarrativeSceneTools(input: DynamicNarrativeSceneInput): DynamicN
     items: {
       type: "object",
       additionalProperties: false,
-      required: ["name", "factionId", "role", "description", "recurring"],
+      required: ["characterRef", "name", "factionId", "role", "description", "recurring"],
       properties: {
+        characterRef: { type: "string", enum: characterRefs },
         name: { type: "string" },
         factionId: { type: "string", enum: factionIds },
         role: { type: "string" },
@@ -1954,6 +2004,16 @@ function dynamicNarrativeSceneTools(input: DynamicNarrativeSceneInput): DynamicN
     }
   };
   const scenePacing = { type: "string", enum: ["none", "continuous", "spanning"] };
+  const actHandoff = {
+    type: "object",
+    additionalProperties: false,
+    required: ["resolvedTension", "lastingConsequence", "continuation"],
+    properties: {
+      resolvedTension: { type: "string", minLength: 12, maxLength: 180 },
+      lastingConsequence: { type: "string", minLength: 12, maxLength: 180 },
+      continuation: { type: "string", minLength: 12, maxLength: 180 }
+    }
+  };
   const optionOverrides = {
     type: "array",
     minItems: 3,
@@ -2013,14 +2073,15 @@ function dynamicNarrativeSceneTools(input: DynamicNarrativeSceneInput): DynamicN
       parameters: {
         type: "object",
         additionalProperties: false,
-        required: ["routeId", "factionId", "narrative", "scenePacing", "participants", "effects"],
+        required: ["routeId", "factionId", "narrative", "scenePacing", "participants", "effects", ...(input.beat === "payoff" ? ["actHandoff"] : [])],
         properties: {
           routeId: { type: "string", enum: routeIds },
           factionId: { type: "string", enum: factionIds },
           narrative: { type: "string" },
           scenePacing,
           participants,
-          effects: effectsSchema(attributePolicy)
+          effects: effectsSchema(attributePolicy),
+          actHandoff
         }
       }
     }
@@ -2033,7 +2094,7 @@ function dynamicNarrativeSceneTools(input: DynamicNarrativeSceneInput): DynamicN
       parameters: {
         type: "object",
         additionalProperties: false,
-        required: ["routeId", "factionId", "narrative", "scenePacing", "participants", "background", "optionOverrides"],
+        required: ["routeId", "factionId", "narrative", "scenePacing", "participants", "background", "optionOverrides", ...(input.beat === "payoff" ? ["actHandoff"] : [])],
         properties: {
           routeId: { type: "string", enum: routeIds },
           factionId: { type: "string", enum: factionIds },
@@ -2041,7 +2102,8 @@ function dynamicNarrativeSceneTools(input: DynamicNarrativeSceneInput): DynamicN
           scenePacing,
           participants,
           background: { type: "string", minLength: 10 },
-          optionOverrides
+          optionOverrides,
+          actHandoff
         }
       }
     }
@@ -2635,7 +2697,7 @@ function buildDirectedStoryRenderPrompt(run: InternalRunState, input: DirectedSt
     input.kind === "milestone"
       ? "必须调用 render_story_turn：narrative 写场景正文；background 写人物来到取舍前的自然引导；三个选项必须分别对应引擎锁定的 safe、balanced、risky 语义，但可依据当前人物处境改写为具体行动。"
       : input.attributePolicy
-        ? `必须调用 render_story_turn，提交正文和 effects。effects 需提交${input.attributePolicy.minEffects}-${input.attributePolicy.maxEffects}项，只能影响${input.attributePolicy.allowedStats.join("、")}，方向只能为${input.attributePolicy.allowedDirections.join("、")}，幅度只能为${input.attributePolicy.allowedBands.join("、")}${input.attributePolicy.requirePositive ? "，且至少一项为正向" : ""}；不在正文中写数值。`
+        ? `必须调用 render_story_turn，提交正文和 effects。effects 需提交${input.attributePolicy.minEffects}-${input.attributePolicy.maxEffects}项，只能影响${input.attributePolicy.allowedStats.join("、")}，方向只能为${input.attributePolicy.allowedDirections.join("、")}，幅度只能为${input.attributePolicy.allowedBands.join("、")}${input.attributePolicy.requirePositive ? "，且至少一项为正向" : ""}${describeAttributePolicyLimits(input.attributePolicy)}；不在正文中写数值。`
         : "必须调用 render_story_turn，提交这段经历的正文；不写总结或人生结论。"
   ].filter(Boolean).join("\n");
 }
@@ -2790,6 +2852,14 @@ function parseNarrativeEffects(raw: unknown, policy: NarrativeAttributePolicy): 
       typeof value.band !== "string" ||
       !policy.allowedBands.includes(value.band as NarrativeAttributeEffect["band"])
     ) return null;
+    if (value.direction === "down" && policy.forbidNegativeStats?.includes(value.stat as StatKey)) return null;
+    const maximumNegativeBand = value.direction === "down"
+      ? policy.maxNegativeBandByStat?.[value.stat as StatKey]
+      : undefined;
+    const bandRank = (band: NarrativeAttributeEffect["band"]): number => (
+      band === "heavy" ? 3 : band === "medium" ? 2 : 1
+    );
+    if (maximumNegativeBand && bandRank(value.band as NarrativeAttributeEffect["band"]) > bandRank(maximumNegativeBand)) return null;
     used.add(value.stat as StatKey);
     effects.push({ stat: value.stat as StatKey, direction: value.direction, band: value.band as NarrativeAttributeEffect["band"] });
   }
@@ -2804,14 +2874,14 @@ async function requestNarrativeOutcomeTool(
   toolInput: Record<string, unknown> | Record<string, unknown>[],
   prompt: string
 ): Promise<{ raw: Record<string, unknown>; toolCall: ToolCallRecord; toolName: string }> {
-  if (!ctx.apiKey.trim()) throw new NarrativeOutcomeError("narrative_outcome_unavailable");
+  if (!ctx.apiKey.trim()) throw new NarrativeOutcomeError("narrative_outcome_unavailable", "api_key_missing");
   const systemPrompt = buildSystemPrompt(normalizePromptPackForModel(ctx.promptPack), world, ctx, "year");
   const conversation = ensureConversationState(ctx.conversation, hashSystemPrompt(systemPrompt), systemPrompt);
   ctx.conversation = conversation;
   const tools = Array.isArray(toolInput) ? toolInput : [toolInput];
   const toolNames = tools.map((tool) => (tool.function as { name?: unknown }).name).filter((name): name is string => typeof name === "string");
   if (tools.length === 0 || toolNames.length !== tools.length) {
-    throw new NarrativeOutcomeError("narrative_outcome_invalid");
+    throw invalidNarrativeOutcome("tool_catalog_invalid");
   }
   const toolChoice = tools.length === 1
     ? { type: "function", function: { name: toolNames[0] } }
@@ -2846,14 +2916,15 @@ async function requestNarrativeOutcomeTool(
       ? toolNames.map((toolName) => findResponseFunctionCall(completion as { output?: unknown[] }, toolName)).find(Boolean)
       : toolNames.map((toolName) => findDirectedToolCall((completion as { choices?: Array<{ message?: unknown }> }).choices?.[0]?.message, toolName)).find(Boolean);
     const raw = call ? parseDirectedToolArguments(call.rawArguments) : null;
-    if (!call || !raw) throw new NarrativeOutcomeError("narrative_outcome_invalid");
+    if (!call) throw invalidNarrativeOutcome("tool_call_missing");
+    if (!raw) throw invalidNarrativeOutcome("tool_arguments_invalid");
     pushHistory(conversation, "user", projectConversationUserPrompt(prompt));
     pushToolCall(conversation, call.toolCall);
     return { raw, toolCall: call.toolCall, toolName: call.toolCall.name };
   } catch (error) {
     debugError("narrative-outcome", error);
     if (error instanceof NarrativeOutcomeError) throw error;
-    throw new NarrativeOutcomeError("narrative_outcome_unavailable");
+    throw new NarrativeOutcomeError("narrative_outcome_unavailable", "provider_request_failed");
   }
 }
 
@@ -2871,13 +2942,13 @@ export async function generateBackgroundNarrativeOutcome(
   const prompt = [
     `请写${ages[0]}岁至${ages[ages.length - 1]}岁的一段连贯人生背景。`,
     `需要承接：${compactText(input.aftermath, 140)}`,
-    `不得写结局、规则、数值或内部标签。每年提交${input.attributePolicy.minEffects}-${input.attributePolicy.maxEffects}项属性后果，只能影响${input.attributePolicy.allowedStats.join("、")}，方向只能为${input.attributePolicy.allowedDirections.join("、")}，幅度只能为${input.attributePolicy.allowedBands.join("、")}。`,
+    `不得写结局、规则、数值或内部标签。每年提交${input.attributePolicy.minEffects}-${input.attributePolicy.maxEffects}项属性后果，只能影响${input.attributePolicy.allowedStats.join("、")}，方向只能为${input.attributePolicy.allowedDirections.join("、")}，幅度只能为${input.attributePolicy.allowedBands.join("、")}${describeAttributePolicyLimits(input.attributePolicy)}。`,
     "必须调用 render_background_turn。"
   ].filter(Boolean).join("\n");
   const result = await requestNarrativeOutcomeTool(run, world, ctx, narrativeBackgroundOutcomeTool(ages, input.attributePolicy), prompt);
   const narrative = typeof result.raw.narrative === "string" ? result.raw.narrative.trim() : "";
   const rows = Array.isArray(result.raw.years) ? result.raw.years : [];
-  if (!isSafePlayerNarrative(narrative) || rows.length !== ages.length) throw new NarrativeOutcomeError("narrative_outcome_invalid");
+  if (!isSafePlayerNarrative(narrative) || rows.length !== ages.length) throw invalidNarrativeOutcome("background_narrative_or_year_count_invalid");
   const years = rows.map((row) => {
     const value = row as { age?: unknown; effects?: unknown };
     const age = typeof value.age === "number" ? value.age : NaN;
@@ -2885,12 +2956,49 @@ export async function generateBackgroundNarrativeOutcome(
     return Number.isFinite(age) && effects ? { age, effects } : null;
   });
   if (years.some((row) => !row) || new Set(years.map((row) => row!.age)).size !== ages.length || years.some((row) => !ages.includes(row!.age))) {
-    throw new NarrativeOutcomeError("narrative_outcome_invalid");
+    throw invalidNarrativeOutcome("background_year_rows_invalid");
   }
   pushToolResult(ctx.conversation!, result.toolCall, "背景叙事与年度后果已由引擎接收。");
   pushHistory(ctx.conversation!, "assistant", narrative);
   compactConversationWindow(ctx, ctx.conversation!);
   return { narrative, years: years as Array<{ age: number; effects: NarrativeAttributeEffect[] }> };
+}
+
+export async function generateNarrativeOrigin(
+  run: InternalRunState,
+  world: WorldConfig,
+  ctx: NarrativeContext
+): Promise<NarrativeOriginOutcome> {
+  const talentContext = run.cards
+    .slice(0, 3)
+    .map((card) => `${card.name}：${compactText(card.description, 70)}${card.narrative?.bias ? `（${compactText(card.narrative.bias, 70)}）` : ""}`)
+    .join("；") || "无";
+  const statSummary = Object.entries(run.stats).map(([stat, value]) => `${stat}=${value}`).join("；");
+  const prompt = [
+    `为一名刚出生、尚未开始推进年份的人物写身世。人物设定：${compactText(run.personaPrompt, 220)}。`,
+    `已选天赋（仅此${run.cards.length}项，应自然体现其气质）：${talentContext}。初始属性仅供判断，不写入正文：${statSummary}。`,
+    "正文以第二人称写一段约180-320字、可供玩家阅读的身世，交代家庭、成长环境和一项会影响其一生的个人张力。",
+    "只写人物来处，不推进世界主线，不解决旧案，不指定路线，不创造需要引擎立即追踪的关键人物或阵营承诺。",
+    "summary 必须是可长期保留的精炼事实；seedHints 最多两条，只能是未来可能回访的模糊处境或关系线索。",
+    "不得写规则、数值、内部标签、工具或结局。必须调用 render_origin。"
+  ].join("\n");
+  const result = await requestNarrativeOutcomeTool(run, world, ctx, narrativeOriginOutcomeTool(), prompt);
+  const narrative = typeof result.raw.narrative === "string" ? result.raw.narrative.trim() : "";
+  const summary = typeof result.raw.summary === "string" ? compactText(result.raw.summary, 180) : "";
+  const seedHints = Array.isArray(result.raw.seedHints)
+    ? result.raw.seedHints
+      .filter((hint): hint is string => typeof hint === "string")
+      .map((hint) => compactText(hint, 90))
+      .filter((hint) => isSafePlayerNarrative(hint))
+      .slice(0, 2)
+    : [];
+  if (!isSafePlayerNarrative(narrative) || !isSafePlayerNarrative(summary)) {
+    throw invalidNarrativeOutcome("origin_narrative_or_profile_invalid");
+  }
+  pushToolResult(ctx.conversation!, result.toolCall, "人物身世和可回访线索已写入人生档案。 ");
+  pushHistory(ctx.conversation!, "assistant", narrative);
+  compactConversationWindow(ctx, ctx.conversation!);
+  return { narrative, profile: { summary, seedHints } };
 }
 
 export async function generateDirectedDecisionNarrativeOutcome(
@@ -2901,7 +3009,7 @@ export async function generateDirectedDecisionNarrativeOutcome(
 ): Promise<DirectedDecisionNarrativeOutcome> {
   const prompt = [
     `人物在${run.age}岁选择了“${compactText(input.label, 36)}”：${compactText(input.description, 90)}。`,
-    `只能影响：${input.attributePolicy.allowedStats.join("、")}；方向只能为：${input.attributePolicy.allowedDirections.join("、")}；可用幅度：${input.attributePolicy.allowedBands.join("、")}；必须提交${input.attributePolicy.minEffects}-${input.attributePolicy.maxEffects}项后果${input.attributePolicy.requirePositive ? "，且至少一项为正向" : ""}。`,
+    `只能影响：${input.attributePolicy.allowedStats.join("、")}；方向只能为：${input.attributePolicy.allowedDirections.join("、")}；可用幅度：${input.attributePolicy.allowedBands.join("、")}；必须提交${input.attributePolicy.minEffects}-${input.attributePolicy.maxEffects}项后果${input.attributePolicy.requirePositive ? "，且至少一项为正向" : ""}${describeAttributePolicyLimits(input.attributePolicy)}。`,
     "写选择已发生后的自然后果，不写数值、规则、结局或工具。后果必须保留可被后续承接的代价或收获。",
     input.factResolutionModes?.length ? `本次正处于世界幕高潮，必须同时选择一个事实收束方式：${input.factResolutionModes.join("、")}。` : "",
     "必须调用 resolve_decision_outcome。"
@@ -2919,7 +3027,7 @@ export async function generateDirectedDecisionNarrativeOutcome(
   const factResolution = input.factResolutionModes?.includes(rawResolution as NarrativeFactResolution)
     ? rawResolution as NarrativeFactResolution
     : undefined;
-  if (!isSafePlayerNarrative(narrative) || !effects || (input.factResolutionModes?.length && !factResolution)) throw new NarrativeOutcomeError("narrative_outcome_invalid");
+  if (!isSafePlayerNarrative(narrative) || !effects || (input.factResolutionModes?.length && !factResolution)) throw invalidNarrativeOutcome("decision_outcome_invalid");
   pushToolResult(ctx.conversation!, result.toolCall, "抉择后果已由引擎审核并写入人生记录。");
   compactConversationWindow(ctx, ctx.conversation!);
   return { narrative, effects, factResolution };
@@ -2927,7 +3035,8 @@ export async function generateDirectedDecisionNarrativeOutcome(
 
 function parseDynamicNarrativeParticipants(
   raw: unknown,
-  factions: DynamicNarrativeSceneInput["factions"]
+  factions: DynamicNarrativeSceneInput["factions"],
+  knownCharacters: DynamicNarrativeSceneInput["knownCharacters"]
 ): DynamicNarrativeSceneResult["participants"] | null {
   if (!Array.isArray(raw) || raw.length > 3) return null;
   const participants: DynamicNarrativeSceneResult["participants"] = [];
@@ -2938,12 +3047,31 @@ function parseDynamicNarrativeParticipants(
     const factionId = typeof item.factionId === "string" ? item.factionId.trim() : "";
     const role = typeof item.role === "string" ? compactText(item.role, 100) : "";
     const description = typeof item.description === "string" ? compactText(item.description, 220) : "";
+    const characterRef = typeof item.characterRef === "string" ? item.characterRef.trim() : "";
     if (!isSafePlayerText(name, 1) || !isSafePlayerText(role, 1) || !isSafePlayerText(description, 1) || !factions.some((faction) => faction.id === factionId)) {
       return null;
     }
-    participants.push({ name, factionId, role, description, recurring: item.recurring === true });
+    const known = characterRef === "new"
+      ? undefined
+      : knownCharacters.find((character) => character.id === characterRef);
+    if (!characterRef || (characterRef !== "new" && (!known || known.name !== name || (known.factionId ?? "") !== factionId))) return null;
+    participants.push({ characterRef, name, factionId, role, description, recurring: item.recurring === true });
   }
   return participants;
+}
+
+function parseDynamicNarrativeActHandoff(raw: unknown): NarrativeActHandoff | null {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const source = raw as Record<string, unknown>;
+  const resolvedTension = typeof source.resolvedTension === "string" ? compactText(source.resolvedTension, 180) : "";
+  const lastingConsequence = typeof source.lastingConsequence === "string" ? compactText(source.lastingConsequence, 180) : "";
+  const continuation = typeof source.continuation === "string" ? compactText(source.continuation, 180) : "";
+  if (
+    !isSafePlayerText(resolvedTension, 12) ||
+    !isSafePlayerText(lastingConsequence, 12) ||
+    !isSafePlayerText(continuation, 12)
+  ) return null;
+  return { resolvedTension, lastingConsequence, continuation };
 }
 
 export async function generateDynamicNarrativeScene(
@@ -2965,10 +3093,11 @@ export async function generateDynamicNarrativeScene(
     `当前世界幕：${compactText(input.act.label, 36)}。${compactText(input.act.prompt, 180)}`,
     `当前节拍：${input.beat}。${input.act.factLabel ? `本幕事实：${compactText(input.act.factLabel, 120)}` : ""}`,
     input.beat === "setup" ? "这是本幕开场。正文应先让世界变化、传闻或他人处境进入人物视野，不要求人物立刻亲自解决冲突。" : "",
+    input.lifeStage ? `当前处于${input.lifeStage.label}（至${input.lifeStage.maxAge}岁）：主角尚不具备独立社会行动能力。以照料者、家庭、感官和成长环境为叙事主体；不得写谋划、交涉、实质抉择或主线推进。` : "",
     `人物能力档位（仅用于判断，不写入正文）：${Object.entries(input.statTiers).map(([stat, tier]) => `${stat}=${tier}`).join("；")}`,
     sceneAllowed ? `可选路线（场景时必须选一条）：${input.routes.map((route) => `${route.id}=${route.label}：${compactText(route.summary, 88)}`).join(" | ")}` : "",
     sceneAllowed ? `可选阵营（场景时必须选一方）：${input.factions.map((faction) => `${faction.id}=${faction.label}：${compactText(faction.summary, 60)}`).join(" | ")}` : "",
-    input.knownCharacters.length ? `可回归人物：${input.knownCharacters.map((character) => `${character.name}(${character.role})`).join("；")}` : "",
+    input.knownCharacters.length ? `可回归人物：${input.knownCharacters.map((character) => `${character.id}=${character.name}（${character.factionId ?? "无阵营"}，${character.role}）：${compactText(character.description, 80)}`).join("；")}` : "",
     ctx.recentNarratives?.length ? `按需召回的已发生片段：${ctx.recentNarratives.map((entry) => compactText(entry, 110)).join("；")}` : "",
     canRenderBackground
       ? `render_background_segment 表示${input.backgroundYearRange.min}-${input.backgroundYearRange.max}年的平静人生片段；不得借背景推进、解释或收束当前主线，逐年提交轻度或中度成长${input.backgroundAttributePolicy.preferredStats?.length ? `，优先影响${input.backgroundAttributePolicy.preferredStats.join("、")}` : ""}。`
@@ -2979,9 +3108,12 @@ export async function generateDynamicNarrativeScene(
     canRenderChoice
       ? "render_choice_scene 表示真正影响人物关系、资源、立场或后续处境的取舍，必须写正文、抉择背景和三个自然语言选项；不要写风险标签。"
       : "",
+    input.beat === "payoff"
+      ? "本拍完成当前世界幕。除正文外，必须在 actHandoff 中提交本幕真正解决的矛盾、留下的不可逆后果、将带入下一幕的人物机会或未尽责任。它们是内部事实，不得写成系统说明；不得复用固定案情，必须来自本段已经发生的故事。"
+      : "",
     input.decisionMode === "required" && canRenderChoice ? "本拍必须调用 render_choice_scene。" : "",
     input.decisionMode === "none" && canRenderScene ? "本拍必须调用 render_scene。" : "",
-    "路线是观察和人物经历的视角，不是独占分支；不得生成世界包之外的路线或阵营 ID。场景可让既有人物回归，也可提出新人物；只有 recurring=true 的人物才会进入命运人物档案。",
+    "路线是观察和人物经历的视角，不是独占分支；不得生成世界包之外的路线或阵营 ID。已有角色再次出场时，characterRef 必须使用其既有 ID，且不得改写其姓名、阵营或身份；只有首次出现的人物使用 characterRef=new。只有 recurring=true 的新人物才会进入命运人物档案。",
     `不得写结局、内部标签、系统说明、数值或工具。必须调用以下允许工具之一：${toolSet.names.join("、")}。`
   ].filter(Boolean).join("\n");
   const result = await requestNarrativeOutcomeTool(run, world, ctx, toolSet.tools, prompt);
@@ -3020,9 +3152,12 @@ export async function generateDynamicNarrativeScene(
 
   const routeId = typeof result.raw.routeId === "string" ? result.raw.routeId.trim() : "";
   const factionId = typeof result.raw.factionId === "string" ? result.raw.factionId.trim() : "";
-  const participants = parseDynamicNarrativeParticipants(result.raw.participants, input.factions);
+  const participants = parseDynamicNarrativeParticipants(result.raw.participants, input.factions, input.knownCharacters);
   const scenePacing = result.raw.scenePacing === "continuous" || result.raw.scenePacing === "spanning"
     ? result.raw.scenePacing
+    : undefined;
+  const actHandoff = input.beat === "payoff"
+    ? parseDynamicNarrativeActHandoff(result.raw.actHandoff) ?? undefined
     : undefined;
   if (!sceneAllowed || !input.routes.some((route) => route.id === routeId) || !input.factions.some((faction) => faction.id === factionId) || !participants) {
     throw invalidNarrativeOutcome("dynamic_scene_identity_or_participants_invalid");
@@ -3031,9 +3166,10 @@ export async function generateDynamicNarrativeScene(
   if (result.toolName === "render_scene") {
     const attributeEffects = input.attributePolicy ? parseNarrativeEffects(result.raw.effects, input.attributePolicy) : null;
     if (!canRenderScene || !attributeEffects) throw invalidNarrativeOutcome("dynamic_scene_effects_invalid");
+    if (input.beat === "payoff" && !actHandoff) throw invalidNarrativeOutcome("dynamic_scene_act_handoff_invalid");
     pushToolResult(ctx.conversation!, result.toolCall, "世界幕场景、人物提议与受控后果已由引擎接收。");
     compactConversationWindow(ctx, ctx.conversation!);
-    return { turnKind: "scene", routeId, factionId, narrative, scenePacing, participants, createsDecision: false, attributeEffects };
+    return { turnKind: "scene", routeId, factionId, narrative, scenePacing, participants, createsDecision: false, attributeEffects, actHandoff };
   }
 
   if (result.toolName === "render_choice_scene") {
@@ -3042,6 +3178,7 @@ export async function generateDynamicNarrativeScene(
     if (!canRenderChoice || !isSafePlayerNarrative(background) || !optionOverrides) {
       throw invalidNarrativeOutcome("dynamic_choice_presentation_invalid");
     }
+    if (input.beat === "payoff" && !actHandoff) throw invalidNarrativeOutcome("dynamic_choice_act_handoff_invalid");
     pushToolResult(ctx.conversation!, result.toolCall, "世界幕抉择、人物提议与待结算后果已由引擎接收。");
     compactConversationWindow(ctx, ctx.conversation!);
     return {
@@ -3052,7 +3189,8 @@ export async function generateDynamicNarrativeScene(
       scenePacing,
       participants,
       createsDecision: true,
-      milestoneCopy: { background, optionOverrides }
+      milestoneCopy: { background, optionOverrides },
+      actHandoff
     };
   }
 

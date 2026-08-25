@@ -13,6 +13,7 @@ import type {
   NarrativeComponentDefinition,
   NarrativeAttributeEffect,
   NarrativeAttributePolicy,
+  NarrativeActHandoff,
   NarrativeDynamicCharacter,
   NarrativeFactResolution,
   NarrativeIntent,
@@ -20,11 +21,13 @@ import type {
   MilestoneChoice,
   NarrativeRunState,
   NarrativeStatTier,
+  NarrativeSurvivalRule,
   NarrativeThreadState,
   NarrativeWorldDefinition,
   PassiveEffect,
   PublicMilestoneChoice,
   PublicRunState,
+  PublicSurvivalCrisis,
   PublicTimelineEntry,
   RunPhase,
   RunState,
@@ -40,6 +43,7 @@ import type {
   Stats,
   TimelineEntry,
   TurnRecord,
+  SurvivalChoice,
   WorldConfig,
   YearEvent
 } from "@reroll/shared";
@@ -61,9 +65,7 @@ import {
   isNarrativeEndingEligible,
   lockNarrativeEnding,
   recordNarrativeSceneDecision,
-  recordNarrativeSetback,
   refreshNarrativeMainlineCompletion,
-  resetNarrativeRouteProgress,
   setNarrativeEndingState
 } from "./narrative.js";
 
@@ -102,7 +104,6 @@ export function getPendingDirectedDecisionPolicy(
 interface DirectedDecisionEffect {
   success: Partial<Record<StatKey, number>>;
   failure: Partial<Record<StatKey, number>>;
-  deathRisk: number;
 }
 
 export interface DirectedEventCandidate {
@@ -165,12 +166,6 @@ const DIRECTOR_EVENT_POOL_SIZE = 16;
 const DIRECTOR_FOCUS_OPTION_LIMIT = 6;
 const CORE_STAT_MIN = -30;
 const STAT_MAX = 100;
-const negativeStatLabel: Record<CoreStatKey, string> = {
-  intelligence: "智力",
-  charisma: "魅力",
-  family: "家境",
-  fortune: "气运"
-};
 
 export interface InternalRunState extends RunState {
   seed: number;
@@ -197,6 +192,20 @@ export interface InternalRunState extends RunState {
   };
   narrativeReservoir: NarrativeReservoirState;
   turnRecords: TurnRecord[];
+  survival: {
+    stageId?: string;
+    lowPhysiqueYears: number;
+  };
+  survivalCrisis?: {
+    id: string;
+    age: number;
+    stageId: string;
+    stageLabel: string;
+    dangerBelowPhysique: number;
+    lowPhysiqueYears: number;
+    triggerRisk: number;
+    cause: string;
+  };
 }
 
 const defaultAgeThresholds: AgeThreshold[] = [
@@ -590,6 +599,198 @@ function reduceDeathRisk(run: InternalRunState, risk: number): number {
   return Math.max(0, risk - reduction);
 }
 
+function getSurvivalRule(narrativeWorld?: NarrativeWorldDefinition | null): NarrativeSurvivalRule | undefined {
+  return narrativeWorld?.progression?.survival;
+}
+
+function ensureSurvivalState(run: InternalRunState): InternalRunState["survival"] {
+  if (!run.survival) run.survival = { lowPhysiqueYears: 0 };
+  return run.survival;
+}
+
+function findSurvivalStage(
+  rule: NarrativeSurvivalRule,
+  ageStageId: AgeThreshold["id"]
+): NarrativeSurvivalRule["stages"][number] | undefined {
+  return rule.stages.find((stage) => stage.ageStageIds.includes(ageStageId));
+}
+
+function pickWeightedDelta(
+  outcomes: NarrativeSurvivalRule["familyPhysiqueSupport"][NarrativeStatTier]["outcomes"],
+  rng: Rng
+): number {
+  const totalWeight = outcomes.reduce((sum, item) => sum + Math.max(0, item.weight), 0);
+  if (totalWeight <= 0) return 0;
+  let cursor = rng() * totalWeight;
+  for (const outcome of outcomes) {
+    cursor -= Math.max(0, outcome.weight);
+    if (cursor <= 0) return Math.trunc(outcome.delta);
+  }
+  return Math.trunc(outcomes[outcomes.length - 1]?.delta ?? 0);
+}
+
+/** Applies the configured household support once for every actual passing year. */
+function applyAnnualFamilyPhysiqueSupport(
+  run: InternalRunState,
+  changes: Partial<Record<StatKey, number>>,
+  narrativeWorld: NarrativeWorldDefinition | null | undefined,
+  rng: Rng
+): Partial<Record<StatKey, number>> {
+  const rule = getSurvivalRule(narrativeWorld);
+  if (!rule) return changes;
+  const tier = resolveNarrativeStatTiers(run.stats, run.narrative.statTierConfig).family;
+  const support = rule.familyPhysiqueSupport[tier];
+  if (!support) return changes;
+  const delta = pickWeightedDelta(support.outcomes, rng);
+  if (delta === 0) return changes;
+  return {
+    ...changes,
+    physique: (changes.physique ?? 0) + delta
+  };
+}
+
+function survivalCause(run: InternalRunState, stageLabel: string): string {
+  const familyTier = resolveNarrativeStatTiers(run.stats, run.narrative.statTierConfig).family;
+  if (familyTier === "low") return `${stageLabel}困顿失养，体魄日渐不支`;
+  if (run.stats.physique <= 0) return `${stageLabel}旧伤与劳顿一并发作`;
+  return `${stageLabel}久病难支`;
+}
+
+/**
+ * Death is never resolved here. An annual low-physique risk only opens a public
+ * survival crisis, which must be settled by one of the three player choices.
+ */
+function updateAnnualSurvivalRisk(
+  run: InternalRunState,
+  world: WorldConfig,
+  narrativeWorld: NarrativeWorldDefinition | null | undefined,
+  sourceId: string
+): void {
+  const rule = getSurvivalRule(narrativeWorld);
+  if (!rule || run.ended || run.survivalCrisis || run.age < rule.startAge) return;
+  const state = ensureSurvivalState(run);
+  const stage = findSurvivalStage(rule, resolveAgeStage(run.age, world).id);
+  if (!stage) {
+    state.stageId = undefined;
+    state.lowPhysiqueYears = 0;
+    return;
+  }
+  if (state.stageId !== stage.id) {
+    state.stageId = stage.id;
+    state.lowPhysiqueYears = 0;
+  }
+  if (run.stats.physique >= stage.dangerBelowPhysique) {
+    state.lowPhysiqueYears = 0;
+    return;
+  }
+  state.lowPhysiqueYears += 1;
+  if (state.lowPhysiqueYears < rule.graceYears) return;
+
+  const rawRisk = stage.baseCrisisRisk + (state.lowPhysiqueYears - rule.graceYears) * stage.additionalYearRisk;
+  const triggerRisk = clamp(reduceDeathRisk(run, rawRisk), 0, stage.maxCrisisRisk);
+  const rng = seedrandom(`${run.seed}:survival:${stage.id}:${run.age}:${state.lowPhysiqueYears}:${sourceId}`);
+  if (rng() >= triggerRisk) return;
+  run.survivalCrisis = {
+    id: `survival:${stage.id}:${run.age}:${state.lowPhysiqueYears}`,
+    age: run.age,
+    stageId: stage.id,
+    stageLabel: stage.label,
+    dangerBelowPhysique: stage.dangerBelowPhysique,
+    lowPhysiqueYears: state.lowPhysiqueYears,
+    triggerRisk,
+    cause: survivalCause(run, stage.label)
+  };
+}
+
+function survivalChoiceStat(choice: SurvivalChoice): StatKey {
+  if (choice === "self_rescue") return "intelligence";
+  if (choice === "seek_help") return "charisma";
+  return "fortune";
+}
+
+const survivalChoiceCopy: Record<SurvivalChoice, { label: string; description: string }> = {
+  self_rescue: { label: "自愈", description: "凭借判断与意志，在病势中寻找一线转机。" },
+  seek_help: { label: "请求帮助", description: "向仍可依靠的人求援，赌一次有人愿意伸手。" },
+  trust_fate: { label: "听天由命", description: "不再强求，任由命数给出最后的回应。" }
+};
+
+function toPublicSurvivalCrisis(run: InternalRunState): PublicSurvivalCrisis | undefined {
+  const crisis = run.survivalCrisis;
+  if (!crisis) return undefined;
+  const tiers = resolveNarrativeStatTiers(run.stats, run.narrative.statTierConfig);
+  return {
+    id: crisis.id,
+    age: crisis.age,
+    stageLabel: crisis.stageLabel,
+    summary: `${crisis.cause}。此刻只能在有限的选择中求一线生机。`,
+    dangerBelowPhysique: crisis.dangerBelowPhysique,
+    choices: (["self_rescue", "seek_help", "trust_fate"] as SurvivalChoice[]).map((choice) => {
+      const stat = survivalChoiceStat(choice);
+      const tier = tiers[stat];
+      return {
+        id: choice,
+        label: survivalChoiceCopy[choice].label,
+        description: survivalChoiceCopy[choice].description,
+        stat,
+        tier,
+        guaranteed: tier === "high"
+      };
+    })
+  };
+}
+
+export function resolveSurvivalCrisis(
+  run: InternalRunState,
+  narrativeWorld: NarrativeWorldDefinition | null | undefined,
+  choice: SurvivalChoice,
+  crisisId?: string
+): { event: YearEvent; recovered: boolean } {
+  const crisis = run.survivalCrisis;
+  const rule = getSurvivalRule(narrativeWorld);
+  if (!crisis || !rule) throw new Error("survival_crisis_unavailable");
+  if (crisisId && crisis.id !== crisisId) throw new Error("survival_crisis_stale");
+  const stat = survivalChoiceStat(choice);
+  const tier = resolveNarrativeStatTiers(run.stats, run.narrative.statTierConfig)[stat];
+  const successRate = rule.recovery.successRateByTier[tier] ?? 0;
+  const rng = seedrandom(`${run.seed}:survival-choice:${crisis.id}:${choice}:${run.history.length}`);
+  const recovered = tier === "high" || rng() < successRate;
+  const copy = survivalChoiceCopy[choice];
+  if (recovered) {
+    const restoredTo = crisis.dangerBelowPhysique + rule.recovery.restoreBuffer;
+    const changes = { physique: Math.max(0, restoredTo - run.stats.physique) };
+    run.stats = applyChanges(run.stats, changes);
+    ensureSurvivalState(run).stageId = crisis.stageId;
+    ensureSurvivalState(run).lowPhysiqueYears = 0;
+    run.survivalCrisis = undefined;
+    refreshRunFame(run);
+    return {
+      recovered: true,
+      event: {
+        age: run.age,
+        title: `${run.age}岁·险境回转`,
+        summary: `你选择${copy.label}。在最难熬的时日里，你终于守住了一口气，病势暂退，往后的路仍需自己慢慢走。`,
+        statChanges: changes,
+        tags: ["survival", "survival_recovered", `survival_choice_${choice}`]
+      }
+    };
+  }
+  run.survivalCrisis = undefined;
+  run.ended = true;
+  run.outcome = "dead";
+  run.deathCause = `${crisis.cause}；${copy.label}未能挽回`;
+  run.endingSummary = calcEnding(run);
+  return {
+    recovered: false,
+    event: {
+      age: run.age,
+      title: `${run.age}岁·命数已尽`,
+      summary: `你选择${copy.label}，却没能越过这一场病厄。`,
+      statChanges: {},
+      tags: ["survival", "survival_failed", `survival_choice_${choice}`]
+    }
+  };
+}
+
 function milestoneTriggerRate(stageId: AgeThreshold["id"], tuning: GameplayTuning): number {
   const rate = tuning.milestone.triggerRateByStage[stageId];
   return clamp(rate, 0, 1);
@@ -886,6 +1087,9 @@ function resolveNarrativeAttributeChanges(
     )) {
       return null;
     }
+    if (effect.direction === "down" && policy?.forbidNegativeStats?.includes(effect.stat)) return null;
+    const maximumNegativeBand = effect.direction === "down" ? policy?.maxNegativeBandByStat?.[effect.stat] : undefined;
+    if (maximumNegativeBand && attributeBandMagnitude(effect.band) > attributeBandMagnitude(maximumNegativeBand)) return null;
     unique.add(effect.stat);
     const sign = effect.direction === "up" ? 1 : -1;
     changes[effect.stat] = sign * attributeBandMagnitude(effect.band);
@@ -915,36 +1119,37 @@ export function settleNarrativeBackgroundOutcomes(
   world: WorldConfig,
   outcomes: Array<{ age: number; effects: NarrativeAttributeEffect[] }>,
   pendingAges: readonly number[],
-  attributePolicies?: Map<number, NarrativeAttributePolicy>
+  attributePolicies?: Map<number, NarrativeAttributePolicy>,
+  narrativeWorld?: NarrativeWorldDefinition | null
 ): boolean {
   const byAge = new Map(outcomes.map((outcome) => [outcome.age, outcome]));
   const pendingAgeSet = new Set(pendingAges);
   if (pendingAgeSet.size === 0 || byAge.size !== pendingAgeSet.size || Array.from(pendingAgeSet).some((age) => !byAge.has(age))) return false;
   const pending = run.history.filter((event) => pendingAgeSet.has(event.age));
   if (pending.length !== pendingAgeSet.size) return false;
-  const finalAge = run.age;
+  let finalAge = run.age;
   for (const event of pending) {
     run.age = event.age;
     const outcome = byAge.get(event.age)!;
-    const changes = approveNarrativeAttributeOutcome(run, world, outcome, "background", attributePolicies?.get(event.age));
-    if (changes === null) return false;
+    const approvedChanges = approveNarrativeAttributeOutcome(run, world, outcome, "background", attributePolicies?.get(event.age));
+    if (approvedChanges === null) return false;
+    const changes = applyAnnualFamilyPhysiqueSupport(
+      run,
+      approvedChanges,
+      narrativeWorld,
+      seedrandom(`${run.seed}:family-support:background:${event.age}:${event.title}`)
+    );
     event.statChanges = changes;
     run.stats = applyChanges(run.stats, changes);
     run.ageStage = resolveAgeStage(run.age, world);
     refreshRunFame(run);
     updateNegativeStreaks(run);
-    const rng = seedrandom(`${run.seed}:background-model-resolve:${run.age}:${event.title}`);
-    const deathCheck = calcDeathRisk(run, world, 0);
-    const adjustedDeathRisk = reduceDeathRisk(run, deathCheck.risk);
-    if (adjustedDeathRisk > 0 && rng() < adjustedDeathRisk) {
-      const cause = deathCheck.cause ?? "意外灾祸";
-      if (!deferNarrativeCatastrophe(run, cause)) {
-        run.ended = true;
-        run.outcome = "dead";
-        run.deathCause = cause;
-        run.endingSummary = calcEnding(run);
-        break;
-      }
+    updateAnnualSurvivalRisk(run, world, narrativeWorld, `background:${event.age}:${event.title}`);
+    if (run.survivalCrisis) {
+      finalAge = event.age;
+      const futurePendingAges = new Set(pending.filter((item) => item.age > event.age).map((item) => item.age));
+      run.history = run.history.filter((item) => !futurePendingAges.has(item.age));
+      break;
     }
   }
   run.age = finalAge;
@@ -989,7 +1194,7 @@ function applyDecision(
   difficulty: DifficultyConfig,
   rng: Rng,
   tuning: GameplayTuning
-): { statChanges: Partial<Record<StatKey, number>>; deathRollBonus: number } {
+): { statChanges: Partial<Record<StatKey, number>> } {
   const primary = pickOne(rng, allStatKeys);
   const secondary = pickOne(rng, allStatKeys.filter((k) => k !== primary));
 
@@ -1009,18 +1214,27 @@ function applyDecision(
       statChanges: {
       [primary]: clamp(baseGain, tuning.decision.gainClampMin, tuning.decision.gainClampMax),
       [secondary]: tuning.decision.secondarySuccessDelta
-      },
-      deathRollBonus: setup.deathBonus
+      }
     };
   }
 
-  return {
-    statChanges: {
+  const statChanges: Partial<Record<StatKey, number>> = {
     [primary]: clamp(baseLoss, tuning.decision.lossClampMin, tuning.decision.lossClampMax),
     [secondary]: tuning.decision.secondaryFailureDelta
-    },
-    deathRollBonus: setup.deathBonus
   };
+  if (decision === "safe" && (statChanges.physique ?? 0) < 0) statChanges.physique = 0;
+  if (decision === "balanced" && (statChanges.physique ?? 0) < -1) statChanges.physique = -1;
+  return { statChanges };
+}
+
+function enforceDecisionPhysiqueBoundary(
+  decision: DecisionType,
+  changes: Partial<Record<StatKey, number>>
+): Partial<Record<StatKey, number>> {
+  const next = { ...changes };
+  if (decision === "safe" && (next.physique ?? 0) < 0) next.physique = 0;
+  if (decision === "balanced" && (next.physique ?? 0) < -1) next.physique = -1;
+  return next;
 }
 
 function buildEventTitle(world: WorldConfig, age: number, rng: Rng, special: boolean, tuning: GameplayTuning): string {
@@ -1137,58 +1351,6 @@ function updateNegativeStreaks(run: InternalRunState): void {
   for (const key of coreStatKeys) {
     run.negativeStreaks[key] = run.stats[key] < 0 ? run.negativeStreaks[key] + 1 : 0;
   }
-}
-
-function calcDeathRisk(
-  run: InternalRunState,
-  _world: WorldConfig,
-  extraBonus = 0
-): { risk: number; cause?: string } {
-  const deathTuning = run.tuningSnapshot.death;
-  if (run.age < deathTuning.minAge) {
-    return { risk: 0 };
-  }
-
-  const lowPhysique = run.stats.physique < deathTuning.lowPhysiqueThreshold;
-  const physiqueRisk = lowPhysique
-    ? clamp(
-      deathTuning.physiqueBaseRisk +
-      ((deathTuning.lowPhysiqueThreshold - run.stats.physique) / deathTuning.lowPhysiqueThreshold) * deathTuning.physiqueMissingRiskFactor,
-      deathTuning.physiqueRiskClampMin,
-      deathTuning.physiqueRiskClampMax
-    )
-    : 0;
-
-  let longNegativeRisk = 0;
-  let longNegativeCause: string | undefined;
-  for (const key of coreStatKeys) {
-    const streak = run.negativeStreaks[key];
-    if (run.stats[key] >= 0 || streak < deathTuning.negativeStreakTrigger) continue;
-    const valueSeverity = clamp(Math.abs(run.stats[key]) / 30, 0, 1);
-    const streakSeverity = clamp((streak - deathTuning.negativeStreakTrigger + 1) / deathTuning.longNegativeStreakDivisor, 0, 1);
-    const risk = clamp(
-      deathTuning.longNegativeBaseRisk +
-      valueSeverity * deathTuning.longNegativeValueFactor +
-      streakSeverity * deathTuning.longNegativeStreakFactor,
-      deathTuning.longNegativeRiskClampMin,
-      deathTuning.longNegativeRiskClampMax
-    );
-    if (risk > longNegativeRisk) {
-      longNegativeRisk = risk;
-      longNegativeCause = `${negativeStatLabel[key]}长期低迷反噬`;
-    }
-  }
-
-  const hasTrigger = lowPhysique || longNegativeRisk > 0;
-  if (!hasTrigger) return { risk: 0 };
-
-  const cause = physiqueRisk >= longNegativeRisk ? "体魄衰竭" : longNegativeCause;
-  const risk = clamp(
-    Math.max(physiqueRisk, longNegativeRisk) + extraBonus,
-    deathTuning.finalRiskClampMin,
-    deathTuning.finalRiskClampMax
-  );
-  return { risk, cause };
 }
 
 function checkAscension(run: InternalRunState): AscensionState {
@@ -1316,6 +1478,9 @@ export function createRun(ctx: EngineContext, req: StartRunRequest): InternalRun
   ) {
     throw new Error("选卡数量超出当前配置允许范围");
   }
+  if (new Set(req.selectedCardIds).size !== req.selectedCardIds.length) {
+    throw new Error("选卡不能重复");
+  }
   const allocated =
     req.stats.intelligence + req.stats.charisma + req.stats.family + req.stats.fortune + req.stats.physique;
   if (allocated !== req.talentPointTotal) {
@@ -1326,6 +1491,9 @@ export function createRun(ctx: EngineContext, req: StartRunRequest): InternalRun
   const rng = seedrandom(String(seed));
 
   const selected = ctx.cards.filter((c) => req.selectedCardIds.includes(c.id));
+  if (selected.length !== req.selectedCardIds.length) {
+    throw new Error("存在无效天赋卡");
+  }
   let stats = cloneStats(req.stats);
   for (const card of selected) {
     stats = applyChanges(stats, card.modifiers);
@@ -1374,6 +1542,7 @@ export function createRun(ctx: EngineContext, req: StartRunRequest): InternalRun
       phase: "generating",
       pendingRequestIds: []
     },
+    survival: { lowPhysiqueYears: 0 },
     turnRecords: [],
     seed,
     endAge
@@ -1758,18 +1927,15 @@ function buildDirectedDecisionEffects(definition: EventDefinition): Record<Decis
   return {
     safe: {
       success: { [secondary]: 1 },
-      failure: { [secondary]: -1 },
-      deathRisk: 0
+      failure: { [secondary]: -1 }
     },
     balanced: {
       success: { [primary]: 2, [secondary]: 1 },
-      failure: { [primary]: -1, [secondary]: -1 },
-      deathRisk: 0.04
+      failure: { [primary]: -1, [secondary]: -1 }
     },
     risky: {
       success: { [primary]: 3, [secondary]: 1 },
-      failure: { [primary]: -2, [secondary]: -1 },
-      deathRisk: 0.11
+      failure: { [primary]: -2, [secondary]: -1 }
     }
   };
 }
@@ -1792,7 +1958,8 @@ function buildDirectedDecisionPolicy(definition: EventDefinition): Record<Decisi
       allowedDirections: ["up", "down"],
       minEffects: 1,
       maxEffects: 2,
-      requirePositive: true
+      requirePositive: true,
+      maxNegativeBandByStat: { physique: "light" }
     },
     // Risky choices let the narrator resolve either a breakthrough or a real setback.
     risky: {
@@ -2690,6 +2857,49 @@ interface MainlineActCompletionRecord {
   decisionCount: number;
 }
 
+function recordDynamicActHandoff(
+  story: StoryDirectorState,
+  act: NonNullable<NarrativeWorldDefinition["mainlineActs"]>[number],
+  handoff: NarrativeActHandoff,
+  age: number,
+  sourceEventId: string,
+  routeId: string
+): void {
+  const ledger = story.factLedger ?? (story.factLedger = createStoryFactLedger());
+  const upsert = (
+    id: string,
+    kind: StoryFactRecord["kind"],
+    label: string,
+    status: StoryFactRecord["status"]
+  ): void => {
+    const existing = ledger.facts.find((fact) => fact.id === id);
+    if (existing) {
+      existing.label = label;
+      existing.kind = kind;
+      existing.status = status;
+      existing.lastTouchedAge = age;
+      if (status === "resolved") existing.resolvedAge = age;
+      return;
+    }
+    ledger.facts.push({
+      id,
+      kind,
+      label,
+      priority: 4,
+      routeIds: [routeId],
+      status,
+      introducedAge: age,
+      lastTouchedAge: age,
+      sourceEventId,
+      resolvedAge: status === "resolved" ? age : undefined
+    });
+  };
+  upsert(`act:${act.id}:payoff`, "open_question", handoff.resolvedTension, "resolved");
+  upsert(`act:${act.id}:consequence`, "cost", handoff.lastingConsequence, "open");
+  upsert(`act:${act.id}:continuation`, "commitment", handoff.continuation, "open");
+  story.factLedger = normalizeStoryFactLedger(ledger);
+}
+
 function recordMainlineActCompletion(
   run: InternalRunState,
   act: NonNullable<NarrativeWorldDefinition["mainlineActs"]>[number],
@@ -2735,11 +2945,10 @@ function recordMainlineActPayoff(
   const actIndex = mainlineActs.findIndex((item) => item.id === act.id);
   const nextAct = actIndex >= 0 ? mainlineActs[actIndex + 1] : undefined;
   run.narrative.activeMainlineActId = nextAct?.id;
-  if (nextAct && experienceId) {
-    // A payoff advances the shared world act. Only the route that actually
-    // reached it begins a fresh local pass; every other route keeps its
-    // accumulated five-beat progress.
-    run.narrative = resetNarrativeRouteProgress(run.narrative, experienceId);
+  if (nextAct) {
+    // A world act owns only local beat bookkeeping. Facts, characters and
+    // consequences persist, while every route starts the next act fresh.
+    run.narrative.routeProgress = [];
   }
   if (!nextAct && experienceId) {
     story.closureExperienceId = experienceId;
@@ -2925,16 +3134,6 @@ export function beginDirectedClosureGuidance(
   return true;
 }
 
-function deferNarrativeCatastrophe(run: InternalRunState, cause: string): boolean {
-  if (!run.narrative.enabled || run.story.closureState === "finished") return false;
-  run.narrative = recordNarrativeSetback(run.narrative, cause);
-  run.story.flags = Array.from(new Set([
-    ...run.story.flags,
-    "narrative:critical_setback"
-  ])).slice(-32);
-  return true;
-}
-
 export function applyDirectedClosureRequest(
   run: InternalRunState,
   action: "guide" | "finish",
@@ -3010,7 +3209,15 @@ export function advanceWithDirectedEvent(
   if (run.narrative.enabled && candidate.kind === "normal" && candidate.definition.narrativeBeat !== "ending" && !modelChanges) {
     throw new Error("scene_outcome_required");
   }
-  const changes = modelChanges ?? reduceNegativeChanges(run, clampYearlyChangesByStage(candidate.preview.statChanges, stageCap));
+  const baseChanges = modelChanges ?? reduceNegativeChanges(run, clampYearlyChangesByStage(candidate.preview.statChanges, stageCap));
+  const changes = heldAge
+    ? baseChanges
+    : applyAnnualFamilyPhysiqueSupport(
+      run,
+      baseChanges,
+      narrativeWorld,
+      seedrandom(`${run.seed}:family-support:directed:${run.age}:${candidate.definition.id}`)
+    );
   const tone = classifyEventTone(changes, stageCap, tuning);
   run.stats = applyChanges(run.stats, changes);
   run.ageStage = stage;
@@ -3059,28 +3266,20 @@ export function advanceWithDirectedEvent(
 
   if (!heldAge) {
     const rng = seedrandom(`${run.seed}:director-resolve:${run.age}:${candidate.definition.id}`);
-    const deathCheck = calcDeathRisk(run, world, 0);
-    if (reduceDeathRisk(run, deathCheck.risk) > 0 && rng() < reduceDeathRisk(run, deathCheck.risk)) {
-      const cause = deathCheck.cause ?? "命运反噬";
-      if (!deferNarrativeCatastrophe(run, cause)) {
-        run.ended = true;
-        run.outcome = "dead";
-        run.deathCause = cause;
-        run.endingSummary = calcEnding(run);
-      }
-    } else {
+    updateAnnualSurvivalRisk(run, world, narrativeWorld, `directed:${candidate.definition.id}`);
+    if (!run.survivalCrisis) {
       run.ascension = maybeUnlockAscension(run, rng);
     }
   }
 
-  if (!run.ended && candidate.kind === "milestone") {
+  if (!run.ended && !run.survivalCrisis && candidate.kind === "milestone") {
     run.nextMilestoneChoice = createDirectedMilestoneChoice(run.age, candidate.definition, tuning);
     run.pendingDirectedDecisionEffects = candidate.preview.decisionEffects;
     run.pendingDirectedDecisionPolicy = buildDirectedDecisionPolicy(candidate.definition);
     run.pendingDirectedDecisionDirections = decisionDirections;
     run.pendingDirectedDecisionFactEffects = candidate.definition.decisionFactEffects;
     run.yearsSinceLastMilestone = 0;
-  } else if (!run.ended) {
+  } else if (!run.ended && !run.survivalCrisis) {
     run.pendingDirectedDecisionDirections = undefined;
     run.pendingDirectedDecisionFactEffects = undefined;
     run.pendingDirectedDecisionPolicy = undefined;
@@ -3095,6 +3294,8 @@ export interface DynamicNarrativeScenePayload {
   beat: Exclude<NonNullable<EventDefinition["narrativeBeat"]>, "ending">;
   narrative: string;
   participants: Array<{
+    /** `new` creates a character only when it is marked recurring; a known id reuses it. */
+    characterRef?: string;
     name: string;
     factionId?: string;
     role: string;
@@ -3103,6 +3304,7 @@ export interface DynamicNarrativeScenePayload {
   }>;
   attributeOutcome?: ApprovedNarrativeAttributeOutcome;
   attributePolicy?: NarrativeAttributePolicy;
+  actHandoff?: NarrativeActHandoff;
   sceneClockMode?: "advance" | "hold";
   createsDecision?: boolean;
 }
@@ -3118,7 +3320,7 @@ export function advanceWithDynamicNarrativeScene(
   narrativeWorld: NarrativeWorldDefinition,
   payload: DynamicNarrativeScenePayload
 ): { updated: InternalRunState; fromAge: number; toAge: number; chunk: YearEvent[] } {
-  if (run.ended || run.nextMilestoneChoice) return { updated: run, fromAge: run.age, toAge: run.age, chunk: [] };
+  if (run.ended || run.nextMilestoneChoice || run.survivalCrisis) return { updated: run, fromAge: run.age, toAge: run.age, chunk: [] };
   if (run.narrative.enabled && run.story.mainlineCompleted) {
     throw new Error("dynamic_scene_after_mainline_complete");
   }
@@ -3143,7 +3345,15 @@ export function advanceWithDynamicNarrativeScene(
   if (!createsDecision && (payload.beat === "setup" || payload.beat === "escalation" || payload.beat === "payoff") && !changes) {
     throw new Error("dynamic_scene_outcome_required");
   }
-  const settledChanges = changes ?? {};
+  const baseChanges = changes ?? {};
+  const settledChanges = heldAge
+    ? baseChanges
+    : applyAnnualFamilyPhysiqueSupport(
+      run,
+      baseChanges,
+      narrativeWorld,
+      seedrandom(`${run.seed}:family-support:dynamic:${run.age}:${payload.routeId}:${payload.beat}`)
+    );
   run.stats = applyChanges(run.stats, settledChanges);
   run.ageStage = resolveAgeStage(run.age, world);
   updateNegativeStreaks(run);
@@ -3190,12 +3400,25 @@ export function advanceWithDynamicNarrativeScene(
     lastEventId: sceneId
   };
   const storedCharacterIds: string[] = [];
-  for (const participant of payload.participants.filter((item) => item.recurring)) {
-    const existing = run.narrative.dynamicCharacters.find((character) => (
-      character.name === participant.name && character.factionId === participant.factionId && character.status === "active"
-    ));
+  for (const participant of payload.participants) {
+    const characterRef = participant.characterRef?.trim() || "new";
+    const referenced = characterRef === "new"
+      ? undefined
+      : run.narrative.dynamicCharacters.find((character) => character.id === characterRef && character.status === "active");
+    if (characterRef !== "new" && !referenced) {
+      throw new Error("dynamic_scene_character_reference_invalid");
+    }
+    // Legacy saves and a model that still emitted `new` for a familiar person
+    // may safely converge on the existing canonical identity once.
+    const legacyMatch = characterRef === "new"
+      ? run.narrative.dynamicCharacters.find((character) => (
+        character.name === participant.name && character.factionId === participant.factionId && character.status === "active"
+      ))
+      : undefined;
+    const existing = referenced ?? legacyMatch;
+    if (!existing && !participant.recurring) continue;
     const character: NarrativeDynamicCharacter = existing ?? {
-      id: `character:${createHash("sha256").update(`${run.runId}:${participant.name}:${participant.factionId ?? "none"}`).digest("hex").slice(0, 16)}`,
+      id: `character:${createHash("sha256").update(`${run.runId}:${sceneId}:${participant.name}:${participant.factionId ?? "none"}`).digest("hex").slice(0, 16)}`,
       name: participant.name,
       factionId: participant.factionId,
       role: participant.role,
@@ -3208,8 +3431,12 @@ export function advanceWithDynamicNarrativeScene(
       status: "active"
     };
     character.lastSeenAge = run.age;
-    character.role = participant.role;
-    character.description = participant.description;
+    // Existing records are the canonical identity. The model may describe a
+    // changed circumstance in prose, but cannot rename or recast the person.
+    if (!existing) {
+      character.role = participant.role;
+      character.description = participant.description;
+    }
     character.relatedRouteIds = Array.from(new Set([...character.relatedRouteIds, payload.routeId])).slice(-8);
     character.relatedFactIds = Array.from(new Set([...character.relatedFactIds, ...(factId ? [factId] : [])])).slice(-8);
     if (!existing) run.narrative.dynamicCharacters = [...run.narrative.dynamicCharacters, character].slice(-24);
@@ -3234,6 +3461,8 @@ export function advanceWithDynamicNarrativeScene(
     run.narrative.sceneClock = { ...run.narrative.sceneClock, sameAgeTurnCount: run.narrative.sceneClock.sameAgeTurnCount + 1 };
   }
   if (payload.beat === "payoff") {
+    if (!payload.actHandoff) throw new Error("dynamic_scene_act_handoff_required");
+    recordDynamicActHandoff(run.story, act, payload.actHandoff, run.age, sceneId, payload.routeId);
     const recorded = recordMainlineActCompletion(run, act, {
       sourceId: sceneId,
       experienceId: payload.routeId,
@@ -3255,26 +3484,18 @@ export function advanceWithDynamicNarrativeScene(
   refreshRunFame(run);
   if (!heldAge) {
     const rng = seedrandom(`${run.seed}:dynamic-scene:${sceneId}`);
-    const deathCheck = calcDeathRisk(run, world, 0);
-    if (reduceDeathRisk(run, deathCheck.risk) > 0 && rng() < reduceDeathRisk(run, deathCheck.risk)) {
-      const cause = deathCheck.cause ?? "命运反噬";
-      if (!deferNarrativeCatastrophe(run, cause)) {
-        run.ended = true;
-        run.outcome = "dead";
-        run.deathCause = cause;
-        run.endingSummary = calcEnding(run);
-      }
-    } else {
+    updateAnnualSurvivalRisk(run, world, narrativeWorld, `dynamic:${sceneId}`);
+    if (!run.survivalCrisis) {
       run.ascension = maybeUnlockAscension(run, rng);
     }
   }
-  if (!run.ended && createsDecision) {
+  if (!run.ended && !run.survivalCrisis && createsDecision) {
     const tuning = run.tuningSnapshot ?? createDefaultGameplayTuning();
     run.nextMilestoneChoice = generateMilestoneChoice(run.age, payload.narrative, tuning);
     run.pendingDirectedDecisionPolicy = dynamicDecisionPolicies();
     run.pendingDynamicScene = { id: sceneId, routeId: payload.routeId, factionId: payload.factionId, beat: payload.beat, mainlineActId: act.id, factId };
     run.yearsSinceLastMilestone = 0;
-  } else if (!run.ended) {
+  } else if (!run.ended && !run.survivalCrisis) {
     run.yearsSinceLastMilestone += 1;
   }
   return { updated: run, fromAge, toAge: run.age, chunk: [event] };
@@ -3283,13 +3504,13 @@ export function advanceWithDynamicNarrativeScene(
 function dynamicDecisionPolicies(): Record<DecisionType, PendingDirectedDecisionPolicy> {
   return {
     safe: { allowedStats: allStatKeys, allowedBands: ["light"], allowedDirections: ["up"], minEffects: 1, maxEffects: 1 },
-    balanced: { allowedStats: allStatKeys, allowedBands: ["light", "medium"], allowedDirections: ["up", "down"], minEffects: 1, maxEffects: 2, requirePositive: true },
+    balanced: { allowedStats: allStatKeys, allowedBands: ["light", "medium"], allowedDirections: ["up", "down"], minEffects: 1, maxEffects: 2, requirePositive: true, maxNegativeBandByStat: { physique: "light" } },
     risky: { allowedStats: allStatKeys, allowedBands: ["light", "medium", "heavy"], allowedDirections: ["up", "down"], minEffects: 1, maxEffects: 2 }
   };
 }
 
 export function dynamicSceneAttributePolicy(): NarrativeAttributePolicy {
-  return { allowedStats: allStatKeys, allowedBands: ["light", "medium"], allowedDirections: ["up", "down"], minEffects: 1, maxEffects: 2, requirePositive: true };
+  return { allowedStats: allStatKeys, allowedBands: ["light", "medium"], allowedDirections: ["up", "down"], minEffects: 1, maxEffects: 2, requirePositive: true, forbidNegativeStats: ["physique"] };
 }
 
 export function dynamicBackgroundAttributePolicy(run: InternalRunState): NarrativeAttributePolicy {
@@ -3319,9 +3540,10 @@ export function autoAdvanceToCheckpoint(
     maxTargetYears?: number;
     allowRandomMilestone?: boolean;
     deferNarrativeAttributeEffects?: boolean;
+    narrativeWorld?: NarrativeWorldDefinition | null;
   }
 ): { updated: InternalRunState; fromAge: number; toAge: number; chunk: YearEvent[] } {
-  if (run.ended || run.nextMilestoneChoice) {
+  if (run.ended || run.nextMilestoneChoice || run.survivalCrisis) {
     return { updated: run, fromAge: run.age, toAge: run.age, chunk: [] };
   }
 
@@ -3335,7 +3557,7 @@ export function autoAdvanceToCheckpoint(
     1,
     Math.max(1, tuning.pacing.maxYearsPerChunk, Math.trunc(options?.maxTargetYears ?? 1))
   );
-  while (!run.ended && !run.nextMilestoneChoice) {
+  while (!run.ended && !run.nextMilestoneChoice && !run.survivalCrisis) {
     run.age += 1;
     const rng = seedrandom(`${run.seed}:${run.age}:${run.history.length}`);
     const currentStage = resolveAgeStage(run.age, world);
@@ -3347,7 +3569,10 @@ export function autoAdvanceToCheckpoint(
       : special
       ? calcSpecialEventChanges(run.stats, difficulty, rng, tuning)
       : calcBaseGrowth(run.stats, difficulty, rng, tuning);
-    const changes = reduceNegativeChanges(run, clampYearlyChangesByStage(rawChanges, stageCap));
+    const baseChanges = reduceNegativeChanges(run, clampYearlyChangesByStage(rawChanges, stageCap));
+    const changes = options?.deferNarrativeAttributeEffects
+      ? baseChanges
+      : applyAnnualFamilyPhysiqueSupport(run, baseChanges, options?.narrativeWorld, rng);
     const tone = classifyEventTone(changes, stageCap, tuning);
     const deltaTags = buildDeltaBinTags(changes, stageCap, tuning);
     const worldGuides = worldNegativeGuideTags(world.id, tone, rng);
@@ -3382,19 +3607,9 @@ export function autoAdvanceToCheckpoint(
     refreshRunFame(run);
     chunk.push(yearlyEvent);
     if (!options?.deferNarrativeAttributeEffects) {
+      updateAnnualSurvivalRisk(run, world, options?.narrativeWorld, `yearly:${run.age}:${run.history.length}`);
+      if (run.survivalCrisis) break;
       run.ascension = maybeUnlockAscension(run, rng);
-      const deathCheck = calcDeathRisk(run, world, 0);
-      const adjustedDeathRisk = reduceDeathRisk(run, deathCheck.risk);
-      if (adjustedDeathRisk > 0 && rng() < adjustedDeathRisk) {
-        const cause = deathCheck.cause ?? "意外灾祸";
-        if (!deferNarrativeCatastrophe(run, cause)) {
-          run.ended = true;
-          run.outcome = "dead";
-          run.deathCause = cause;
-          run.endingSummary = calcEnding(run);
-          break;
-        }
-      }
     }
 
     if (run.ascension.unlocked && !run.narrative.enabled) {
@@ -3455,17 +3670,19 @@ export function applyMilestoneDecisionAndAdvance(
     throw new Error("decision_outcome_required");
   }
   const decisionResult = modelChanges
-    ? { statChanges: modelChanges, deathRollBonus: 0 }
+    ? { statChanges: modelChanges }
     : directedEffect
     ? {
         statChanges: rng() < directedSuccessRate
           ? directedEffect.success
-          : directedEffect.failure,
-        deathRollBonus: directedEffect.deathRisk
+          : directedEffect.failure
       }
     : applyDecision(run.stats, decision, difficulty, rng, tuning);
   const stageCap = resolveStageDeltaCap(run.ageStage.id, tuning);
-  const decisionChanges = reduceNegativeChanges(run, clampYearlyChangesByStage(decisionResult.statChanges, stageCap));
+  const decisionChanges = enforceDecisionPhysiqueBoundary(
+    decision,
+    reduceNegativeChanges(run, clampYearlyChangesByStage(decisionResult.statChanges, stageCap))
+  );
   const tone = classifyEventTone(decisionChanges, stageCap, tuning);
   const deltaTags = buildDeltaBinTags(decisionChanges, stageCap, tuning);
   const worldGuides = worldNegativeGuideTags(world.id, tone, rng);
@@ -3555,32 +3772,6 @@ export function applyMilestoneDecisionAndAdvance(
   run.pendingDirectedDecisionFactEffects = undefined;
   run.pendingDynamicScene = undefined;
 
-  const deathCheck = calcDeathRisk(run, world, decisionResult.deathRollBonus);
-  const adjustedDeathRisk = reduceDeathRisk(run, deathCheck.risk);
-  if (adjustedDeathRisk > 0 && rng() < adjustedDeathRisk) {
-    const cause = deathCheck.cause ?? (decision === "risky" ? "冒险失败" : "决策反噬");
-    if (deferNarrativeCatastrophe(run, cause)) {
-      return {
-        updated: run,
-        fromAge: decisionEvent.age,
-        toAge: run.age,
-        chunk: [decisionEvent],
-        decisionEvent
-      };
-    }
-    run.ended = true;
-    run.outcome = "dead";
-    run.deathCause = cause;
-    run.endingSummary = calcEnding(run);
-    return {
-      updated: run,
-      fromAge: decisionEvent.age,
-      toAge: run.age,
-      chunk: [decisionEvent],
-      decisionEvent
-    };
-  }
-
   run.ascension = maybeUnlockAscension(run, rng);
   if (run.ascension.unlocked && !isDirectedDecision) {
     run.ended = true;
@@ -3628,17 +3819,24 @@ export function toClientRun(run: InternalRunState): PublicRunState {
     .reverse()
     .find((turn) => turn.choice && !turn.choiceOutcome)
     ?.choice;
+  const visibleSurvivalCrisis = run.survivalCrisis;
   const visibleEnded = run.ended && run.narrativeReservoir.queued.length === 0 && (
     !visibleTurn || visibleTurn.age >= run.age
   );
   const visiblePhase: RunPhase = visibleEnded
     ? "ended"
-    : visibleChoice
+    : visibleSurvivalCrisis || visibleChoice
       ? "waiting_decision"
       : run.narrativeReservoir.phase === "generating"
         ? "ready"
       : run.narrativeReservoir.phase;
   const visibleStats = visibleTurn?.statsSnapshot ?? run.stats;
+  const statTiers = resolveNarrativeStatTiers(visibleStats, run.narrative.statTierConfig);
+  const defaultStatTierLabels: Record<NarrativeStatTier, string> = { low: "积累中", steady: "可用", high: "出众" };
+  const statTierLabels = allStatKeys.reduce<Record<StatKey, string>>((labels, stat) => {
+    labels[stat] = run.narrative.statTierPresentation?.[stat]?.[statTiers[stat]] ?? defaultStatTierLabels[statTiers[stat]];
+    return labels;
+  }, {} as Record<StatKey, string>);
   const runtime = run.narrative.actRuntime;
   const growthFocus = runtime && (runtime.growthFocusOptions?.length ?? 0) > 0
     ? {
@@ -3658,8 +3856,12 @@ export function toClientRun(run: InternalRunState): PublicRunState {
     ageStage: { label: visibleStage.label },
     personaPrompt: run.personaPrompt,
     stats: visibleStats,
-    statTiers: resolveNarrativeStatTiers(visibleStats, run.narrative.statTierConfig),
+    statTiers,
+    statTierLabels,
     growthFocus,
+    opening: run.narrative.opening
+      ? { status: run.narrative.opening.status }
+      : undefined,
     cards: run.cards.map((card) => ({
       id: card.id,
       name: card.name,
@@ -3670,6 +3872,7 @@ export function toClientRun(run: InternalRunState): PublicRunState {
     items: visibleTurn?.itemsSnapshot ?? publicItemsSnapshot(run),
     narrativeCharacters: visibleTurn?.narrativeCharactersSnapshot ?? publicNarrativeCharactersSnapshot(run),
     nextMilestoneChoice: visibleChoice,
+    survivalCrisis: toPublicSurvivalCrisis(run),
     ended: visibleEnded,
     endingSummary: visibleEnded ? run.endingSummary : undefined,
     ascension: run.ascension,

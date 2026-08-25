@@ -18,10 +18,11 @@ import {
   createRun,
   ensureVisibleTurnRecords,
   settleNarrativeBackgroundOutcomes,
+  resolveSurvivalCrisis,
   toPublicTimelineEntryFromEvent,
   toClientRun
 } from "./engine.js";
-import { assessClosureReadiness, assessEnding, ensureNarrativeRunState, getNarrativeRouteProgress, refreshNarrativeMainlineCompletion } from "./narrative.js";
+import { assessClosureReadiness, assessEnding, ensureNarrativeActRuntime, ensureNarrativeRunState, getNarrativeRouteProgress, isNarrativeEarlyLife, refreshNarrativeMainlineCompletion } from "./narrative.js";
 import { loadEventDefinitions, loadNarrativeWorldDefinition, validateNarrativeWorldFactContract } from "./content.js";
 
 const world: WorldConfig = {
@@ -241,6 +242,43 @@ test("公开运行态只投影最后一个已提交回合的快照", () => {
   assert.equal(publicRun.age, 4);
   assert.equal(publicRun.stats.intelligence, 17);
   assert.equal(publicRun.fame, 12);
+});
+
+test("开局身世作为0岁的独立公开回合持久化", () => {
+  const run = makeRun();
+  run.narrative.opening = {
+    status: "ready",
+    profile: {
+      summary: "你出身于一户重视书信与账目的寻常人家。",
+      seedHints: ["家中留有一封未寄出的旧信。"]
+    }
+  };
+  appendPublicTurnRecord(run, {
+    entryId: "origin",
+    age: 0,
+    ageStage: { label: "幼年" },
+    kind: "origin",
+    narrative: "你出生在城南雨巷的一户人家，家人以旧书与账册维持生计。",
+    statChanges: {}
+  });
+
+  const publicRun = toClientRun(run);
+  assert.equal(publicRun.opening?.status, "ready");
+  assert.equal(publicRun.age, 0);
+  assert.equal(run.turnRecords[0]?.kind, "origin");
+  assert.deepEqual(run.turnRecords[0]?.statChanges, {});
+});
+
+test("早年限制来自世界包，边界后仍由属性资格决定主线开场", () => {
+  const earlyWorld: NarrativeWorldDefinition = {
+    ...narrativeWorld,
+    opening: { earlyLife: { maxAge: 3 } }
+  };
+
+  assert.equal(isNarrativeEarlyLife(earlyWorld, 0), true);
+  assert.equal(isNarrativeEarlyLife(earlyWorld, 2), true);
+  assert.equal(isNarrativeEarlyLife(earlyWorld, 3), false);
+  assert.equal(isNarrativeEarlyLife(earlyWorld, 4), false);
 });
 
 test("待决抉择会修复到同年龄的公开回合记录", () => {
@@ -520,7 +558,7 @@ test("模型选定路线后由旧高潮状态机在该路线选择当前拍点�
     assert.ok(run.narrative.completedScenes.some((scene) => scene.mainlineActId === actId));
     if (actId !== "reckoning") {
       assert.equal(getNarrativeRouteProgress(run.narrative, direction.id), undefined);
-      assert.equal(getNarrativeRouteProgress(run.narrative, parallelDirection.id)?.phase, "setup");
+      assert.equal(getNarrativeRouteProgress(run.narrative, parallelDirection.id), undefined);
     }
   }
 
@@ -628,14 +666,14 @@ test("完成主线后可申请结局，年龄不再是额外门槛", () => {
   assert.equal(run.ended, true);
 });
 
-test("古代世界包的具体素材均有可用情境层与世界主线事实", async () => {
+test("古代世界包以开放幕间职责和路线目录驱动动态叙事", async () => {
   const [definitions, ancientWorld] = await Promise.all([
     loadEventDefinitions("ancient"),
     loadNarrativeWorldDefinition("ancient")
   ]);
   assert.ok(ancientWorld);
   const archetypeIds = new Set(ancientWorld.sceneArchetypes?.map((item) => item.id));
-  assert.ok(ancientWorld.mainlineFacts && ancientWorld.mainlineFacts.length >= 3);
+  assert.equal(ancientWorld.mainlineFacts?.length ?? 0, 0);
   assert.equal(ancientWorld.mainlineActs?.length, 3);
   assert.ok(definitions.length >= 60);
   const eventIds = new Set(definitions.map((definition) => definition.id));
@@ -899,6 +937,38 @@ test("叙事结局以主线完成为前提，并稳定区分好、普通、坏�
   assert.equal(evaluate(9, ["decision_outcome_setback"], 26).polarity, "bad");
 });
 
+test("属性档位文案由世界包快照，不写死在引擎或已有存档中", () => {
+  const run = createRun(
+    { world, difficulty, cards: [card], tuning: createDefaultGameplayTuning(), narrativeEnabled: true },
+    {
+      clientId: "tier-presentation-client",
+      worldId: world.id,
+      difficultyId: difficulty.id,
+      personaPrompt: "在世道里慢慢站稳的人",
+      talentPointTotal: 25,
+      stats: { intelligence: 5, charisma: 5, family: 5, fortune: 5, physique: 5 },
+      selectedCardIds: [card.id]
+    }
+  );
+  const presentation = {
+    intelligence: { low: "学思未定", steady: "明察善断", high: "洞见如炬" },
+    charisma: { low: "未谙人情", steady: "善解人意", high: "长袖善舞" },
+    family: { low: "根基未稳", steady: "家道可凭", high: "门庭煊赫" },
+    fortune: { low: "时运未至", steady: "逢凶化吉", high: "天眷所归" },
+    physique: { low: "体弱未成", steady: "筋骨康健", high: "龙精虎健" }
+  };
+  const configuredWorld: NarrativeWorldDefinition = {
+    ...narrativeWorld,
+    progression: { ...narrativeWorld.progression!, statTiers: { lowMax: 4, highMin: 8 }, statTierPresentation: presentation },
+    mainlineActs: [{ id: "act.one", label: "起始", prompt: "测试" }]
+  };
+  run.narrative = ensureNarrativeActRuntime(run.narrative, configuredWorld, run.age);
+  assert.equal(toClientRun(run).statTierLabels?.intelligence, "明察善断");
+  configuredWorld.progression!.statTierPresentation!.intelligence.steady = "不应影响旧局";
+  run.narrative = ensureNarrativeActRuntime(run.narrative, configuredWorld, run.age);
+  assert.equal(toClientRun(run).statTierLabels?.intelligence, "明察善断");
+});
+
 test("动态世界幕以单一五拍推进，路线可切换且常驻人物进入公开投影", () => {
   const run = createRun(
     { world, difficulty, cards: [card], tuning: createDefaultGameplayTuning(), narrativeEnabled: true },
@@ -928,23 +998,27 @@ test("动态世界幕以单一五拍推进，路线可切换且常驻人物进�
     factionId: "court",
     beat: "setup",
     narrative: "你从一页被改写的账目里，看见家门旧事与朝局之间的裂缝。",
-    participants: [{ name: "沈衡", factionId: "court", role: "递来旧档的书吏", description: "谨慎地试探你的立场", recurring: true }],
+    participants: [{ characterRef: "new", name: "沈衡", factionId: "court", role: "递来旧档的书吏", description: "谨慎地试探你的立场", recurring: true }],
     attributeOutcome: { effects: [{ stat: "intelligence", direction: "up", band: "light" }] },
     attributePolicy: { allowedStats: ["intelligence"], allowedBands: ["light"], allowedDirections: ["up"], minEffects: 1, maxEffects: 1 }
   });
   assert.equal(setup.updated.narrative.actRuntime?.beat, "escalation");
   assert.equal(setup.updated.narrative.dynamicCharacters[0]?.name, "沈衡");
+  const shenHengId = setup.updated.narrative.dynamicCharacters[0]!.id;
   const escalation = advanceWithDynamicNarrativeScene(run, world, dynamicWorld, {
     routeId: "route.two",
     factionId: "court",
     beat: "escalation",
     narrative: "沈衡带来的口供迫使你把家门的隐忧放到朝局的目光之下。",
-    participants: [{ name: "沈衡", factionId: "court", role: "递来旧档的书吏", description: "开始要求你给出承诺", recurring: true }],
+    participants: [{ characterRef: shenHengId, name: "临时称谓", factionId: "court", role: "被改写的身份", description: "模型不得覆盖既有人物。", recurring: false }],
     attributeOutcome: { effects: [{ stat: "charisma", direction: "up", band: "light" }] },
     attributePolicy: { allowedStats: ["charisma"], allowedBands: ["light"], allowedDirections: ["up"], minEffects: 1, maxEffects: 1 }
   });
   assert.equal(escalation.updated.narrative.actRuntime?.beat, "pressure");
   assert.deepEqual(escalation.updated.narrative.actRuntime?.selectedRouteIds, ["route.one", "route.two"]);
+  assert.equal(escalation.updated.narrative.dynamicCharacters.length, 1);
+  assert.equal(escalation.updated.narrative.dynamicCharacters[0]?.name, "沈衡");
+  assert.equal(escalation.updated.narrative.dynamicCharacters[0]?.role, "递来旧档的书吏");
   assert.equal(toClientRun(run).narrativeCharacters?.[0]?.name, "沈衡");
   advanceWithDynamicNarrativeScene(run, world, dynamicWorld, {
     routeId: "route.one", factionId: "court", beat: "pressure",
@@ -989,15 +1063,10 @@ test("动态三幕只各自结算一次，并在最终 payoff 后进入结局申
   const dynamicWorld: NarrativeWorldDefinition = {
     ...narrativeWorld,
     version: 4,
-    mainlineFacts: [
-      { id: "act.fact.one", kind: "open_question", label: "第一幕的旧档" },
-      { id: "act.fact.two", kind: "stake", label: "第二幕的人情代价" },
-      { id: "act.fact.three", kind: "stake", label: "第三幕的边地危机" }
-    ],
     mainlineActs: [
-      { id: "act.one", label: "旧案显形", prompt: "让旧档进入人物生活", factId: "act.fact.one", introduceFactIds: ["act.fact.one"] },
-      { id: "act.two", label: "阵营周旋", prompt: "让旧档进入阵营博弈", factId: "act.fact.two", introduceFactIds: ["act.fact.two"], requiredFactIds: ["act.fact.one"] },
-      { id: "act.three", label: "边地危机", prompt: "让旧案后果化为现实危机", factId: "act.fact.three", introduceFactIds: ["act.fact.three"], requiredFactIds: ["act.fact.one", "act.fact.two"], resolveFactIds: ["act.fact.three"] }
+      { id: "act.one", label: "旧事入局", prompt: "让人物从自身处境接触被遮蔽的旧事。" },
+      { id: "act.two", label: "立身周旋", prompt: "承接前幕后果，让人物进入新的阵营位置。" },
+      { id: "act.three", label: "大局担当", prompt: "让积累的身份面对更大范围的危机。" }
     ],
     narrativeFactions: [{ id: "court", label: "朝局", summary: "掌握文书与人情" }],
     routeArcs: [
@@ -1040,7 +1109,14 @@ test("动态三幕只各自结算一次，并在最终 payoff 后进入结局申
           attributeOutcome: { effects: [{ stat: "intelligence" as const, direction: "up" as const, band: "light" as const }] },
           attributePolicy: growthPolicy
         }
-      : {})
+      : {}),
+    ...(beat === "payoff" ? {
+      actHandoff: {
+        resolvedTension: "人物已为本幕冲突作出无法撤回的处理。",
+        lastingConsequence: "这次处理改变了人物在关系与局势中的位置。",
+        continuation: "此前结识的人与承担的责任会进入下一幕。"
+      }
+    } : {})
   });
   const playAct = (setupRoute: "route.one" | "route.two", climaxRoute: "route.one" | "route.two") => {
     scene(setupRoute, "setup");
@@ -1071,6 +1147,8 @@ test("动态三幕只各自结算一次，并在最终 payoff 后进入结局申
   assert.deepEqual(run.narrative.completedScenes.map((item) => item.mainlineActId), ["act.one", "act.two", "act.three"]);
   assert.equal(run.narrative.climaxCount, 3);
   assert.equal(run.narrative.payoffCount, 3);
+  assert.ok(run.story.factLedger?.facts.some((fact) => fact.id === "act:act.one:payoff" && fact.status === "resolved"));
+  assert.ok(run.story.factLedger?.facts.some((fact) => fact.id === "act:act.two:continuation" && fact.status === "open"));
   assert.equal(run.story.mainlineCompleted, true);
   assert.equal(run.narrative.endingState, "eligible");
   assert.equal(canRequestDirectedClosure(run, dynamicWorld), true);
@@ -1091,4 +1169,73 @@ test("世界幕引用不存在的事实会在内容加载前被拒绝", () => {
     }]
   };
   assert.throws(() => validateNarrativeWorldFactContract(invalid), /mainline_act_fact_reference_invalid/);
+});
+
+test("连续跨年体魄低迷才进入濒死，三种求生方式由对应属性档位结算", () => {
+  const survivalWorld: NarrativeWorldDefinition = {
+    ...narrativeWorld,
+    progression: {
+      ...narrativeWorld.progression!,
+      survival: {
+        startAge: 4,
+        graceYears: 3,
+        stages: [{
+          id: "child",
+          label: "幼年",
+          ageStageIds: ["child"],
+          dangerBelowPhysique: 10,
+          baseCrisisRisk: 1,
+          additionalYearRisk: 0,
+          maxCrisisRisk: 1
+        }],
+        recovery: {
+          successRateByTier: { low: 0, steady: 0, high: 1 },
+          restoreBuffer: 5
+        },
+        familyPhysiqueSupport: {
+          low: { outcomes: [{ delta: 0, weight: 1 }] },
+          steady: { outcomes: [{ delta: 0, weight: 1 }] },
+          high: { outcomes: [{ delta: 0, weight: 1 }] }
+        }
+      }
+    }
+  };
+  const advanceOneYear = (run: ReturnType<typeof makeRun>) => autoAdvanceToCheckpoint(run, world, difficulty, {
+    targetYears: 1,
+    maxTargetYears: 1,
+    allowRandomMilestone: false,
+    narrativeWorld: survivalWorld
+  });
+
+  const recoveredRun = makeRun();
+  recoveredRun.age = 3;
+  recoveredRun.ageStage = world.ageThresholds![0]!;
+  recoveredRun.stats.physique = 0;
+  recoveredRun.stats.intelligence = 30;
+  advanceOneYear(recoveredRun);
+  advanceOneYear(recoveredRun);
+  assert.equal(recoveredRun.survivalCrisis, undefined);
+  advanceOneYear(recoveredRun);
+  assert.ok(recoveredRun.survivalCrisis);
+  assert.equal(toClientRun(recoveredRun).survivalCrisis?.choices.find((choice) => choice.id === "self_rescue")?.guaranteed, true);
+  const recoveredCrisis = recoveredRun.survivalCrisis as { id: string };
+  const recovered = resolveSurvivalCrisis(recoveredRun, survivalWorld, "self_rescue", recoveredCrisis.id);
+  assert.equal(recovered.recovered, true);
+  assert.equal(recoveredRun.stats.physique, 15);
+  assert.equal(recoveredRun.ended, false);
+
+  const failedRun = makeRun();
+  failedRun.age = 3;
+  failedRun.ageStage = world.ageThresholds![0]!;
+  failedRun.stats.physique = 0;
+  failedRun.stats.fortune = 0;
+  advanceOneYear(failedRun);
+  advanceOneYear(failedRun);
+  advanceOneYear(failedRun);
+  assert.ok(failedRun.survivalCrisis);
+  const failedCrisis = failedRun.survivalCrisis as { id: string };
+  const failed = resolveSurvivalCrisis(failedRun, survivalWorld, "trust_fate", failedCrisis.id);
+  assert.equal(failed.recovered, false);
+  assert.equal(failedRun.outcome, "dead");
+  assert.match(failedRun.deathCause ?? "", /幼年/);
 });

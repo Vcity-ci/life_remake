@@ -134,3 +134,12 @@ docs/
 - `applyNarrativeEvent` 仅更新本回合实际选择路线的 `routeProgress`。`activeScene` 同步为该路线的展示/停表投影，不承担全局状态机职责。
 - `recordMainlineActPayoff` 仅清除完成 payoff 的路线记录；共享世界幕前进与世界事实结算不清除其它路线。
 - 年龄没有叙事终止上限。普通年份、场景停表和属性门槛沿用既有逻辑；路线局部进度不改变这些模块。
+
+## 12. 当前动态回合与生存结算（2026-08-25 14:54 +08:00，增量）
+
+1. `generateDirectedSegmentForRun` 通过 `generateDynamicNarrativeScene` 发起当前唯一的动态叙事调用。依据可用回合类型，模型必须调用 `render_background_segment`、`render_scene` 或 `render_choice_scene`；`/responses` 与 `/chat/completions` 的返回分别归一为同一工具调用记录。
+2. 动态工具结果由 `apps/backend/src/ai.ts` 审核正文安全性、路线/阵营 ID、人物引用、属性语义、抉择选项和 payoff 交接事实；`apps/backend/src/engine.ts` 随后结算年龄、场景停表、事实、人物记忆与公开 `TurnRecord`。工具结果不合法时整回合回滚，内部原因只写后端日志，不投影前端。
+3. `NarrativeRunState.dynamicCharacters` 保存本局常驻人物。工具 schema 将 `characterRef` 限制为 `new` 或当前已知人物 ID；引擎只在 `recurring=true` 时创建档案，并以既有 ID、或旧数据的姓名加阵营匹配，稳定合并重复人物。
+4. `progression.survival` 是世界包拥有的死亡风险配置：年龄阶段风险线、连续低体魄宽限期、年度风险上限、恢复成功率与家境对体魄的年度支持均由其定义。当前古代包从 4 岁开始检测，连续 3 年低于风险线后才可触发危机。
+5. `resolveSurvivalCrisis` 使用固定种子结算三种选择。成功率按所用属性的低/中/高档取世界包配置，高档直接成功；成功把体魄恢复到风险线加 `restoreBuffer`，失败才把 `outcome` 设为 `dead`，并交由既有结局渲染补足死因文本。
+6. `BackgroundCard.narrative` 以 `bias`、`affinities`、`riskTone` 承载叙事游戏性。`summarizeTalentHooks` 只汇总本局已选的最多三张卡；身世生成、推进和结局均复用这一紧凑上下文，初始属性修正仍由卡片 `modifiers` 在创建运行态时结算。

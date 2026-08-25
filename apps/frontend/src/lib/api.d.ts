@@ -1,4 +1,4 @@
-import type { AdminConfigPayload, ContentBundle, CreateSaveResponse, CurrentGameRunResponse, GameEnvConfigResponse, PublicBackgroundCard, PublicDifficultyOption, PublicRunState, PublicTimelineEntry, TurnRecord, PublicWorldOption, ProviderConfig, ProviderLimits, SaveSlotSummary, StepAction, StartAllocationConfig, StartRunResponse, StepRunResponse, Stats } from "@reroll/shared";
+import type { AdminConfigPayload, ContentBundle, CreateSaveResponse, CurrentGameRunResponse, GameEnvConfigResponse, PublicBackgroundCard, PublicDifficultyOption, PublicRunState, PublicTimelineEntry, TurnRecord, PublicWorldOption, ProviderConfig, ProviderLimits, SaveSlotSummary, StepAction, StartAllocationConfig, StartRunResponse, StepRunResponse, Stats, SurvivalChoice } from "@reroll/shared";
 export declare class ApiError extends Error {
     status: number;
     code?: string;
@@ -82,6 +82,8 @@ export declare function stepRun(payload: {
     decisionAge?: number;
     sceneId?: string;
     sceneRevision?: number;
+    survivalChoice?: SurvivalChoice;
+    survivalCrisisId?: string;
     requestId?: string;
 }): Promise<StepRunResponse>;
 export declare function startRunStream(payload: {
@@ -101,6 +103,8 @@ export declare function stepRunStream(payload: {
     decisionAge?: number;
     sceneId?: string;
     sceneRevision?: number;
+    survivalChoice?: SurvivalChoice;
+    survivalCrisisId?: string;
     requestId?: string;
 }, onEvent: (event: GameStreamEvent) => void | Promise<void>): Promise<void>;
 export declare function fetchCurrentRun(): Promise<CurrentGameRunResponse>;

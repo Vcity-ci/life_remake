@@ -81,20 +81,6 @@ interface EventMetadataSetting {
   events: EventMetadata[];
 }
 
-interface TalentPromptHook {
-  id: string;
-  name: string;
-  rarity: "common" | "rare" | "epic" | "legendary";
-  description: string;
-  modifiers: Partial<Record<"intelligence" | "charisma" | "family" | "fortune", number>>;
-  tags: string[];
-  promptHooks: {
-    narrativeBias: string;
-    eventAffinity: string[];
-    riskTone: string;
-  };
-}
-
 const projectRoot = resolveProjectRoot(import.meta.url);
 const dataRoot = path.resolve(projectRoot, "data");
 const skillsRoot = path.resolve(projectRoot, "skills");
@@ -108,7 +94,6 @@ const factionPath = path.resolve(dataRoot, "settings", "factions", "factions.jso
 const factionEventPath = path.resolve(dataRoot, "events", "faction-events.json");
 const eventMetadataPath = path.resolve(dataRoot, "events", "event-metadata.json");
 const narrativeWorldDir = path.resolve(dataRoot, "narratives");
-const talentPromptPath = path.resolve(dataRoot, "talents", "talent-cards.json");
 const itemPath = path.resolve(dataRoot, "items.json");
 const defaultPromptPack: Record<string, string> = {
   systemCore: "C0 只输出叙事；第二人称；不得改写年龄、属性、结局。",
@@ -136,8 +121,6 @@ let eventMetadataCache: EventMetadataSetting[] | null = null;
 let eventMetadataLoadPromise: Promise<EventMetadataSetting[]> | null = null;
 const narrativeWorldCache = new Map<string, NarrativeWorldDefinition | null>();
 const narrativeWorldLoadPromises = new Map<string, Promise<NarrativeWorldDefinition | null>>();
-let talentHooksCache: TalentPromptHook[] | null = null;
-let talentHooksLoadPromise: Promise<TalentPromptHook[]> | null = null;
 let itemDefinitionsCache: ItemDefinition[] | null = null;
 let itemDefinitionsLoadPromise: Promise<ItemDefinition[]> | null = null;
 
@@ -190,10 +173,41 @@ function normalizePromptPack(promptPack?: Record<string, string>): Record<string
   };
 }
 
-function normalizeContentBundle(parsed: ContentBundle): ContentBundle {
+const legacyBuiltinCardDescriptions: Readonly<Record<string, string>> = {
+  c_street_sense: "你对他人情绪和局势变化有基础敏感度。",
+  c_hard_study: "长线投入学习时，你更容易稳步进步。",
+  c_family_trade: "家中有稳定技能或营生渠道。",
+  r_public_speaker: "你在公共表达和说服方面具备优势。",
+  r_lucky_break: "关键时刻更容易遇到转机。",
+  r_patron_network: "你更容易接触到高质量资源和人脉。",
+  e_strategist: "你能跨周期规划关键选择，降低长期失误率。",
+  e_noble_lineage: "出身背景显著提升起步资源。",
+  l_destiny_weaver: "你在高风险节点更容易转化危机为机遇。",
+  l_crown_aura: "你的存在本身会影响他人的判断和追随。"
+};
+
+function mergeBuiltinCardCatalog(cards: BackgroundCard[], seedCards: BackgroundCard[]): BackgroundCard[] {
+  if (seedCards.length === 0) return cards;
+  const existingById = new Map(cards.map((card) => [card.id, card]));
+  const builtinIds = new Set(seedCards.map((card) => card.id));
+  const builtins = seedCards.map((seed) => {
+    const existing = existingById.get(seed.id);
+    if (!existing) return seed;
+    const isLegacyBuiltin = !existing.narrative && legacyBuiltinCardDescriptions[seed.id] === existing.description;
+    if (isLegacyBuiltin) {
+      return { ...seed };
+    }
+    // Preserve administrator-authored card mechanics and prose, while making
+    // the new narrator metadata available to older built-in card snapshots.
+    return { ...existing, narrative: existing.narrative ?? seed.narrative };
+  });
+  return [...builtins, ...cards.filter((card) => !builtinIds.has(card.id))];
+}
+
+function normalizeContentBundle(parsed: ContentBundle, seedCards: BackgroundCard[] = []): ContentBundle {
   return {
     worlds: [...parsed.worlds].sort((a, b) => a.id.localeCompare(b.id)),
-    cards: parsed.cards,
+    cards: mergeBuiltinCardCatalog(parsed.cards, seedCards),
     difficulties: parsed.difficulties,
     promptPack: normalizePromptPack(parsed.promptPack),
     gameplayTuning: parsed.gameplayTuning ?? createDefaultGameplayTuning()
@@ -237,7 +251,12 @@ export async function readContentBundle(): Promise<ContentBundle> {
   contentBundleLoadPromise = (async () => {
     const raw = await fs.readFile(contentPath, "utf8");
     const parsed = JSON.parse(raw) as ContentBundle;
-    const normalized = normalizeContentBundle(parsed);
+    const seed = await loadSeedBundle();
+    const normalized = normalizeContentBundle(parsed, seed.cards);
+    if (JSON.stringify(parsed.cards) !== JSON.stringify(normalized.cards)) {
+      await writeBackup(parsed, "talent-catalog-migration");
+      await fs.writeFile(contentPath, JSON.stringify(normalized, null, 2), "utf8");
+    }
     contentBundleCache = normalized;
     return normalized;
   })();
@@ -251,7 +270,8 @@ export async function readContentBundle(): Promise<ContentBundle> {
 
 export async function writeContentBundle(next: ContentBundle): Promise<ContentBundle> {
   await ensureStorageSeed();
-  const normalized = normalizeContentBundle(next);
+  const seed = await loadSeedBundle();
+  const normalized = normalizeContentBundle(next, seed.cards);
   await fs.writeFile(contentPath, JSON.stringify(normalized, null, 2), "utf8");
   await writeBackup(normalized, "update");
   contentBundleCache = normalized;
@@ -449,7 +469,7 @@ export async function loadNarrativeWorldDefinition(worldId: string): Promise<Nar
     readJsonFile<NarrativeComponentCatalog>(path.resolve(narrativeWorldDir, `${worldId}.components.json`)).catch(() => null)
   ])
     .then(([definition, catalog]) => {
-      const merged = (definition.version === 1 || definition.version === 2 || definition.version === 3 || definition.version === 4 || definition.version === 5) && definition.worldId === worldId
+      const merged = (definition.version === 1 || definition.version === 2 || definition.version === 3 || definition.version === 4 || definition.version === 5 || definition.version === 6) && definition.worldId === worldId
         ? mergeNarrativeComponentCatalog(definition, catalog, worldId)
         : null;
       const valid = merged ? validateNarrativeWorldFactContract(merged) : null;
@@ -807,22 +827,5 @@ export async function loadItemDefinitions(): Promise<ItemDefinition[]> {
     return [];
   } finally {
     itemDefinitionsLoadPromise = null;
-  }
-}
-
-export async function loadTalentPromptHooks(): Promise<TalentPromptHook[]> {
-  try {
-    if (talentHooksCache) return talentHooksCache;
-    if (!talentHooksLoadPromise) {
-      talentHooksLoadPromise = readJsonFile<TalentPromptHook[]>(talentPromptPath).then((items) => {
-        talentHooksCache = items;
-        return items;
-      });
-    }
-    return await talentHooksLoadPromise;
-  } catch {
-    return [];
-  } finally {
-    talentHooksLoadPromise = null;
   }
 }

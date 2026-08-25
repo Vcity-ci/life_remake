@@ -1,278 +1,146 @@
 [
   {
-    "id": "talent_01",
-    "name": "夜灯苦读",
+    "id": "c_street_sense",
+    "name": "街头直觉",
     "rarity": "common",
-    "description": "漫长而稳定的学习耐受力。",
-    "modifiers": {
-      "intelligence": 2
-    },
-    "tags": [
-      "learning",
-      "discipline"
-    ]
+    "description": "巷陌里一句未尽的话、席间一瞬停顿，总能让你先察觉风向。",
+    "modifiers": { "charisma": 1, "fortune": 1 },
+    "tags": ["social", "survival"],
+    "narrative": { "bias": "善于从人情缝隙读出局势变化。", "affinities": ["试探", "交涉", "求援"], "riskTone": "先探虚实" }
   },
   {
-    "id": "talent_02",
-    "name": "众人之眼",
+    "id": "c_hard_study",
+    "name": "苦读本能",
     "rarity": "common",
-    "description": "更容易感知群体情绪变化。",
-    "modifiers": {
-      "charisma": 2
-    },
-    "tags": [
-      "social",
-      "perception"
-    ]
+    "description": "灯火熄了仍肯回到案前，慢功夫终会在岁月里留下痕迹。",
+    "modifiers": { "intelligence": 2 },
+    "tags": ["learning"],
+    "narrative": { "bias": "把困局拆成可积累的学问与判断。", "affinities": ["求学", "推演", "复盘"], "riskTone": "稳中求进" }
   },
   {
-    "id": "talent_03",
-    "name": "旧宅余荫",
+    "id": "c_family_trade",
+    "name": "家传手艺",
     "rarity": "common",
-    "description": "家族仍有可调用的基础资源。",
-    "modifiers": {
-      "family": 2
-    },
-    "tags": [
-      "resource",
-      "legacy"
-    ]
+    "description": "家中总有一门能安身的营生，平常日子里也留着退路。",
+    "modifiers": { "family": 2 },
+    "tags": ["economy"],
+    "narrative": { "bias": "资源、手艺与家人责任总会一同出现。", "affinities": ["营生", "调度", "守成"], "riskTone": "保留余地" }
   },
   {
-    "id": "talent_04",
-    "name": "转角之运",
+    "id": "c_tough_bones",
+    "name": "硬朗筋骨",
     "rarity": "common",
-    "description": "普通局面中偶尔出现意外转机。",
-    "modifiers": {
-      "fortune": 2
-    },
-    "tags": [
-      "luck",
-      "timing"
-    ]
+    "description": "风雨和劳作没有轻易压垮你，身体总比旁人多一分耐受。",
+    "modifiers": { "physique": 2 },
+    "tags": ["survival", "resilience"],
+    "narrative": { "bias": "在奔波、劳作与病痛中仍能保持行动。", "affinities": ["远行", "劳作", "坚守"], "riskTone": "能扛代价" }
   },
   {
-    "id": "talent_05",
-    "name": "冷静账本",
-    "rarity": "common",
-    "description": "面对资源波动时更能维持秩序。",
-    "modifiers": {
-      "family": 1,
-      "intelligence": 1
-    },
-    "tags": [
-      "finance",
-      "control"
-    ]
-  },
-  {
-    "id": "talent_06",
-    "name": "街巷耳目",
+    "id": "r_public_speaker",
+    "name": "天生演说家",
     "rarity": "rare",
-    "description": "你能更快获得一线消息。",
-    "modifiers": {
-      "charisma": 1,
-      "fortune": 1
-    },
-    "tags": [
-      "intel",
-      "social"
-    ]
+    "description": "你能把纷乱的心思说成众人听得懂的话，也敢在关键处开口。",
+    "modifiers": { "charisma": 2, "intelligence": 1 },
+    "tags": ["social", "career"],
+    "narrative": { "bias": "擅长以言辞凝聚人心，也容易被推到台前。", "affinities": ["陈情", "说服", "斡旋"], "riskTone": "愿担声名" }
   },
   {
-    "id": "talent_07",
-    "name": "硬骨耐压",
+    "id": "r_lucky_break",
+    "name": "逢凶化吉",
     "rarity": "rare",
-    "description": "高压场景下你更不易崩盘。",
-    "modifiers": {
-      "intelligence": 1,
-      "fortune": 1
-    },
-    "tags": [
-      "resilience",
-      "pressure"
-    ]
+    "description": "险路走到尽头时，常会有一扇原本看不见的门为你留着。",
+    "modifiers": { "fortune": 2 },
+    "tags": ["luck"],
+    "narrative": { "bias": "绝境里仍可能出现可信的转机。", "affinities": ["偶遇", "补救", "转圜"], "riskTone": "可作一试" }
   },
   {
-    "id": "talent_08",
-    "name": "门客三千",
+    "id": "r_patron_network",
+    "name": "贵人网络",
     "rarity": "rare",
-    "description": "你周围更容易形成协作网络。",
-    "modifiers": {
-      "charisma": 1,
-      "family": 1
-    },
-    "tags": [
-      "network",
-      "organization"
-    ]
+    "description": "总有人愿意替你递一句话、留一扇门，但人情从来需要偿还。",
+    "modifiers": { "family": 1, "charisma": 1, "fortune": 1 },
+    "tags": ["resource", "social"],
+    "narrative": { "bias": "机会常以关系和承诺的形式来到面前。", "affinities": ["举荐", "结盟", "求援"], "riskTone": "先计人情" }
   },
   {
-    "id": "talent_09",
-    "name": "长线耐心",
+    "id": "r_warm_heart",
+    "name": "仁心相护",
     "rarity": "rare",
-    "description": "愿意为慢变量持续投入。",
-    "modifiers": {
-      "intelligence": 1,
-      "family": 1
-    },
-    "tags": [
-      "longterm",
-      "discipline"
-    ]
+    "description": "你记得他人的难处，也总有人因这份记得在危急时站到你身边。",
+    "modifiers": { "physique": 1, "charisma": 1, "family": 1 },
+    "tags": ["care", "relationship"],
+    "narrative": { "bias": "照料与被照料的关系会成为持续的牵挂。", "affinities": ["照拂", "调停", "守诺"], "riskTone": "先保全人" }
   },
   {
-    "id": "talent_10",
-    "name": "临门直觉",
+    "id": "r_medic_memory",
+    "name": "岐黄入心",
     "rarity": "rare",
-    "description": "你常在最后时刻捕捉正确方向。",
-    "modifiers": {
-      "fortune": 2
-    },
-    "tags": [
-      "timing",
-      "decision"
-    ]
+    "description": "你对病容、药性与伤后的变化格外敏锐，知道何时该停下来。",
+    "modifiers": { "physique": 2, "intelligence": 1 },
+    "tags": ["medical", "survival"],
+    "narrative": { "bias": "会留意身体代价、照护方法与恢复的时机。", "affinities": ["诊治", "照护", "避险"], "riskTone": "审慎自保" }
   },
   {
-    "id": "talent_11",
-    "name": "远见图谱",
+    "id": "r_oathbound",
+    "name": "守誓之人",
+    "rarity": "rare",
+    "description": "一旦把话说出口，你会比旁人更久地记住它，也更难轻易回头。",
+    "modifiers": { "charisma": 1, "family": 1, "physique": 1 },
+    "tags": ["oath", "commitment"],
+    "narrative": { "bias": "承诺会沉入人物关系，并在后来要求兑现。", "affinities": ["立誓", "担责", "守护"], "riskTone": "不轻许诺" }
+  },
+  {
+    "id": "e_strategist",
+    "name": "远见策士",
     "rarity": "epic",
-    "description": "你能把零散信息拼成趋势。",
-    "modifiers": {
-      "intelligence": 2,
-      "fortune": 1
-    },
-    "tags": [
-      "strategy",
-      "forecast"
-    ]
+    "description": "你能在零散迹象里看见趋势，也明白每一步布局都有代价。",
+    "modifiers": { "intelligence": 2, "fortune": 1 },
+    "tags": ["strategy"],
+    "narrative": { "bias": "倾向从长期后果与信息关联中寻找破局点。", "affinities": ["布局", "预判", "破局"], "riskTone": "以小博大" }
   },
   {
-    "id": "talent_12",
-    "name": "王庭礼节",
+    "id": "e_noble_lineage",
+    "name": "显赫血脉",
     "rarity": "epic",
-    "description": "高阶场合中你更易获得信任。",
-    "modifiers": {
-      "charisma": 2,
-      "family": 1
-    },
-    "tags": [
-      "prestige",
-      "protocol"
-    ]
+    "description": "门第带来资源、名望与被注视的目光，你很难只为自己而活。",
+    "modifiers": { "family": 3 },
+    "tags": ["status"],
+    "narrative": { "bias": "出身既是助力，也会把家门责任压在选择之上。", "affinities": ["门第", "举荐", "担名"], "riskTone": "顾及全局" }
   },
   {
-    "id": "talent_13",
-    "name": "秘境记忆",
+    "id": "e_unbroken_will",
+    "name": "百折不屈",
     "rarity": "epic",
-    "description": "你对未知环境有异常适应力。",
-    "modifiers": {
-      "intelligence": 1,
-      "fortune": 2
-    },
-    "tags": [
-      "exploration",
-      "adaptation"
-    ]
+    "description": "跌倒后仍能重新站稳，最坏的年月也难以磨灭你的行动意志。",
+    "modifiers": { "physique": 2, "fortune": 1 },
+    "tags": ["resilience", "survival"],
+    "narrative": { "bias": "挫败后仍会寻找下一次行动的机会。", "affinities": ["逆转", "坚守", "重建"], "riskTone": "逆境前行" }
   },
   {
-    "id": "talent_14",
-    "name": "众望所归",
+    "id": "e_burden_bearer",
+    "name": "负重而行",
     "rarity": "epic",
-    "description": "群体更愿意把关键决策交给你。",
-    "modifiers": {
-      "charisma": 2,
-      "fortune": 1
-    },
-    "tags": [
-      "leadership",
-      "influence"
-    ]
+    "description": "越是众人退让的难处，你越容易被推去承担，也越能撑住局面。",
+    "modifiers": { "physique": 1, "intelligence": 1, "charisma": 1 },
+    "tags": ["duty", "leadership"],
+    "narrative": { "bias": "责任会把人物推向真实的组织与公共后果。", "affinities": ["担当", "统筹", "救援"], "riskTone": "承担风险" }
   },
   {
-    "id": "talent_15",
-    "name": "遗产编织",
-    "rarity": "epic",
-    "description": "你能把旧资源重组出新价值。",
-    "modifiers": {
-      "family": 2,
-      "intelligence": 1
-    },
-    "tags": [
-      "resource",
-      "innovation"
-    ]
-  },
-  {
-    "id": "talent_16",
-    "name": "星环庇护",
+    "id": "l_destiny_weaver",
+    "name": "命运织者",
     "rarity": "legendary",
-    "description": "你在灾厄年份更容易找到生路。",
-    "modifiers": {
-      "fortune": 3,
-      "intelligence": 1
-    },
-    "tags": [
-      "destiny",
-      "survival"
-    ]
+    "description": "你总能在最险处看见一线可供翻转的因果，却仍要亲手承担选择。",
+    "modifiers": { "fortune": 3, "intelligence": 1 },
+    "tags": ["destiny", "risk"],
+    "narrative": { "bias": "危险与机会会以更紧密的因果同时出现。", "affinities": ["翻盘", "回收", "险局"], "riskTone": "高险高回" }
   },
   {
-    "id": "talent_17",
-    "name": "冠冕威仪",
+    "id": "l_crown_aura",
+    "name": "王者气场",
     "rarity": "legendary",
-    "description": "你的出现会改变现场权力重心。",
-    "modifiers": {
-      "charisma": 3,
-      "family": 1
-    },
-    "tags": [
-      "authority",
-      "presence"
-    ]
-  },
-  {
-    "id": "talent_18",
-    "name": "命运复写",
-    "rarity": "legendary",
-    "description": "你在失败边缘拥有二次博弈窗口。",
-    "modifiers": {
-      "fortune": 2,
-      "intelligence": 2
-    },
-    "tags": [
-      "rewrite",
-      "turnaround"
-    ]
-  },
-  {
-    "id": "talent_19",
-    "name": "万卷骨血",
-    "rarity": "legendary",
-    "description": "你的认知成长会跨越常规边界。",
-    "modifiers": {
-      "intelligence": 3,
-      "charisma": 1
-    },
-    "tags": [
-      "cognition",
-      "mastery"
-    ]
-  },
-  {
-    "id": "talent_20",
-    "name": "世代灯塔",
-    "rarity": "legendary",
-    "description": "你更容易成为跨阶段的精神锚点。",
-    "modifiers": {
-      "charisma": 2,
-      "family": 1,
-      "fortune": 1
-    },
-    "tags": [
-      "legacy",
-      "faith"
-    ]
+    "description": "你一出现，旁人的判断与追随便会随之偏转，权力也更容易向你靠近。",
+    "modifiers": { "charisma": 3, "family": 1 },
+    "tags": ["leadership"],
+    "narrative": { "bias": "群体会把目光、期待与责任一并交到人物手中。", "affinities": ["统合", "裁断", "号召"], "riskTone": "高压担责" }
   }
 ]

@@ -16,6 +16,8 @@ import type {
   NarrativeRouteProgress,
   NarrativeRunState,
   NarrativeStatTierConfig,
+  NarrativeStatTierPresentation,
+  NarrativeStatTier,
   NarrativeProgressGateStage,
   NarrativeThreadState,
   NarrativeWorldDefinition,
@@ -49,6 +51,7 @@ export interface ClosureReadiness {
 
 export interface NarrativePromptPlan {
   storyBible: string;
+  origin?: string;
   mainlineSkeleton?: string;
   styleRules: string[];
   activeLore: string[];
@@ -113,8 +116,9 @@ function defaultScene() {
 
 export function createNarrativeRunState(enabled = false): NarrativeRunState {
   return {
-    version: 6,
+    version: 7,
     enabled,
+    opening: enabled ? { status: "pending" } : undefined,
     arcPhase: "setup",
     climaxCount: 0,
     payoffCount: 0,
@@ -142,7 +146,7 @@ export function ensureNarrativeRunState(
   currentAge?: number
 ): NarrativeRunState {
   const defaults = createNarrativeRunState(enabled);
-  if (!state || (state.version !== 1 && state.version !== 2 && state.version !== 3 && state.version !== 4 && state.version !== 5 && state.version !== 6)) return defaults;
+  if (!state || (state.version !== 1 && state.version !== 2 && state.version !== 3 && state.version !== 4 && state.version !== 5 && state.version !== 6 && state.version !== 7)) return defaults;
   const normalizeAge = (value: unknown): number => {
     const age = Number(value);
     if (!Number.isFinite(age)) return 0;
@@ -290,6 +294,38 @@ export function ensureNarrativeRunState(
       ? { lowMax: Math.trunc(lowMax), highMin: Math.trunc(highMin) }
       : undefined;
   };
+  const statKeys: Array<keyof Stats> = ["intelligence", "charisma", "family", "fortune", "physique"];
+  const tierKeys: NarrativeStatTier[] = ["low", "steady", "high"];
+  const normalizeStatTierPresentation = (value: unknown): NarrativeStatTierPresentation | undefined => {
+    if (!value || typeof value !== "object") return undefined;
+    const source = value as Partial<NarrativeStatTierPresentation>;
+    const presentation = {} as NarrativeStatTierPresentation;
+    for (const stat of statKeys) {
+      const labels = source[stat];
+      if (!labels || typeof labels !== "object") return undefined;
+      const normalized = {} as Record<NarrativeStatTier, string>;
+      for (const tier of tierKeys) {
+        const label = labels[tier];
+        if (typeof label !== "string" || !label.trim()) return undefined;
+        normalized[tier] = compactText(label, 32);
+      }
+      presentation[stat] = normalized;
+    }
+    return presentation;
+  };
+  const opening = state.opening?.status === "ready" && state.opening.profile?.summary?.trim()
+    ? {
+      status: "ready" as const,
+      profile: {
+        summary: compactText(state.opening.profile.summary, 180),
+        seedHints: Array.isArray(state.opening.profile.seedHints)
+          ? uniqueRecent(state.opening.profile.seedHints.map((hint) => compactText(String(hint), 90)), 2)
+          : []
+      }
+    }
+    : state.opening?.status === "pending"
+      ? { status: "pending" as const }
+      : undefined;
   const actRuntime = state.actRuntime && typeof state.actRuntime.actId === "string" && validBeats.includes(state.actRuntime.beat)
     ? {
       actId: compactText(state.actRuntime.actId, 120),
@@ -313,8 +349,9 @@ export function ensureNarrativeRunState(
   return {
     ...defaults,
     ...state,
-    version: 6,
+    version: 7,
     enabled: enabled && state.enabled !== false,
+    opening,
     arcPhase: phase.includes(state.arcPhase) ? state.arcPhase : defaults.arcPhase,
     climaxCount: Math.max(0, Math.min(8, Number(state.climaxCount) || 0)),
     payoffCount: Math.max(0, Math.min(8, Number(state.payoffCount) || 0)),
@@ -347,7 +384,8 @@ export function ensureNarrativeRunState(
       : undefined,
     endingScore: typeof state.endingScore === "number" ? state.endingScore : undefined,
     setbackCount: Math.max(0, Math.min(8, Number(state.setbackCount) || 0)),
-    statTierConfig: normalizeStatTierConfig(state.statTierConfig)
+    statTierConfig: normalizeStatTierConfig(state.statTierConfig),
+    statTierPresentation: normalizeStatTierPresentation(state.statTierPresentation)
   };
 }
 
@@ -368,6 +406,9 @@ export function ensureNarrativeActRuntime(
 ): NarrativeRunState {
   const next = ensureNarrativeRunState(state, state.enabled, age);
   if (world?.progression?.statTiers) next.statTierConfig = { ...world.progression.statTiers };
+  if (!next.statTierPresentation && world?.progression?.statTierPresentation) {
+    next.statTierPresentation = structuredClone(world.progression.statTierPresentation);
+  }
   if (!next.enabled || !world?.mainlineActs?.length || next.actRuntime) return next;
   const act = world.mainlineActs[0];
   next.actRuntime = {
@@ -381,6 +422,17 @@ export function ensureNarrativeActRuntime(
   };
   next.activeMainlineActId = act.id;
   return next;
+}
+
+export function isNarrativeEarlyLife(
+  world: NarrativeWorldDefinition | null | undefined,
+  age: number
+): boolean {
+  const maxAge = world?.opening?.earlyLife?.maxAge;
+  // A background segment starting at age 0 may cover 1-3岁. Once the visible
+  // age reaches the configured boundary, the next turn may use normal pacing.
+  if (typeof maxAge !== "number" || !Number.isInteger(maxAge) || maxAge <= 0) return false;
+  return age >= 0 && age < maxAge;
 }
 
 export function getNarrativeActRuntime(
@@ -740,12 +792,14 @@ function hasResolvedCoreFacts(
   source: NarrativePromptSource,
   world: NarrativeWorldDefinition
 ): boolean {
-  if (source.narrative.actRuntime && world.mainlineActs?.length) {
-    const requiredFactIds = world.mainlineActs.flatMap((act) => Array.from(new Set([
-      ...(act.factId ? [act.factId] : []),
-      ...(act.resolveFactIds ?? [])
-    ])));
-    return requiredFactIds.every((id) => source.story.factLedger?.facts.some((fact) => fact.id === id && fact.status === "resolved"));
+  const mainlineActs = world.mainlineActs ?? [];
+  const usesDynamicActHandoffs = source.narrative.actRuntime
+    && mainlineActs.length > 0
+    && mainlineActs.every((act) => !act.factId);
+  if (usesDynamicActHandoffs) {
+    return mainlineActs.every((act) => source.story.factLedger?.facts.some((fact) => (
+      fact.id === `act:${act.id}:payoff` && fact.status === "resolved"
+    )));
   }
   const directionId = source.story.closureExperienceId ?? currentDirectionId(source);
   const coreThreadIds = world.routeArcs.find((route) => route.directionId === directionId)?.coreThreadIds
@@ -1214,6 +1268,12 @@ export function buildNarrativePromptPlan(
     .slice(0, 2);
   return {
     storyBible: world.storyBible,
+    origin: source.narrative.opening?.status === "ready"
+      ? compactText([
+        source.narrative.opening.profile?.summary ?? "",
+        ...(source.narrative.opening.profile?.seedHints ?? [])
+      ].filter(Boolean).join("；"), 220)
+      : "",
     mainlineSkeleton: world.mainlineSkeleton
       ? compactText([
         `总冲突：${world.mainlineSkeleton.premise}`,
@@ -1229,7 +1289,7 @@ export function buildNarrativePromptPlan(
     scene: `场景=${source.narrative.scene.place}；冲突=${source.narrative.scene.conflict}；余波=${source.narrative.scene.aftermath}`,
     authorNote: buildAuthorNote(source, activeComponents[0]),
     ending: ending
-      ? `结局大纲=${ending.title}/${ending.polarity}；终局冲突=${ending.finalConflict}；回收=${ending.payoffFocus}；余响=${ending.epilogueFocus}`
+      ? `结局倾向=${ending.title}/${ending.polarity}；按该路线的身份与代价收束。最终冲突、伏笔回收与余响必须以本局已完成三幕的事实、人物和后果为准，不可把世界包中的示例情节当作本局既定经历。`
       : "",
     selectedRoute: selectedRoute ? {
       label: selectedRoute.label || selectedRoute.directionId,
@@ -1304,6 +1364,7 @@ export function formatNarrativePromptPlan(
     ].filter(Boolean).join("\n"), 520)
     : "";
   return [
+    plan.origin ? `人物身世：${compactText(plan.origin, 180)}` : "",
     plan.mainlineSkeleton ? `必须遵循的主线因果：${plan.mainlineSkeleton}` : "",
     lore ? `相关世界事实：${lore}` : "",
     essentials ? `已确立的关键事实：${essentials}` : "",

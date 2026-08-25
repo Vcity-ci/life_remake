@@ -17,7 +17,8 @@ import type {
   StartAllocationConfig,
   StartRunResponse,
   StepRunResponse,
-  Stats
+  Stats,
+  SurvivalChoice
 } from "@reroll/shared";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "";
@@ -171,6 +172,8 @@ export async function stepRun(payload: {
   decisionAge?: number;
   sceneId?: string;
   sceneRevision?: number;
+  survivalChoice?: SurvivalChoice;
+  survivalCrisisId?: string;
   requestId?: string;
 }): Promise<StepRunResponse> {
   const res = await gameFetch("/api/game/step", {
@@ -260,6 +263,8 @@ export async function stepRunStream(
     decisionAge?: number;
     sceneId?: string;
     sceneRevision?: number;
+    survivalChoice?: SurvivalChoice;
+    survivalCrisisId?: string;
     requestId?: string;
   },
   onEvent: (event: GameStreamEvent) => void | Promise<void>

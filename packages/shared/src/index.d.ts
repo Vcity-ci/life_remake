@@ -3,7 +3,7 @@ export type StatKey = "intelligence" | "charisma" | "family" | "fortune" | "phys
 export type DecisionType = "safe" | "balanced" | "risky";
 export type CardRarity = "common" | "rare" | "epic" | "legendary";
 export type AgeStageId = "child" | "youth" | "prime" | "middle" | "elder";
-export type StepAction = "consume" | "decide" | "select_growth_focus";
+export type StepAction = "consume" | "decide" | "select_growth_focus" | "generate_opening" | "resolve_survival";
 export type RunPhase = "generating" | "ready" | "waiting_decision" | "ended";
 export type DirectorMode = "legacy" | "tool-fast" | "auto";
 export type EventKind = "normal" | "milestone" | "any";
@@ -42,6 +42,7 @@ export interface Stats {
 export type NarrativeAttributeBand = "light" | "medium" | "heavy";
 export type NarrativeAttributeDirection = "up" | "down";
 export type NarrativeStatTier = "low" | "steady" | "high";
+export type SurvivalChoice = "self_rescue" | "seek_help" | "trust_fate";
 export type NarrativeProgressGateStage = "opening" | "escalation" | "pressure" | "climax";
 export interface NarrativeAttributeEffect {
     stat: StatKey;
@@ -62,6 +63,10 @@ export interface NarrativeAttributePolicy {
     /** A local preference the engine verifies without exposing numeric rules to players. */
     preferredStats?: StatKey[];
     minPreferredEffects?: number;
+    /** Negative effects on these stats are never accepted for this policy. */
+    forbidNegativeStats?: StatKey[];
+    /** The engine accepts at most this negative semantic band for a specific stat. */
+    maxNegativeBandByStat?: Partial<Record<StatKey, NarrativeAttributeBand>>;
 }
 export interface BackgroundCard {
     id: string;
@@ -70,7 +75,14 @@ export interface BackgroundCard {
     description: string;
     modifiers: Partial<Record<StatKey, number>>;
     tags: string[];
+    /** Compact narrator hints carried only by the player-selected talent cards. */
+    narrative?: TalentNarrativeProfile;
     effects?: PassiveEffect[];
+}
+export interface TalentNarrativeProfile {
+    bias: string;
+    affinities?: string[];
+    riskTone?: string;
 }
 export interface PassiveEffect {
     type: PassiveEffectType;
@@ -227,6 +239,15 @@ export interface NarrativeMainlineActDefinition {
     resolutionModes?: NarrativeFactResolution[];
 }
 /**
+ * Compact model-authored continuity from one world act to the next. The engine
+ * persists it in the existing fact ledger, never as a player-facing label.
+ */
+export interface NarrativeActHandoff {
+    resolvedTension: string;
+    lastingConsequence: string;
+    continuation: string;
+}
+/**
  * A reusable dramatic situation. It gives the director usable material even
  * after a very specific local event has aged out or is on cooldown.
  */
@@ -315,6 +336,8 @@ export interface NarrativeStatTierConfig {
     lowMax: number;
     highMin: number;
 }
+/** Player-facing wording for a world's internal low / steady / high stat tiers. */
+export type NarrativeStatTierPresentation = Record<StatKey, Record<NarrativeStatTier, string>>;
 export interface NarrativeRouteProgression {
     directionId: string;
     gates?: Partial<Record<NarrativeProgressGateStage, NarrativeStatGate>>;
@@ -323,6 +346,15 @@ export interface NarrativeBackgroundPacing {
     minYears: number;
     maxYears: number;
     personalReflectionChance?: number;
+}
+/** World-owned early-life constraints. They shape narration, never story completion. */
+export interface NarrativeEarlyLifeDefinition {
+    /** Inclusive upper bound for the dependent-life narration frame. */
+    maxAge: number;
+}
+/** Opening policy for one world package. */
+export interface NarrativeOpeningDefinition {
+    earlyLife?: NarrativeEarlyLifeDefinition;
 }
 export interface NarrativeCompletionRule {
     requireCommittedDirection?: boolean;
@@ -336,13 +368,32 @@ export interface NarrativeCompletionRule {
     /** A world may require all configured acts without naming their semantics in code. */
     requireAllMainlineActs?: boolean;
 }
-/** Reserved for a later age-stage decline/death rule; the engine does not enforce it yet. */
-export interface NarrativeSurvivalRule {
-    graceYears: number;
-    stages: Array<{
-        ageStageId: AgeStageId;
-        minimums: Partial<Record<StatKey, number>>;
+export interface NarrativeSurvivalStage {
+    id: string;
+    label: string;
+    ageStageIds: AgeStageId[];
+    /** A crisis can accumulate only while physique is strictly below this value. */
+    dangerBelowPhysique: number;
+    baseCrisisRisk: number;
+    additionalYearRisk: number;
+    maxCrisisRisk: number;
+}
+export interface NarrativeFamilyPhysiqueSupport {
+    outcomes: Array<{
+        delta: number;
+        weight: number;
     }>;
+}
+export interface NarrativeSurvivalRule {
+    /** No survival risk is checked before this age. */
+    startAge: number;
+    graceYears: number;
+    stages: NarrativeSurvivalStage[];
+    recovery: {
+        successRateByTier: Record<NarrativeStatTier, number>;
+        restoreBuffer: number;
+    };
+    familyPhysiqueSupport: Record<NarrativeStatTier, NarrativeFamilyPhysiqueSupport>;
 }
 export interface NarrativeWorldProgression {
     backgroundPacing: NarrativeBackgroundPacing;
@@ -350,6 +401,7 @@ export interface NarrativeWorldProgression {
     completion: NarrativeCompletionRule;
     growthFocuses?: NarrativeGrowthFocusDefinition[];
     statTiers?: NarrativeStatTierConfig;
+    statTierPresentation?: NarrativeStatTierPresentation;
     survival?: NarrativeSurvivalRule;
 }
 /**
@@ -383,13 +435,14 @@ export interface NarrativeRouteDefinition {
     materialEventIds?: string[];
 }
 export interface NarrativeWorldDefinition {
-    version: 1 | 2 | 3 | 4;
+    version: 1 | 2 | 3 | 4 | 5 | 6;
     worldId: WorldId;
     storyBible: string;
     styleRules: string[];
+    opening?: NarrativeOpeningDefinition;
     mainlineSkeleton?: NarrativeMainlineSkeleton;
     progression?: NarrativeWorldProgression;
-    /** Facts required by the world plot, independent from an individual route. */
+    /** Optional static facts. Dynamic worlds may create act handoffs at runtime. */
     mainlineFacts?: NarrativeMainlineFactDefinition[];
     /** Ordered, world-owned dramatic acts; never rendered as player-facing chapters. */
     mainlineActs?: NarrativeMainlineActDefinition[];
@@ -490,6 +543,15 @@ export interface NarrativeSceneClock {
     sameAgeTurnCount: number;
     maxSameAgeTurns: number;
 }
+/** One generated opening passage plus the compact facts that remain in model context. */
+export interface NarrativeOriginProfile {
+    summary: string;
+    seedHints: string[];
+}
+export interface NarrativeOpeningState {
+    status: "pending" | "ready";
+    profile?: NarrativeOriginProfile;
+}
 /** Immutable proof that a concrete scene, rather than merely a route label, was completed. */
 export interface CompletedNarrativeScene {
     id: string;
@@ -501,8 +563,9 @@ export interface CompletedNarrativeScene {
     decisionCount: number;
 }
 export interface NarrativeRunState {
-    version: 1 | 2 | 3 | 4 | 5 | 6;
+    version: 1 | 2 | 3 | 4 | 5 | 6 | 7;
     enabled: boolean;
+    opening?: NarrativeOpeningState;
     arcPhase: NarrativeArcPhase;
     climaxCount: number;
     payoffCount: number;
@@ -526,6 +589,8 @@ export interface NarrativeRunState {
     endingScore?: number;
     setbackCount: number;
     statTierConfig?: NarrativeStatTierConfig;
+    /** Snapshot of world-owned player-facing tier wording for this run. */
+    statTierPresentation?: NarrativeStatTierPresentation;
 }
 export interface StoryCompletenessBuffer {
     origin: number;
@@ -745,6 +810,8 @@ export interface StepRunRequest {
     decisionAge?: number;
     sceneId?: string;
     sceneRevision?: number;
+    survivalChoice?: SurvivalChoice;
+    survivalCrisisId?: string;
     requestId?: string;
 }
 export interface YearEvent {
@@ -799,7 +866,7 @@ export interface PublicItemInstance {
     description: string;
     obtainedAge: number;
 }
-export type TimelinePresentationKind = "passage" | "scene" | "choice_outcome";
+export type TimelinePresentationKind = "origin" | "passage" | "scene" | "choice_outcome";
 export interface PublicTimelineEntry {
     entryId: string;
     ageFrom?: number;
@@ -849,6 +916,21 @@ export interface PublicNarrativeCharacter {
     description: string;
     introducedAge: number;
 }
+export interface PublicSurvivalCrisis {
+    id: string;
+    age: number;
+    stageLabel: string;
+    summary: string;
+    dangerBelowPhysique: number;
+    choices: Array<{
+        id: SurvivalChoice;
+        label: string;
+        description: string;
+        stat: StatKey;
+        tier: NarrativeStatTier;
+        guaranteed: boolean;
+    }>;
+}
 export interface PublicRunState {
     runId: string;
     worldId: WorldId;
@@ -858,15 +940,20 @@ export interface PublicRunState {
     personaPrompt: string;
     stats: Stats;
     statTiers?: Record<StatKey, NarrativeStatTier>;
+    statTierLabels?: Record<StatKey, string>;
     growthFocus?: {
         selectedId?: string;
         options: Array<Pick<NarrativeGrowthFocusDefinition, "id" | "label" | "description">>;
+    };
+    opening?: {
+        status: NarrativeOpeningState["status"];
     };
     cards: PublicBackgroundCard[];
     items: PublicItemInstance[];
     narrativeCharacters?: PublicNarrativeCharacter[];
     /** Compatibility projection of the latest unresolved TurnRecord choice. */
     nextMilestoneChoice?: PublicMilestoneChoice;
+    survivalCrisis?: PublicSurvivalCrisis;
     ended: boolean;
     endingSummary?: string;
     ascension: AscensionState;

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import type { CurrentGameRunResponse, ProviderConfig, ProviderLimits, PublicBackgroundCard, PublicRunState, RunPhase, SaveSlotSummary, StartAllocationConfig, StatKey, Stats, StepAction, TurnRecord } from "@reroll/shared";
+import type { CurrentGameRunResponse, ProviderConfig, ProviderLimits, PublicBackgroundCard, PublicRunState, RunPhase, SaveSlotSummary, StartAllocationConfig, StatKey, Stats, StepAction, SurvivalChoice, TurnRecord } from "@reroll/shared";
 import { AdminPanel } from "./components/AdminPanel";
 import {
   ApiError,
@@ -34,6 +34,7 @@ interface BootstrapState {
 }
 
 type MilestoneChoice = NonNullable<PublicRunState["nextMilestoneChoice"]>;
+type SurvivalCrisis = NonNullable<PublicRunState["survivalCrisis"]>;
 type StartOverrides = {
   stats?: Stats;
   selectedCardIds?: string[];
@@ -154,6 +155,8 @@ export default function App(): React.JSX.Element {
   const [isStreaming, setIsStreaming] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [autoAdvance, setAutoAdvance] = useState(false);
+  const [showGrowthFocus, setShowGrowthFocus] = useState(false);
+  const [expandedOriginIds, setExpandedOriginIds] = useState<Set<string>>(() => new Set());
   const timelineRef = useRef<HTMLDivElement | null>(null);
   const followLatestTimelineRef = useRef(true);
   const isGeneratingRef = useRef(false);
@@ -165,6 +168,7 @@ export default function App(): React.JSX.Element {
   const activeDecision = useMemo<MilestoneChoice | undefined>(() => (
     [...turns].reverse().find((turn) => turn.choice && !turn.choiceOutcome)?.choice
   ), [turns]);
+  const activeSurvivalCrisis: SurvivalCrisis | undefined = run?.survivalCrisis;
   const decisionHistory = useMemo(() => {
     const seen = new Set<string>();
     return [...turns].reverse().flatMap((turn) => {
@@ -336,6 +340,7 @@ export default function App(): React.JSX.Element {
     setSelectedCards(restored.cards.map((card) => card.id));
     setFlippedCards(buildFlippedCards(restored.cards.map((card) => card.id)));
     setAutoAdvance(false);
+    setShowGrowthFocus(false);
     setShowEndingModal(false);
     setStatus(payload.environmentReady ? "已恢复本局人生。" : "已恢复本局人生，请在 Setting 重新确认本局环境。");
     return true;
@@ -367,11 +372,27 @@ export default function App(): React.JSX.Element {
 
   function canAdvance(runState: PublicRunState | null): boolean {
     if (!runState) return false;
+    if (runState.opening?.status === "pending") return false;
+    if (runState.growthFocus && !runState.growthFocus.selectedId) return false;
     const runPhase = phaseOf(runState);
     return runPhase === "ready";
   }
 
-  async function runStepGeneration(decision?: string, decisionAgeOverride?: number): Promise<void> {
+  function needsGrowthFocus(runState: PublicRunState | null): boolean {
+    return Boolean(
+      runState &&
+      runState.opening?.status === "ready" &&
+      runState.growthFocus &&
+      !runState.growthFocus.selectedId
+    );
+  }
+
+  async function runStepGeneration(
+    decision?: string,
+    decisionAgeOverride?: number,
+    survivalChoice?: SurvivalChoice,
+    survivalCrisisId?: string
+  ): Promise<void> {
     const currentRun = runRef.current;
     if (!currentRun) return;
     if (isGeneratingRef.current) return;
@@ -379,7 +400,20 @@ export default function App(): React.JSX.Element {
     setIsGenerating(true);
     try {
       await stepRunStream(
-        decision
+        survivalChoice
+          ? {
+              runId: currentRun.runId,
+              action: "resolve_survival",
+              survivalChoice,
+              survivalCrisisId,
+              requestId: makeStepRequestId(
+                currentRun.runId,
+                "resolve_survival",
+                ++requestNonceRef.current,
+                survivalChoice
+              )
+            }
+          : decision
           ? {
               runId: currentRun.runId,
               action: "decide",
@@ -418,6 +452,8 @@ export default function App(): React.JSX.Element {
             if (event.data.run.ended || phaseOf(event.data.run) === "ended") {
               setStatus("本局结束。");
               setShowEndingModal(true);
+            } else if (event.data.run.survivalCrisis && phaseOf(event.data.run) === "waiting_decision") {
+              setStatus("命悬一线，请作出求生选择。");
             } else if (event.data.run.nextMilestoneChoice && phaseOf(event.data.run) === "waiting_decision") {
               setStatus("新的抉择出现。");
             } else {
@@ -614,7 +650,9 @@ export default function App(): React.JSX.Element {
           setRun(event.data.run);
           runRef.current = event.data.run;
           setTurns([]);
-          setStatus("角色已开局，点击“推进年份”开始流转。");
+          setShowGrowthFocus(false);
+          setExpandedOriginIds(new Set());
+          setStatus(event.data.run.opening?.status === "pending" ? "身世正在显现..." : "角色已开局。");
           return;
         }
         if (event.type === "turn") {
@@ -631,6 +669,8 @@ export default function App(): React.JSX.Element {
           if (mergedPhase === "ended") {
             setStatus("本局结束。");
             setShowEndingModal(true);
+          } else if (needsGrowthFocus(mergedRun)) {
+            setStatus("身世已写就，踏入人生以确定此阶段的积累。");
           } else if (mergedRun.nextMilestoneChoice && mergedPhase === "waiting_decision") {
             setStatus("新的抉择出现。");
           } else {
@@ -686,18 +726,17 @@ export default function App(): React.JSX.Element {
   async function onAdvance(): Promise<void> {
     if (!run) return;
     if (isStreaming) return;
-    if (!canAdvance(run)) return;
+    if (!canAdvance(run)) {
+      setAutoAdvance(false);
+      return;
+    }
     const runPhase = phaseOf(run);
     if (runPhase === "ended") {
       setStatus("本局已结束。");
       return;
     }
-    if (activeDecision && runPhase === "waiting_decision") {
+    if ((activeDecision || activeSurvivalCrisis) && runPhase === "waiting_decision") {
       setStatus("请先完成当前抉择。");
-      return;
-    }
-    if (run.growthFocus && !run.growthFocus.selectedId) {
-      setStatus("请先确定这一阶段的成长方向。");
       return;
     }
     try {
@@ -747,6 +786,33 @@ export default function App(): React.JSX.Element {
     }
   }
 
+  async function onSurvivalChoice(choice: SurvivalChoice): Promise<void> {
+    if (!run || !activeSurvivalCrisis || isStreaming || isGeneratingRef.current) return;
+    const currentRun = run;
+    try {
+      resetPendingFlowState();
+      const optimisticRun: PublicRunState = {
+        ...currentRun,
+        survivalCrisis: undefined,
+        phase: "generating"
+      };
+      setRun(optimisticRun);
+      runRef.current = optimisticRun;
+      setStatus("在生死之间挣扎...");
+      await runStepGeneration(undefined, undefined, choice, activeSurvivalCrisis.id);
+    } catch (error) {
+      setRun(currentRun);
+      runRef.current = currentRun;
+      if (isServerBusyError(error)) {
+        setAutoAdvance(false);
+        setShowBusyModal(true);
+        setStatus("服务器繁忙，请稍后重试。");
+      } else {
+        setStatus("暂时无法完成求生抉择，请稍后重试。");
+      }
+    }
+  }
+
   async function onSelectGrowthFocus(focusId: string): Promise<void> {
     const currentRun = runRef.current;
     if (!currentRun || isStreaming || isGeneratingRef.current) return;
@@ -763,6 +829,7 @@ export default function App(): React.JSX.Element {
           if (event.data.turns) setTurns(event.data.turns);
           setRun(event.data.run);
           runRef.current = event.data.run;
+          setShowGrowthFocus(false);
           setStatus("成长方向已确定。");
           return;
         }
@@ -770,6 +837,40 @@ export default function App(): React.JSX.Element {
       });
     } catch {
       setStatus("暂时无法确认成长方向，请稍后重试。");
+    } finally {
+      isGeneratingRef.current = false;
+      setIsGenerating(false);
+    }
+  }
+
+  async function onGenerateOpening(): Promise<void> {
+    const currentRun = runRef.current;
+    if (!currentRun || currentRun.opening?.status !== "pending" || isStreaming || isGeneratingRef.current) return;
+    isGeneratingRef.current = true;
+    setIsGenerating(true);
+    setStatus("身世正在显现...");
+    try {
+      await stepRunStream({
+        runId: currentRun.runId,
+        action: "generate_opening",
+        requestId: makeStepRequestId(currentRun.runId, "generate_opening", ++requestNonceRef.current)
+      }, async (event: GameStreamEvent) => {
+        if (event.type === "turn") {
+          appendTurn(event.data.record);
+          return;
+        }
+        if (event.type === "done") {
+          if (event.data.turns) setTurns(event.data.turns);
+          setRun(event.data.run);
+          runRef.current = event.data.run;
+          setShowGrowthFocus(false);
+          setStatus("身世已写就。");
+          return;
+        }
+        if (event.type === "error") throw new Error(event.data.message);
+      });
+    } catch {
+      setStatus("暂时无法写就身世，请稍后重试。");
     } finally {
       isGeneratingRef.current = false;
       setIsGenerating(false);
@@ -790,6 +891,8 @@ export default function App(): React.JSX.Element {
     setFlippedCards({});
     setStats(defaultStats);
     setTurns([]);
+    setShowGrowthFocus(false);
+    setExpandedOriginIds(new Set());
     followLatestTimelineRef.current = true;
     resetPendingFlowState();
     setShowEndingModal(false);
@@ -814,6 +917,8 @@ export default function App(): React.JSX.Element {
       setFlippedCards({});
       setStats(defaultStats);
       setTurns([]);
+      setShowGrowthFocus(false);
+      setExpandedOriginIds(new Set());
       setSaveSlots([]);
       setSaveTitle("");
       setRecoveryCode("");
@@ -846,16 +951,19 @@ export default function App(): React.JSX.Element {
       return;
     }
     if (isStreaming || isGenerating) return;
-    if (activeDecision && phaseOf(run) === "waiting_decision") {
+    if ((activeDecision || activeSurvivalCrisis) && phaseOf(run) === "waiting_decision") {
       setStatus("自动流转已暂停，等待抉择。");
       return;
     }
-    if (!canAdvance(run)) return;
+    if (!canAdvance(run)) {
+      setAutoAdvance(false);
+      return;
+    }
     const timer = window.setTimeout(() => {
       void onAdvance();
     }, 350);
     return () => window.clearTimeout(timer);
-  }, [autoAdvance, run, timeline.length, activeDecision, isStreaming, isGenerating]);
+  }, [autoAdvance, run, timeline.length, activeDecision, activeSurvivalCrisis, isStreaming, isGenerating]);
 
   if (!bootstrap) {
     return <main className="app"><p>{status}</p></main>;
@@ -871,6 +979,7 @@ export default function App(): React.JSX.Element {
             <input
               type="checkbox"
               checked={autoAdvance}
+              disabled={Boolean(run && !canAdvance(run))}
               onChange={(e) => setAutoAdvance(e.target.checked)}
             />
             自动流转
@@ -957,7 +1066,7 @@ export default function App(): React.JSX.Element {
               <dl className="stat-list">
                 {statKeys.map((key) => {
                   const tier = run.statTiers?.[key] ?? "steady";
-                  return <div key={key}><dt>{statIcons[key]} {statLabels[key]}</dt><dd><span>{run.stats[key]}</span><small className={`stat-tier stat-tier-${tier}`}>{statTierLabels[tier]}</small></dd></div>;
+                  return <div key={key}><dt>{statIcons[key]} {statLabels[key]}</dt><dd><span>{run.stats[key]}</span><small className={`stat-tier stat-tier-${tier}`}>{run.statTierLabels?.[key] ?? statTierLabels[tier]}</small></dd></div>;
                 })}
               </dl>
               <div className="rail-meta"><span>名望 {run.fame}</span><span>{run.outcome === "ongoing" ? "命途未定" : outcomeLabel(run.outcome)}</span></div>
@@ -973,17 +1082,49 @@ export default function App(): React.JSX.Element {
                   followLatestTimelineRef.current = target.scrollHeight - target.scrollTop - target.clientHeight < 24;
                 }}
               >
-                {timeline.map((item, index) => (
-                  <article className="narrative" key={timelineKey(item)}>
-                    <header><strong>{item.ageFrom && item.ageFrom < item.age
-                      ? `${item.ageFrom}-${item.age}岁`
-                      : timeline[index - 1]?.age === item.age
-                        ? "同年"
-                        : `${item.age}岁`}</strong></header>
-                    <p>{item.narrative}</p>
-                    <div className="delta-row">{extractDeltaLabels(item).map((label, idx) => <small key={`${timelineKey(item)}-${idx}`}>{label}</small>)}</div>
-                  </article>
-                ))}
+                {timeline.map((item, index) => {
+                  const isOrigin = item.kind === "origin";
+                  const originExpanded = isOrigin && (needsGrowthFocus(run) || expandedOriginIds.has(item.turnId));
+                  return (
+                    <article className={`narrative${isOrigin ? " narrative-origin" : ""}${originExpanded ? " is-expanded" : ""}`} key={timelineKey(item)}>
+                      <header>
+                        {isOrigin ? <><small>命运初卷</small><strong>身世</strong></> : <strong>{item.ageFrom && item.ageFrom < item.age
+                          ? `${item.ageFrom}-${item.age}岁`
+                          : timeline[index - 1]?.age === item.age
+                            ? "同年"
+                            : `${item.age}岁`}</strong>}
+                        {isOrigin ? (
+                          <button
+                            className="origin-toggle"
+                            type="button"
+                            title={originExpanded ? "收起身世" : "展开身世"}
+                            aria-label={originExpanded ? "收起身世" : "展开身世"}
+                            onClick={() => setExpandedOriginIds((previous) => {
+                              const next = new Set(previous);
+                              if (originExpanded) next.delete(item.turnId);
+                              else next.add(item.turnId);
+                              return next;
+                            })}
+                          >{originExpanded ? "⌃" : "⌄"}</button>
+                        ) : null}
+                      </header>
+                      {(!isOrigin || originExpanded) ? <p>{item.narrative}</p> : null}
+                      {isOrigin && originExpanded ? (
+                        <div className="origin-talent-tags" aria-label="此生天赋">
+                          {run.cards.map((card) => <span className={`asset-chip ${rarityClass(card.rarity)}`} key={card.id} title={card.description}>{card.name}</span>)}
+                        </div>
+                      ) : null}
+                      {!isOrigin ? <div className="delta-row">{extractDeltaLabels(item).map((label, idx) => <small key={`${timelineKey(item)}-${idx}`}>{label}</small>)}</div> : null}
+                    </article>
+                  );
+                })}
+                {run.opening?.status === "pending" ? (
+                  <section className="opening-pending" aria-live="polite">
+                    <small>命运初卷</small>
+                    <p>身世正在显现，往后的经历会从这里开始。</p>
+                    {!isStreaming && !isGenerating ? <button type="button" onClick={() => void onGenerateOpening()}>重新写就身世</button> : null}
+                  </section>
+                ) : null}
               </div>
 
               {activeDecision && phaseOf(run) === "waiting_decision" ? (
@@ -997,8 +1138,40 @@ export default function App(): React.JSX.Element {
                 </section>
               ) : null}
 
-              {!run.ended && !(activeDecision && phaseOf(run) === "waiting_decision") ? (
-                <div className="advance-bar"><button disabled={isStreaming || isGenerating || !canAdvance(run)} onClick={() => void onAdvance()}>继续推进</button></div>
+              {activeSurvivalCrisis && phaseOf(run) === "waiting_decision" ? (
+                <section className="survival-dock" aria-live="polite">
+                  <p className="survival-kicker">{activeSurvivalCrisis.age}岁 · {activeSurvivalCrisis.stageLabel}</p>
+                  <p>{activeSurvivalCrisis.summary}</p>
+                  <div className="survival-options">
+                    {activeSurvivalCrisis.choices.map((choice) => (
+                      <button
+                        key={choice.id}
+                        disabled={isStreaming || isGenerating}
+                        onClick={() => void onSurvivalChoice(choice.id)}
+                      >
+                        <strong>{choice.label}</strong>
+                        <small>凭 {statLabels[choice.stat]} · {choice.tier === "high" ? "把握十足" : choice.tier === "steady" ? "尚有转机" : "希望渺茫"}</small>
+                        <span>{choice.description}</span>
+                      </button>
+                    ))}
+                  </div>
+                </section>
+              ) : null}
+
+              {!run.ended && !(activeDecision && phaseOf(run) === "waiting_decision") && !(activeSurvivalCrisis && phaseOf(run) === "waiting_decision") ? (
+                <div className="advance-bar">
+                  <button
+                    disabled={isStreaming || isGenerating || (needsGrowthFocus(run) ? false : !canAdvance(run))}
+                    onClick={() => {
+                      if (needsGrowthFocus(run)) {
+                        setShowGrowthFocus(true);
+                        setStatus("请选择此阶段希望积累的方向。");
+                        return;
+                      }
+                      void onAdvance();
+                    }}
+                  >{needsGrowthFocus(run) ? "踏入人生" : "继续推进"}</button>
+                </div>
               ) : null}
 
               {run.ended ? (
@@ -1050,7 +1223,7 @@ export default function App(): React.JSX.Element {
         />
       ) : null}
 
-      {run?.growthFocus && !run.growthFocus.selectedId && !run.ended ? (
+      {showGrowthFocus && run?.growthFocus && !run.growthFocus.selectedId && !run.ended && run.opening?.status !== "pending" ? (
         <div className="modal-mask" role="dialog" aria-modal="true" aria-label="选择成长方向">
           <div className="modal growth-focus-modal">
             <h2>此阶段的积累</h2>

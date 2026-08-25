@@ -51,12 +51,14 @@ export const startRunSchema = z.object({
 
 export const stepRunSchema = z.object({
   runId: z.string().min(1),
-  action: z.enum(["consume", "decide", "select_growth_focus"]).optional(),
+  action: z.enum(["consume", "decide", "select_growth_focus", "generate_opening", "resolve_survival"]).optional(),
   growthFocusId: z.string().min(1).max(80).optional(),
   decision: z.string().min(8).max(128).optional(),
   decisionAge: z.number().int().min(0).max(160).optional(),
   sceneId: z.string().min(8).max(128).optional(),
   sceneRevision: z.number().int().min(0).max(10000).optional(),
+  survivalChoice: z.enum(["self_rescue", "seek_help", "trust_fate"]).optional(),
+  survivalCrisisId: z.string().min(8).max(128).optional(),
   requestId: z.string().max(128).optional()
 });
 
@@ -125,6 +127,11 @@ const cardSchema = z.object({
     physique: z.number().int().min(-5).max(5).optional()
   }),
   tags: z.array(z.string().min(1)),
+  narrative: z.object({
+    bias: z.string().min(1).max(240),
+    affinities: z.array(z.string().min(1).max(80)).max(6).optional(),
+    riskTone: z.string().min(1).max(120).optional()
+  }).optional(),
   effects: z.array(z.object({
     type: z.enum(["candidate_weight", "negative_reduce", "death_risk_reduce", "reward_bonus", "unlock_event"]),
     stat: z.enum(["intelligence", "charisma", "family", "fortune", "physique"]).optional(),

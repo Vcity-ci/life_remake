@@ -2,22 +2,21 @@
   {
     "id": "fantasy",
     "mainlineId": "fantasy.mainline",
-    "eraName": "群星魔潮",
-    "timeframe": "魔潮纪元第七阶段",
-    "coreConflict": "凡人秩序与古神遗产、超凡垄断、灾厄污染之间的长期冲突",
-    "socialOrder": "王国、学院、公会、宗门和异族边境共同瓜分资源；力量越强，契约、污染和阵营代价越重",
-    "taboos": ["唤醒封印古神", "献祭平民", "篡改契约印记", "私开灾厄裂隙"],
+    "eraName": "诡境仙途",
+    "timeframe": "诸域并立的修行时代",
+    "coreConflict": "人间生路、诡异侵蚀、异族边患、宗门竞争与求道欲望之间的长期冲突",
+    "socialOrder": "宗门、城邦、商盟、异族部落与散修共同争夺灵机和解释权；修为越高，因果、誓约、污染与立场的代价越重",
+    "taboos": ["以无辜者祭炼", "主动放任诡异扩散", "毁弃已立誓约", "将异族一概视作无心之物"],
     "mainlineStages": [
-      { "stage": "觉醒期", "ageRange": "0-16", "goal": "识别血脉、魔法或异象来源，并第一次承受代价" },
-      { "stage": "远征期", "ageRange": "17-30", "goal": "在秘境、公会、宗门试炼和边境战场建立生存资本" },
-      { "stage": "裂变期", "ageRange": "31-48", "goal": "在王都阴谋、阵营战争、古神污染和飞升线索中确定立场" },
-      { "stage": "传承期", "ageRange": "49+", "goal": "选择封印、传承、飞升或陨落，成为新时代规则的一部分" }
+      { "stage": "成长与奇遇", "ageRange": "按人物道途节奏", "goal": "在诡异、边境、遗迹或日常生计中接触修行与超出常理的世界" },
+      { "stage": "宗门试炼与难题", "ageRange": "按人物立足节奏", "goal": "在宗门、城邦、商盟、部族或散修群体的竞争中承担真实的集体难题" },
+      { "stage": "跨越与飞升", "ageRange": "按人物因果节奏", "goal": "以积累的修为、关系与代价面对更大危机，并决定飞升、守望、传承或离去的意义" }
     ],
     "storyDirections": [
       {
         "id": "fantasy.guardian",
         "label": "守望与庇护",
-        "summary": "把部族、同伴或边境安危置于个人力量之前，在灾厄中承担守护责任。",
+        "summary": "从同伴、部族、城镇或边境安危观察仙途；守护他人会改变自身的因果和力量。",
         "focusTags": ["care", "survival", "family", "integrity"],
         "factionIds": ["guardian"],
         "openingThreadIds": ["fantasy.guardian_commitment"],
@@ -26,7 +25,7 @@
       {
         "id": "fantasy.ambition",
         "label": "力量与攀升",
-        "summary": "追逐力量、地位与稀缺资源，在超凡捷径和失控代价之间确定底线。",
+        "summary": "从修为、宗门位置与稀缺资源观察仙途；攀升必须面对捷径、竞争与失控代价。",
         "focusTags": ["power", "career", "strategy", "risk"],
         "factionIds": ["ambition"],
         "openingThreadIds": ["fantasy.ambition_commitment"],
@@ -35,7 +34,7 @@
       {
         "id": "fantasy.broker",
         "label": "契约与资源",
-        "summary": "通过契约、交易和资源网络在魔潮中站稳，同时承担交换关系的反噬。",
+        "summary": "从灵材、契约、交易与往来观察仙途；资源网络能救人，也会反过来索取代价。",
         "focusTags": ["resource", "network", "relationship", "negotiation"],
         "factionIds": ["broker"],
         "openingThreadIds": ["fantasy.network_commitment"],
@@ -44,7 +43,7 @@
       {
         "id": "fantasy.mentor",
         "label": "知识与传承",
-        "summary": "追索秘法、遗产与师承，决定所得力量将被封存、继承还是用于改变秩序。",
+        "summary": "从功法、师承、典籍与诡异真相观察仙途，决定所得力量应被继承、封存还是改变世界。",
         "focusTags": ["study", "legacy", "exploration", "teaching"],
         "factionIds": ["mentor"],
         "openingThreadIds": ["fantasy.study_commitment"],
@@ -53,7 +52,7 @@
       {
         "id": "fantasy.institution",
         "label": "秩序与权柄",
-        "summary": "进入学院、公会、宗门或王国体系，在规则、权柄和灾厄责任之间作出选择。",
+        "summary": "从宗门法度、城邦秩序与组织权柄观察仙途，在规则和灾厄责任之间作出选择。",
         "focusTags": ["institution", "authority", "career", "integrity"],
         "factionIds": ["institution"],
         "openingThreadIds": ["fantasy.institution_commitment"],
@@ -62,13 +61,13 @@
       {
         "id": "fantasy.outsider",
         "label": "秘境与异路",
-        "summary": "从秘境、边境和禁忌遗产中开辟道路，决定探索、封印或飞升的代价。",
+        "summary": "从异族、禁区、秘境与非常规道路观察仙途，决定探索、结盟、封印或飞升的代价。",
         "focusTags": ["exploration", "risk", "closure", "power"],
         "factionIds": ["outsider"],
         "openingThreadIds": ["fantasy.outsider_commitment"],
         "closureTags": ["exploration", "closure", "legacy"]
       }
     ],
-    "factionTone": "高幻想但逻辑自洽，强调奇迹的代价与长期后果"
+    "factionTone": "东方奇幻而逻辑自洽，诡异、异族和宗门均有自身立场；阶段名称只用于背景概述，绝不构成年龄推进指令"
   }
 ]

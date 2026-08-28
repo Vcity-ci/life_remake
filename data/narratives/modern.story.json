@@ -1,0 +1,129 @@
+{
+  "version": 6,
+  "worldId": "modern",
+  "storyBible": "这是一个当代都市人生世界。教育、职业、家庭、社交网络、组织规则与个人兴趣共同塑造机会，但人生不预设唯一成功模板。人物可以在学校、家庭、工作、迁移、创作、关系或公共生活中形成道路；每一次选择都应留下可被后来的人和自己感受到的后果。婚姻只是亲密关系的一种可能，成就也可以是事业、技艺、照料、社群、独立生活或被自己认可的平静。",
+  "styleRules": [
+    "使用第二人称，写实克制，以生活细节、关系变化和行动后果呈现人物成长；不写章节标题、前情提要或系统说明。",
+    "不把升学、求职、恋爱、结婚、创业或成名写成所有人的必经路径；应尊重人物既有人设、天赋和已经发生的选择。",
+    "普通年份承担成长、尝试、关系余波和自我认知，不替代当前主线的推进或收束。",
+    "每幕高潮必须改变人物真实的关系、位置或生活安排；回收必须回应已经发生的承诺、代价或人物联系。"
+  ],
+  "opening": { "earlyLife": { "maxAge": 3 } },
+  "mainlineSkeleton": {
+    "premise": "三幕讲述同一段当代人生，但不把它简化为单一职业线。人物先在成长环境中形成愿望和能力，再经历方向选择与现实迷茫，最终让关系、事业或生活方式形成可信回响。前一幕留下的人、机会和代价必须成为后一幕的来处，具体学校、城市、行业、家庭形态和成功定义均由本局故事决定。",
+    "opening": "第一幕让人物从家庭、学校、兴趣、同伴或早期生活中看见一件需要认真回应的事。它可以是机会、误解、责任、竞争、失去或愿望，不预设具体考试、行业、城市或亲属。",
+    "pressure": "第二幕承接第一幕的实际后果。人物在升学、就业、迁移、创作、照料、关系或组织生活中面对独立矛盾；高潮应改变其现实位置或重要关系，而不是重复第一幕的问题。",
+    "climax": "第三幕让积累的能力、关系和代价进入更深的生活抉择。人物可以在亲密关系、家庭、职业、公共责任、作品或个人道路中承担与自身处境相称的责任，不预设身份高度。",
+    "payoff": "三次高潮的选择、人物和代价在结局前共同兑现。必须回答人物如何理解自己留下的关系与成果，而不是回到预设的婚姻、职位或财富答案。",
+    "goodEndingDirection": "人物以判断、行动和承担形成可延续的关系、事业、技艺或生活秩序；收获必须承认已付出的代价。",
+    "badEndingDirection": "人物因误判、失去、资源限制或关系破裂失去重要之物；结局仍应尊重其做过的真实选择。"
+  },
+  "mainlineActs": [
+    {
+      "id": "modern.learning_growth",
+      "label": "学习成长",
+      "prompt": "让人物从自身年龄、家庭、学校、兴趣或同伴关系中接触一件会改变其看待未来的具体处境。它可以是机会、竞争、误解、照料责任、学习发现或早期失去；先让世界和他人的处境进入视野，不要求人物立刻解决全部问题。高潮要形成一次真实选择，并留下能带往下一幕的能力、关系或代价。",
+      "readinessStage": "opening"
+    },
+    {
+      "id": "modern.choice_and_drift",
+      "label": "选择与迷茫",
+      "prompt": "承接第一幕已经发生的后果，让人物在升学、求职、迁移、创作、照料、关系或组织生活中获得或失去一个新的位置。此幕必须围绕独立矛盾展开：机会与底线、安稳与远行、亲密与自我、资源与信任皆可。高潮要真实改变人物的现实安排或重要关系，不得把第一幕的具体问题原样重演。",
+      "readinessStage": "pressure"
+    },
+    {
+      "id": "modern.relationship_and_achievement",
+      "label": "关系与成就",
+      "prompt": "让前两幕积累的能力、人物与代价进入更深的生活回响。人物可以在婚姻或其他亲密关系、家庭、职业、技艺、社群、公共责任或独立生活中面对关键选择；根据其实际处境决定承担的尺度。高潮必须让此前的承诺、关系与自我认同得到实质兑现，为人生结局留下可回收的后果。",
+      "readinessStage": "climax"
+    }
+  ],
+  "progression": {
+    "backgroundPacing": { "minYears": 1, "maxYears": 3, "personalReflectionChance": 0.35 },
+    "statTiers": { "lowMax": 8, "highMin": 22 },
+    "statTierPresentation": {
+      "intelligence": { "low": "学思未定", "steady": "融会贯通", "high": "见微知著" },
+      "charisma": { "low": "拘谨青涩", "steady": "待人得体", "high": "众望所归" },
+      "family": { "low": "家计维艰", "steady": "家境可持", "high": "根基丰足" },
+      "fortune": { "low": "时运未至", "steady": "机缘恰逢", "high": "顺势而起" },
+      "physique": { "low": "体弱易倦", "steady": "精力充沛", "high": "身心康健" }
+    },
+    "survival": {
+      "startAge": 4,
+      "graceYears": 3,
+      "stages": [
+        { "id": "child", "label": "幼年", "ageStageIds": ["child"], "dangerBelowPhysique": 1, "baseCrisisRisk": 0.04, "additionalYearRisk": 0.03, "maxCrisisRisk": 0.14 },
+        { "id": "youth", "label": "青年", "ageStageIds": ["youth"], "dangerBelowPhysique": 2, "baseCrisisRisk": 0.06, "additionalYearRisk": 0.04, "maxCrisisRisk": 0.22 },
+        { "id": "adult", "label": "成年", "ageStageIds": ["prime", "middle"], "dangerBelowPhysique": 3, "baseCrisisRisk": 0.08, "additionalYearRisk": 0.05, "maxCrisisRisk": 0.3 },
+        { "id": "elder", "label": "晚年", "ageStageIds": ["elder"], "dangerBelowPhysique": 5, "baseCrisisRisk": 0.12, "additionalYearRisk": 0.06, "maxCrisisRisk": 0.42 }
+      ],
+      "recovery": { "successRateByTier": { "low": 0.25, "steady": 0.55, "high": 1 }, "restoreBuffer": 5 },
+      "familyPhysiqueSupport": {
+        "low": { "outcomes": [{ "delta": -1, "weight": 20 }, { "delta": 0, "weight": 60 }, { "delta": 1, "weight": 20 }] },
+        "steady": { "outcomes": [{ "delta": 0, "weight": 60 }, { "delta": 1, "weight": 40 }] },
+        "high": { "outcomes": [{ "delta": 0, "weight": 45 }, { "delta": 1, "weight": 45 }, { "delta": 2, "weight": 10 }] }
+      }
+    },
+    "growthFocuses": [
+      { "id": "study", "label": "学识与技艺", "description": "将日常积累更多放在学习、专业能力与创造之上。", "primaryStats": ["intelligence", "fortune"], "secondaryStats": ["charisma"] },
+      { "id": "bond", "label": "关系与根基", "description": "将日常积累更多放在人情、家庭与可依靠的关系之上。", "primaryStats": ["charisma", "family"], "secondaryStats": ["fortune"] },
+      { "id": "resolve", "label": "行动与韧性", "description": "将日常积累更多放在行动、体魄与承受现实的能力之上。", "primaryStats": ["physique", "fortune"], "secondaryStats": ["intelligence"] }
+    ],
+    "routes": [
+      { "directionId": "modern.guardian", "gates": { "opening": { "weights": { "charisma": 0.55, "family": 0.3, "physique": 0.15 }, "threshold": 6 }, "escalation": { "weights": { "charisma": 0.55, "family": 0.3, "physique": 0.15 }, "threshold": 12 }, "pressure": { "weights": { "charisma": 0.55, "family": 0.3, "physique": 0.15 }, "threshold": 18 }, "climax": { "weights": { "charisma": 0.55, "family": 0.3, "physique": 0.15 }, "threshold": 26 } } },
+      { "directionId": "modern.ambition", "gates": { "opening": { "weights": { "intelligence": 0.55, "charisma": 0.25, "fortune": 0.2 }, "threshold": 6 }, "escalation": { "weights": { "intelligence": 0.55, "charisma": 0.25, "fortune": 0.2 }, "threshold": 13 }, "pressure": { "weights": { "intelligence": 0.55, "charisma": 0.25, "fortune": 0.2 }, "threshold": 20 }, "climax": { "weights": { "intelligence": 0.55, "charisma": 0.25, "fortune": 0.2 }, "threshold": 28 } } },
+      { "directionId": "modern.broker", "gates": { "opening": { "weights": { "family": 0.45, "charisma": 0.35, "fortune": 0.2 }, "threshold": 6 }, "escalation": { "weights": { "family": 0.45, "charisma": 0.35, "fortune": 0.2 }, "threshold": 12 }, "pressure": { "weights": { "family": 0.45, "charisma": 0.35, "fortune": 0.2 }, "threshold": 19 }, "climax": { "weights": { "family": 0.45, "charisma": 0.35, "fortune": 0.2 }, "threshold": 27 } } },
+      { "directionId": "modern.mentor", "gates": { "opening": { "weights": { "intelligence": 0.7, "charisma": 0.3 }, "threshold": 6 }, "escalation": { "weights": { "intelligence": 0.7, "charisma": 0.3 }, "threshold": 13 }, "pressure": { "weights": { "intelligence": 0.7, "charisma": 0.3 }, "threshold": 20 }, "climax": { "weights": { "intelligence": 0.7, "charisma": 0.3 }, "threshold": 28 } } },
+      { "directionId": "modern.institution", "gates": { "opening": { "weights": { "intelligence": 0.55, "charisma": 0.35, "family": 0.1 }, "threshold": 6 }, "escalation": { "weights": { "intelligence": 0.55, "charisma": 0.35, "family": 0.1 }, "threshold": 13 }, "pressure": { "weights": { "intelligence": 0.55, "charisma": 0.35, "family": 0.1 }, "threshold": 20 }, "climax": { "weights": { "intelligence": 0.55, "charisma": 0.35, "family": 0.1 }, "threshold": 28 } } },
+      { "directionId": "modern.outsider", "gates": { "opening": { "weights": { "fortune": 0.4, "physique": 0.35, "intelligence": 0.25 }, "threshold": 6 }, "escalation": { "weights": { "fortune": 0.4, "physique": 0.35, "intelligence": 0.25 }, "threshold": 12 }, "pressure": { "weights": { "fortune": 0.4, "physique": 0.35, "intelligence": 0.25 }, "threshold": 18 }, "climax": { "weights": { "fortune": 0.4, "physique": 0.35, "intelligence": 0.25 }, "threshold": 26 } } }
+    ],
+    "completion": { "requireCommittedDirection": true, "requireDecisionConsequence": true, "requireClimax": true, "requirePayoff": true, "requireResolvedCoreFacts": true, "requireNoActiveScene": true, "minCompletedSceneInstances": 3, "requireAllMainlineActs": true }
+  },
+  "narrativeFactions": [
+    { "id": "guardian", "label": "家庭与社区", "summary": "由亲属、照料者、邻里与共同生活构成，既能提供归处，也会提出责任。", "conflictFactionIds": ["ambition", "institution"] },
+    { "id": "ambition", "label": "学业与职业竞争", "summary": "由成绩、机会、行业与竞争者构成，提供上升可能，也不断追问代价。", "conflictFactionIds": ["guardian", "outsider"] },
+    { "id": "broker", "label": "关系与资源网络", "summary": "由朋友、同事、合作者与资源往来构成，信任从不完全免费。", "conflictFactionIds": ["institution", "outsider"] },
+    { "id": "mentor", "label": "师友与专业共同体", "summary": "由老师、前辈、伙伴与技艺传统构成，重视积累，也可能形成期待。", "conflictFactionIds": ["ambition"] },
+    { "id": "institution", "label": "学校与组织规则", "summary": "由学校、公司、行业或公共体系构成，规则能提供机会，也能遮蔽具体的人。", "conflictFactionIds": ["broker", "outsider"] },
+    { "id": "outsider", "label": "迁移与非常规生活", "summary": "由新城市、边缘社群、自由职业或不同生活方式构成，带来突破也带来不安。", "conflictFactionIds": ["ambition", "institution"] }
+  ],
+  "routeArcs": [
+    { "directionId": "modern.guardian", "label": "家人与归处", "summary": "从家庭、照料、亲密关系与社区责任观察人生；人物可以守护他人，也可能寻求被理解和安放。", "perspective": "让宏大的选择落到相识之人的处境、承诺与归处。", "escalation": "照料、亏欠、陪伴与边界会让善意变成必须回答的选择。", "crisis": "更深的生活危机来临时，谁得到陪伴、谁被忽略、谁仍能回家应成为真实后果。", "payoffFocus": "回应人物曾经承担或期待的照料、名分与归属。", "coreThreadIds": [] },
+    { "directionId": "modern.ambition", "label": "学习与上升", "summary": "从学习、竞争、职业与个人目标观察人生；人物可以追求位置，也可能重新定义什么值得追求。", "perspective": "让每次获得机会都伴随能力、底线和会被追问的代价。", "escalation": "成绩、履历、作品、同侪与机会会把私人愿望变成现实判断。", "crisis": "人生的重要关口中，得到的位置、放弃的位置或未被看见的努力都应决定人物能承担什么。", "payoffFocus": "让人物说明自己为何取得、放弃或重新定义成就。", "coreThreadIds": [] },
+    { "directionId": "modern.broker", "label": "关系与资源", "summary": "从信任、协商、资源往来与关系网络观察人生；人物可以撮合、借力、回避或被关系牵动。", "perspective": "让信息、金钱、时间、人情和信用成为可见的生活筹码。", "escalation": "多方需求会要求人物用承诺、时间、资源或信任换取立足之处。", "crisis": "压力来临时，资源的断绝与重新分配应落到具体人的生活和关系。", "payoffFocus": "说明人物经营的信任最终保住、伤害或改变了谁。", "coreThreadIds": [] },
+    { "directionId": "modern.mentor", "label": "能力与传承", "summary": "从学习、技艺、师友、创造与传承观察人生；人物可以求学、带人、创作或在专业中寻找责任。", "perspective": "让能力如何进入现实、帮助他人或改变自身始终成为可追问的选择。", "escalation": "师友期待、作品压力、学习门槛与职业现实会要求人物证明积累的意义。", "crisis": "更大选择到来时，知识、作品、技术与人才可以成为行动资源，也可能成为必须保护的东西。", "payoffFocus": "回应一段师友关系、创造尝试或由能力引出的责任。", "coreThreadIds": [] },
+    { "directionId": "modern.institution", "label": "规则与责任", "summary": "从学校、公司、行业和公共规则观察人生；人物可以执行、质疑、修补或承受组织留下的缺口。", "perspective": "让程序既成为机会的门槛，也成为追问责任的凭据。", "escalation": "上级、同侪、客户、家庭与规则会要求人物在正确流程和具体代价之间取舍。", "crisis": "重要压力下，每项决定、审批或承担都应产生帮助、伤害或失效的现实后果。", "payoffFocus": "让一项判断、规则或职责留下可被承担的影响。", "coreThreadIds": [] },
+    { "directionId": "modern.outsider", "label": "异地与新路", "summary": "从迁移、转行、创作、边缘社群与非典型生活观察人生；人物可以远行、试错、离开或重新选择归属。", "perspective": "让人物的视野持续被陌生环境、不同生活方式与被忽略的人纠正。", "escalation": "迁徙、转向、自由与不稳定会使每次选择都伴随新的关系和风险。", "crisis": "当生活需要答案时，远方机会、边缘处境与不被主流承认的道路应成为实际行动的一部分。", "payoffFocus": "回应人物选择离开、留下、创造或守住的那条新路。", "coreThreadIds": [] }
+  ],
+  "threads": [],
+  "characters": [],
+  "lore": [
+    { "id": "modern.realism", "text": "人物的机会、失去和成长都应有具体生活依据；避免用突兀的财富、职位或关系反转代替长期积累。", "priority": 100 },
+    { "id": "modern.choice", "text": "升学、求职、迁移、恋爱、婚姻和独立生活都是可能，不得假定其中任何一项必然发生或天然更高贵。", "priority": 95 },
+    { "id": "modern.relationship", "text": "亲密关系、友谊、同事关系与家庭关系都应有边界、误解、照料与回响，不能只作为职业奖励。", "priority": 88, "directionIds": ["modern.guardian", "modern.broker"] },
+    { "id": "modern.ability", "text": "学习、技艺和职业成长需通过练习、反馈、机会与代价呈现，不能一步跃迁。", "priority": 88, "directionIds": ["modern.ambition", "modern.mentor"] },
+    { "id": "modern.institution", "text": "学校、公司与公共组织并非单一反派或救世主；规则的好坏应落到人的时间、尊严与选择上。", "priority": 86, "directionIds": ["modern.institution"] },
+    { "id": "modern.mobility", "text": "迁移、转行和非典型生活能带来新的可能，但也会改变原有关系、资源和自我认同。", "priority": 86, "directionIds": ["modern.outsider"] }
+  ],
+  "eventBindings": [],
+  "endingBlueprints": [
+    { "id": "modern.guardian.good", "worldId": "modern", "directionId": "modern.guardian", "polarity": "good", "title": "灯火有归", "premise": "你让重要的人拥有了可继续生活的安稳，也没有遗失自己。", "finalConflict": "在最后一次关系与责任的取舍中决定怎样留下。", "payoffFocus": "回应照料、陪伴或归属的承诺。", "epilogueFocus": "以可被彼此看见的关系与生活收束。", "statWeights": { "charisma": 0.3, "family": 0.28, "physique": 0.16, "intelligence": 0.14, "fortune": 0.12 }, "requiredThreadIds": [] },
+    { "id": "modern.guardian.normal", "worldId": "modern", "directionId": "modern.guardian", "polarity": "normal", "title": "仍有人等你", "premise": "你未能照顾所有人，却守住了最不能放下的关系。", "finalConflict": "在遗憾与责任之间留下可承受的安排。", "payoffFocus": "回应曾经许下的陪伴。", "epilogueFocus": "以有限安稳和持续牵挂收束。", "statWeights": { "charisma": 0.3, "family": 0.28, "physique": 0.16, "intelligence": 0.14, "fortune": 0.12 }, "requiredThreadIds": [] },
+    { "id": "modern.guardian.bad", "worldId": "modern", "directionId": "modern.guardian", "polarity": "bad", "title": "未竟的归处", "premise": "你失去了重要的陪伴或安稳，但仍留下过真实的守护。", "finalConflict": "在无法两全的关系中承认最后的失去。", "payoffFocus": "回应曾经试图保全的人。", "epilogueFocus": "以离散、牺牲与被记住的善意收束。", "statWeights": { "charisma": 0.3, "family": 0.28, "physique": 0.16, "intelligence": 0.14, "fortune": 0.12 }, "requiredThreadIds": [] },
+    { "id": "modern.ambition.good", "worldId": "modern", "directionId": "modern.ambition", "polarity": "good", "title": "自成其路", "premise": "你取得了位置或成果，也保住了自己认可的尺度。", "finalConflict": "在最后一次机会前说明何种成功值得付出。", "payoffFocus": "回应能力、目标与底线之间的选择。", "epilogueFocus": "以成果、清醒与后续可能收束。", "statWeights": { "intelligence": 0.3, "charisma": 0.25, "fortune": 0.2, "physique": 0.15, "family": 0.1 }, "requiredThreadIds": [] },
+    { "id": "modern.ambition.normal", "worldId": "modern", "directionId": "modern.ambition", "polarity": "normal", "title": "未负来路", "premise": "你未得到所有期待，却留下了能继续前行的能力与位置。", "finalConflict": "在得失之间承认真正想带走的东西。", "payoffFocus": "回应一次关键的上升或放弃。", "epilogueFocus": "以有限成果与仍可继续的生活收束。", "statWeights": { "intelligence": 0.3, "charisma": 0.25, "fortune": 0.2, "physique": 0.15, "family": 0.1 }, "requiredThreadIds": [] },
+    { "id": "modern.ambition.bad", "worldId": "modern", "directionId": "modern.ambition", "polarity": "bad", "title": "高处有痕", "premise": "你得到或错失的位置最终要求偿还代价，仍必须面对自己走过的路。", "finalConflict": "在保住表面成功和承认真实损失之间作最后选择。", "payoffFocus": "让一次关键竞争的代价回到眼前。", "epilogueFocus": "以失衡、转身或迟来的清醒收束。", "statWeights": { "intelligence": 0.3, "charisma": 0.25, "fortune": 0.2, "physique": 0.15, "family": 0.1 }, "requiredThreadIds": [] },
+    { "id": "modern.broker.good", "worldId": "modern", "directionId": "modern.broker", "polarity": "good", "title": "信任成网", "premise": "你让关系和资源成为彼此成全的力量，没有把任何人只当作筹码。", "finalConflict": "在最后一次交换中决定信任应如何被保留。", "payoffFocus": "回应人情、协商与资源承诺。", "epilogueFocus": "以可信赖的关系和可持续的生活收束。", "statWeights": { "family": 0.3, "charisma": 0.25, "fortune": 0.24, "intelligence": 0.14, "physique": 0.07 }, "requiredThreadIds": [] },
+    { "id": "modern.broker.normal", "worldId": "modern", "directionId": "modern.broker", "polarity": "normal", "title": "人情尚在", "premise": "你没有赢下所有往来，却保住了几段值得信任的关系。", "finalConflict": "在利益与情义之间留下可承受的答案。", "payoffFocus": "回应一次重要的协商或帮助。", "epilogueFocus": "以谨慎往来和仍在的联系收束。", "statWeights": { "family": 0.3, "charisma": 0.25, "fortune": 0.24, "intelligence": 0.14, "physique": 0.07 }, "requiredThreadIds": [] },
+    { "id": "modern.broker.bad", "worldId": "modern", "directionId": "modern.broker", "polarity": "bad", "title": "关系余债", "premise": "你被关系和资源的代价拖住，却仍明白自己曾想守住什么。", "finalConflict": "在交出筹码和保住重要之人之间作最后交换。", "payoffFocus": "让旧日信任兑现其真实代价。", "epilogueFocus": "以疏离、亏欠或重新开始收束。", "statWeights": { "family": 0.3, "charisma": 0.25, "fortune": 0.24, "intelligence": 0.14, "physique": 0.07 }, "requiredThreadIds": [] },
+    { "id": "modern.mentor.good", "worldId": "modern", "directionId": "modern.mentor", "polarity": "good", "title": "所学有用", "premise": "你让积累的能力进入真实生活，也留下了能继续生长的影响。", "finalConflict": "在最后一次能力与责任的取舍中决定所学服务于谁。", "payoffFocus": "回应师友、作品或长期练习。", "epilogueFocus": "以技艺、创造和被传下去的东西收束。", "statWeights": { "intelligence": 0.35, "charisma": 0.24, "family": 0.16, "physique": 0.14, "fortune": 0.11 }, "requiredThreadIds": [] },
+    { "id": "modern.mentor.normal", "worldId": "modern", "directionId": "modern.mentor", "polarity": "normal", "title": "微光未灭", "premise": "你未必站在最显眼的位置，却让一项能力和一段关系没有白费。", "finalConflict": "在现实压力前决定什么仍值得留下。", "payoffFocus": "回应一段学习、创作或师友情谊。", "epilogueFocus": "以持续积累和有限传承收束。", "statWeights": { "intelligence": 0.35, "charisma": 0.24, "family": 0.16, "physique": 0.14, "fortune": 0.11 }, "requiredThreadIds": [] },
+    { "id": "modern.mentor.bad", "worldId": "modern", "directionId": "modern.mentor", "polarity": "bad", "title": "技艺留白", "premise": "你未能让所学完全抵达想去的地方，但它仍记录着你做过的努力。", "finalConflict": "在放下、保存和重新定义之间作最后决定。", "payoffFocus": "回应一次未能兑现的学习或创造。", "epilogueFocus": "以中断、转向或沉默的坚持收束。", "statWeights": { "intelligence": 0.35, "charisma": 0.24, "family": 0.16, "physique": 0.14, "fortune": 0.11 }, "requiredThreadIds": [] },
+    { "id": "modern.institution.good", "worldId": "modern", "directionId": "modern.institution", "polarity": "good", "title": "规则有人", "premise": "你让制度和职责不只停在纸面，也为具体的人留下了余地。", "finalConflict": "在最后一次责任判断中保住真正重要的部分。", "payoffFocus": "回应规则、职责与人之间的取舍。", "epilogueFocus": "以可信的承担和可被延续的改变收束。", "statWeights": { "intelligence": 0.3, "charisma": 0.25, "family": 0.16, "fortune": 0.15, "physique": 0.14 }, "requiredThreadIds": [] },
+    { "id": "modern.institution.normal", "worldId": "modern", "directionId": "modern.institution", "polarity": "normal", "title": "留下余地", "premise": "你没能改变全部规则，却让少数人和一部分事情有了更好的去处。", "finalConflict": "在职责边界前决定还能坚持什么。", "payoffFocus": "回应一项长期承担的责任。", "epilogueFocus": "以有限改变与日常信誉收束。", "statWeights": { "intelligence": 0.3, "charisma": 0.25, "family": 0.16, "fortune": 0.15, "physique": 0.14 }, "requiredThreadIds": [] },
+    { "id": "modern.institution.bad", "worldId": "modern", "directionId": "modern.institution", "polarity": "bad", "title": "程序之外", "premise": "规则没有保护住你想保护的人，你也必须承担留下的缺口。", "finalConflict": "在服从与拒绝之间承认最后的代价。", "payoffFocus": "让此前的职责和判断回到人物面前。", "epilogueFocus": "以失职、离开或艰难的补偿收束。", "statWeights": { "intelligence": 0.3, "charisma": 0.25, "family": 0.16, "fortune": 0.15, "physique": 0.14 }, "requiredThreadIds": [] },
+    { "id": "modern.outsider.good", "worldId": "modern", "directionId": "modern.outsider", "polarity": "good", "title": "另辟生路", "premise": "你没有照搬既定答案，而是走出了适合自己也能照亮他人的道路。", "finalConflict": "决定新生活应如何面对旧关系与现实。", "payoffFocus": "回应远行、转向或创造的初心。", "epilogueFocus": "以新居所、作品、社群或自由生活收束。", "statWeights": { "fortune": 0.3, "physique": 0.25, "intelligence": 0.2, "charisma": 0.15, "family": 0.1 }, "requiredThreadIds": [] },
+    { "id": "modern.outsider.normal", "worldId": "modern", "directionId": "modern.outsider", "polarity": "normal", "title": "仍在路上", "premise": "你未得到所有确认，却为自己争得了继续尝试的空间。", "finalConflict": "在安定与探索之间留下最后的选择。", "payoffFocus": "回应一次离开、迁移或转行。", "epilogueFocus": "以尚未定型的人生和可信的自由收束。", "statWeights": { "fortune": 0.3, "physique": 0.25, "intelligence": 0.2, "charisma": 0.15, "family": 0.1 }, "requiredThreadIds": [] },
+    { "id": "modern.outsider.bad", "worldId": "modern", "directionId": "modern.outsider", "polarity": "bad", "title": "远方余响", "premise": "你为突破付出了沉重代价，却没有否认当初为何要走出去。", "finalConflict": "在回头、坚持和告别之间作最后决定。", "payoffFocus": "让那条非常规道路的代价得到回应。", "epilogueFocus": "以漂泊、失落或重新寻找归处收束。", "statWeights": { "fortune": 0.3, "physique": 0.25, "intelligence": 0.2, "charisma": 0.15, "family": 0.1 }, "requiredThreadIds": [] }
+  ]
+}

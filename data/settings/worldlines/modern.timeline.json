@@ -2,22 +2,21 @@
   {
     "id": "modern",
     "mainlineId": "modern.mainline",
-    "eraName": "新纪现代",
-    "timeframe": "2005-2050",
-    "coreConflict": "个人成长、家庭责任与城市资源分配之间的长期冲突",
-    "socialOrder": "学历、平台算法、资本、人脉和资产共同决定上升通道；阶层可流动但代价高昂",
+    "eraName": "当代都市",
+    "timeframe": "当代",
+    "coreConflict": "个人成长、现实选择、亲密关系与长期成就之间不断变化的张力",
+    "socialOrder": "教育、职业、家庭、社交网络与公共规则共同塑造人生机会；人可以改变方向，也必须承担选择留下的后果",
     "taboos": ["伪造履历", "黑产数据操纵", "恶意舆论围猎", "金融欺诈"],
     "mainlineStages": [
-      { "stage": "分流期", "ageRange": "0-17", "goal": "在家庭教育、学校评价和兴趣天赋中形成初始位置" },
-      { "stage": "竞速期", "ageRange": "18-30", "goal": "在专业选择、实习、第一份工作、情感绑定和创业诱惑中取舍" },
-      { "stage": "承压期", "ageRange": "31-45", "goal": "处理资产压力、职业瓶颈、家庭责任和舆论风险" },
-      { "stage": "定型期", "ageRange": "46+", "goal": "面对健康、子女、财富守成和时代更替，兑现长期承诺" }
+      { "stage": "学习成长", "ageRange": "按人物成长节奏", "goal": "在家庭、学校、兴趣与同伴关系中形成可被带往未来的能力和愿望" },
+      { "stage": "选择迷茫", "ageRange": "按人物选择节奏", "goal": "在升学、就业、迁移、试错与关系变化中寻找自己愿意承担的方向" },
+      { "stage": "关系与成就", "ageRange": "按人生回响节奏", "goal": "让亲密关系、家庭、事业、技艺、社群或独立生活形成各自可信的落点" }
     ],
     "storyDirections": [
       {
         "id": "modern.guardian",
         "label": "守护与承担",
-        "summary": "把家庭、照料和公共责任置于个人上升之前，承担由此带来的资源与关系代价。",
+        "summary": "从家庭、照料、亲密关系与社区责任观察人生；承担可以成为力量，也会留下真实代价。",
         "focusTags": ["family", "care", "community", "integrity"],
         "factionIds": ["guardian"],
         "openingThreadIds": ["modern.guardian_commitment"],
@@ -26,7 +25,7 @@
       {
         "id": "modern.ambition",
         "label": "上升与取舍",
-        "summary": "在竞争、资源和职业跃迁中争取主动，同时面对效率与底线之间的取舍。",
+        "summary": "从学习、职业竞争与个人上升观察人生；争取主动时也要决定效率、底线与自我认同。",
         "focusTags": ["career", "strategy", "resource", "integrity"],
         "factionIds": ["ambition"],
         "openingThreadIds": ["modern.ambition_commitment"],
@@ -35,7 +34,7 @@
       {
         "id": "modern.broker",
         "label": "关系与资源",
-        "summary": "通过人脉、协商和资源配置获得位置，并承受关系网络反噬的风险。",
+        "summary": "从朋友、恋人、同事与资源网络观察人生；协商和信任能开路，也会带来反噬。",
         "focusTags": ["network", "resource", "relationship", "negotiation"],
         "factionIds": ["broker"],
         "openingThreadIds": ["modern.network_commitment"],
@@ -44,7 +43,7 @@
       {
         "id": "modern.mentor",
         "label": "学识与传承",
-        "summary": "围绕学习、专业能力和师承建立长期价值，并决定知识将服务于谁。",
+        "summary": "从学习、专业能力、师友与创造积累长期价值，并决定所得将服务于谁。",
         "focusTags": ["study", "career", "legacy", "teaching"],
         "factionIds": ["mentor"],
         "openingThreadIds": ["modern.study_commitment"],
@@ -53,7 +52,7 @@
       {
         "id": "modern.institution",
         "label": "秩序与权责",
-        "summary": "进入组织与公共体系，在规则、职责和个人判断之间寻找可承担的位置。",
+        "summary": "从学校、公司与公共体系的规则中寻找位置，在职责和个人判断之间作出承担。",
         "focusTags": ["institution", "public", "career", "integrity"],
         "factionIds": ["institution"],
         "openingThreadIds": ["modern.institution_commitment"],
@@ -62,13 +61,13 @@
       {
         "id": "modern.outsider",
         "label": "边缘与开拓",
-        "summary": "从非主流机会、风险选择或城市迁徙中开辟道路，并决定是否接受主流秩序。",
+        "summary": "从迁移、转行、创作或非典型生活选择中开辟道路，并决定如何面对主流期待。",
         "focusTags": ["risk", "frontier", "career", "public"],
         "factionIds": ["outsider"],
         "openingThreadIds": ["modern.outsider_commitment"],
         "closureTags": ["risk", "career", "integrity"]
       }
     ],
-    "factionTone": "写实、克制、因果明确，强调日常决策的连锁反应"
+    "factionTone": "写实、克制、因果明确；阶段名称只用于背景概述，绝不构成年龄推进指令"
   }
 ]

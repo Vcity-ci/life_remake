@@ -1,0 +1,131 @@
+{
+  "version": 6,
+  "worldId": "fantasy",
+  "storyBible": "这是一个诡异、异族、宗门争衡与修行大道并存的仙途世界。诡异不是单纯的战利品，异族不是没有意志的敌人，宗门也不是唯一可依附的道路；城邦、商盟、部族、散修与边境都拥有各自的规则和恐惧。修行能带来力量，也会留下因果、誓约、污染、资源债或立场代价。人物可以求道、守护、交易、传法、从军、避世或与异族往来，具体功法、种族、组织和危机均由本局已发生的故事决定。",
+  "styleRules": [
+    "使用第二人称，文风具象克制，以气息、地貌、法器、关系和行动后果呈现奇幻；不写章节标题、前情提要或系统说明。",
+    "不得预设主角天选、固定境界、固定宗门、固定异族或唯一诡异根源；应让人物身份、天赋和已发生事实决定其接触世界的方式。",
+    "普通年份承接修行、劳作、见闻、关系余波和身体变化，不替代当前主线的推进或收束。",
+    "高潮必须让修为、立场、誓约或关系发生不可逆改变；回收必须回应已发生的代价、诡异影响或人物承诺。"
+  ],
+  "opening": { "earlyLife": { "maxAge": 3 } },
+  "mainlineSkeleton": {
+    "premise": "三幕讲述同一条仙途，但不复述同一处遗迹或同一场灾厄。人物先在生存和奇遇中接触非常之物，再在宗门或其他组织的竞争与责任中立足，最终面对更高层的诡异、异族危机或大道去处。前一幕留下的人、因果和代价必须成为后一幕的来处，具体组织、功法、边境与危机形态均由本局故事决定。",
+    "opening": "第一幕让人物从自身生活、边境传闻、诡境、异族往来、遗迹或修行机会中撞见超出常理的矛盾。它可以是新近异象，也可以带着更早的线索；不预设血脉、法器、遗迹或敌人。",
+    "pressure": "第二幕承接第一幕的实际后果。人物获得或失去进入宗门、城邦、商盟、部族、军镇或散修网络的机会；高潮要解决这一新位置中的独立难题，让立场、修为或关系真正改变，而非重复追索原来的异常。",
+    "climax": "第三幕以已积累的修为、人物与代价面对更大范围的诡异、异族、天地秩序或边境危机。人物可以居于强者、谋士、行者、守城者、医者或普通人位置，根据实际身份决定承担的尺度。",
+    "payoff": "三次高潮的选择、人物和代价在结局前共同兑现。必须回答人物如何处理自身因果与世界留下的裂缝，而不是回到一个预设的飞升答案。",
+    "goodEndingDirection": "人物以判断、修行和承担为他人与世界留下可延续的生路；突破必须带着真实代价。",
+    "badEndingDirection": "人物因误判、失势、污染、代价或身份局限失去重要之物；结局仍应承认其曾作出的真实选择。"
+  },
+  "mainlineActs": [
+    {
+      "id": "fantasy.growth_and_encounter",
+      "label": "成长与奇遇",
+      "prompt": "让人物从自身年龄、出身、日常生计、边境消息、诡境传闻、异族往来或修行机会中接触一件超出常理的具体处境。它可以是危险、机缘、误解、求助、失去或第一次看见世界裂缝；先让世界和他人的处境进入视野，不要求人物立刻掌握力量。高潮要形成一次真实选择，并留下能带往下一幕的因果、关系或代价。",
+      "readinessStage": "opening"
+    },
+    {
+      "id": "fantasy.sect_trial_and_burden",
+      "label": "宗门试炼与难题",
+      "prompt": "承接第一幕已经发生的后果，让人物获得或失去进入宗门、城邦、商盟、部族、军镇或散修网络的机会。此幕必须围绕新的组织性矛盾展开：资源争夺、试炼规则、异族盟约、诡异处置、同门责任或权柄冲突皆可。高潮要真实改变人物的立场、修为或重要关系，不得把第一幕的具体异常原样重演。",
+      "readinessStage": "pressure"
+    },
+    {
+      "id": "fantasy.transcendence_and_destination",
+      "label": "跨越与飞升",
+      "prompt": "让前两幕积累的修为、人物与代价进入更大范围的诡异、异族、边境或天地危机。人物可以面对飞升、守望、传承、封印、远行或留下的选择；根据其实际身份决定承担的尺度。高潮必须让此前因果、立场和承诺得到实质兑现，为人生结局留下可回收的后果。",
+      "readinessStage": "climax"
+    }
+  ],
+  "progression": {
+    "backgroundPacing": { "minYears": 1, "maxYears": 3, "personalReflectionChance": 0.35 },
+    "statTiers": { "lowMax": 8, "highMin": 22 },
+    "statTierPresentation": {
+      "intelligence": { "low": "灵识未开", "steady": "明悟法理", "high": "神识通明" },
+      "charisma": { "low": "孤行少援", "steady": "得人相助", "high": "众望所归" },
+      "family": { "low": "根基薄弱", "steady": "道途可凭", "high": "福缘深厚" },
+      "fortune": { "low": "气数未显", "steady": "机缘在握", "high": "天命所眷" },
+      "physique": { "low": "气血未固", "steady": "筋骨强健", "high": "体魄如炉" }
+    },
+    "survival": {
+      "startAge": 4,
+      "graceYears": 3,
+      "stages": [
+        { "id": "child", "label": "幼年", "ageStageIds": ["child"], "dangerBelowPhysique": 1, "baseCrisisRisk": 0.04, "additionalYearRisk": 0.03, "maxCrisisRisk": 0.14 },
+        { "id": "youth", "label": "青年", "ageStageIds": ["youth"], "dangerBelowPhysique": 2, "baseCrisisRisk": 0.06, "additionalYearRisk": 0.04, "maxCrisisRisk": 0.22 },
+        { "id": "adult", "label": "成年", "ageStageIds": ["prime", "middle"], "dangerBelowPhysique": 3, "baseCrisisRisk": 0.08, "additionalYearRisk": 0.05, "maxCrisisRisk": 0.3 },
+        { "id": "elder", "label": "晚年", "ageStageIds": ["elder"], "dangerBelowPhysique": 5, "baseCrisisRisk": 0.12, "additionalYearRisk": 0.06, "maxCrisisRisk": 0.42 }
+      ],
+      "recovery": { "successRateByTier": { "low": 0.25, "steady": 0.55, "high": 1 }, "restoreBuffer": 5 },
+      "familyPhysiqueSupport": {
+        "low": { "outcomes": [{ "delta": -1, "weight": 20 }, { "delta": 0, "weight": 60 }, { "delta": 1, "weight": 20 }] },
+        "steady": { "outcomes": [{ "delta": 0, "weight": 60 }, { "delta": 1, "weight": 40 }] },
+        "high": { "outcomes": [{ "delta": 0, "weight": 45 }, { "delta": 1, "weight": 45 }, { "delta": 2, "weight": 10 }] }
+      }
+    },
+    "growthFocuses": [
+      { "id": "insight", "label": "悟道与术法", "description": "将日常积累更多放在悟性、见识与把握机缘之上。", "primaryStats": ["intelligence", "fortune"], "secondaryStats": ["charisma"] },
+      { "id": "bond", "label": "同道与根基", "description": "将日常积累更多放在人情、师友、家门与可依靠的关系之上。", "primaryStats": ["charisma", "family"], "secondaryStats": ["fortune"] },
+      { "id": "resolve", "label": "历练与韧性", "description": "将日常积累更多放在行动、体魄与承受因果的能力之上。", "primaryStats": ["physique", "fortune"], "secondaryStats": ["intelligence"] }
+    ],
+    "routes": [
+      { "directionId": "fantasy.guardian", "gates": { "opening": { "weights": { "charisma": 0.55, "family": 0.3, "physique": 0.15 }, "threshold": 6 }, "escalation": { "weights": { "charisma": 0.55, "family": 0.3, "physique": 0.15 }, "threshold": 12 }, "pressure": { "weights": { "charisma": 0.55, "family": 0.3, "physique": 0.15 }, "threshold": 18 }, "climax": { "weights": { "charisma": 0.55, "family": 0.3, "physique": 0.15 }, "threshold": 26 } } },
+      { "directionId": "fantasy.ambition", "gates": { "opening": { "weights": { "intelligence": 0.55, "charisma": 0.25, "fortune": 0.2 }, "threshold": 6 }, "escalation": { "weights": { "intelligence": 0.55, "charisma": 0.25, "fortune": 0.2 }, "threshold": 13 }, "pressure": { "weights": { "intelligence": 0.55, "charisma": 0.25, "fortune": 0.2 }, "threshold": 20 }, "climax": { "weights": { "intelligence": 0.55, "charisma": 0.25, "fortune": 0.2 }, "threshold": 28 } } },
+      { "directionId": "fantasy.broker", "gates": { "opening": { "weights": { "family": 0.45, "charisma": 0.35, "fortune": 0.2 }, "threshold": 6 }, "escalation": { "weights": { "family": 0.45, "charisma": 0.35, "fortune": 0.2 }, "threshold": 12 }, "pressure": { "weights": { "family": 0.45, "charisma": 0.35, "fortune": 0.2 }, "threshold": 19 }, "climax": { "weights": { "family": 0.45, "charisma": 0.35, "fortune": 0.2 }, "threshold": 27 } } },
+      { "directionId": "fantasy.mentor", "gates": { "opening": { "weights": { "intelligence": 0.7, "charisma": 0.3 }, "threshold": 6 }, "escalation": { "weights": { "intelligence": 0.7, "charisma": 0.3 }, "threshold": 13 }, "pressure": { "weights": { "intelligence": 0.7, "charisma": 0.3 }, "threshold": 20 }, "climax": { "weights": { "intelligence": 0.7, "charisma": 0.3 }, "threshold": 28 } } },
+      { "directionId": "fantasy.institution", "gates": { "opening": { "weights": { "intelligence": 0.55, "charisma": 0.35, "family": 0.1 }, "threshold": 6 }, "escalation": { "weights": { "intelligence": 0.55, "charisma": 0.35, "family": 0.1 }, "threshold": 13 }, "pressure": { "weights": { "intelligence": 0.55, "charisma": 0.35, "family": 0.1 }, "threshold": 20 }, "climax": { "weights": { "intelligence": 0.55, "charisma": 0.35, "family": 0.1 }, "threshold": 28 } } },
+      { "directionId": "fantasy.outsider", "gates": { "opening": { "weights": { "fortune": 0.4, "physique": 0.35, "intelligence": 0.25 }, "threshold": 6 }, "escalation": { "weights": { "fortune": 0.4, "physique": 0.35, "intelligence": 0.25 }, "threshold": 12 }, "pressure": { "weights": { "fortune": 0.4, "physique": 0.35, "intelligence": 0.25 }, "threshold": 18 }, "climax": { "weights": { "fortune": 0.4, "physique": 0.35, "intelligence": 0.25 }, "threshold": 26 } } }
+    ],
+    "completion": { "requireCommittedDirection": true, "requireDecisionConsequence": true, "requireClimax": true, "requirePayoff": true, "requireResolvedCoreFacts": true, "requireNoActiveScene": true, "minCompletedSceneInstances": 3, "requireAllMainlineActs": true }
+  },
+  "narrativeFactions": [
+    { "id": "guardian", "label": "城镇与守望者", "summary": "由亲属、同伴、村镇、部族与边境守望者构成，重生路也重承诺。", "conflictFactionIds": ["ambition", "institution"] },
+    { "id": "ambition", "label": "宗门与攀升者", "summary": "由争夺名额、传承、权位与修为的人构成，机会总伴随竞争和代价。", "conflictFactionIds": ["guardian", "outsider"] },
+    { "id": "broker", "label": "商盟与契约者", "summary": "掌握灵材、消息、契约与通道，愿以资源交换可信的人与承诺。", "conflictFactionIds": ["institution", "outsider"] },
+    { "id": "mentor", "label": "传承与求法者", "summary": "掌握典籍、术法、师承与诡异知识，必须面对所知带来的责任。", "conflictFactionIds": ["ambition"] },
+    { "id": "institution", "label": "法度与城邦秩序", "summary": "掌握宗门戒律、城邦命令、边防与追责，规则能护人也能伤人。", "conflictFactionIds": ["broker", "outsider"] },
+    { "id": "outsider", "label": "异族与禁区行者", "summary": "带来边境之外的语言、诡境线索与不同生存法则；不必天然敌对，却始终危险。", "conflictFactionIds": ["ambition", "institution"] }
+  ],
+  "routeArcs": [
+    { "directionId": "fantasy.guardian", "label": "守望与庇护", "summary": "从同伴、部族、城镇与边境安危观察仙途；人物可以守护他人，也可能寻找值得守住的归处。", "perspective": "让诡异、异族和战争的后果落到具体人的生路、承诺与归处。", "escalation": "守护、亏欠、救援与边界会让善意变成必须承担的因果。", "crisis": "更大危机来临时，谁得以存活、谁被牺牲、谁仍有归处应成为真实后果。", "payoffFocus": "回应人物曾经承担或期待的守望与庇护。", "coreThreadIds": [] },
+    { "directionId": "fantasy.ambition", "label": "力量与攀升", "summary": "从修为、宗门位置、竞争与稀缺资源观察仙途；人物可以求强，也可能重新定义力量的意义。", "perspective": "让每次获得功法、位置或资源都伴随立场、底线和会被追问的代价。", "escalation": "同门、对手、靠山、名额与修为会把个人愿望变成现实判断。", "crisis": "大局失序时，得到的力量、拒绝的捷径或失去的位置都应决定人物能承担什么。", "payoffFocus": "让人物说明自己为何攀升、停步或重新定义大道。", "coreThreadIds": [] },
+    { "directionId": "fantasy.broker", "label": "契约与资源", "summary": "从灵材、契约、往来与资源网络观察仙途；人物可以经营、运送、调停或在交易代价中求生。", "perspective": "让灵石、法器、消息、誓约与信用成为看得见的权力筹码。", "escalation": "多方需求会要求人物用资源、消息、承诺或信用换取立足之处。", "crisis": "大局危机下，资源断绝与重新分配应落到具体人的生路与选择。", "payoffFocus": "说明人物的契约与信誉最终保住、伤害或改变了谁。", "coreThreadIds": [] },
+    { "directionId": "fantasy.mentor", "label": "知识与传承", "summary": "从功法、师承、典籍、异闻与传承观察仙途；人物可以求法、教人、守秘或让知识进入现实。", "perspective": "让术法和真相如何帮助、伤害或改变他人始终成为可追问的选择。", "escalation": "师承、禁法、传承资格与求知风险会要求人物证明所学能否承担现实。", "crisis": "大局危机下，知识、术法、人才与记忆可以成为行动资源，也可能成为必须保护的东西。", "payoffFocus": "回应一段师承、传法或由真相引出的责任。", "coreThreadIds": [] },
+    { "directionId": "fantasy.institution", "label": "秩序与权柄", "summary": "从宗门戒律、城邦命令、边防与组织权柄观察仙途；人物可以执行、质疑、修补或承受规则留下的缺口。", "perspective": "让程序既成为力量的遮蔽，也成为追问责任的凭据。", "escalation": "同门、上位者、部族与城民会要求人物在规则正确和具体代价之间取舍。", "crisis": "大局危机下，每一道命令、封印或调度都应产生救人、伤人或失效的后果。", "payoffFocus": "让一项法度、判断或权柄留下可被承担的责任。", "coreThreadIds": [] },
+    { "directionId": "fantasy.outsider", "label": "异族与异路", "summary": "从异族、边境、禁区、秘境与非常规道路观察仙途；人物可以远行、结盟、避世或在陌生法则中寻找位置。", "perspective": "让人物的视野持续被异族立场、诡境消息与不同生存法则纠正。", "escalation": "传言、禁区、异语、迁徙与陌生关系会使判断和传递本身变得危险。", "crisis": "更大危机到来时，边境消息、异族处境与禁区真相应成为实际行动的一部分。", "payoffFocus": "回应人物选择相信、结盟、带走、封存或守住的那条异路。", "coreThreadIds": [] }
+  ],
+  "threads": [],
+  "characters": [],
+  "lore": [
+    { "id": "fantasy.world", "text": "诡异、异族、宗门和修行资源均有自身规则与代价；不得将任何一方简化为只供主角取得力量的背景。", "priority": 100 },
+    { "id": "fantasy.cultivation", "text": "修行进境必须通过见闻、练习、资源、传承、战斗、代价或因果呈现，不能无缘由跃迁。", "priority": 95 },
+    { "id": "fantasy.weird", "text": "诡异现象应先体现不安、限制、代价或未知，再逐步显露可被理解的边界；不得一段内解释全部根源。", "priority": 92 },
+    { "id": "fantasy.foreign", "text": "异族拥有自己的亲缘、利益、恐惧和判断；敌对、结盟、误解与合作都应来自具体处境。", "priority": 90, "directionIds": ["fantasy.guardian", "fantasy.outsider"] },
+    { "id": "fantasy.sects", "text": "宗门竞争应包含传承、资源、规矩、名额与人的关系，不可只写比武和升级。", "priority": 90, "directionIds": ["fantasy.ambition", "fantasy.institution"] },
+    { "id": "fantasy.contract", "text": "契约、誓言、交易和因果应留下可被回访的条件与代价，帮助不能没有来处。", "priority": 88, "directionIds": ["fantasy.broker"] },
+    { "id": "fantasy.legacy", "text": "功法、典籍、师承与遗迹知识应改变人物与他人的关系，而不只是提供数值力量。", "priority": 88, "directionIds": ["fantasy.mentor"] },
+    { "id": "fantasy.ascent", "text": "飞升、封印、守望、传承、远行或留下都可能成为道途结果；结局必须回应人物实际承担过的因果。", "priority": 86 }
+  ],
+  "eventBindings": [],
+  "endingBlueprints": [
+    { "id": "fantasy.guardian.good", "worldId": "fantasy", "directionId": "fantasy.guardian", "polarity": "good", "title": "万家灯火", "premise": "你让重要的人拥有了可继续生存的余地，也没有遗失自己的道心。", "finalConflict": "在最后一次守护与代价的取舍中决定怎样留下。", "payoffFocus": "回应庇护、同行或边境承诺。", "epilogueFocus": "以可被看见的守望与生路收束。", "statWeights": { "charisma": 0.3, "family": 0.28, "physique": 0.16, "intelligence": 0.14, "fortune": 0.12 }, "requiredThreadIds": [] },
+    { "id": "fantasy.guardian.normal", "worldId": "fantasy", "directionId": "fantasy.guardian", "polarity": "normal", "title": "余烬未冷", "premise": "你未能守住所有人，却让最不能放下的生路延续下去。", "finalConflict": "在遗憾与责任之间留下可承受的安排。", "payoffFocus": "回应曾经许下的守望。", "epilogueFocus": "以有限安稳和持续牵挂收束。", "statWeights": { "charisma": 0.3, "family": 0.28, "physique": 0.16, "intelligence": 0.14, "fortune": 0.12 }, "requiredThreadIds": [] },
+    { "id": "fantasy.guardian.bad", "worldId": "fantasy", "directionId": "fantasy.guardian", "polarity": "bad", "title": "守灯之人", "premise": "你失去了重要的同行或归处，但仍留下过真实的庇护。", "finalConflict": "在无法两全的危局中承认最后的失去。", "payoffFocus": "回应曾经试图保全的人。", "epilogueFocus": "以离散、牺牲与被记住的善意收束。", "statWeights": { "charisma": 0.3, "family": 0.28, "physique": 0.16, "intelligence": 0.14, "fortune": 0.12 }, "requiredThreadIds": [] },
+    { "id": "fantasy.ambition.good", "worldId": "fantasy", "directionId": "fantasy.ambition", "polarity": "good", "title": "道途自明", "premise": "你取得修为或位置，也没有把大道完全交给欲望与代价。", "finalConflict": "在最后一次攀升前说明何种力量值得掌握。", "payoffFocus": "回应修为、目标与底线之间的选择。", "epilogueFocus": "以力量、清醒与后续可能收束。", "statWeights": { "intelligence": 0.3, "charisma": 0.25, "fortune": 0.2, "physique": 0.15, "family": 0.1 }, "requiredThreadIds": [] },
+    { "id": "fantasy.ambition.normal", "worldId": "fantasy", "directionId": "fantasy.ambition", "polarity": "normal", "title": "未负此心", "premise": "你未得尽头的风光，却留下了继续求道的能力与位置。", "finalConflict": "在得失之间承认真正想带走的东西。", "payoffFocus": "回应一次关键的攀升或停步。", "epilogueFocus": "以有限突破和仍可继续的道途收束。", "statWeights": { "intelligence": 0.3, "charisma": 0.25, "fortune": 0.2, "physique": 0.15, "family": 0.1 }, "requiredThreadIds": [] },
+    { "id": "fantasy.ambition.bad", "worldId": "fantasy", "directionId": "fantasy.ambition", "polarity": "bad", "title": "高台有痕", "premise": "你得到或错失的力量最终要求偿还代价，仍必须面对自己走过的路。", "finalConflict": "在保住力量和承认真实损失之间作最后选择。", "payoffFocus": "让一次关键竞争的代价回到眼前。", "epilogueFocus": "以失衡、沉沦或迟来的清醒收束。", "statWeights": { "intelligence": 0.3, "charisma": 0.25, "fortune": 0.2, "physique": 0.15, "family": 0.1 }, "requiredThreadIds": [] },
+    { "id": "fantasy.broker.good", "worldId": "fantasy", "directionId": "fantasy.broker", "polarity": "good", "title": "万物有契", "premise": "你让交易和契约成为彼此成全的力量，没有把任何人只当作筹码。", "finalConflict": "在最后一次交换中决定信义应如何被保留。", "payoffFocus": "回应契约、资源与承诺。", "epilogueFocus": "以可信的往来和可持续的生路收束。", "statWeights": { "family": 0.3, "charisma": 0.25, "fortune": 0.24, "intelligence": 0.14, "physique": 0.07 }, "requiredThreadIds": [] },
+    { "id": "fantasy.broker.normal", "worldId": "fantasy", "directionId": "fantasy.broker", "polarity": "normal", "title": "旧约尚存", "premise": "你没有赢下所有交易，却保住了几段值得信任的盟约。", "finalConflict": "在利益与承诺之间留下可承受的答案。", "payoffFocus": "回应一次重要的交易或帮助。", "epilogueFocus": "以谨慎往来和仍在的联系收束。", "statWeights": { "family": 0.3, "charisma": 0.25, "fortune": 0.24, "intelligence": 0.14, "physique": 0.07 }, "requiredThreadIds": [] },
+    { "id": "fantasy.broker.bad", "worldId": "fantasy", "directionId": "fantasy.broker", "polarity": "bad", "title": "契约余债", "premise": "你被资源和誓约的代价拖住，却仍明白自己曾想守住什么。", "finalConflict": "在交出筹码和保住重要之人之间作最后交换。", "payoffFocus": "让旧日契约兑现其真实代价。", "epilogueFocus": "以疏离、亏欠或重新开始收束。", "statWeights": { "family": 0.3, "charisma": 0.25, "fortune": 0.24, "intelligence": 0.14, "physique": 0.07 }, "requiredThreadIds": [] },
+    { "id": "fantasy.mentor.good", "worldId": "fantasy", "directionId": "fantasy.mentor", "polarity": "good", "title": "薪火照夜", "premise": "你让所学进入真实危局，也留下了能继续传下去的判断。", "finalConflict": "在最后一次传承与责任的取舍中决定知识服务于谁。", "payoffFocus": "回应师承、功法或诡异真相。", "epilogueFocus": "以传法、守秘和被后人接续的道路收束。", "statWeights": { "intelligence": 0.35, "charisma": 0.24, "family": 0.16, "physique": 0.14, "fortune": 0.11 }, "requiredThreadIds": [] },
+    { "id": "fantasy.mentor.normal", "worldId": "fantasy", "directionId": "fantasy.mentor", "polarity": "normal", "title": "一卷微明", "premise": "你未必参透全部真相，却让一段传承和一群人没有白走。", "finalConflict": "在危险与沉默之间决定什么仍值得留下。", "payoffFocus": "回应一段求法、教导或异闻。", "epilogueFocus": "以有限传承和持续追问收束。", "statWeights": { "intelligence": 0.35, "charisma": 0.24, "family": 0.16, "physique": 0.14, "fortune": 0.11 }, "requiredThreadIds": [] },
+    { "id": "fantasy.mentor.bad", "worldId": "fantasy", "directionId": "fantasy.mentor", "polarity": "bad", "title": "残卷留痕", "premise": "你未能让所知完全抵达想去的地方，但它仍记录着你做过的选择。", "finalConflict": "在封存、传下和遗忘之间作最后决定。", "payoffFocus": "回应一次未能兑现的师承或真相。", "epilogueFocus": "以中断、隐秘或沉默的坚持收束。", "statWeights": { "intelligence": 0.35, "charisma": 0.24, "family": 0.16, "physique": 0.14, "fortune": 0.11 }, "requiredThreadIds": [] },
+    { "id": "fantasy.institution.good", "worldId": "fantasy", "directionId": "fantasy.institution", "polarity": "good", "title": "法度护生", "premise": "你让宗门或城邦的规则不只停在命令上，也为具体的人留下余地。", "finalConflict": "在最后一次责任判断中保住真正重要的部分。", "payoffFocus": "回应戒律、权柄与人的取舍。", "epilogueFocus": "以可信承担和可被延续的秩序收束。", "statWeights": { "intelligence": 0.3, "charisma": 0.25, "family": 0.16, "fortune": 0.15, "physique": 0.14 }, "requiredThreadIds": [] },
+    { "id": "fantasy.institution.normal", "worldId": "fantasy", "directionId": "fantasy.institution", "polarity": "normal", "title": "留下一线", "premise": "你没能改变所有法度，却让少数人和一部分事情有了更好的去处。", "finalConflict": "在职责边界前决定还能坚持什么。", "payoffFocus": "回应一项长期承担的规则或责任。", "epilogueFocus": "以有限改变与日常信誉收束。", "statWeights": { "intelligence": 0.3, "charisma": 0.25, "family": 0.16, "fortune": 0.15, "physique": 0.14 }, "requiredThreadIds": [] },
+    { "id": "fantasy.institution.bad", "worldId": "fantasy", "directionId": "fantasy.institution", "polarity": "bad", "title": "法外风雪", "premise": "规则没有保护住你想保护的人，你也必须承担留下的缺口。", "finalConflict": "在服从与拒绝之间承认最后的代价。", "payoffFocus": "让此前的命令和判断回到人物面前。", "epilogueFocus": "以失职、离开或艰难的补偿收束。", "statWeights": { "intelligence": 0.3, "charisma": 0.25, "family": 0.16, "fortune": 0.15, "physique": 0.14 }, "requiredThreadIds": [] },
+    { "id": "fantasy.outsider.good", "worldId": "fantasy", "directionId": "fantasy.outsider", "polarity": "good", "title": "越界成途", "premise": "你没有照搬既定秩序，而是在陌生法则中走出了能让人继续活下去的道路。", "finalConflict": "决定异路应如何面对旧关系、边境与诡异。", "payoffFocus": "回应结盟、远行、封印或探索的初心。", "epilogueFocus": "以新盟约、远方、飞升或自由的道途收束。", "statWeights": { "fortune": 0.3, "physique": 0.25, "intelligence": 0.2, "charisma": 0.15, "family": 0.1 }, "requiredThreadIds": [] },
+    { "id": "fantasy.outsider.normal", "worldId": "fantasy", "directionId": "fantasy.outsider", "polarity": "normal", "title": "仍向远处", "premise": "你未能解释所有未知，却为自己和他人争得了继续前行的空间。", "finalConflict": "在安定与探索之间留下最后的选择。", "payoffFocus": "回应一次越界、远行或结盟。", "epilogueFocus": "以尚未定型的道途和可信的自由收束。", "statWeights": { "fortune": 0.3, "physique": 0.25, "intelligence": 0.2, "charisma": 0.15, "family": 0.1 }, "requiredThreadIds": [] },
+    { "id": "fantasy.outsider.bad", "worldId": "fantasy", "directionId": "fantasy.outsider", "polarity": "bad", "title": "禁境余响", "premise": "你为越界付出了沉重代价，却没有否认当初为何要走进去。", "finalConflict": "在回头、坚持和告别之间作最后决定。", "payoffFocus": "让那条异路与诡境的代价得到回应。", "epilogueFocus": "以漂泊、失落或重新寻找归处收束。", "statWeights": { "fortune": 0.3, "physique": 0.25, "intelligence": 0.2, "charisma": 0.15, "family": 0.1 }, "requiredThreadIds": [] }
+  ]
+}

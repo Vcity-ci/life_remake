@@ -1837,6 +1837,30 @@ function shouldHoldSceneAge(run: InternalRunState): boolean {
   );
 }
 
+/**
+ * The model receives this exact projection before it renders a dynamic turn.
+ * Time remains engine-owned: the projection contains no model-controlled age.
+ */
+export function resolveDynamicNarrativeTurnAges(
+  run: InternalRunState,
+  backgroundYearRange: { min: number; max: number }
+): {
+  sceneAge: number;
+  backgroundAgeRange: { fromAge: number; minToAge: number; maxToAge: number };
+} {
+  const fromAge = run.age + 1;
+  const minYears = Math.max(1, Math.trunc(backgroundYearRange.min));
+  const maxYears = Math.max(minYears, Math.trunc(backgroundYearRange.max));
+  return {
+    sceneAge: shouldHoldSceneAge(run) ? run.age : fromAge,
+    backgroundAgeRange: {
+      fromAge,
+      minToAge: run.age + minYears,
+      maxToAge: run.age + maxYears
+    }
+  };
+}
+
 function eventStatsForProfile(profileId: string): [StatKey, StatKey] {
   const profiles: Record<string, [StatKey, StatKey]> = {
     guardian: ["charisma", "physique"],

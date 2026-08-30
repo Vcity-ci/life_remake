@@ -1,0 +1,21 @@
+[
+  {
+    "id": "my_world",
+    "name": "示例世界",
+    "intro": "一份可从人物处境出发、自由展开三幕人生故事的世界包模板。",
+    "stylePrompt": "以具体经历、人物关系与选择后果推进叙事，避免系统说明和章节标题。",
+    "milestoneAges": [15, 28, 45],
+    "endAgeRange": {
+      "min": 50,
+      "max": 80
+    },
+    "yearlyEventHints": ["成长与见闻", "关系变化", "能力积累", "处境转折", "生活回响"],
+    "ageThresholds": [
+      { "id": "child", "label": "幼年", "min": 0, "max": 12 },
+      { "id": "youth", "label": "青年", "min": 13, "max": 29 },
+      { "id": "prime", "label": "壮年", "min": 30, "max": 44 },
+      { "id": "middle", "label": "中年", "min": 45, "max": 59 },
+      { "id": "elder", "label": "老年", "min": 60, "max": 120 }
+    ]
+  }
+]

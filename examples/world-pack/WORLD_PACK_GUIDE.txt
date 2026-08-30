@@ -1,0 +1,58 @@
+世界包 JSON 模板说明
+===================
+
+本目录提供两个相互配对的模板：
+
+- world.example.json：世界在前端的名称、简介、年龄段与基础时间线配置。
+- story.example.json：世界的叙事骨架、三幕主线、阵营、路线、成长门槛与结局蓝图。
+
+一、文件放置
+------------
+
+为新世界选择一个唯一 ID（例如 my_world），并将两个模板中所有 my_world 同步替换为该 ID。
+
+将 world.example.json 复制为：
+  data/worlds/<世界ID>.json
+
+将 story.example.json 复制为：
+  data/narratives/<世界ID>.story.json
+
+两个 JSON 内的 worldId / id 必须一致；文件名也应使用同一个世界 ID。
+
+当前世界列表会在项目首次初始化时从 data/worlds 载入并写入本地内容存储。模板保证可用于全新的源码副本或首次初始化环境。已完成初始化的项目暂未提供“导入已有世界包到内容存储”的界面流程，因此仅复制文件不会让既有内容存储自动出现新世界。
+
+二、world JSON
+--------------
+
+world.example.json 的根节点是数组，单个对象需要：
+
+- id：世界唯一 ID。
+- name / intro：世界选择界面显示的名称与介绍。
+- stylePrompt：该世界的基础叙事风格。
+- ageThresholds：五个年龄段。id 使用 child、youth、prime、middle、elder。
+- milestoneAges、endAgeRange、yearlyEventHints：与现有内容格式兼容的基础时间线字段；它们不是故事完成的硬性年龄条件。
+
+三、story JSON
+--------------
+
+story.example.json 是运行中的叙事世界包。请保留以下结构，再替换其中的题材内容：
+
+- storyBible 与 styleRules：世界背景和文本底线。只写模型应该遵守的叙事事实，不写玩家可见的内部标签。
+- mainlineSkeleton：三幕整体的因果关系和好/坏结局方向。它是模型的叙事骨架，不会作为章节标题显示。
+- mainlineActs：必须按顺序提供三幕。每一幕写清独立的处境、压力与高潮职责；不要把具体情节写死成唯一答案。
+- narrativeFactions：能够参与当前世界矛盾的阵营或压力来源。模型可据此生成本局人物与互动。
+- routeArcs：可供模型选择的叙事视角/经历路线。路线数量由世界包决定，不要求固定六条。
+- progression：普通年份的跨度、属性档位显示、成长方向和各路线的属性准入门槛。
+- lore：按需提供给模型的世界事实与文本约束。
+- endingBlueprints：每条 routeArcs 路线都必须各有 good、normal、bad 三个结局蓝图；directionId 必须与路线 ID 完全一致。
+
+threads、characters、eventBindings 可以先保留为空数组。运行时人物与幕间事实由模型输出和引擎记录；不要用空白占位文本替代真实世界设定。
+
+四、检查清单
+------------
+
+1. 两个文件都是合法 JSON，且所有 my_world 已替换为同一个新 ID。
+2. story JSON 的 version 为 6，worldId 与 world JSON 的 id 相同。
+3. mainlineActs 有三幕，routeArcs 至少有一条路线，narrativeFactions 至少有一个阵营。
+4. 每条路线均有 good、normal、bad 三个 endingBlueprints，且 directionId 对应正确。
+5. 玩家可见的叙事不要输出路线 ID、幕名、工具调用内容或内部标签。

@@ -72,9 +72,7 @@ export function AdminPanel(props: Props): React.JSX.Element {
     canConfirmEnv,
     envReady,
     worldId,
-    setWorldId,
-    difficultyId,
-    setDifficultyId
+    setWorldId
   } = props;
 
   const [tab, setTab] = useState<"session" | "model" | "content">("session");
@@ -308,15 +306,6 @@ export function AdminPanel(props: Props): React.JSX.Element {
                   ))}
                 </select>
               </label>
-
-              <label>
-                难度
-                <select value={difficultyId} onChange={(e) => setDifficultyId(e.target.value)}>
-                  {bootstrap.difficulties.map((d) => (
-                    <option key={d.id} value={d.id}>{d.name}</option>
-                  ))}
-                </select>
-              </label>
             </div>
 
             <div className="row">
@@ -361,19 +350,6 @@ export function AdminPanel(props: Props): React.JSX.Element {
                   <label>名称<input value={card.name} onChange={(e) => patchCard(i, { name: e.target.value })} /></label>
                   <label>描述<textarea value={card.description} onChange={(e) => patchCard(i, { description: e.target.value })} /></label>
                   <button className="ghost" onClick={() => removeCard(i)}>删除</button>
-                </div>
-              ))}
-            </details>
-
-            <details>
-              <summary>难度</summary>
-              <div className="row between"><span>新增/编辑/删除</span><button onClick={addDifficulty}>新增</button></div>
-              {content.difficulties.map((d, i) => (
-                <div key={`${d.id}-${i}`} className="editor-card">
-                  <label>ID<input value={d.id} onChange={(e) => patchDifficulty(i, { id: e.target.value })} /></label>
-                  <label>名称<input value={d.name} onChange={(e) => patchDifficulty(i, { name: e.target.value })} /></label>
-                  <label>描述<textarea value={d.description} onChange={(e) => patchDifficulty(i, { description: e.target.value })} /></label>
-                  <button className="ghost" onClick={() => removeDifficulty(i)}>删除</button>
                 </div>
               ))}
             </details>

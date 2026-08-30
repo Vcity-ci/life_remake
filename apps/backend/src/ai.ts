@@ -202,7 +202,9 @@ export interface DynamicNarrativeSceneInput {
   beat: Exclude<NarrativeBeat, "ending">;
   decisionMode: "none" | "optional" | "required";
   allowedTurnKinds: Array<"scene" | "background">;
-  backgroundYearRange: { min: number; max: number };
+  /** Age facts are projected by the engine before the model is called. */
+  sceneAge: number;
+  backgroundAgeRange: { fromAge: number; minToAge: number; maxToAge: number };
   routes: Array<{ id: string; label: string; summary: string; perspective?: string }>;
   factions: Array<{ id: string; label: string; summary: string }>;
   knownCharacters: Array<{ id: string; name: string; factionId?: string; role: string; description: string }>;
@@ -226,8 +228,8 @@ export interface DynamicNarrativeSceneResult {
   createsDecision?: boolean;
   attributeEffects?: NarrativeAttributeEffect[];
   actHandoff?: NarrativeActHandoff;
-  backgroundYears?: number;
-  backgroundAttributeEffects?: Array<{ offset: number; effects: NarrativeAttributeEffect[] }>;
+  backgroundAgeTo?: number;
+  backgroundAttributeEffects?: Array<{ age: number; effects: NarrativeAttributeEffect[] }>;
 }
 
 export class DirectedStoryTurnError extends Error {
@@ -1971,9 +1973,13 @@ function dynamicNarrativeSceneTools(input: DynamicNarrativeSceneInput): DynamicN
   const routeIds = input.routes.map((route) => route.id);
   const factionIds = input.factions.map((faction) => faction.id);
   const characterRefs = ["new", ...input.knownCharacters.map((character) => character.id)];
-  const offsets = Array.from(
-    { length: Math.max(1, input.backgroundYearRange.max) },
-    (_value, index) => index + 1
+  const backgroundAges = Array.from(
+    { length: Math.max(1, input.backgroundAgeRange.maxToAge - input.backgroundAgeRange.fromAge + 1) },
+    (_value, index) => input.backgroundAgeRange.fromAge + index
+  );
+  const backgroundEndAges = Array.from(
+    { length: Math.max(1, input.backgroundAgeRange.maxToAge - input.backgroundAgeRange.minToAge + 1) },
+    (_value, index) => input.backgroundAgeRange.minToAge + index
   );
   const effectsSchema = (policy: NarrativeAttributePolicy): Record<string, unknown> => ({
     type: "array",
@@ -2037,26 +2043,23 @@ function dynamicNarrativeSceneTools(input: DynamicNarrativeSceneInput): DynamicN
       parameters: {
         type: "object",
         additionalProperties: false,
-        required: ["narrative", "backgroundYears", "backgroundEffects"],
+        required: ["narrative", "ageTo", "backgroundEffects"],
         properties: {
           narrative: { type: "string" },
-          backgroundYears: {
+          ageTo: {
             type: "number",
-            enum: Array.from(
-              { length: Math.max(1, input.backgroundYearRange.max - input.backgroundYearRange.min + 1) },
-              (_value, index) => input.backgroundYearRange.min + index
-            )
+            enum: backgroundEndAges
           },
           backgroundEffects: {
             type: "array",
-            minItems: input.backgroundYearRange.min,
-            maxItems: input.backgroundYearRange.max,
+            minItems: input.backgroundAgeRange.minToAge - input.backgroundAgeRange.fromAge + 1,
+            maxItems: input.backgroundAgeRange.maxToAge - input.backgroundAgeRange.fromAge + 1,
             items: {
               type: "object",
               additionalProperties: false,
-              required: ["offset", "effects"],
+              required: ["age", "effects"],
               properties: {
-                offset: { type: "number", enum: offsets },
+                age: { type: "number", enum: backgroundAges },
                 effects: effectsSchema(input.backgroundAttributePolicy)
               }
             }
@@ -2975,7 +2978,7 @@ export async function generateNarrativeOrigin(
     .join("；") || "无";
   const statSummary = Object.entries(run.stats).map(([stat, value]) => `${stat}=${value}`).join("；");
   const prompt = [
-    `为一名刚出生、尚未开始推进年份的人物写身世。人物设定：${compactText(run.personaPrompt, 220)}。`,
+    `为一名出生前的人物写身世。人物设定：${compactText(run.personaPrompt, 220)}。`,
     `已选天赋（仅此${run.cards.length}项，应自然体现其气质）：${talentContext}。初始属性仅供判断，不写入正文：${statSummary}。`,
     "正文以第二人称写一段约180-320字、可供玩家阅读的身世，交代家庭、成长环境和一项会影响其一生的个人张力。",
     "只写人物来处，不推进世界主线，不解决旧案，不指定路线，不创造需要引擎立即追踪的关键人物或阵营承诺。",
@@ -3092,6 +3095,7 @@ export async function generateDynamicNarrativeScene(
   const prompt = [
     `当前世界幕：${compactText(input.act.label, 36)}。${compactText(input.act.prompt, 180)}`,
     `当前节拍：${input.beat}。${input.act.factLabel ? `本幕事实：${compactText(input.act.factLabel, 120)}` : ""}`,
+    `本场景实际发生在${input.sceneAge}岁；正文如涉及年龄或人生阶段，必须以此为准。`,
     input.beat === "setup" ? "这是本幕开场。正文应先让世界变化、传闻或他人处境进入人物视野，不要求人物立刻亲自解决冲突。" : "",
     input.lifeStage ? `当前处于${input.lifeStage.label}（至${input.lifeStage.maxAge}岁）：主角尚不具备独立社会行动能力。以照料者、家庭、感官和成长环境为叙事主体；不得写谋划、交涉、实质抉择或主线推进。` : "",
     `人物能力档位（仅用于判断，不写入正文）：${Object.entries(input.statTiers).map(([stat, tier]) => `${stat}=${tier}`).join("；")}`,
@@ -3100,7 +3104,7 @@ export async function generateDynamicNarrativeScene(
     input.knownCharacters.length ? `可回归人物：${input.knownCharacters.map((character) => `${character.id}=${character.name}（${character.factionId ?? "无阵营"}，${character.role}）：${compactText(character.description, 80)}`).join("；")}` : "",
     ctx.recentNarratives?.length ? `按需召回的已发生片段：${ctx.recentNarratives.map((entry) => compactText(entry, 110)).join("；")}` : "",
     canRenderBackground
-      ? `render_background_segment 表示${input.backgroundYearRange.min}-${input.backgroundYearRange.max}年的平静人生片段；不得借背景推进、解释或收束当前主线，逐年提交轻度或中度成长${input.backgroundAttributePolicy.preferredStats?.length ? `，优先影响${input.backgroundAttributePolicy.preferredStats.join("、")}` : ""}。`
+      ? `render_background_segment 表示${input.backgroundAgeRange.fromAge}岁起的一段平静人生片段；必须选择结束年龄 ageTo（${input.backgroundAgeRange.minToAge}-${input.backgroundAgeRange.maxToAge}岁），正文只覆盖${input.backgroundAgeRange.fromAge}岁至 ageTo 岁，并按每个实际年龄提交轻度或中度成长${input.backgroundAttributePolicy.preferredStats?.length ? `，优先影响${input.backgroundAttributePolicy.preferredStats.join("、")}` : ""}；不得借背景推进、解释或收束当前主线。`
       : "",
     canRenderScene
       ? `render_scene 表示推进当前节拍的场景，必须提交${input.attributePolicy?.minEffects ?? 1}-${input.attributePolicy?.maxEffects ?? 2}项受控属性后果。`
@@ -3122,21 +3126,21 @@ export async function generateDynamicNarrativeScene(
 
   if (result.toolName === "render_background_segment") {
     if (!canRenderBackground) throw invalidNarrativeOutcome("dynamic_background_tool_disallowed");
-    const backgroundYears = typeof result.raw.backgroundYears === "number" ? result.raw.backgroundYears : NaN;
+    const backgroundAgeTo = typeof result.raw.ageTo === "number" ? result.raw.ageTo : NaN;
     const rows = Array.isArray(result.raw.backgroundEffects) ? result.raw.backgroundEffects : [];
     const effects = rows.map((row) => {
-      const value = row as { offset?: unknown; effects?: unknown };
-      const offset = typeof value.offset === "number" ? value.offset : NaN;
+      const value = row as { age?: unknown; effects?: unknown };
+      const age = typeof value.age === "number" ? value.age : NaN;
       const parsed = parseNarrativeEffects(value.effects, input.backgroundAttributePolicy);
-      return Number.isInteger(offset) && parsed ? { offset, effects: parsed } : null;
+      return Number.isInteger(age) && parsed ? { age, effects: parsed } : null;
     });
-    const isValidBackgroundYears = Number.isInteger(backgroundYears) && backgroundYears >= input.backgroundYearRange.min && backgroundYears <= input.backgroundYearRange.max;
-    const expectedOffsets = isValidBackgroundYears
-      ? Array.from({ length: backgroundYears }, (_value, index) => index + 1)
+    const isValidBackgroundAgeTo = Number.isInteger(backgroundAgeTo) && backgroundAgeTo >= input.backgroundAgeRange.minToAge && backgroundAgeTo <= input.backgroundAgeRange.maxToAge;
+    const expectedAges = isValidBackgroundAgeTo
+      ? Array.from({ length: backgroundAgeTo - input.backgroundAgeRange.fromAge + 1 }, (_value, index) => input.backgroundAgeRange.fromAge + index)
       : [];
-    if (effects.length !== expectedOffsets.length || effects.some((row) => !row) ||
-      new Set(effects.map((row) => row!.offset)).size !== expectedOffsets.length ||
-      expectedOffsets.some((offset) => !effects.some((row) => row?.offset === offset))) {
+    if (effects.length !== expectedAges.length || effects.some((row) => !row) ||
+      new Set(effects.map((row) => row!.age)).size !== expectedAges.length ||
+      expectedAges.some((age) => !effects.some((row) => row?.age === age))) {
       throw invalidNarrativeOutcome("dynamic_background_effects_invalid");
     }
     pushToolResult(ctx.conversation!, result.toolCall, "背景叙事与年度后果已由引擎接收。");
@@ -3145,8 +3149,8 @@ export async function generateDynamicNarrativeScene(
       turnKind: "background",
       narrative,
       participants: [],
-      backgroundYears,
-      backgroundAttributeEffects: effects as Array<{ offset: number; effects: NarrativeAttributeEffect[] }>
+      backgroundAgeTo,
+      backgroundAttributeEffects: effects as Array<{ age: number; effects: NarrativeAttributeEffect[] }>
     };
   }
 

@@ -439,6 +439,8 @@ export interface NarrativeWorldDefinition {
     worldId: WorldId;
     storyBible: string;
     styleRules: string[];
+    /** World-owned closing texture for the final renderer. */
+    endingGuide?: string;
     opening?: NarrativeOpeningDefinition;
     mainlineSkeleton?: NarrativeMainlineSkeleton;
     progression?: NarrativeWorldProgression;

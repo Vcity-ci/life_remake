@@ -1846,17 +1846,20 @@ export function resolveDynamicNarrativeTurnAges(
   backgroundYearRange: { min: number; max: number }
 ): {
   sceneAge: number;
-  backgroundAgeRange: { fromAge: number; minToAge: number; maxToAge: number };
+  backgroundAgeRange: { fromAge: number; toAge: number };
 } {
   const fromAge = run.age + 1;
   const minYears = Math.max(1, Math.trunc(backgroundYearRange.min));
   const maxYears = Math.max(minYears, Math.trunc(backgroundYearRange.max));
+  // The engine fixes this span before asking for prose, so a retry cannot change time.
+  const targetYears = minYears + Math.floor(
+    seedrandom(`${run.seed}:narrative-background-span:${run.age}:${run.history.length}`)() * (maxYears - minYears + 1)
+  );
   return {
     sceneAge: shouldHoldSceneAge(run) ? run.age : fromAge,
     backgroundAgeRange: {
       fromAge,
-      minToAge: run.age + minYears,
-      maxToAge: run.age + maxYears
+      toAge: run.age + targetYears
     }
   };
 }
@@ -3543,14 +3546,13 @@ export function dynamicBackgroundAttributePolicy(run: InternalRunState): Narrati
     ? runtime.growthFocusOptions?.find((option) => option.id === runtime.growthFocusId)
     : undefined;
   return {
-    allowedStats: allStatKeys,
+    // The tool schema receives the same stat envelope that the engine will accept.
+    allowedStats: focus?.primaryStats?.length ? focus.primaryStats : allStatKeys,
     allowedBands: ["light", "medium"],
     allowedDirections: ["up"],
     minEffects: 1,
     maxEffects: 1,
-    requirePositive: true,
-    preferredStats: focus?.primaryStats,
-    minPreferredEffects: focus ? 1 : undefined
+    requirePositive: true
   };
 }
 

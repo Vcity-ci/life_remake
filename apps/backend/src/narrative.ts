@@ -54,6 +54,7 @@ export interface NarrativePromptPlan {
   origin?: string;
   mainlineSkeleton?: string;
   styleRules: string[];
+  endingGuide?: string;
   activeLore: string[];
   plotEssentials: string[];
   activeThreads: string[];
@@ -1288,9 +1289,13 @@ export function buildNarrativePromptPlan(
     activeCharacters: Array.from(new Set([...staticActiveCharacters, ...dynamicActiveCharacters, ...routeCharacters])).slice(0, 5),
     scene: `场景=${source.narrative.scene.place}；冲突=${source.narrative.scene.conflict}；余波=${source.narrative.scene.aftermath}`,
     authorNote: buildAuthorNote(source, activeComponents[0]),
-    ending: ending
-      ? `结局倾向=${ending.title}/${ending.polarity}；按该路线的身份与代价收束。最终冲突、伏笔回收与余响必须以本局已完成三幕的事实、人物和后果为准，不可把世界包中的示例情节当作本局既定经历。`
-      : "",
+    endingGuide: world.endingGuide ? compactText(world.endingGuide, 150) : undefined,
+    ending: [
+      ending
+        ? `结局倾向=${ending.title}/${ending.polarity}；按该路线的身份与代价收束。最终冲突、伏笔回收与余响必须以本局已完成三幕的事实、人物和后果为准，不可把世界包中的示例情节当作本局既定经历。`
+        : "",
+      world.endingGuide ? `结局文风：${compactText(world.endingGuide, 150)}` : ""
+    ].filter(Boolean).join("\n"),
     selectedRoute: selectedRoute ? {
       label: selectedRoute.label || selectedRoute.directionId,
       summary: selectedRoute.summary,

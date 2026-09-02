@@ -1438,8 +1438,8 @@ async function generateDirectedSegmentForRunUnsafe(options: DirectedSegmentOptio
       : undefined
   }, narrativeCtx);
   if (scene.turnKind === "background") {
-    if (!scene.backgroundAgeTo || !scene.backgroundAttributeEffects) throw new Error("dynamic_background_outcome_missing");
-    const backgroundYears = scene.backgroundAgeTo - run.age;
+    if (!scene.backgroundAttributeEffects) throw new Error("dynamic_background_outcome_missing");
+    const backgroundYears = turnAges.backgroundAgeRange.toAge - run.age;
     const advanced = autoAdvanceToCheckpoint(run, world, difficulty, {
       targetYears: backgroundYears,
       maxTargetYears: backgroundMaxYears,
@@ -1447,10 +1447,9 @@ async function generateDirectedSegmentForRunUnsafe(options: DirectedSegmentOptio
       deferNarrativeAttributeEffects: true,
       narrativeWorld
     });
-    const effectsByAge = new Map(scene.backgroundAttributeEffects.map((outcome) => [outcome.age, outcome.effects]));
     const outcomes = advanced.chunk.map((event) => ({
       age: event.age,
-      effects: effectsByAge.get(event.age) ?? []
+      effects: scene.backgroundAttributeEffects!
     }));
     const policiesByAge = new Map(advanced.chunk.map((event) => [event.age, backgroundAttributePolicy]));
     if (!settleNarrativeBackgroundOutcomes(run, world, outcomes, advanced.chunk.map((event) => event.age), policiesByAge, narrativeWorld)) {

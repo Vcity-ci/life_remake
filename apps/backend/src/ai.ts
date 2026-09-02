@@ -204,7 +204,7 @@ export interface DynamicNarrativeSceneInput {
   allowedTurnKinds: Array<"scene" | "background">;
   /** Age facts are projected by the engine before the model is called. */
   sceneAge: number;
-  backgroundAgeRange: { fromAge: number; minToAge: number; maxToAge: number };
+  backgroundAgeRange: { fromAge: number; toAge: number };
   routes: Array<{ id: string; label: string; summary: string; perspective?: string }>;
   factions: Array<{ id: string; label: string; summary: string }>;
   knownCharacters: Array<{ id: string; name: string; factionId?: string; role: string; description: string }>;
@@ -228,8 +228,8 @@ export interface DynamicNarrativeSceneResult {
   createsDecision?: boolean;
   attributeEffects?: NarrativeAttributeEffect[];
   actHandoff?: NarrativeActHandoff;
-  backgroundAgeTo?: number;
-  backgroundAttributeEffects?: Array<{ age: number; effects: NarrativeAttributeEffect[] }>;
+  /** One engine-approved growth intent, applied across this fixed background span. */
+  backgroundAttributeEffects?: NarrativeAttributeEffect[];
 }
 
 export class DirectedStoryTurnError extends Error {
@@ -1083,7 +1083,7 @@ function buildSystemPrompt(
   const modeAddon = yearMode
     ? compactText(promptPack.factionForeshadowRule, 96)
     : endingMode
-      ? "R:E2 只做收束，不扩展新支线；飞升结局重点写原因，结合BG主线/世界规则/前史说明为何走到飞升，结果一句带过。"
+      ? "R:E2 只做收束，不扩展新支线；结合本局主线、世界规则与前史说明人物为何走到此处，结果一句带过。"
       : "";
 
   const worldBackground = [
@@ -1401,9 +1401,9 @@ function fallbackEndingSummary(run: InternalRunState): string {
 
 function buildEndingPrompt(run: InternalRunState, baseEnding: string, narrativePlan?: NarrativePromptPlan): string {
   const cards = run.cards.map((c) => `${c.name}(${c.rarity})`).join("、") || "无";
-  const ascensionInfo = run.ascension.unlocked
+  const legacyAscensionInfo = !run.narrative.enabled && run.ascension.unlocked
     ? `${run.ascension.title ?? "未知称号"} / ${run.ascension.type ?? "unknown"} / ${run.ascension.unlockedAge ?? run.age}岁`
-    : "未触发";
+    : "";
   const endingQuality = run.narrative.endingPolarity === "good"
     ? "好结局：人物克服主要代价，留下明确且可被后人承接的成果。"
     : run.narrative.endingPolarity === "normal"
@@ -1423,7 +1423,7 @@ function buildEndingPrompt(run: InternalRunState, baseEnding: string, narrativeP
   return [
     "T:E 结局收束任务。",
     `S0 type=${run.outcome} age=${run.age} fame=${run.fame}(${fameGrade(run.fame)}) ending=${run.narrative.endingPolarity ?? "none"} score=${run.narrative.endingScore ?? "none"}`,
-    `S1 stats=${summarizeStatsShort(run.stats)} death=${compactText(run.deathCause ?? "none", 32)} asc=${compactText(ascensionInfo, 56)}`,
+    `S1 stats=${summarizeStatsShort(run.stats)} death=${compactText(run.deathCause ?? "none", 32)}${legacyAscensionInfo ? ` asc=${compactText(legacyAscensionInfo, 56)}` : ""}`,
     `S2 cards=${compactText(cards, 52)} key=${compactText(summarizeEndingRecent(run.history), 120)}`,
     `S3 base=${compactText(baseEnding, 70)}`,
     formatNarrativePromptPlan(narrativePlan, "ending"),
@@ -1973,14 +1973,6 @@ function dynamicNarrativeSceneTools(input: DynamicNarrativeSceneInput): DynamicN
   const routeIds = input.routes.map((route) => route.id);
   const factionIds = input.factions.map((faction) => faction.id);
   const characterRefs = ["new", ...input.knownCharacters.map((character) => character.id)];
-  const backgroundAges = Array.from(
-    { length: Math.max(1, input.backgroundAgeRange.maxToAge - input.backgroundAgeRange.fromAge + 1) },
-    (_value, index) => input.backgroundAgeRange.fromAge + index
-  );
-  const backgroundEndAges = Array.from(
-    { length: Math.max(1, input.backgroundAgeRange.maxToAge - input.backgroundAgeRange.minToAge + 1) },
-    (_value, index) => input.backgroundAgeRange.minToAge + index
-  );
   const effectsSchema = (policy: NarrativeAttributePolicy): Record<string, unknown> => ({
     type: "array",
     minItems: policy.minEffects,
@@ -2039,31 +2031,14 @@ function dynamicNarrativeSceneTools(input: DynamicNarrativeSceneInput): DynamicN
     type: "function",
     function: {
       name: "render_background_segment",
-      description: "提交一段不推进主线的普通人生背景及逐年属性成长。",
+      description: "提交一段不推进主线的普通人生背景及其共享属性成长标签。",
       parameters: {
         type: "object",
         additionalProperties: false,
-        required: ["narrative", "ageTo", "backgroundEffects"],
+        required: ["narrative", "effects"],
         properties: {
           narrative: { type: "string" },
-          ageTo: {
-            type: "number",
-            enum: backgroundEndAges
-          },
-          backgroundEffects: {
-            type: "array",
-            minItems: input.backgroundAgeRange.minToAge - input.backgroundAgeRange.fromAge + 1,
-            maxItems: input.backgroundAgeRange.maxToAge - input.backgroundAgeRange.fromAge + 1,
-            items: {
-              type: "object",
-              additionalProperties: false,
-              required: ["age", "effects"],
-              properties: {
-                age: { type: "number", enum: backgroundAges },
-                effects: effectsSchema(input.backgroundAttributePolicy)
-              }
-            }
-          }
+          effects: effectsSchema(input.backgroundAttributePolicy)
         }
       }
     }
@@ -2569,7 +2544,13 @@ export async function generateDirectedStoryTurn(
     throw new DirectedStoryTurnError("directed_story_turn_unavailable");
   }
   const promptPack = normalizePromptPackForModel(ctx.promptPack);
-  const systemPrompt = buildSystemPrompt(promptPack, world, ctx, "year");
+  const planningContext: NarrativeContext = {
+    ...ctx,
+    narrativePlan: ctx.narrativePlan
+      ? { ...ctx.narrativePlan, styleRules: ctx.narrativePlan.styleRules.slice(0, 1) }
+      : undefined
+  };
+  const systemPrompt = buildSystemPrompt(promptPack, world, planningContext, "year");
   const conversation = ensureConversationState(ctx.conversation, hashSystemPrompt(systemPrompt), systemPrompt);
   ctx.conversation = conversation;
   syncStoryConversationState(conversation, run);
@@ -3104,7 +3085,7 @@ export async function generateDynamicNarrativeScene(
     input.knownCharacters.length ? `可回归人物：${input.knownCharacters.map((character) => `${character.id}=${character.name}（${character.factionId ?? "无阵营"}，${character.role}）：${compactText(character.description, 80)}`).join("；")}` : "",
     ctx.recentNarratives?.length ? `按需召回的已发生片段：${ctx.recentNarratives.map((entry) => compactText(entry, 110)).join("；")}` : "",
     canRenderBackground
-      ? `render_background_segment 表示${input.backgroundAgeRange.fromAge}岁起的一段平静人生片段；必须选择结束年龄 ageTo（${input.backgroundAgeRange.minToAge}-${input.backgroundAgeRange.maxToAge}岁），正文只覆盖${input.backgroundAgeRange.fromAge}岁至 ageTo 岁，并按每个实际年龄提交轻度或中度成长${input.backgroundAttributePolicy.preferredStats?.length ? `，优先影响${input.backgroundAttributePolicy.preferredStats.join("、")}` : ""}；不得借背景推进、解释或收束当前主线。`
+      ? `render_background_segment 表示${input.backgroundAgeRange.fromAge}岁至${input.backgroundAgeRange.toAge}岁的一段平静人生片段；正文只覆盖这个固定年龄范围。提交一组轻度或中度成长标签，引擎会将其应用于其中每个实际年龄；不得借背景推进、解释或收束当前主线。`
       : "",
     canRenderScene
       ? `render_scene 表示推进当前节拍的场景，必须提交${input.attributePolicy?.minEffects ?? 1}-${input.attributePolicy?.maxEffects ?? 2}项受控属性后果。`
@@ -3126,31 +3107,17 @@ export async function generateDynamicNarrativeScene(
 
   if (result.toolName === "render_background_segment") {
     if (!canRenderBackground) throw invalidNarrativeOutcome("dynamic_background_tool_disallowed");
-    const backgroundAgeTo = typeof result.raw.ageTo === "number" ? result.raw.ageTo : NaN;
-    const rows = Array.isArray(result.raw.backgroundEffects) ? result.raw.backgroundEffects : [];
-    const effects = rows.map((row) => {
-      const value = row as { age?: unknown; effects?: unknown };
-      const age = typeof value.age === "number" ? value.age : NaN;
-      const parsed = parseNarrativeEffects(value.effects, input.backgroundAttributePolicy);
-      return Number.isInteger(age) && parsed ? { age, effects: parsed } : null;
-    });
-    const isValidBackgroundAgeTo = Number.isInteger(backgroundAgeTo) && backgroundAgeTo >= input.backgroundAgeRange.minToAge && backgroundAgeTo <= input.backgroundAgeRange.maxToAge;
-    const expectedAges = isValidBackgroundAgeTo
-      ? Array.from({ length: backgroundAgeTo - input.backgroundAgeRange.fromAge + 1 }, (_value, index) => input.backgroundAgeRange.fromAge + index)
-      : [];
-    if (effects.length !== expectedAges.length || effects.some((row) => !row) ||
-      new Set(effects.map((row) => row!.age)).size !== expectedAges.length ||
-      expectedAges.some((age) => !effects.some((row) => row?.age === age))) {
+    const effects = parseNarrativeEffects(result.raw.effects, input.backgroundAttributePolicy);
+    if (!effects) {
       throw invalidNarrativeOutcome("dynamic_background_effects_invalid");
     }
-    pushToolResult(ctx.conversation!, result.toolCall, "背景叙事与年度后果已由引擎接收。");
+    pushToolResult(ctx.conversation!, result.toolCall, "背景叙事与成长标签已由引擎接收。");
     compactConversationWindow(ctx, ctx.conversation!);
     return {
       turnKind: "background",
       narrative,
       participants: [],
-      backgroundAgeTo,
-      backgroundAttributeEffects: effects as Array<{ age: number; effects: NarrativeAttributeEffect[] }>
+      backgroundAttributeEffects: effects
     };
   }
 

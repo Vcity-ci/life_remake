@@ -1,7 +1,15 @@
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
-import type { ProviderConfig, SaveSlotSummary } from "@reroll/shared";
+import type {
+  ModelUsageEntry,
+  ModelUsageOperation,
+  ModelUsageSummary,
+  ModelUsageTotals,
+  ModelUsageTransport,
+  ProviderConfig,
+  SaveSlotSummary
+} from "@reroll/shared";
 import type { InternalRunState } from "./engine.js";
 import { resolveProjectRoot } from "./project-root.js";
 
@@ -34,11 +42,32 @@ interface StoredSaveSlot extends SaveSlotSummary {
   snapshot: InternalRunState;
 }
 
+interface StoredModelUsage extends ModelUsageEntry {
+  sessionId: string;
+}
+
+export interface ModelUsageRecordInput {
+  runId?: string;
+  worldId?: string;
+  model: string;
+  transport: ModelUsageTransport;
+  operation: ModelUsageOperation;
+  success?: boolean;
+  cacheHit?: boolean;
+  durationMs: number;
+  usage?: {
+    inputTokens?: number;
+    outputTokens?: number;
+    totalTokens?: number;
+  };
+}
+
 interface PersistedAnonymousStore {
   version: 1;
   sessions: AnonymousSession[];
   runs: StoredRunRecord[];
   saves: StoredSaveSlot[];
+  modelUsage?: StoredModelUsage[];
   environments: Array<{
     sessionId: string;
     runtimeMode: "cloud" | "local";
@@ -54,11 +83,13 @@ const RUN_TTL_MS = daysToMs(process.env.ANONYMOUS_RUN_TTL_DAYS, 7, 1, 30);
 const SAVE_TTL_MS = daysToMs(process.env.ANONYMOUS_SAVE_TTL_DAYS, 180, 7, 365);
 const MAX_SAVES_PER_SESSION = boundedInt(process.env.ANONYMOUS_SAVE_SLOT_LIMIT, 5, 1, 12);
 const MAX_DECISION_CHECKPOINTS_PER_SESSION = 12;
+const MAX_MODEL_USAGE_ENTRIES_PER_SESSION = 48;
 
 const runs = new Map<string, StoredRunRecord>();
 const sessions = new Map<string, AnonymousSession>();
 const envBySession = new Map<string, StoredGameEnv>();
 const saves = new Map<string, StoredSaveSlot>();
+const modelUsage = new Map<string, StoredModelUsage>();
 const runLocks = new Map<string, Promise<void>>();
 const sessionLocks = new Map<string, Promise<void>>();
 let loadPromise: Promise<void> | null = null;
@@ -87,12 +118,87 @@ function makeRecoveryCode(saveId: string): { code: string; hash: string } {
   return { code: `${saveId}.${secret}`, hash: hashSecret(`${saveId}:${secret}`) };
 }
 
+const modelUsageOperations: ModelUsageOperation[] = [
+  "narrative",
+  "summary",
+  "continuation",
+  "director",
+  "planning",
+  "render",
+  "origin",
+  "background",
+  "scene",
+  "choice",
+  "decision",
+  "ending"
+];
+
+function nonNegativeInteger(value: unknown): number {
+  return typeof value === "number" && Number.isFinite(value)
+    ? Math.max(0, Math.trunc(value))
+    : 0;
+}
+
+function emptyModelUsageTotals(): ModelUsageTotals {
+  return {
+    requestCount: 0,
+    successCount: 0,
+    failureCount: 0,
+    cacheHitCount: 0,
+    reportedUsageCount: 0,
+    unreportedUsageCount: 0,
+    inputTokens: 0,
+    outputTokens: 0,
+    totalTokens: 0,
+    durationMs: 0
+  };
+}
+
+function modelUsageKey(entry: Pick<StoredModelUsage, "sessionId" | "runId" | "worldId" | "model" | "transport" | "operation">): string {
+  return [
+    entry.sessionId,
+    entry.runId ?? "",
+    entry.worldId ?? "",
+    entry.model,
+    entry.transport,
+    entry.operation
+  ].join("\u0000");
+}
+
+function normalizeStoredModelUsage(value: unknown): StoredModelUsage | undefined {
+  const entry = value as Partial<StoredModelUsage> | null;
+  if (!entry || typeof entry.sessionId !== "string" || !entry.sessionId) return undefined;
+  if (typeof entry.model !== "string" || !entry.model) return undefined;
+  if (entry.transport !== "chat" && entry.transport !== "responses") return undefined;
+  if (!modelUsageOperations.includes(entry.operation as ModelUsageOperation)) return undefined;
+  return {
+    sessionId: entry.sessionId,
+    runId: typeof entry.runId === "string" && entry.runId ? entry.runId : undefined,
+    worldId: typeof entry.worldId === "string" && entry.worldId ? entry.worldId : undefined,
+    model: entry.model.slice(0, 160),
+    transport: entry.transport,
+    operation: entry.operation as ModelUsageOperation,
+    updatedAt: nonNegativeInteger(entry.updatedAt),
+    requestCount: nonNegativeInteger(entry.requestCount),
+    successCount: nonNegativeInteger(entry.successCount),
+    failureCount: nonNegativeInteger(entry.failureCount),
+    cacheHitCount: nonNegativeInteger(entry.cacheHitCount),
+    reportedUsageCount: nonNegativeInteger(entry.reportedUsageCount),
+    unreportedUsageCount: nonNegativeInteger(entry.unreportedUsageCount),
+    inputTokens: nonNegativeInteger(entry.inputTokens),
+    outputTokens: nonNegativeInteger(entry.outputTokens),
+    totalTokens: nonNegativeInteger(entry.totalTokens),
+    durationMs: nonNegativeInteger(entry.durationMs)
+  };
+}
+
 function serializeStore(): PersistedAnonymousStore {
   return {
     version: 1,
     sessions: Array.from(sessions.values()),
     runs: Array.from(runs.values()),
     saves: Array.from(saves.values()),
+    modelUsage: Array.from(modelUsage.values()),
     // API keys are deliberately process-only and never written to disk.
     environments: Array.from(envBySession.entries()).map(([sessionId, env]) => ({
       sessionId,
@@ -138,6 +244,11 @@ function cleanupExpired(now = Date.now()): boolean {
     saves.delete(saveId);
     changed = true;
   }
+  for (const [key, usage] of modelUsage) {
+    if (sessions.has(usage.sessionId)) continue;
+    modelUsage.delete(key);
+    changed = true;
+  }
   return changed;
 }
 
@@ -162,6 +273,11 @@ async function loadStore(): Promise<void> {
         recoveryHash: source.recoveryHash ?? ""
       };
       saves.set(save.id, save);
+    }
+    for (const source of parsed.modelUsage ?? []) {
+      const usage = normalizeStoredModelUsage(source);
+      if (!usage) continue;
+      modelUsage.set(modelUsageKey(usage), usage);
     }
     for (const environment of parsed.environments ?? []) {
       if (!environment?.sessionId || !environment.runtimeMode) continue;
@@ -291,6 +407,99 @@ export async function saveGameEnv(sessionId: string, env: StoredGameEnv): Promis
 export async function getGameEnv(sessionId: string): Promise<StoredGameEnv | undefined> {
   await ensureStoreReady();
   return envBySession.get(sessionId);
+}
+
+/**
+ * Persist only compact, provider-reported usage aggregates. This telemetry is
+ * intentionally independent from run snapshots so restoring a save never
+ * rewinds already-issued model requests.
+ */
+export async function recordModelUsage(sessionId: string, input: ModelUsageRecordInput): Promise<void> {
+  await ensureStoreReady();
+  const model = input.model.trim().slice(0, 160);
+  if (!sessions.has(sessionId) || !model || !modelUsageOperations.includes(input.operation)) return;
+
+  const key = modelUsageKey({
+    sessionId,
+    runId: input.runId,
+    worldId: input.worldId,
+    model,
+    transport: input.transport,
+    operation: input.operation
+  });
+  const now = Date.now();
+  const existing = modelUsage.get(key);
+  const entry: StoredModelUsage = existing ?? {
+    sessionId,
+    runId: input.runId,
+    worldId: input.worldId,
+    model,
+    transport: input.transport,
+    operation: input.operation,
+    updatedAt: now,
+    ...emptyModelUsageTotals()
+  };
+  const durationMs = nonNegativeInteger(input.durationMs);
+  entry.updatedAt = now;
+
+  if (input.cacheHit) {
+    entry.cacheHitCount += 1;
+  } else {
+    entry.requestCount += 1;
+    entry.durationMs += durationMs;
+    if (input.success) {
+      entry.successCount += 1;
+      const usage = input.usage;
+      const inputTokens = nonNegativeInteger(usage?.inputTokens);
+      const outputTokens = nonNegativeInteger(usage?.outputTokens);
+      const totalTokens = nonNegativeInteger(usage?.totalTokens);
+      const hasReportedUsage = inputTokens > 0 || outputTokens > 0 || totalTokens > 0;
+      if (hasReportedUsage) {
+        entry.reportedUsageCount += 1;
+        entry.inputTokens += inputTokens;
+        entry.outputTokens += outputTokens;
+        entry.totalTokens += totalTokens || inputTokens + outputTokens;
+      } else {
+        entry.unreportedUsageCount += 1;
+      }
+    } else {
+      entry.failureCount += 1;
+    }
+  }
+
+  modelUsage.set(key, entry);
+  const sessionEntries = Array.from(modelUsage.entries())
+    .filter(([, usage]) => usage.sessionId === sessionId)
+    .sort(([, left], [, right]) => left.updatedAt - right.updatedAt);
+  while (sessionEntries.length > MAX_MODEL_USAGE_ENTRIES_PER_SESSION) {
+    const oldest = sessionEntries.shift();
+    if (oldest) modelUsage.delete(oldest[0]);
+  }
+  await queuePersist();
+}
+
+export async function getModelUsageSummary(sessionId: string): Promise<ModelUsageSummary> {
+  await ensureStoreReady();
+  const entries = Array.from(modelUsage.values())
+    .filter((entry) => entry.sessionId === sessionId)
+    .sort((left, right) => right.updatedAt - left.updatedAt)
+    .map(({ sessionId: _sessionId, ...entry }) => ({ ...entry }));
+  const totals = emptyModelUsageTotals();
+  let updatedAt: number | null = null;
+  for (const entry of entries) {
+    totals.requestCount += entry.requestCount;
+    totals.successCount += entry.successCount;
+    totals.failureCount += entry.failureCount;
+    totals.cacheHitCount += entry.cacheHitCount;
+    totals.reportedUsageCount += entry.reportedUsageCount;
+    totals.unreportedUsageCount += entry.unreportedUsageCount;
+    totals.inputTokens += entry.inputTokens;
+    totals.outputTokens += entry.outputTokens;
+    totals.totalTokens += entry.totalTokens;
+    totals.durationMs += entry.durationMs;
+    updatedAt = updatedAt === null ? entry.updatedAt : Math.max(updatedAt, entry.updatedAt);
+  }
+  return { updatedAt, totals, entries };
 }
 
 export async function createSaveSlot(
@@ -437,6 +646,11 @@ export async function resetAnonymousGameData(sessionId: string): Promise<void> {
   for (const [saveId, save] of saves) {
     if (save.ownerSessionId !== sessionId) continue;
     saves.delete(saveId);
+    changed = true;
+  }
+  for (const [key, usage] of modelUsage) {
+    if (usage.sessionId !== sessionId) continue;
+    modelUsage.delete(key);
     changed = true;
   }
   if (changed) await queuePersist();

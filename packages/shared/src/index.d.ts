@@ -1029,6 +1029,37 @@ export interface CreateSaveResponse {
     save: SaveSlotSummary;
     recoveryCode: string;
 }
+export type ModelUsageOperation = "narrative" | "summary" | "continuation" | "director" | "planning" | "render" | "origin" | "background" | "scene" | "choice" | "decision" | "ending";
+export type ModelUsageTransport = "chat" | "responses";
+export interface ModelUsageTotals {
+    requestCount: number;
+    successCount: number;
+    failureCount: number;
+    cacheHitCount: number;
+    reportedUsageCount: number;
+    unreportedUsageCount: number;
+    inputTokens: number;
+    outputTokens: number;
+    totalTokens: number;
+    durationMs: number;
+}
+/**
+ * Session-local aggregate of provider-reported usage. It intentionally excludes
+ * credentials, prompts, generated text, provider balance, and price estimates.
+ */
+export interface ModelUsageEntry extends ModelUsageTotals {
+    runId?: string;
+    worldId?: string;
+    model: string;
+    transport: ModelUsageTransport;
+    operation: ModelUsageOperation;
+    updatedAt: number;
+}
+export interface ModelUsageSummary {
+    updatedAt: number | null;
+    totals: ModelUsageTotals;
+    entries: ModelUsageEntry[];
+}
 export interface ProviderConfig {
     provider: "openai-compatible";
     baseUrl: string;

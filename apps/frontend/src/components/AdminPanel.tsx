@@ -4,11 +4,13 @@ import type {
   BackgroundCard,
   ContentBundle,
   DifficultyConfig,
+  ModelUsageOperation,
+  ModelUsageSummary,
   ProviderConfig,
   ProviderLimits,
   WorldConfig
 } from "@reroll/shared";
-import { fetchAdminConfig, fetchAdminContent, saveAdminConfig, saveAdminContent } from "../lib/api";
+import { fetchAdminConfig, fetchAdminContent, fetchModelUsage, saveAdminConfig, saveAdminContent } from "../lib/api";
 import { ProviderConfigForm } from "./ProviderConfigForm";
 
 interface Props {
@@ -60,6 +62,30 @@ function defaultContent(): ContentBundle {
   };
 }
 
+const usageOperationLabels: Record<ModelUsageOperation, string> = {
+  narrative: "常规叙事",
+  summary: "上下文摘要",
+  continuation: "文本续写",
+  director: "方向选择",
+  planning: "剧情规划",
+  render: "场景渲染",
+  origin: "身世生成",
+  background: "人生背景",
+  scene: "场景推进",
+  choice: "抉择生成",
+  decision: "抉择后果",
+  ending: "结局渲染"
+};
+
+function formatUsageNumber(value: number): string {
+  return new Intl.NumberFormat("zh-CN").format(value);
+}
+
+function formatUsageDuration(durationMs: number): string {
+  if (durationMs < 1000) return `${durationMs} ms`;
+  return `${(durationMs / 1000).toFixed(1)} 秒`;
+}
+
 export function AdminPanel(props: Props): React.JSX.Element {
   const {
     onClose,
@@ -79,6 +105,9 @@ export function AdminPanel(props: Props): React.JSX.Element {
   const [cloudProvider, setCloudProvider] = useState<ProviderConfig>(defaultProvider);
   const [limits, setLimits] = useState<ProviderLimits>(bootstrap.limits);
   const [content, setContent] = useState<ContentBundle>(defaultContent());
+  const [modelUsage, setModelUsage] = useState<ModelUsageSummary | null>(null);
+  const [usageLoading, setUsageLoading] = useState(true);
+  const [usageError, setUsageError] = useState("");
   const [status, setStatus] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const cloudLocked = bootstrap.deployMode === "cloud";
@@ -115,6 +144,22 @@ export function AdminPanel(props: Props): React.JSX.Element {
     }
     void init();
   }, [cloudLocked]);
+
+  async function loadModelUsage(): Promise<void> {
+    setUsageLoading(true);
+    setUsageError("");
+    try {
+      setModelUsage(await fetchModelUsage());
+    } catch {
+      setUsageError("暂时无法读取本会话的模型用量。");
+    } finally {
+      setUsageLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    void loadModelUsage();
+  }, []);
 
   useEffect(() => {
     if (cloudLocked && tab !== "session") {
@@ -312,6 +357,48 @@ export function AdminPanel(props: Props): React.JSX.Element {
               <button disabled={!canConfirmEnv} onClick={() => void onConfirmEnvironment()}>确认本局环境</button>
               <small>{envReady ? "已确认" : "未确认"}</small>
             </div>
+
+            <section className="model-usage-panel" aria-live="polite">
+              <div className="row between model-usage-heading">
+                <div>
+                  <h3>模型用量</h3>
+                  <small>仅统计本浏览器会话中服务商已上报的 Token，不估算费用或账户余额。</small>
+                </div>
+                <button className="ghost" disabled={usageLoading} onClick={() => void loadModelUsage()}>
+                  {usageLoading ? "读取中" : "刷新"}
+                </button>
+              </div>
+
+              {usageError ? <p className="model-usage-empty">{usageError}</p> : null}
+              {!usageError && usageLoading && !modelUsage ? <p className="model-usage-empty">正在读取本会话用量...</p> : null}
+              {!usageError && !usageLoading && modelUsage?.entries.length === 0 ? <p className="model-usage-empty">尚无模型调用记录。</p> : null}
+              {modelUsage && modelUsage.entries.length > 0 ? (
+                <>
+                  <dl className="model-usage-totals">
+                    <div><dt>实际请求</dt><dd>{formatUsageNumber(modelUsage.totals.requestCount)}</dd></div>
+                    <div><dt>已上报 Token</dt><dd>{formatUsageNumber(modelUsage.totals.totalTokens)}</dd></div>
+                    <div><dt>输入 / 输出</dt><dd>{formatUsageNumber(modelUsage.totals.inputTokens)} / {formatUsageNumber(modelUsage.totals.outputTokens)}</dd></div>
+                    <div><dt>未上报 / 缓存命中</dt><dd>{formatUsageNumber(modelUsage.totals.unreportedUsageCount)} / {formatUsageNumber(modelUsage.totals.cacheHitCount)}</dd></div>
+                  </dl>
+                  <div className="model-usage-list">
+                    {modelUsage.entries.map((entry) => (
+                      <div key={`${entry.runId ?? "session"}-${entry.model}-${entry.transport}-${entry.operation}`} className="model-usage-entry">
+                        <div>
+                          <strong>{usageOperationLabels[entry.operation]}</strong>
+                          <small>{entry.model} · {entry.transport === "responses" ? "Responses" : "Chat Completions"}</small>
+                        </div>
+                        <small>
+                          {entry.requestCount} 次请求 · {entry.inputTokens} / {entry.outputTokens} / {entry.totalTokens} Token · {formatUsageDuration(entry.durationMs)}
+                          {entry.failureCount ? ` · ${entry.failureCount} 次失败` : ""}
+                          {entry.unreportedUsageCount ? ` · ${entry.unreportedUsageCount} 次未上报` : ""}
+                          {entry.cacheHitCount ? ` · ${entry.cacheHitCount} 次缓存` : ""}
+                        </small>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              ) : null}
+            </section>
           </section>
         ) : null}
 

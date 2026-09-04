@@ -2,12 +2,18 @@ import OpenAI from "openai";
 import { createHash } from "node:crypto";
 import type { InternalRunState } from "./engine.js";
 import type { ChatConversationState, ChatHistoryMessage, StoryConversationState, ToolCallRecord } from "./conversation.js";
-import type { AiMilestoneOptions, DecisionType, EventStoryPosition, NarrativeActHandoff, NarrativeAttributeEffect, NarrativeAttributePolicy, NarrativeBeat, NarrativeFactResolution, NarrativeIntent, NarrativeStatTier, ProviderConfig, StatKey, Stats, WorldConfig, YearEvent } from "@reroll/shared";
+import type { AiMilestoneOptions, DecisionType, EventStoryPosition, ModelUsageOperation, NarrativeActHandoff, NarrativeAttributeEffect, NarrativeAttributePolicy, NarrativeBeat, NarrativeFactResolution, NarrativeIntent, NarrativeStatTier, ProviderConfig, StatKey, Stats, WorldConfig, YearEvent } from "@reroll/shared";
 import { formatNarrativePromptPlan, type NarrativePromptPlan } from "./narrative.js";
+import { recordModelUsage } from "./store.js";
 
 export interface NarrativeContext {
   providerConfig: ProviderConfig;
   apiKey: string;
+  usageScope?: {
+    sessionId: string;
+    runId?: string;
+    worldId?: string;
+  };
   promptPack: Record<string, string>;
   worldlineSummary?: string;
   factionSummary?: string;
@@ -28,11 +34,107 @@ interface CallModelOptions {
   structuredOutput?: StructuredOutputSpec;
   jsonMode?: boolean;
   conversation?: ChatConversationState;
+  usageOperation?: ModelUsageOperation;
 }
 interface ModelCallResult {
   text: string;
   truncated: boolean;
   truncateReason?: string;
+}
+
+interface ProviderReportedUsage {
+  inputTokens?: number;
+  outputTokens?: number;
+  totalTokens?: number;
+}
+
+type ModelUsageOperationInput = ModelUsageOperation | {
+  fallback: ModelUsageOperation;
+  resolve: (response: unknown) => ModelUsageOperation;
+};
+
+function reportedTokenValue(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0
+    ? Math.trunc(value)
+    : undefined;
+}
+
+function extractProviderUsage(response: unknown, transport: "chat" | "responses"): ProviderReportedUsage | undefined {
+  const usage = (response as {
+    usage?: {
+      prompt_tokens?: unknown;
+      completion_tokens?: unknown;
+      input_tokens?: unknown;
+      output_tokens?: unknown;
+      total_tokens?: unknown;
+    };
+  }).usage;
+  if (!usage || typeof usage !== "object") return undefined;
+  return {
+    inputTokens: reportedTokenValue(transport === "chat" ? usage.prompt_tokens : usage.input_tokens),
+    outputTokens: reportedTokenValue(transport === "chat" ? usage.completion_tokens : usage.output_tokens),
+    totalTokens: reportedTokenValue(usage.total_tokens)
+  };
+}
+
+function recordProviderUsage(
+  ctx: NarrativeContext,
+  operation: ModelUsageOperationInput,
+  transport: "chat" | "responses",
+  input: { success?: boolean; cacheHit?: boolean; durationMs: number; response?: unknown }
+): void {
+  const scope = ctx.usageScope;
+  if (!scope?.sessionId) return;
+  const resolvedOperation = typeof operation === "string"
+    ? operation
+    : input.response
+      ? operation.resolve(input.response)
+      : operation.fallback;
+  void recordModelUsage(scope.sessionId, {
+    runId: scope.runId,
+    worldId: scope.worldId,
+    model: ctx.providerConfig.model,
+    transport,
+    operation: resolvedOperation,
+    success: input.success,
+    cacheHit: input.cacheHit,
+    durationMs: input.durationMs,
+    usage: input.response ? extractProviderUsage(input.response, transport) : undefined
+  }).catch((error) => debugError("model-usage", error));
+}
+
+async function createTrackedChatCompletion(
+  ctx: NarrativeContext,
+  client: OpenAI,
+  payload: OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming,
+  operation: ModelUsageOperationInput
+): Promise<OpenAI.Chat.Completions.ChatCompletion> {
+  const startedAt = Date.now();
+  try {
+    const response = await client.chat.completions.create(payload);
+    recordProviderUsage(ctx, operation, "chat", { success: true, durationMs: Date.now() - startedAt, response });
+    return response;
+  } catch (error) {
+    recordProviderUsage(ctx, operation, "chat", { success: false, durationMs: Date.now() - startedAt });
+    throw error;
+  }
+}
+
+async function createTrackedResponse(
+  ctx: NarrativeContext,
+  client: OpenAI,
+  payload: Parameters<OpenAI["responses"]["create"]>[0],
+  operation: ModelUsageOperationInput
+): Promise<Awaited<ReturnType<OpenAI["responses"]["create"]>>> {
+  const startedAt = Date.now();
+  try {
+    const response = await client.responses.create(payload);
+    recordProviderUsage(ctx, operation, "responses", { success: true, durationMs: Date.now() - startedAt, response });
+    return response;
+  } catch (error) {
+    recordProviderUsage(ctx, operation, "responses", { success: false, durationMs: Date.now() - startedAt });
+    throw error;
+  }
 }
 interface YearNarrativeOptions {
   avoidNarratives?: string[];
@@ -819,7 +921,8 @@ async function summarizeOverflowPairs(
   ].join("\n");
   const result = await callModel(ctx, summarySystem, summaryPrompt, {
     mode: "year",
-    skipCache: true
+    skipCache: true,
+    usageOperation: "summary"
   });
   const merged = [conversation.headMemory, result.text]
     .map((x) => x.trim())
@@ -1045,6 +1148,7 @@ async function continueNarrative(
   return callModel(ctx, systemPrompt, continuationPrompt, {
     mode: "year",
     conversation: options?.conversation,
+    usageOperation: "continuation",
     semanticQuery: continuationPrompt
   });
 }
@@ -1514,6 +1618,7 @@ async function callModel(
   }
 ): Promise<ModelCallResult> {
   const mode = options?.mode ?? "year";
+  const usageOperation = options?.usageOperation ?? "narrative";
   const canUseLocalPromptCache = !options?.skipCache;
   const semanticQuery = options?.semanticQuery ?? userPrompt;
   const convo = options?.conversation;
@@ -1529,6 +1634,7 @@ async function callModel(
       if (debugModel) {
         console.log("[model-debug:semantic-cache-hit]", { len: semanticHit.length, mode });
       }
+      recordProviderUsage(ctx, usageOperation, "chat", { cacheHit: true, durationMs: 0 });
       return { text: semanticHit, truncated: false };
     }
     const cached = readPromptCache(cacheKey);
@@ -1536,6 +1642,7 @@ async function callModel(
       if (debugModel) {
         console.log("[model-debug:cache-hit]", { len: cached.length });
       }
+      recordProviderUsage(ctx, usageOperation, "chat", { cacheHit: true, durationMs: 0 });
       return { text: cached, truncated: false };
     }
   }
@@ -1586,11 +1693,11 @@ async function callModel(
         ...requestBase
       }
     ];
-    let chat: Awaited<ReturnType<typeof client.chat.completions.create>> | null = null;
+    let chat: OpenAI.Chat.Completions.ChatCompletion | null = null;
     let lastVariantError: unknown = null;
     for (const payload of requestVariants) {
       try {
-        chat = await client.chat.completions.create(payload as never);
+        chat = await createTrackedChatCompletion(ctx, client, payload as never, usageOperation);
         break;
       } catch (error) {
         lastVariantError = error;
@@ -1657,6 +1764,7 @@ async function callModelAsJson(
     conversation?: ChatConversationState;
     semanticQuery: string;
     skipCache: boolean;
+    usageOperation?: ModelUsageOperation;
   }
 ): Promise<{ result: ModelCallResult; outputMode: JsonOutputMode }> {
   const supportKey = buildToolSupportCacheKey(ctx);
@@ -1665,8 +1773,9 @@ async function callModelAsJson(
     try {
       const result = await callModel(ctx, systemPrompt, userPrompt, {
         ...options,
-        structuredOutput: outputMode === "json-schema" ? structuredOutput : undefined,
-        jsonMode: outputMode === "json-object"
+          structuredOutput: outputMode === "json-schema" ? structuredOutput : undefined,
+          jsonMode: outputMode === "json-object",
+          usageOperation: options.usageOperation
       });
       structuredOutputSupportCache.set(supportKey, outputMode);
       return { result, outputMode };
@@ -2381,7 +2490,7 @@ export async function generateDirectedFocusSelection(
     compactConversationWindow(ctx, conversation);
     const client = getOpenAIClient(ctx);
     // This request only selects a direction; event material and narrative are handled by the next stage.
-    const completion = await client.chat.completions.create({
+    const completion = await createTrackedChatCompletion(ctx, client, {
       model: ctx.providerConfig.model,
       temperature: ctx.providerConfig.temperature,
       max_tokens: ctx.providerConfig.maxTokens,
@@ -2392,7 +2501,7 @@ export async function generateDirectedFocusSelection(
       ],
       tools: [tool as never],
       tool_choice: { type: "function", function: { name: toolName } }
-    } as never);
+    } as never, "director");
     const directedToolCall = findDirectedToolCall(completion.choices[0]?.message, toolName);
     if (!directedToolCall) return null;
     toolSupportCache.set(supportKey, true);
@@ -2438,7 +2547,7 @@ export async function generateDirectedNarrative(
   try {
     compactConversationWindow(ctx, conversation);
     const client = getOpenAIClient(ctx);
-    const completion = await client.chat.completions.create({
+    const completion = await createTrackedChatCompletion(ctx, client, {
       model: ctx.providerConfig.model,
       temperature: ctx.providerConfig.temperature,
       max_tokens: ctx.providerConfig.maxTokens,
@@ -2466,7 +2575,7 @@ export async function generateDirectedNarrative(
           content: toolResultContent
         }
       ]
-    } as never);
+    } as never, "render");
     return parseResult(readChatCompletionText(completion.choices[0]?.message));
   } catch (error) {
     if (!isLikelyToolTranscriptUnsupported(error)) {
@@ -2477,6 +2586,7 @@ export async function generateDirectedNarrative(
       const fallback = await callModel(ctx, systemPrompt, userPrompt, {
         mode: "year",
         conversation,
+        usageOperation: "render",
         semanticQuery: `director-render|${run.age + 1}|${input.id}|${input.focusTag}|${run.personaPrompt}`
       });
       return parseResult(fallback.text);
@@ -2576,7 +2686,7 @@ export async function generateDirectedStoryTurn(
         ? "required"
         : { type: "function", name: "propose_story_intent" };
     const completion = isResponsesApi
-      ? await client.responses.create({
+      ? await createTrackedResponse(ctx, client, {
           model: ctx.providerConfig.model,
           instructions: buildSystemMessage(conversation),
           input: [
@@ -2588,8 +2698,8 @@ export async function generateDirectedStoryTurn(
           tools: directedStoryResponseTools(input) as never,
           tool_choice: responseToolChoice,
           parallel_tool_calls: false
-        } as never)
-      : await client.chat.completions.create({
+        } as never, "planning")
+      : await createTrackedChatCompletion(ctx, client, {
           model: ctx.providerConfig.model,
           temperature: ctx.providerConfig.temperature,
           max_tokens: ctx.providerConfig.maxTokens,
@@ -2603,7 +2713,7 @@ export async function generateDirectedStoryTurn(
           parallel_tool_calls: false,
           thinking: { type: "disabled" },
           reasoning_effort: reasoningEffortForSdk(ctx.providerConfig.reasoningEffort)
-        } as never);
+        } as never, "planning");
     const closureCall = input.allowClosureRequest ? (isResponsesApi
       ? findResponseFunctionCall(completion as { output?: unknown[] }, "request_story_closure")
       : findDirectedToolCall((completion as { choices?: Array<{ message?: unknown }> }).choices?.[0]?.message, "request_story_closure")) : null;
@@ -2766,7 +2876,7 @@ export async function generateDirectedStoryRender(
     compactConversationWindow(ctx, conversation);
     const client = getOpenAIClient(ctx);
     const completion = turn.continuation.protocol === "responses"
-      ? await client.responses.create({
+      ? await createTrackedResponse(ctx, client, {
           model: ctx.providerConfig.model,
           instructions: turn.continuation.systemPrompt,
           previous_response_id: turn.continuation.responseId,
@@ -2780,8 +2890,8 @@ export async function generateDirectedStoryRender(
           tools: [directedStoryRenderResponseTool(input)] as never,
           tool_choice: { type: "function", name: renderToolName },
           parallel_tool_calls: false
-        } as never)
-      : await client.chat.completions.create({
+        } as never, "render")
+      : await createTrackedChatCompletion(ctx, client, {
           model: ctx.providerConfig.model,
           temperature: ctx.providerConfig.temperature,
           max_tokens: ctx.providerConfig.maxTokens,
@@ -2806,7 +2916,7 @@ export async function generateDirectedStoryRender(
           tools: [directedStoryRenderTool(input)] as never,
           tool_choice: { type: "function", function: { name: renderToolName } },
           parallel_tool_calls: false
-        } as never);
+        } as never, "render");
     const incomplete = turn.continuation.protocol === "responses"
       ? Boolean((completion as { incomplete_details?: unknown }).incomplete_details)
       : (completion as { choices?: Array<{ finish_reason?: string | null }> }).choices?.[0]?.finish_reason === "length";
@@ -2847,8 +2957,21 @@ function parseNarrativeEffects(raw: unknown, policy: NarrativeAttributePolicy): 
     used.add(value.stat as StatKey);
     effects.push({ stat: value.stat as StatKey, direction: value.direction, band: value.band as NarrativeAttributeEffect["band"] });
   }
+  if (policy.preferredStats?.length && (policy.minPreferredEffects ?? 0) > 0) {
+    const preferredCount = effects.filter((effect) => policy.preferredStats!.includes(effect.stat)).length;
+    if (preferredCount < (policy.minPreferredEffects ?? 0)) return null;
+  }
   if (policy.requirePositive && !effects.some((effect) => effect.direction === "up")) return null;
   return effects;
+}
+
+function narrativeToolUsageOperation(toolNames: string[]): ModelUsageOperation {
+  if (toolNames.includes("render_origin")) return "origin";
+  if (toolNames.includes("render_background_segment") || toolNames.includes("render_background_turn")) return "background";
+  if (toolNames.includes("render_choice_scene")) return "choice";
+  if (toolNames.includes("render_scene")) return "scene";
+  if (toolNames.includes("resolve_decision_outcome")) return "decision";
+  return "narrative";
 }
 
 async function requestNarrativeOutcomeTool(
@@ -2870,12 +2993,22 @@ async function requestNarrativeOutcomeTool(
   const toolChoice = tools.length === 1
     ? { type: "function", function: { name: toolNames[0] } }
     : "required";
+  const isResponsesApi = ctx.providerConfig.apiPath === "/responses";
+  const usageOperation: ModelUsageOperationInput = {
+    // A failed multi-tool request has no actual tool choice to classify.
+    fallback: tools.length === 1 ? narrativeToolUsageOperation(toolNames) : "narrative",
+    resolve: (response) => {
+      const selected = isResponsesApi
+        ? toolNames.map((toolName) => findResponseFunctionCall(response as { output?: unknown[] }, toolName)).find(Boolean)
+        : toolNames.map((toolName) => findDirectedToolCall((response as { choices?: Array<{ message?: unknown }> }).choices?.[0]?.message, toolName)).find(Boolean);
+      return selected ? narrativeToolUsageOperation([selected.toolCall.name]) : "narrative";
+    }
+  };
   try {
     compactConversationWindow(ctx, conversation);
     const client = getOpenAIClient(ctx);
-    const isResponsesApi = ctx.providerConfig.apiPath === "/responses";
     const completion = isResponsesApi
-      ? await client.responses.create({
+      ? await createTrackedResponse(ctx, client, {
           model: ctx.providerConfig.model,
           instructions: buildSystemMessage(conversation),
           input: [...buildConversationHistoryMessages(conversation), { role: "user", content: prompt }],
@@ -2884,8 +3017,8 @@ async function requestNarrativeOutcomeTool(
           tools: tools.map(responseTool) as never,
           tool_choice: tools.length === 1 ? { type: "function", name: toolNames[0] } : "required",
           parallel_tool_calls: false
-        } as never)
-      : await client.chat.completions.create({
+        } as never, usageOperation)
+      : await createTrackedChatCompletion(ctx, client, {
           model: ctx.providerConfig.model,
           temperature: ctx.providerConfig.temperature,
           max_tokens: ctx.providerConfig.maxTokens,
@@ -2895,7 +3028,7 @@ async function requestNarrativeOutcomeTool(
           tools: tools as never,
           tool_choice: toolChoice as never,
           parallel_tool_calls: false
-        } as never);
+        } as never, usageOperation);
     const call = isResponsesApi
       ? toolNames.map((toolName) => findResponseFunctionCall(completion as { output?: unknown[] }, toolName)).find(Boolean)
       : toolNames.map((toolName) => findDirectedToolCall((completion as { choices?: Array<{ message?: unknown }> }).choices?.[0]?.message, toolName)).find(Boolean);
@@ -3615,7 +3748,8 @@ export async function generateMilestoneOptions(
       mode: "milestone",
       conversation,
       semanticQuery: `${run.age}|${run.ageStage.label}|${run.personaPrompt}`,
-      skipCache: true
+      skipCache: true,
+      usageOperation: "choice"
     });
     const text = first.result.text;
     if (debugModel) {
@@ -3637,7 +3771,8 @@ export async function generateMilestoneOptions(
         mode: "milestone",
         conversation,
         semanticQuery: retryPrompt,
-        skipCache: true
+        skipCache: true,
+        usageOperation: "choice"
       });
       const retriedText = retried.result.text;
       parsed = parseMilestonePayload(retriedText);
@@ -3700,7 +3835,8 @@ export async function generateEndingNarrative(
       mode: "ending",
       conversation,
       semanticQuery: `${run.outcome}|${run.age}|${run.fame}|${run.deathCause ?? ""}`,
-      skipCache: true
+      skipCache: true,
+      usageOperation: "ending"
     });
     let text = callResult.text;
     text = text.replace(/\s+/g, " ").trim();

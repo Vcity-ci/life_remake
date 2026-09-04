@@ -3545,14 +3545,17 @@ export function dynamicBackgroundAttributePolicy(run: InternalRunState): Narrati
   const focus = runtime?.growthFocusId
     ? runtime.growthFocusOptions?.find((option) => option.id === runtime.growthFocusId)
     : undefined;
+  const preferredStats = focus?.primaryStats ?? [];
   return {
-    // The tool schema receives the same stat envelope that the engine will accept.
-    allowedStats: focus?.primaryStats?.length ? focus.primaryStats : allStatKeys,
+    // A focus anchors the segment without turning its attributes into a whitelist.
+    allowedStats: allStatKeys,
     allowedBands: ["light", "medium"],
     allowedDirections: ["up"],
     minEffects: 1,
-    maxEffects: 1,
-    requirePositive: true
+    maxEffects: 2,
+    requirePositive: true,
+    preferredStats,
+    minPreferredEffects: preferredStats.length ? 1 : 0
   };
 }
 

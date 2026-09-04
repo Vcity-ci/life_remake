@@ -115,6 +115,7 @@ import {
   ensureStoreReady,
   getGameEnv,
   getLatestRun,
+  getModelUsageSummary,
   getRun,
   getRunSessionId,
   listSaveSlots,
@@ -716,6 +717,7 @@ interface RunYearFlowOptions {
   branch: "start" | "step";
   rawChunk: YearEvent[];
   currentRun: InternalRunState;
+  sessionId: string;
   world: WorldConfig;
   providerConfig: ProviderConfig;
   apiKey: string;
@@ -733,6 +735,7 @@ async function runYearFlow(options: RunYearFlowOptions): Promise<{ updatedRun: I
     branch,
     rawChunk,
     currentRun,
+    sessionId,
     world,
     providerConfig,
     apiKey,
@@ -748,6 +751,7 @@ async function runYearFlow(options: RunYearFlowOptions): Promise<{ updatedRun: I
   const narrativeCtx: NarrativeCallContext = {
     providerConfig,
     apiKey,
+    usageScope: { sessionId, runId: currentRun.runId, worldId: currentRun.worldId },
     promptPack,
     worldlineSummary,
     factionSummary,
@@ -794,6 +798,7 @@ async function runYearFlow(options: RunYearFlowOptions): Promise<{ updatedRun: I
       const milestoneCtx: NarrativeCallContext = {
         providerConfig,
         apiKey,
+        usageScope: { sessionId, runId: currentRun.runId, worldId: currentRun.worldId },
         promptPack,
         worldlineSummary,
         factionSummary,
@@ -994,6 +999,7 @@ interface DirectedSegmentOptions {
   run: InternalRunState;
   world: WorldConfig;
   difficulty: DifficultyConfig;
+  sessionId: string;
   providerConfig: ProviderConfig;
   apiKey: string;
   promptPack: Record<string, string>;
@@ -1011,6 +1017,7 @@ interface OpeningGenerationOptions {
   run: InternalRunState;
   world: WorldConfig;
   narrativeWorld?: NarrativeWorldDefinition | null;
+  sessionId: string;
   providerConfig: ProviderConfig;
   apiKey: string;
   promptPack: Record<string, string>;
@@ -1025,6 +1032,7 @@ async function generateOpeningForRun(options: OpeningGenerationOptions): Promise
     run,
     world,
     narrativeWorld,
+    sessionId,
     providerConfig,
     apiKey,
     promptPack,
@@ -1038,6 +1046,7 @@ async function generateOpeningForRun(options: OpeningGenerationOptions): Promise
   const narrativeCtx: NarrativeCallContext = {
     providerConfig,
     apiKey,
+    usageScope: { sessionId, runId: run.runId, worldId: run.worldId },
     promptPack,
     worldlineSummary,
     factionSummary,
@@ -1091,6 +1100,7 @@ async function generateStaticDirectedSegmentForRunUnsafe(options: DirectedSegmen
     run,
     world,
     difficulty,
+    sessionId,
     providerConfig,
     apiKey,
     promptPack,
@@ -1116,6 +1126,7 @@ async function generateStaticDirectedSegmentForRunUnsafe(options: DirectedSegmen
   const narrativeCtx: NarrativeCallContext = {
     providerConfig,
     apiKey,
+    usageScope: { sessionId, runId: run.runId, worldId: run.worldId },
     promptPack,
     worldlineSummary,
     factionSummary,
@@ -1292,6 +1303,7 @@ async function generateDirectedSegmentForRunUnsafe(options: DirectedSegmentOptio
     run,
     world,
     difficulty,
+    sessionId,
     providerConfig,
     apiKey,
     promptPack,
@@ -1307,6 +1319,7 @@ async function generateDirectedSegmentForRunUnsafe(options: DirectedSegmentOptio
   const narrativeCtx: NarrativeCallContext = {
     providerConfig,
     apiKey,
+    usageScope: { sessionId, runId: run.runId, worldId: run.worldId },
     promptPack,
     worldlineSummary,
     factionSummary,
@@ -1520,6 +1533,7 @@ async function generateSegmentForRun(
   run: InternalRunState,
   world: WorldConfig,
   difficulty: DifficultyConfig,
+  sessionId: string,
   providerConfig: ProviderConfig,
   apiKey: string,
   promptPack: Record<string, string>,
@@ -1584,6 +1598,7 @@ async function generateSegmentForRun(
         run,
         world,
         difficulty,
+        sessionId,
         providerConfig,
         apiKey,
         promptPack,
@@ -1603,6 +1618,7 @@ async function generateSegmentForRun(
       run,
       world,
       difficulty,
+      sessionId,
       providerConfig,
       apiKey,
       promptPack,
@@ -1627,6 +1643,7 @@ async function generateSegmentForRun(
     branch: "start",
     rawChunk,
     currentRun: advanced.updated,
+    sessionId,
     world,
     providerConfig,
     apiKey,
@@ -1731,6 +1748,7 @@ async function runStartFlowUnlocked(
       run,
       world,
       narrativeWorld,
+      sessionId,
       providerConfig,
       apiKey,
       promptPack: content.promptPack,
@@ -1870,6 +1888,7 @@ async function runStepFlowUnlocked(
         run,
         world,
         narrativeWorld,
+        sessionId,
         providerConfig,
         apiKey,
         promptPack: content.promptPack,
@@ -1917,6 +1936,7 @@ async function runStepFlowUnlocked(
         const endingCtx: NarrativeCallContext = {
           providerConfig,
           apiKey,
+          usageScope: { sessionId, runId: run.runId, worldId: run.worldId },
           promptPack: content.promptPack,
           worldlineSummary,
           factionSummary,
@@ -2023,6 +2043,7 @@ async function runStepFlowUnlocked(
       directedDecisionContext = {
         providerConfig,
         apiKey,
+        usageScope: { sessionId, runId: run.runId, worldId: run.worldId },
         promptPack: content.promptPack,
         worldlineSummary,
         factionSummary,
@@ -2083,6 +2104,7 @@ async function runStepFlowUnlocked(
         branch: "step",
         rawChunk: stepped.chunk,
         currentRun: stepped.updated,
+        sessionId,
         world,
         providerConfig,
         apiKey,
@@ -2104,6 +2126,7 @@ async function runStepFlowUnlocked(
       run,
       world,
       difficulty,
+      sessionId,
       providerConfig,
       apiKey,
       content.promptPack,
@@ -2276,6 +2299,17 @@ app.get("/api/game/current", async (req, res) => {
     return res.json(await currentGameRunPayload(session.id));
   } catch (error) {
     logGameFlowError("current", error);
+    const publicError = toPublicGameError(error);
+    return res.status(publicError.status).json({ error: publicError.code, message: publicError.message });
+  }
+});
+
+app.get("/api/game/usage", async (req, res) => {
+  try {
+    const session = requireAnonymousSession(req);
+    return res.json(await getModelUsageSummary(session.id));
+  } catch (error) {
+    logGameFlowError("model-usage", error);
     const publicError = toPublicGameError(error);
     return res.status(publicError.status).json({ error: publicError.code, message: publicError.message });
   }

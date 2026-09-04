@@ -70,6 +70,10 @@ export async function saveGameEnvironment(payload) {
     });
     return parseJson(res);
 }
+export async function fetchModelUsage() {
+    const res = await gameFetch("/api/game/usage");
+    return parseJson(res);
+}
 export async function startRun(payload) {
     const res = await gameFetch("/api/game/start", {
         method: "POST",

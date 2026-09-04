@@ -1,4 +1,4 @@
-import type { AdminConfigPayload, ContentBundle, CreateSaveResponse, CurrentGameRunResponse, GameEnvConfigResponse, PublicBackgroundCard, PublicDifficultyOption, PublicRunState, PublicTimelineEntry, TurnRecord, PublicWorldOption, ProviderConfig, ProviderLimits, SaveSlotSummary, StepAction, StartAllocationConfig, StartRunResponse, StepRunResponse, Stats, SurvivalChoice } from "@reroll/shared";
+import type { AdminConfigPayload, ContentBundle, CreateSaveResponse, CurrentGameRunResponse, GameEnvConfigResponse, ModelUsageSummary, PublicBackgroundCard, PublicDifficultyOption, PublicRunState, PublicTimelineEntry, TurnRecord, PublicWorldOption, ProviderConfig, ProviderLimits, SaveSlotSummary, StepAction, StartAllocationConfig, StartRunResponse, StepRunResponse, Stats, SurvivalChoice } from "@reroll/shared";
 export declare class ApiError extends Error {
     status: number;
     code?: string;
@@ -65,6 +65,7 @@ export declare function saveGameEnvironment(payload: {
     localApiKey?: string;
     localProviderConfig?: ProviderConfig;
 }): Promise<GameEnvConfigResponse>;
+export declare function fetchModelUsage(): Promise<ModelUsageSummary>;
 export declare function startRun(payload: {
     clientId: string;
     worldId: string;

@@ -4,6 +4,7 @@ import type {
   CreateSaveResponse,
   CurrentGameRunResponse,
   GameEnvConfigResponse,
+  ModelUsageSummary,
   PublicBackgroundCard,
   PublicDifficultyOption,
   PublicRunState,
@@ -145,6 +146,11 @@ export async function saveGameEnvironment(payload: {
     body: JSON.stringify(payload)
   });
   return parseJson<GameEnvConfigResponse>(res);
+}
+
+export async function fetchModelUsage(): Promise<ModelUsageSummary> {
+  const res = await gameFetch("/api/game/usage");
+  return parseJson<ModelUsageSummary>(res);
 }
 
 export async function startRun(payload: {

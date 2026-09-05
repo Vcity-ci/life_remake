@@ -813,6 +813,22 @@ button.danger:hover { background: #8a4b41; }
 .advance-bar button { min-width: 148px; }
 
 .rail-section { padding: 0 0 17px; margin: 0 0 17px; border-bottom: 1px solid #423f36; }
+.narrative-assets { min-width: 0; overflow-wrap: anywhere; }
+.narrative-assets p { margin: 7px 0; font-size: 12px; line-height: 1.7; }
+.current-place { display: grid; gap: 5px; }
+.current-place strong { color: #d8c18a; font-size: 14px; }
+.current-place small, .asset-detail small { color: #a4afa3; font-size: 11px; }
+.current-place span, .asset-source { color: #b6b1a6; }
+.asset-archive { margin-top: 10px; }
+.asset-archive > summary { color: #b6b1a6; font-size: 12px; }
+.asset-detail { padding: 8px 0; border-bottom: 1px solid #353c39; }
+.asset-detail:last-child { border-bottom: 0; }
+.asset-detail summary { color: #d8d0bd; font-size: 12px; line-height: 1.7; }
+.asset-detail summary small { margin-left: 6px; }
+.narrative-assets summary { cursor: pointer; }
+.narrative-assets summary:focus-visible { outline: 1px solid #d8c18a; outline-offset: 3px; }
+.asset-detail.is-unavailable summary { color: #99978f; }
+.narrative-asset-changes { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 9px; color: #a8b7ac; font-size: 12px; overflow-wrap: anywhere; }
 .rail-section h3, .decision-history h3 { margin: 0 0 10px; color: #d8c18a; font-size: 14px; font-weight: 600; }
 .asset-list { gap: 6px; }
 .asset-chip { min-height: 25px; padding: 3px 7px; border-color: #5b5546; border-radius: 3px; background: #1c2020; color: #d8d0bd; font-size: 12px; }

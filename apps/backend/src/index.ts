@@ -30,6 +30,7 @@ import type {
   YearEvent
 } from "@reroll/shared";
 import { createDefaultGameplayTuning } from "@reroll/shared";
+import { applyNarrativeAssetUpdates, commitNarrativeAssets } from "./narrative-assets.js";
 import {
   generateEndingNarrative,
   generateDynamicNarrativeScene,
@@ -1066,6 +1067,7 @@ async function generateOpeningForRun(options: OpeningGenerationOptions): Promise
     ...run.narrative,
     opening: { status: "ready", profile: opening.profile }
   };
+  commitNarrativeAssets(run.narrative, applyNarrativeAssetUpdates(run.narrative.assets, opening.assetUpdates, { age: 0 }), opening.assetUpdates, { age: 0 });
   run.aiConversation = run.aiConversation ?? {};
   run.aiConversation.year = narrativeCtx.conversation;
   return appendPublicTurnRecord(run, {
@@ -1476,6 +1478,10 @@ async function generateDirectedSegmentForRunUnsafe(options: DirectedSegmentOptio
     advanced.chunk.forEach((event, index) => {
       event.summary = index === advanced.chunk.length - 1 ? scene.narrative : "";
     });
+    if (run.age === turnAges.backgroundAgeRange.toAge) {
+      const when = { ageFrom: turnAges.backgroundAgeRange.fromAge, age: run.age };
+      commitNarrativeAssets(run.narrative, applyNarrativeAssetUpdates(run.narrative.assets, scene.assetUpdates, when), scene.assetUpdates, when);
+    }
     recordDirectedStoryTurnOutcome(narrativeCtx, run, {
       kind: "normal",
       narrative: scene.narrative,
@@ -1512,6 +1518,11 @@ async function generateDirectedSegmentForRunUnsafe(options: DirectedSegmentOptio
     createsDecision: scene.createsDecision
   });
   applyDirectedMilestonePresentation(advanced.updated, scene.milestoneCopy);
+  commitNarrativeAssets(run.narrative, applyNarrativeAssetUpdates(run.narrative.assets, scene.assetUpdates, { age: run.age }), scene.assetUpdates, { age: run.age }, {
+    routeIds: [scene.routeId], factionIds: scene.factionId ? [scene.factionId] : [],
+    characterIds: run.narrative.dynamicCharacters.filter((entry) => scene.participants.some((participant) => participant.characterRef === entry.id || (participant.name === entry.name && participant.factionId === entry.factionId))).map((entry) => entry.id),
+    factIds: factId ? [factId] : []
+  });
   recordDirectedStoryTurnOutcome(narrativeCtx, run, {
     kind: scene.createsDecision ? "milestone" : "normal",
     narrative: scene.narrative,
@@ -1800,7 +1811,9 @@ async function runStepFlowUnlocked(
   sessionId: string,
   onTurn?: (record: TurnRecord, index: number, total: number) => Promise<void> | void
 ): Promise<StepFlowResult> {
-  const run = await getRun(body.runId) as InternalRunState | undefined;
+  const storedRun = await getRun(body.runId) as InternalRunState | undefined;
+  // Failed generation must not mutate the live archive held by the store.
+  const run = storedRun ? structuredClone(storedRun) : undefined;
   if (!run) {
     throw new Error("run_not_found");
   }
@@ -2037,6 +2050,8 @@ async function runStepFlowUnlocked(
     let directedDecisionContext: NarrativeCallContext | undefined;
     let narrativeOutcome: { effects: import("@reroll/shared").NarrativeAttributeEffect[] } | undefined;
     let factResolution: import("@reroll/shared").NarrativeFactResolution | undefined;
+    let settledAssets: import("@reroll/shared").NarrativeAssets | undefined;
+    let assetUpdates: import("@reroll/shared").NarrativeAssetUpdates | undefined;
     if (wasDirectedMilestone && usesStoryDirectionDecision) {
       const policy = getPendingDirectedDecisionPolicy(run, resolvedDecision);
       if (!policy) throw new Error("decision_outcome_policy_missing");
@@ -2066,6 +2081,8 @@ async function runStepFlowUnlocked(
       directedDecisionNarrative = outcome.narrative;
       narrativeOutcome = { effects: outcome.effects };
       factResolution = outcome.factResolution;
+      settledAssets = applyNarrativeAssetUpdates(run.narrative.assets, outcome.assetUpdates, { age: run.age });
+      assetUpdates = outcome.assetUpdates;
     }
     const stepped = applyMilestoneDecisionAndAdvance(
       run,
@@ -2080,6 +2097,7 @@ async function runStepFlowUnlocked(
       }
     );
     resolveTurnRecordChoice(run, publicChoice, selectedOption);
+    if (settledAssets) commitNarrativeAssets(run.narrative, settledAssets, assetUpdates, { age: run.age });
     if (directedDecisionNarrative) {
       stepped.decisionEvent.summary = directedDecisionNarrative;
     }

@@ -48,6 +48,7 @@ import type {
   YearEvent
 } from "@reroll/shared";
 import { createDefaultGameplayTuning } from "@reroll/shared";
+import { publicNarrativeAssetsSnapshot } from "./narrative-assets.js";
 import type { AiConversationState } from "./conversation.js";
 import {
   applyNarrativeEvent,
@@ -1654,6 +1655,7 @@ export function appendTurnRecords(
       statsSnapshot: publicStatsSnapshot(run),
       itemsSnapshot: publicItemsSnapshot(run),
       narrativeCharactersSnapshot: publicNarrativeCharactersSnapshot(run),
+      narrativeAssetsSnapshot: publicNarrativeAssetsSnapshot(run.narrative.assets),
       fameSnapshot: run.fame,
       choice: index === entries.length - 1 ? choice : undefined,
       choiceOutcome: index === entries.length - 1 ? choiceOutcome : undefined,
@@ -1683,6 +1685,7 @@ export function appendPublicTurnRecord(
     statsSnapshot: publicStatsSnapshot(run),
     itemsSnapshot: publicItemsSnapshot(run),
     narrativeCharactersSnapshot: publicNarrativeCharactersSnapshot(run),
+    narrativeAssetsSnapshot: publicNarrativeAssetsSnapshot(run.narrative.assets),
     fameSnapshot: run.fame,
     choice,
     choiceOutcome,
@@ -1758,6 +1761,7 @@ export function appendDecisionTurnRecord(
     statsSnapshot: publicStatsSnapshot(run),
     itemsSnapshot: publicItemsSnapshot(run),
     narrativeCharactersSnapshot: publicNarrativeCharactersSnapshot(run),
+    narrativeAssetsSnapshot: publicNarrativeAssetsSnapshot(run.narrative.assets),
     fameSnapshot: run.fame,
     choice,
     choiceOutcome: resolvedOption ? {
@@ -3421,7 +3425,7 @@ export function advanceWithDynamicNarrativeScene(
       decisionCount: previousScene?.decisionCount ?? 0
     };
   run.narrative.scene = {
-    place: payload.factionId ? `${payload.factionId}势力所在` : "人物所处的现实场域",
+    place: run.narrative.assets?.locations.find((entry) => entry.id === run.narrative.assets?.currentLocationId)?.name ?? run.narrative.scene.place,
     conflict: payload.narrative.trim().slice(0, 160),
     aftermath: payload.beat === "payoff" ? "这一幕的代价已留下余波。" : "此段经历仍会在后续被承接。",
     lastEventId: sceneId
@@ -3900,6 +3904,9 @@ export function toClientRun(run: InternalRunState): PublicRunState {
     })),
     items: visibleTurn?.itemsSnapshot ?? publicItemsSnapshot(run),
     narrativeCharacters: visibleTurn?.narrativeCharactersSnapshot ?? publicNarrativeCharactersSnapshot(run),
+    narrativeAssets: visibleTurn
+      ? visibleTurn.narrativeAssetsSnapshot ?? { locations: [], abilities: [] }
+      : publicNarrativeAssetsSnapshot(run.narrative.assets),
     nextMilestoneChoice: visibleChoice,
     survivalCrisis: toPublicSurvivalCrisis(run),
     ended: visibleEnded,

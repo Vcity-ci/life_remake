@@ -508,6 +508,60 @@ export interface NarrativeDynamicCharacter {
     importance: NarrativeCharacterImportance;
     status: "active" | "resolved" | "gone";
 }
+export interface NarrativeAssetMoment {
+    ageFrom?: number;
+    age: number;
+}
+export interface NarrativeAssetLinks {
+    characterIds?: string[];
+    factionIds?: string[];
+    routeIds?: string[];
+    factIds?: string[];
+}
+export interface NarrativeLocation extends NarrativeAssetLinks {
+    id: string;
+    name: string;
+    description: string;
+    introduced: NarrativeAssetMoment;
+    lastSeen: NarrativeAssetMoment;
+}
+export interface NarrativeAbility extends NarrativeAssetLinks {
+    id: string;
+    name: string;
+    description: string;
+    source: string;
+    mastery: string;
+    status: "available" | "unavailable";
+    introduced: NarrativeAssetMoment;
+    updated: NarrativeAssetMoment;
+}
+export interface NarrativeAssets {
+    locations: NarrativeLocation[];
+    abilities: NarrativeAbility[];
+    currentLocationId?: string;
+}
+export interface PublicNarrativeAssets {
+    locations: Array<Omit<NarrativeLocation, keyof NarrativeAssetLinks>>;
+    abilities: Array<Omit<NarrativeAbility, keyof NarrativeAssetLinks>>;
+    currentLocationId?: string;
+}
+/** Changes describe accomplished events, never the unselected consequences of a choice. */
+export interface NarrativeAssetUpdates {
+    locations: Array<{
+        ref: string;
+        name: string;
+        description: string;
+        current: boolean;
+    }>;
+    abilities: Array<{
+        ref: string;
+        name: string;
+        description: string;
+        source: string;
+        mastery: string;
+        status: NarrativeAbility["status"];
+    }>;
+}
 /** Compact, deterministic local memory. Retrieval never changes engine state. */
 export interface NarrativeMemoryEntry {
     id: string;
@@ -516,6 +570,8 @@ export interface NarrativeMemoryEntry {
     factionIds: string[];
     characterIds: string[];
     factIds: string[];
+    locationIds?: string[];
+    abilityIds?: string[];
     text: string;
 }
 export interface NarrativeComponentRunState {
@@ -576,6 +632,7 @@ export interface NarrativeRunState {
     /** Global act beat. routeProgress is retained only to read old snapshots. */
     actRuntime?: NarrativeActRuntime;
     dynamicCharacters: NarrativeDynamicCharacter[];
+    assets?: NarrativeAssets;
     memoryEntries: NarrativeMemoryEntry[];
     components: NarrativeComponentRunState[];
     activeCharacterIds: string[];
@@ -891,6 +948,7 @@ export interface TurnRecord {
     statsSnapshot: Stats;
     itemsSnapshot: PublicItemInstance[];
     narrativeCharactersSnapshot?: PublicNarrativeCharacter[];
+    narrativeAssetsSnapshot?: PublicNarrativeAssets;
     fameSnapshot: number;
     choice?: PublicMilestoneChoice;
     choiceOutcome?: {
@@ -953,6 +1011,7 @@ export interface PublicRunState {
     cards: PublicBackgroundCard[];
     items: PublicItemInstance[];
     narrativeCharacters?: PublicNarrativeCharacter[];
+    narrativeAssets?: PublicNarrativeAssets;
     /** Compatibility projection of the latest unresolved TurnRecord choice. */
     nextMilestoneChoice?: PublicMilestoneChoice;
     survivalCrisis?: PublicSurvivalCrisis;

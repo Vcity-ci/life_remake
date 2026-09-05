@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import type { CurrentGameRunResponse, ProviderConfig, ProviderLimits, PublicBackgroundCard, PublicRunState, RunPhase, SaveSlotSummary, StartAllocationConfig, StatKey, Stats, StepAction, SurvivalChoice, TurnRecord } from "@reroll/shared";
 import { AdminPanel } from "./components/AdminPanel";
+import { NarrativeAssetsPanel, NarrativeAssetChanges } from "./components/NarrativeAssets";
 import {
   ApiError,
   createSaveSlot,
@@ -165,6 +166,7 @@ export default function App(): React.JSX.Element {
   const [flippedCards, setFlippedCards] = useState<Record<string, boolean>>({});
 
   const timeline = turns;
+  const visibleAssets = turns.length ? turns[turns.length - 1].narrativeAssetsSnapshot : run?.narrativeAssets;
   const activeDecision = useMemo<MilestoneChoice | undefined>(() => (
     [...turns].reverse().find((turn) => turn.choice && !turn.choiceOutcome)?.choice
   ), [turns]);
@@ -1115,6 +1117,7 @@ export default function App(): React.JSX.Element {
                         </div>
                       ) : null}
                       {!isOrigin ? <div className="delta-row">{extractDeltaLabels(item).map((label, idx) => <small key={`${timelineKey(item)}-${idx}`}>{label}</small>)}</div> : null}
+                      {(!isOrigin || originExpanded) ? <NarrativeAssetChanges current={item.narrativeAssetsSnapshot} previous={timeline[index - 1]?.narrativeAssetsSnapshot} /> : null}
                     </article>
                   );
                 })}
@@ -1187,6 +1190,7 @@ export default function App(): React.JSX.Element {
             <aside className="reader-rail fate-rail" aria-label="命运档案">
               <section className="rail-section"><h3>天赋</h3><div className="asset-list">{run.cards.map((card) => <span className={`asset-chip ${rarityClass(card.rarity)}`} key={card.id} title={card.description}>{card.name}</span>)}</div></section>
               <section className="rail-section"><h3>命运人物</h3><div className="asset-list">{(run.narrativeCharacters?.length ?? 0) === 0 ? <small>尚无常驻人物</small> : run.narrativeCharacters!.map((character) => <span className="asset-chip item-chip" key={character.id} title={`${character.role}：${character.description}`}>{character.name}</span>)}</div></section>
+              <NarrativeAssetsPanel assets={visibleAssets} />
               <section className="decision-history">
                 <div className="decision-history-head"><h3>已作抉择</h3></div>
                 {decisionHistory.length === 0 ? <p className="decision-history-empty">尚未走到分岔处。</p> : (

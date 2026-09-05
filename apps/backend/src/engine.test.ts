@@ -24,6 +24,7 @@ import {
 } from "./engine.js";
 import { assessClosureReadiness, assessEnding, ensureNarrativeActRuntime, ensureNarrativeRunState, getNarrativeRouteProgress, isNarrativeEarlyLife, refreshNarrativeMainlineCompletion } from "./narrative.js";
 import { loadEventDefinitions, loadNarrativeWorldDefinition, validateNarrativeWorldFactContract } from "./content.js";
+import { applyNarrativeAssetUpdates, commitNarrativeAssets, formatNarrativeAssets, narrativeAssetUpdatesSchema, normalizeNarrativeAssets, parseNarrativeAssetUpdates } from "./narrative-assets.js";
 
 const world: WorldConfig = {
   id: "test-world",
@@ -220,6 +221,57 @@ test("事件只能回收已经写入账本的事实", () => {
   advanceWithDirectedEvent(run, world, openingCandidate, "守望者将未竟之约交到你手中。");
   assert.ok(buildDirectedEventCandidates(run, world, difficulty, [payoff], [item])
     .some((candidate) => candidate.definition.id === payoff.id));
+});
+
+test("地点本领随回合归档，引用复用且存档分支不会污染已公开快照", () => {
+  const run = makeRun();
+  const changes = parseNarrativeAssetUpdates({
+    locations: [{ ref: "new", name: "山中书院", description: "临溪的学舍与演练庭院。", current: true }],
+    abilities: [{ ref: "new", name: "观息", description: "从呼吸辨认疲惫与动作间隙。", source: "在书院练习中学得。", mastery: "初窥门径", status: "available" }]
+  });
+  commitNarrativeAssets(run.narrative, applyNarrativeAssetUpdates(undefined, changes, { ageFrom: 120, age: 123 }), changes, { ageFrom: 120, age: 123 }, { factionIds: ["academy"] });
+  const original = structuredClone(run.narrative.assets!);
+  assert.equal(run.narrative.scene.place, "山中书院");
+  assert.equal(run.narrative.memoryEntries.at(-1)?.abilityIds?.[0], original.abilities[0].id);
+  assert.deepEqual(original.locations[0].factionIds, ["academy"]);
+  appendPublicTurnRecord(run, { entryId: "study", ageFrom: 120, age: 123, ageStage: { label: "成年" }, kind: "passage", narrative: "你在书院学习观息，渐渐辨认出动作的间隙。", statChanges: {} });
+  const saved = JSON.parse(JSON.stringify(run));
+  const returned = applyNarrativeAssetUpdates(original, { ...changes!, abilities: [] }, { age: 124 });
+  assert.equal(returned.locations.length, 1);
+  assert.equal(returned.locations[0].id, original.locations[0].id);
+  const trained = parseNarrativeAssetUpdates({
+    locations: [],
+    abilities: [{ ...changes!.abilities[0], ref: original.abilities[0].id, mastery: "运用自如" }]
+  }, original);
+  run.narrative.assets = applyNarrativeAssetUpdates(original, trained, { age: 124 });
+  assert.equal(run.narrative.assets.abilities.length, 1);
+  assert.equal(run.narrative.assets.abilities[0].id, original.abilities[0].id);
+  assert.equal(toClientRun(run).narrativeAssets?.abilities[0].mastery, "初窥门径");
+  assert.equal(run.turnRecords?.at(-1)?.narrativeAssetsSnapshot?.abilities[0].mastery, "初窥门径");
+  assert.ok(!JSON.stringify(toClientRun(run).narrativeAssets).includes("academy"));
+  assert.equal(saved.narrative.assets.abilities[0].mastery, "初窥门径");
+  saved.runId = "restored-branch";
+  assert.equal(ensureNarrativeRunState(saved.narrative, true).assets?.abilities[0].id, original.abilities[0].id);
+  assert.deepEqual(normalizeNarrativeAssets().abilities, []);
+  const message = formatNarrativeAssets(run.narrative.assets);
+  assert.ok(message.includes(original.abilities[0].id) && message.includes("运用自如"));
+  assert.ok(message.includes(original.locations[0].id));
+  assert.ok(JSON.stringify(narrativeAssetUpdatesSchema(run.narrative.assets)).includes(original.abilities[0].id));
+  assert.throws(() => parseNarrativeAssetUpdates({ locations: [{ ref: "missing", name: "远方", description: "一片山谷。", current: true }] }, original));
+  assert.deepEqual(original, saved.narrative.assets);
+});
+
+test("地点本领未提交更新不改变状态，也不提前投影到历史回合", () => {
+  const run = makeRun();
+  appendPublicTurnRecord(run, { entryId: "before-choice", age: 10, ageStage: { label: "幼年" }, kind: "scene", narrative: "你站在书院门外，尚未决定是否求学。", statChanges: {} });
+  assert.deepEqual(applyNarrativeAssetUpdates(undefined, undefined, { age: 10 }), { locations: [], abilities: [], currentLocationId: undefined });
+  assert.equal(parseNarrativeAssetUpdates(undefined), undefined);
+  assert.equal(toClientRun(run).narrativeAssets?.abilities.length, 0);
+  const changes = { locations: [], abilities: [{ ref: "new", name: "观息", description: "辨别呼吸的变化。", source: "求学所得。", mastery: "初学", status: "available" as const }] };
+  run.narrative.assets = applyNarrativeAssetUpdates(undefined, changes, { age: 10 });
+  assert.equal(toClientRun(run).narrativeAssets?.abilities.length, 0);
+  appendPublicTurnRecord(run, { entryId: "after-choice", age: 10, ageStage: { label: "幼年" }, kind: "choice_outcome", narrative: "你决定留下求学，开始练习辨别呼吸的变化。", statChanges: {} });
+  assert.equal(toClientRun(run).narrativeAssets?.abilities.length, 1);
 });
 
 test("公开运行态只投影最后一个已提交回合的快照", () => {

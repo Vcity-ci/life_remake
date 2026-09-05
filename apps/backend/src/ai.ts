@@ -5,6 +5,8 @@ import type { ChatConversationState, ChatHistoryMessage, StoryConversationState,
 import type { AiMilestoneOptions, DecisionType, EventStoryPosition, ModelUsageOperation, NarrativeActHandoff, NarrativeAttributeEffect, NarrativeAttributePolicy, NarrativeBeat, NarrativeFactResolution, NarrativeIntent, NarrativeStatTier, ProviderConfig, StatKey, Stats, WorldConfig, YearEvent } from "@reroll/shared";
 import { formatNarrativePromptPlan, type NarrativePromptPlan } from "./narrative.js";
 import { recordModelUsage } from "./store.js";
+import type { NarrativeAssetUpdates } from "@reroll/shared";
+import { narrativeAssetUpdatesSchema, parseNarrativeAssetUpdates } from "./narrative-assets.js";
 
 export interface NarrativeContext {
   providerConfig: ProviderConfig;
@@ -286,12 +288,14 @@ export interface BackgroundNarrativeOutcome {
 }
 
 export interface DirectedDecisionNarrativeOutcome {
+  assetUpdates?: NarrativeAssetUpdates;
   narrative: string;
   effects: NarrativeAttributeEffect[];
   factResolution?: NarrativeFactResolution;
 }
 
 export interface NarrativeOriginOutcome {
+  assetUpdates?: NarrativeAssetUpdates;
   narrative: string;
   profile: {
     summary: string;
@@ -320,6 +324,7 @@ export interface DynamicNarrativeSceneInput {
 }
 
 export interface DynamicNarrativeSceneResult {
+  assetUpdates?: NarrativeAssetUpdates;
   turnKind: "scene" | "background";
   routeId?: string;
   factionId?: string;
@@ -2980,12 +2985,19 @@ async function requestNarrativeOutcomeTool(
   ctx: NarrativeContext,
   toolInput: Record<string, unknown> | Record<string, unknown>[],
   prompt: string
-): Promise<{ raw: Record<string, unknown>; toolCall: ToolCallRecord; toolName: string }> {
+): Promise<{ raw: Record<string, unknown>; toolCall: ToolCallRecord; toolName: string; assetUpdates?: NarrativeAssetUpdates }> {
   if (!ctx.apiKey.trim()) throw new NarrativeOutcomeError("narrative_outcome_unavailable", "api_key_missing");
   const systemPrompt = buildSystemPrompt(normalizePromptPackForModel(ctx.promptPack), world, ctx, "year");
   const conversation = ensureConversationState(ctx.conversation, hashSystemPrompt(systemPrompt), systemPrompt);
   ctx.conversation = conversation;
   const tools = Array.isArray(toolInput) ? toolInput : [toolInput];
+  const assetTools = new Set(["render_origin", "render_background_segment", "render_scene", "render_choice_scene", "resolve_decision_outcome"]);
+  for (const tool of tools) {
+    const definition = tool.function as { name: string; parameters: { properties: Record<string, unknown> } };
+    if (assetTools.has(definition.name)) {
+      definition.parameters.properties.assetUpdates = narrativeAssetUpdatesSchema(run.narrative.assets);
+    }
+  }
   const toolNames = tools.map((tool) => (tool.function as { name?: unknown }).name).filter((name): name is string => typeof name === "string");
   if (tools.length === 0 || toolNames.length !== tools.length) {
     throw invalidNarrativeOutcome("tool_catalog_invalid");
@@ -2993,6 +3005,7 @@ async function requestNarrativeOutcomeTool(
   const toolChoice = tools.length === 1
     ? { type: "function", function: { name: toolNames[0] } }
     : "required";
+  const requestPrompt = [ctx.narrativePlan?.assetContext, prompt].filter(Boolean).join("\n");
   const isResponsesApi = ctx.providerConfig.apiPath === "/responses";
   const usageOperation: ModelUsageOperationInput = {
     // A failed multi-tool request has no actual tool choice to classify.
@@ -3011,7 +3024,7 @@ async function requestNarrativeOutcomeTool(
       ? await createTrackedResponse(ctx, client, {
           model: ctx.providerConfig.model,
           instructions: buildSystemMessage(conversation),
-          input: [...buildConversationHistoryMessages(conversation), { role: "user", content: prompt }],
+          input: [...buildConversationHistoryMessages(conversation), { role: "user", content: requestPrompt }],
           temperature: ctx.providerConfig.temperature,
           max_output_tokens: ctx.providerConfig.maxTokens,
           tools: tools.map(responseTool) as never,
@@ -3022,7 +3035,7 @@ async function requestNarrativeOutcomeTool(
           model: ctx.providerConfig.model,
           temperature: ctx.providerConfig.temperature,
           max_tokens: ctx.providerConfig.maxTokens,
-          messages: [{ role: "system", content: buildSystemMessage(conversation) }, ...buildConversationHistoryMessages(conversation), { role: "user", content: prompt }],
+          messages: [{ role: "system", content: buildSystemMessage(conversation) }, ...buildConversationHistoryMessages(conversation), { role: "user", content: requestPrompt }],
           thinking: { type: "disabled" },
           reasoning_effort: reasoningEffortForSdk(ctx.providerConfig.reasoningEffort),
           tools: tools as never,
@@ -3035,9 +3048,22 @@ async function requestNarrativeOutcomeTool(
     const raw = call ? parseDirectedToolArguments(call.rawArguments) : null;
     if (!call) throw invalidNarrativeOutcome("tool_call_missing");
     if (!raw) throw invalidNarrativeOutcome("tool_arguments_invalid");
+    let assetUpdates: NarrativeAssetUpdates | undefined;
+    if (assetTools.has(call.toolCall.name)) {
+      try {
+        assetUpdates = parseNarrativeAssetUpdates(raw.assetUpdates, run.narrative.assets);
+        const descriptions = [
+          ...(assetUpdates?.locations ?? []).flatMap((entry) => [entry.name, entry.description]),
+          ...(assetUpdates?.abilities ?? []).flatMap((entry) => [entry.name, entry.description, entry.source, entry.mastery])
+        ];
+        if (descriptions.some((value) => !isSafePlayerText(value, 1))) throw new Error("asset_text_invalid");
+      } catch {
+        throw invalidNarrativeOutcome("narrative_asset_updates_invalid");
+      }
+    }
     pushHistory(conversation, "user", projectConversationUserPrompt(prompt));
     pushToolCall(conversation, call.toolCall);
-    return { raw, toolCall: call.toolCall, toolName: call.toolCall.name };
+    return { raw, toolCall: call.toolCall, toolName: call.toolCall.name, assetUpdates };
   } catch (error) {
     debugError("narrative-outcome", error);
     if (error instanceof NarrativeOutcomeError) throw error;
@@ -3115,7 +3141,7 @@ export async function generateNarrativeOrigin(
   pushToolResult(ctx.conversation!, result.toolCall, "人物身世和可回访线索已写入人生档案。 ");
   pushHistory(ctx.conversation!, "assistant", narrative);
   compactConversationWindow(ctx, ctx.conversation!);
-  return { narrative, profile: { summary, seedHints } };
+  return { narrative, profile: { summary, seedHints }, assetUpdates: result.assetUpdates };
 }
 
 export async function generateDirectedDecisionNarrativeOutcome(
@@ -3147,7 +3173,7 @@ export async function generateDirectedDecisionNarrativeOutcome(
   if (!isSafePlayerNarrative(narrative) || !effects || (input.factResolutionModes?.length && !factResolution)) throw invalidNarrativeOutcome("decision_outcome_invalid");
   pushToolResult(ctx.conversation!, result.toolCall, "抉择后果已由引擎审核并写入人生记录。");
   compactConversationWindow(ctx, ctx.conversation!);
-  return { narrative, effects, factResolution };
+  return { narrative, effects, factResolution, assetUpdates: result.assetUpdates };
 }
 
 function parseDynamicNarrativeParticipants(
@@ -3248,6 +3274,7 @@ export async function generateDynamicNarrativeScene(
     compactConversationWindow(ctx, ctx.conversation!);
     return {
       turnKind: "background",
+      assetUpdates: result.assetUpdates,
       narrative,
       participants: [],
       backgroundAttributeEffects: effects
@@ -3273,7 +3300,7 @@ export async function generateDynamicNarrativeScene(
     if (input.beat === "payoff" && !actHandoff) throw invalidNarrativeOutcome("dynamic_scene_act_handoff_invalid");
     pushToolResult(ctx.conversation!, result.toolCall, "世界幕场景、人物提议与受控后果已由引擎接收。");
     compactConversationWindow(ctx, ctx.conversation!);
-    return { turnKind: "scene", routeId, factionId, narrative, scenePacing, participants, createsDecision: false, attributeEffects, actHandoff };
+    return { turnKind: "scene", routeId, factionId, narrative, scenePacing, participants, createsDecision: false, attributeEffects, actHandoff, assetUpdates: result.assetUpdates };
   }
 
   if (result.toolName === "render_choice_scene") {
@@ -3287,6 +3314,7 @@ export async function generateDynamicNarrativeScene(
     compactConversationWindow(ctx, ctx.conversation!);
     return {
       turnKind: "scene",
+      assetUpdates: result.assetUpdates,
       routeId,
       factionId,
       narrative,

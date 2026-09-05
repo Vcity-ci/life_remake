@@ -27,6 +27,7 @@ import type {
   YearEvent
 } from "@reroll/shared";
 import { createDefaultGameplayTuning } from "@reroll/shared";
+import { formatNarrativeAssets, normalizeNarrativeAssets } from "./narrative-assets.js";
 
 export interface NarrativePromptSource {
   worldId: string;
@@ -52,6 +53,7 @@ export interface ClosureReadiness {
 export interface NarrativePromptPlan {
   storyBible: string;
   origin?: string;
+  assetContext?: string;
   mainlineSkeleton?: string;
   styleRules: string[];
   endingGuide?: string;
@@ -126,6 +128,7 @@ export function createNarrativeRunState(enabled = false): NarrativeRunState {
     threads: [],
     routeProgress: [],
     dynamicCharacters: [],
+    assets: normalizeNarrativeAssets(),
     memoryEntries: [],
     components: [],
     activeCharacterIds: [],
@@ -268,6 +271,8 @@ export function ensureNarrativeRunState(
         factionIds: uniqueRecent(entry.factionIds ?? [], 8),
         characterIds: uniqueRecent(entry.characterIds ?? [], 8),
         factIds: uniqueRecent(entry.factIds ?? [], 8),
+        locationIds: uniqueRecent(entry.locationIds ?? [], 8),
+        abilityIds: uniqueRecent(entry.abilityIds ?? [], 8),
         text: compactText(entry.text, 480)
       }))
     : [];
@@ -364,6 +369,7 @@ export function ensureNarrativeRunState(
     routeProgress,
     actRuntime,
     dynamicCharacters,
+    assets: normalizeNarrativeAssets(state.assets),
     memoryEntries,
     activeCharacterIds: uniqueRecent(Array.isArray(state.activeCharacterIds) ? state.activeCharacterIds : [], 8),
     components,
@@ -1287,7 +1293,8 @@ export function buildNarrativePromptPlan(
     plotEssentials: Array.from(new Set([...factEssentials, ...plotEssentials])).slice(0, 6),
     activeThreads,
     activeCharacters: Array.from(new Set([...staticActiveCharacters, ...dynamicActiveCharacters, ...routeCharacters])).slice(0, 5),
-    scene: `场景=${source.narrative.scene.place}；冲突=${source.narrative.scene.conflict}；余波=${source.narrative.scene.aftermath}`,
+    assetContext: formatNarrativeAssets(source.narrative.assets),
+    scene: `场景=${source.narrative.assets?.locations.find((entry) => entry.id === source.narrative.assets?.currentLocationId)?.name ?? source.narrative.scene.place}；冲突=${source.narrative.scene.conflict}；余波=${source.narrative.scene.aftermath}`,
     authorNote: buildAuthorNote(source, activeComponents[0]),
     endingGuide: world.endingGuide ? compactText(world.endingGuide, 150) : undefined,
     ending: [
@@ -1330,6 +1337,11 @@ export function retrieveNarrativeMemories(
     .map((entry) => {
       let score = entry.age / 10_000;
       if (query.routeId && entry.routeId === query.routeId) score += 8;
+      if (source.narrative.assets?.currentLocationId && entry.locationIds?.includes(source.narrative.assets.currentLocationId)) score += 5;
+      score += (entry.abilityIds ?? []).filter((id) => {
+        const ability = source.narrative.assets?.abilities.find((item) => item.id === id);
+        return ability && (query.text ?? "").includes(ability.name);
+      }).length * 5;
       score += (query.factionIds ?? []).filter((id) => entry.factionIds.includes(id)).length * 5;
       score += (query.factIds ?? []).filter((id) => entry.factIds.includes(id)).length * 7;
       const entryWords = entry.text.toLowerCase().match(/[\p{L}\p{N}]{2,}/gu) ?? [];
@@ -1375,6 +1387,7 @@ export function formatNarrativePromptPlan(
     essentials ? `已确立的关键事实：${essentials}` : "",
     threads ? `仍待回应的旧事：${threads}` : "",
     characters ? `此刻相关的人物：${characters}` : "",
+    plan.assetContext ?? "",
     plan.scene ? compactText(plan.scene, 180) : "",
     shortTerm ? `近期余波：${shortTerm}` : "",
     routeDetail,

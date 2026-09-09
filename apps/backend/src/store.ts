@@ -1,5 +1,6 @@
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import fs from "node:fs/promises";
+import { applyConversationSummary, type AiConversationState, type ConversationSummaryWork } from "./conversation.js";
 import path from "node:path";
 import type {
   ModelUsageEntry,
@@ -348,6 +349,24 @@ export async function getRun(runId: string): Promise<InternalRunState | undefine
   const record = runs.get(runId);
   if (!record || record.expiresAt <= Date.now()) return undefined;
   return record.run;
+}
+
+export async function commitRunSummary(
+  runId: string, sessionId: string, purpose: keyof AiConversationState,
+  work: ConversationSummaryWork, summary: string
+): Promise<boolean> {
+  return withSessionLock(sessionId, () => withRunLock(runId, async () => {
+    await ensureStoreReady();
+    const record = runs.get(runId);
+    if (!record || record.sessionId !== sessionId || record.expiresAt <= Date.now()) return false;
+    const current = record.run.aiConversation?.[purpose];
+    if (!current) return false;
+    const updated = structuredClone(current);
+    if (!applyConversationSummary(updated, work, summary)) return false;
+    record.run.aiConversation![purpose] = updated;
+    await queuePersist();
+    return true;
+  }));
 }
 
 export async function getRunSessionId(runId: string): Promise<string | undefined> {

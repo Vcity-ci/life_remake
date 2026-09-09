@@ -1,3 +1,4 @@
+import { commitNarrativeMemory } from "./narrative-memory.js";
 import dotenv from "dotenv";
 import cors from "cors";
 import express from "express";
@@ -30,18 +31,21 @@ import type {
   YearEvent
 } from "@reroll/shared";
 import { createDefaultGameplayTuning } from "@reroll/shared";
+import { narrativeFactResolutionModes } from "./narrative-continuity.js";
 import { applyNarrativeAssetUpdates, commitNarrativeAssets } from "./narrative-assets.js";
 import {
   generateEndingNarrative,
   generateDynamicNarrativeScene,
   generateDirectedDecisionNarrativeOutcome,
+  renderInterruptedBackground,
   generateMilestoneOptions,
   generateNarrativeOrigin,
   generateYearNarrative,
   isDirectedToolAvailable,
   NarrativeOutcomeError,
   recordDirectedDecisionOutcome,
-  recordDirectedStoryTurnOutcome
+  recordDirectedStoryTurnOutcome,
+  scheduleCommittedNarrativeSummary
 } from "./ai.js";
 import { generateNarrativeRender, generateNarrativeTurn } from "./narrative-provider.js";
 import { approveStoryClosure, approveStoryIntent } from "./tool-gateway.js";
@@ -57,10 +61,12 @@ import {
   readContentBundle,
   writeContentBundle
 } from "./content.js";
-import { buildNarrativePromptPlan, ensureNarrativeActRuntime, isNarrativeEarlyLife, isNarrativeMainlineActEntryReady, isNarrativeWorldStageReady, retrieveNarrativeMemories, selectNarrativeGrowthFocus } from "./narrative.js";
+import { buildNarrativePromptPlan, narrativeRouteBeatGuidance, ensureNarrativeActRuntime, isNarrativeEarlyLife, isNarrativeMainlineActEntryReady, isNarrativeWorldStageReady, selectNarrativeGrowthFocus } from "./narrative.js";
 import {
   attachTimelineChunk,
   applyDirectedMilestonePresentation,
+  applyNarrativeFactUpdates,
+  applyNarrativeRelationshipUpdates,
   advanceWithDirectedEvent,
   advanceWithDynamicNarrativeScene,
   autoAdvanceToCheckpoint,
@@ -486,6 +492,7 @@ function logNarrativeOutcomeFailure(
   if (!debugModel || !(error instanceof NarrativeOutcomeError)) return;
   console.error("[model-debug:narrative-outcome]", {
     reason: error.reason ?? "unspecified",
+    validation: error.validation,
     tool,
     model: options.providerConfig.model,
     apiPath: options.providerConfig.apiPath,
@@ -529,7 +536,6 @@ function flattenMilestoneEventPool(events: Array<{ events: Array<string | { titl
 
 function summarizeTalentHooks(cards: BackgroundCard[]): string {
   return cards
-    .slice(0, 3)
     .map((card) => {
       const narrative = card.narrative;
       const affinity = narrative?.affinities?.length ? `；倾向=${narrative.affinities.join("/")}` : "";
@@ -982,7 +988,7 @@ async function generateApprovedDirectedEnding(
     ...narrativeCtx,
     // Ending is rendered only after the engine has locked its route and may use
     // that route's detailed world material.
-    narrativePlan: buildNarrativePromptPlan(run, narrativeWorld ?? null),
+    narrativePlan: buildNarrativePromptPlan(run, narrativeWorld ?? null, undefined, "ending"),
     conversation: run.aiConversation.ending
   };
   try {
@@ -1053,7 +1059,7 @@ async function generateOpeningForRun(options: OpeningGenerationOptions): Promise
     factionSummary,
     eventPoolSummary,
     talentHookSummary,
-    narrativePlan: buildNarrativePromptPlan(run, narrativeWorld, null),
+    narrativePlan: buildNarrativePromptPlan(run, narrativeWorld, null, "origin"),
     conversation: run.aiConversation?.year
   };
   let opening: Awaited<ReturnType<typeof generateNarrativeOrigin>>;
@@ -1067,8 +1073,10 @@ async function generateOpeningForRun(options: OpeningGenerationOptions): Promise
     ...run.narrative,
     opening: { status: "ready", profile: opening.profile }
   };
-  commitNarrativeAssets(run.narrative, applyNarrativeAssetUpdates(run.narrative.assets, opening.assetUpdates, { age: 0 }), opening.assetUpdates, { age: 0 });
+  commitNarrativeMemory(run.narrative, { id: "memory:origin", age: 0, factionIds: [], characterIds: [], factIds: [], text: opening.narrative });
+  commitNarrativeAssets(run.narrative, applyNarrativeAssetUpdates(run.narrative.assets, opening.assetUpdates, { age: 0 }), opening.assetUpdates, { age: 0 }, {}, "origin");
   run.aiConversation = run.aiConversation ?? {};
+  recordDirectedStoryTurnOutcome(narrativeCtx, run, { kind: "origin", sourceEventId: "origin", narrative: opening.narrative, statChanges: {} });
   run.aiConversation.year = narrativeCtx.conversation;
   return appendPublicTurnRecord(run, {
     entryId: "origin",
@@ -1090,210 +1098,6 @@ async function generateDirectedSegmentForRun(options: DirectedSegmentOptions): P
     throw error;
   }
 }
-
-/*
- * Retired static director implementation. Dynamic world packages no longer
- * compile or invoke this EventDefinition candidate path; it is retained here
- * temporarily only as historical source context while the static content
- * authoring files are still used by non-narrative data tooling.
- *
-async function generateStaticDirectedSegmentForRunUnsafe(options: DirectedSegmentOptions): Promise<GenerationOutput> {
-  const {
-    run,
-    world,
-    difficulty,
-    sessionId,
-    providerConfig,
-    apiKey,
-    promptPack,
-    worldlineSummary,
-    factionSummary,
-    eventPoolSummary,
-    talentHookSummary,
-    eventDefinitions,
-    itemDefinitions,
-    storyDirections,
-    narrativeWorld
-  } = options;
-  markRunPhase(run, "generating");
-  const candidates = buildDirectedEventCandidates(
-    run,
-    world,
-    difficulty,
-    eventDefinitions,
-    itemDefinitions,
-    storyDirections,
-    narrativeWorld
-  );
-  const narrativeCtx: NarrativeCallContext = {
-    providerConfig,
-    apiKey,
-    usageScope: { sessionId, runId: run.runId, worldId: run.worldId },
-    promptPack,
-    worldlineSummary,
-    factionSummary,
-    eventPoolSummary,
-    talentHookSummary,
-    narrativePlan: buildNarrativePromptPlan(run, narrativeWorld ?? null, null),
-    conversation: run.aiConversation?.year
-  };
-  // The readiness check may latch `mainlineCompleted` for a migrated or
-  // freshly recovered run, so it must execute before we decide the tool set.
-  const closureRequestEligible = canRequestDirectedClosure(run, narrativeWorld ?? null);
-  const closureRequired = run.narrative.enabled && run.story.mainlineCompleted &&
-    run.story.closureState === "open" && closureRequestEligible;
-  const directionOptions = buildDirectedStoryDirections(candidates, storyDirections);
-  const decisionDirections = candidates.some((candidate) => candidate.kind === "milestone")
-    ? buildDirectedDecisionDirections(run, directionOptions, storyDirections)
-    : undefined;
-  const focusOptions = closureRequired ? [] : buildDirectedNarrativeComponentFocuses(run, candidates, narrativeWorld ?? null);
-  const routeOptions = (narrativeWorld?.routeArcs ?? []).map((route) => ({
-    id: route.directionId,
-    label: route.label || route.directionId,
-    summary: route.summary
-  }));
-  const allowedIntents: NarrativeIntent[] = closureRequired
-    ? []
-    : ["continue", "pressure", "payoff"];
-  const canRequestClosure = closureRequired || closureRequestEligible;
-  const rejectedRouteIds = new Set<string>();
-  let turn: Awaited<ReturnType<typeof generateNarrativeTurn>>;
-  let closureOutcome: ReturnType<typeof approveStoryClosure>;
-  let approvedIntent: ReturnType<typeof approveStoryIntent>;
-  let selectedDirection: StoryDirectionDefinition | undefined;
-  let selected: ReturnType<typeof selectDirectedCandidateForIntent>;
-  while (true) {
-    const turnInput = {
-      allowedIntents,
-      routeOptions,
-      focusOptions,
-      allowClosureRequest: canRequestClosure,
-      closureRequired,
-      allowScenePacing: run.narrative.enabled && !run.narrative.activeScene && !closureRequired,
-      rejectedRouteIds: Array.from(rejectedRouteIds)
-    };
-    turn = await generateNarrativeTurn({ run, world, input: turnInput, context: narrativeCtx });
-    closureOutcome = approveStoryClosure(run, turn.closureRequest, narrativeWorld ?? null);
-    approvedIntent = approveStoryIntent(run, allowedIntents, turn, focusOptions, routeOptions);
-    const closureCandidates = closureOutcome === "guiding"
-      ? buildDirectedEventCandidates(run, world, difficulty, eventDefinitions, itemDefinitions, storyDirections, narrativeWorld)
-      : candidates;
-    selectedDirection = approvedIntent.routeId
-      ? storyDirections.find((direction) => direction.id === approvedIntent.routeId)
-      : undefined;
-    selected = closureOutcome === "guiding"
-      ? closureCandidates.find((candidate) => candidate.definition.narrativeBeat === "ending")
-      : selectedDirection
-        ? selectDirectedCandidateForIntent(
-          run,
-          candidates,
-          approvedIntent.intent,
-          approvedIntent.focusComponentId,
-          undefined,
-          narrativeWorld,
-          approvedIntent.routeId
-        )
-        : undefined;
-    if (selected || closureOutcome === "guiding" || !approvedIntent.routeId) break;
-    rejectedRouteIds.add(approvedIntent.routeId);
-    if (rejectedRouteIds.size >= routeOptions.length) {
-      throw new Error("directed_route_selection_exhausted");
-    }
-  }
-  if (!selected) {
-    markRunPhase(run, "ready");
-    return { run, generatedChunk: [], fromAge: run.age, toAge: run.age, rawChunkCount: 0 };
-  }
-  const eventDirection = selectedDirection ?? resolveEventStoryDirection(run, selected, storyDirections);
-  // A decision changes how the current experience is handled. It must not
-  // silently select an unrelated life route simply because the option is risky.
-  const selectedDecisionDirections = eventDirection
-    ? { safe: eventDirection, balanced: eventDirection, risky: eventDirection }
-    : decisionDirections;
-  const focus = closureOutcome === "guiding"
-    ? undefined
-    : resolveDirectedNarrativeFocus(run, narrativeWorld, approvedIntent.focusComponentId);
-  const decisionSeed = selected.kind === "milestone"
-    ? createDirectedMilestoneChoice(run.age + 1, selected.definition, run.tuningSnapshot)
-    : undefined;
-  if (approvedIntent.routeId) {
-    narrativeCtx.narrativePlan = buildNarrativePromptPlan(run, narrativeWorld ?? null, approvedIntent.routeId);
-  }
-  const rendered = await generateNarrativeRender({
-    run,
-    world,
-    input: {
-      kind: selected.kind,
-      intent: approvedIntent.intent,
-      eventId: selected.definition.id,
-      eventTitle: selected.definition.title,
-      premise: selected.definition.promptHook || selected.definition.title,
-      outcomeHint: focus?.hint || "这件事会留下需要在后续面对的真实后果。",
-      sceneHint: run.narrative.scene.conflict,
-      focus: focus ? { label: focus.label, hint: focus.hint } : undefined,
-      decision: decisionSeed ? {
-        background: decisionSeed.background ?? (selected.definition.promptHook || selected.definition.title),
-        options: decisionSeed.options.map((option) => ({
-          id: option.id,
-          label: option.label,
-          description: option.description
-        }))
-      } : undefined,
-      attributePolicy: selected.kind === "normal" && selected.definition.narrativeBeat !== "ending"
-        ? getDirectedEventAttributePolicy(selected.definition)
-        : undefined,
-      turn
-    },
-    context: narrativeCtx
-  });
-  const advanced = advanceWithDirectedEvent(
-    run,
-    world,
-    selected,
-    rendered.narrative,
-    eventDirection,
-    selectedDecisionDirections,
-    narrativeWorld ?? null,
-    {
-      attributeOutcome: rendered.attributeEffects ? { effects: rendered.attributeEffects } : undefined,
-      attributePolicy: selected.kind === "normal" && selected.definition.narrativeBeat !== "ending"
-        ? getDirectedEventAttributePolicy(selected.definition)
-        : undefined,
-      experienceId: approvedIntent.routeId,
-      sceneClockMode: approvedIntent.scenePacing === "continuous" ? "hold" : approvedIntent.scenePacing === "spanning" ? "advance" : undefined,
-      completeMainlineAct: selected.definition.narrativeBeat === "payoff" && Boolean(approvedIntent.routeId)
-    }
-  );
-  applyDirectedMilestonePresentation(advanced.updated, rendered.milestoneCopy);
-  const engineApprovedClosureBeat = selected.definition.narrativeBeat === "ending" &&
-    run.story.closureState === "guiding";
-  const settledClosureOutcome = engineApprovedClosureBeat
-    ? approveStoryClosure(advanced.updated, "finish", narrativeWorld ?? null)
-    : undefined;
-  const settledEvent = advanced.chunk[0];
-  recordDirectedStoryTurnOutcome(narrativeCtx, run, {
-    kind: selected.kind,
-    narrative: settledEvent?.summary ?? rendered.narrative,
-    statChanges: settledEvent?.statChanges ?? selected.preview.statChanges,
-    turn,
-    toolResult: rendered.toolResult
-  });
-  run.aiConversation = run.aiConversation ?? {};
-  run.aiConversation.year = narrativeCtx.conversation;
-  if (settledClosureOutcome === "finished") {
-    await generateApprovedDirectedEnding(run, world, narrativeCtx, narrativeWorld);
-  }
-  attachTimelineChunk(advanced.updated, world, advanced.chunk);
-  const timelineChunk = advanced.updated.timelineChunk ?? [];
-  return {
-    run: advanced.updated,
-    generatedChunk: timelineChunk,
-    fromAge: advanced.fromAge,
-    toAge: advanced.toAge,
-    rawChunkCount: advanced.chunk.length
-  };
-}
-*/
 
 /**
  * The active director does not receive concrete event candidates. It receives
@@ -1403,50 +1207,38 @@ async function generateDirectedSegmentForRunUnsafe(options: DirectedSegmentOptio
     : runtime.beat === "escalation"
       ? "optional"
       : "none";
-  const recall = retrieveNarrativeMemories({
-    worldId: run.worldId,
-    age: run.age,
-    personaPrompt: run.personaPrompt,
-    stats: run.stats,
-    fame: run.fame,
-    history: run.history,
-    tuning: run.tuningSnapshot,
-    cards: run.cards,
-    items: run.items,
-    story: run.story,
-    narrative: run.narrative
-  }, { factIds: factId ? [factId] : [], text: `${act.prompt} ${run.narrative.scene.conflict}` });
-  narrativeCtx.recentNarratives = recall;
+  const allowedTurnKinds: Array<"scene" | "background"> = earlyLife
+    ? ["background"]
+    : runtime.beat === "setup"
+      ? canEnterAct ? ["scene"] : ["background"]
+      : canAdvanceBeat ? ["background", "scene"] : ["background"];
+  narrativeCtx.narrativePlan = buildNarrativePromptPlan(run, narrativeWorld, null, canAdvanceBeat ? "dynamic" : "background", {
+    backgroundAllowed: allowedTurnKinds.includes("background")
+  });
+  const contextSelection = narrativeCtx.narrativePlan!.recall!;
   const scene = await generateDynamicNarrativeScene(run, world, {
+    storyArc: narrativeWorld.mainlineSkeleton?.premise,
     act: { id: act.id, label: act.label, prompt: act.prompt, factLabel },
     beat: runtime.beat,
     decisionMode,
-    allowedTurnKinds: earlyLife
-      ? ["background"]
-      : runtime.beat === "setup"
-        ? canEnterAct ? ["scene"] : ["background"]
-        : canAdvanceBeat
-          ? ["background", "scene"]
-          : ["background"],
+    allowedTurnKinds,
     sceneAge: turnAges.sceneAge,
     backgroundAgeRange: turnAges.backgroundAgeRange,
     routes: narrativeWorld.routeArcs.map((route) => ({
       id: route.directionId,
       label: route.label || route.directionId,
       summary: route.summary,
-      perspective: route.perspective
+      perspective: narrativeRouteBeatGuidance(route, runtime.beat)
     })),
     factions: (narrativeWorld.narrativeFactions ?? []).map((faction) => ({
       id: faction.id,
       label: faction.label,
       summary: faction.summary
     })),
-    knownCharacters: run.narrative.dynamicCharacters
-      .filter((character) => character.status === "active")
-      .slice(-6)
-      .map((character) => ({ id: character.id, name: character.name, factionId: character.factionId, role: character.role, description: character.description })),
+    knownCharacters: contextSelection.characters,
     attributePolicy: runtime.beat === "pressure" || runtime.beat === "climax" ? undefined : dynamicSceneAttributePolicy(),
     backgroundAttributePolicy,
+    growthFocus: runtime.growthFocusOptions?.find((focus) => focus.id === runtime.growthFocusId),
     statTiers: resolveNarrativeStatTiers(run.stats, run.narrative.statTierConfig),
     lifeStage: earlyLife && Number.isInteger(earlyLifeMaxAge)
       ? { label: "早年依赖期", maxAge: earlyLifeMaxAge as number }
@@ -1475,16 +1267,34 @@ async function generateDirectedSegmentForRunUnsafe(options: DirectedSegmentOptio
       advanced.chunk.splice(0, advanced.chunk.length, ...resolvedChunk);
       advanced.toAge = run.age;
     }
+    let background = scene;
+    if (run.age < turnAges.backgroundAgeRange.toAge) {
+      narrativeCtx.narrativePlan = buildNarrativePromptPlan(run, narrativeWorld, null, "background");
+      background = { ...scene, ...await renderInterruptedBackground(run, world, narrativeCtx, turnAges.backgroundAgeRange.fromAge, advanced.chunk) };
+    }
     advanced.chunk.forEach((event, index) => {
-      event.summary = index === advanced.chunk.length - 1 ? scene.narrative : "";
+      event.summary = index === advanced.chunk.length - 1 ? background.narrative : "";
     });
-    if (run.age === turnAges.backgroundAgeRange.toAge) {
+    {
       const when = { ageFrom: turnAges.backgroundAgeRange.fromAge, age: run.age };
-      commitNarrativeAssets(run.narrative, applyNarrativeAssetUpdates(run.narrative.assets, scene.assetUpdates, when), scene.assetUpdates, when);
+      const backgroundFactIds = applyNarrativeFactUpdates(run, background.factUpdates, {
+        sourceEventId: `background:${when.ageFrom}:${when.age}:${run.history.length}`
+      });
+      applyNarrativeRelationshipUpdates(run, background.relationshipUpdates, backgroundFactIds);
+      const sourceId = `background:${when.ageFrom}:${when.age}:${run.history.length}`;
+      commitNarrativeMemory(run.narrative, {
+        id: `memory:${sourceId}`, age: run.age, factionIds: [],
+        characterIds: background.relationshipUpdates?.map((entry) => entry.characterRef) ?? [],
+        factIds: backgroundFactIds, text: background.narrative
+      });
+      commitNarrativeAssets(run.narrative, applyNarrativeAssetUpdates(run.narrative.assets, background.assetUpdates, when), background.assetUpdates, when, {
+        factIds: backgroundFactIds
+      }, sourceId);
     }
     recordDirectedStoryTurnOutcome(narrativeCtx, run, {
       kind: "normal",
-      narrative: scene.narrative,
+      narrative: background.narrative,
+      sourceEventId: `background:${turnAges.backgroundAgeRange.fromAge}:${run.age}:${run.history.length}`,
       statChanges: advanced.chunk.reduce<Partial<Record<keyof InternalRunState["stats"], number>>>((total, event) => {
         for (const [stat, value] of Object.entries(event.statChanges)) {
           const key = stat as keyof InternalRunState["stats"];
@@ -1515,17 +1325,27 @@ async function generateDirectedSegmentForRunUnsafe(options: DirectedSegmentOptio
     attributePolicy: runtime.beat === "pressure" || runtime.beat === "climax" ? undefined : dynamicSceneAttributePolicy(),
     actHandoff: scene.actHandoff,
     sceneClockMode: scene.scenePacing === "continuous" ? "hold" : scene.scenePacing === "spanning" ? "advance" : undefined,
-    createsDecision: scene.createsDecision
+    createsDecision: scene.createsDecision,
+    factUpdates: scene.factUpdates,
+    relationshipUpdates: scene.relationshipUpdates
   });
   applyDirectedMilestonePresentation(advanced.updated, scene.milestoneCopy);
+  const committedNarrative = [
+    scene.narrative,
+    scene.milestoneCopy?.background !== scene.narrative ? scene.milestoneCopy?.background : "",
+    ...(scene.milestoneCopy?.optionOverrides.map((option) => `可选行动：${option.label}。 ${option.description}`) ?? [])
+  ].filter(Boolean).join("\n");
+  const sceneMemory = run.narrative.memoryEntries.find((entry) => entry.id === `memory:${run.narrative.scene.lastEventId}`);
+  if (sceneMemory) commitNarrativeMemory(run.narrative, { ...sceneMemory, text: committedNarrative });
   commitNarrativeAssets(run.narrative, applyNarrativeAssetUpdates(run.narrative.assets, scene.assetUpdates, { age: run.age }), scene.assetUpdates, { age: run.age }, {
     routeIds: [scene.routeId], factionIds: scene.factionId ? [scene.factionId] : [],
     characterIds: run.narrative.dynamicCharacters.filter((entry) => scene.participants.some((participant) => participant.characterRef === entry.id || (participant.name === entry.name && participant.factionId === entry.factionId))).map((entry) => entry.id),
-    factIds: factId ? [factId] : []
-  });
+    factIds: Array.from(new Set([...(factId ? [factId] : []), ...advanced.factIds]))
+  }, run.narrative.scene.lastEventId);
   recordDirectedStoryTurnOutcome(narrativeCtx, run, {
     kind: scene.createsDecision ? "milestone" : "normal",
-    narrative: scene.narrative,
+    narrative: committedNarrative,
+    sourceEventId: run.narrative.scene.lastEventId,
     statChanges: advanced.chunk[0]?.statChanges ?? {}
   });
   run.aiConversation = run.aiConversation ?? {};
@@ -1769,6 +1589,7 @@ async function runStartFlowUnlocked(
       talentHookSummary
     });
     if (openingRecord && hooks?.onTurn) {
+      await saveRun(run, sessionId);
       await hooks.onTurn(openingRecord);
     }
   } catch (error) {
@@ -1918,6 +1739,7 @@ async function runStepFlowUnlocked(
     syncRunPhase(run);
     rememberRequestId(run, body.requestId);
     await saveRun(run, sessionId);
+    scheduleCommittedNarrativeSummary({ providerConfig, apiKey, promptPack: content.promptPack, usageScope: { sessionId, runId: run.runId, worldId: run.worldId } }, run);
     if (openingRecord && onTurn) await onTurn(openingRecord, 0, 1);
     return {
       updatedRun: run,
@@ -2050,8 +1872,16 @@ async function runStepFlowUnlocked(
     let directedDecisionContext: NarrativeCallContext | undefined;
     let narrativeOutcome: { effects: import("@reroll/shared").NarrativeAttributeEffect[] } | undefined;
     let factResolution: import("@reroll/shared").NarrativeFactResolution | undefined;
+    let relationshipUpdates: import("@reroll/shared").NarrativeRelationshipUpdate[] | undefined;
+    let narrativeFactUpdates: import("@reroll/shared").NarrativeFactUpdates | undefined;
     let settledAssets: import("@reroll/shared").NarrativeAssets | undefined;
     let assetUpdates: import("@reroll/shared").NarrativeAssetUpdates | undefined;
+    let decisionNarrativeLinks: {
+      routeId?: string;
+      factionId?: string;
+      characterIds: string[];
+      factIds: string[];
+    } | undefined;
     if (wasDirectedMilestone && usesStoryDirectionDecision) {
       const policy = getPendingDirectedDecisionPolicy(run, resolvedDecision);
       if (!policy) throw new Error("decision_outcome_policy_missing");
@@ -2064,7 +1894,7 @@ async function runStepFlowUnlocked(
         factionSummary,
         eventPoolSummary,
         talentHookSummary,
-        narrativePlan: buildNarrativePromptPlan(run, narrativeWorld),
+        narrativePlan: buildNarrativePromptPlan(run, narrativeWorld, null, "decision"),
         conversation: run.aiConversation?.year
       };
       const pendingDynamicScene = run.pendingDynamicScene;
@@ -2076,11 +1906,21 @@ async function runStepFlowUnlocked(
         label: selectedOption?.label ?? "已选抉择",
         description: selectedOption?.description ?? "人物作出了会改变后续处境的取舍。",
         attributePolicy: policy,
-        factResolutionModes: pendingDynamicScene?.beat === "climax" ? activeAct?.resolutionModes : undefined
+        factResolutionModes: narrativeFactResolutionModes(activeAct, pendingDynamicScene)
       }, directedDecisionContext);
       directedDecisionNarrative = outcome.narrative;
       narrativeOutcome = { effects: outcome.effects };
       factResolution = outcome.factResolution;
+      narrativeFactUpdates = outcome.factUpdates;
+      relationshipUpdates = outcome.relationshipUpdates;
+      decisionNarrativeLinks = pendingDynamicScene
+        ? {
+          routeId: pendingDynamicScene.routeId,
+          factionId: pendingDynamicScene.factionId,
+          characterIds: pendingDynamicScene.characterIds ?? [],
+          factIds: pendingDynamicScene.factIds ?? []
+        }
+        : undefined;
       settledAssets = applyNarrativeAssetUpdates(run.narrative.assets, outcome.assetUpdates, { age: run.age });
       assetUpdates = outcome.assetUpdates;
     }
@@ -2093,13 +1933,20 @@ async function runStepFlowUnlocked(
         milestoneEventPool,
         narrativeOutcome,
         factResolution,
+        narrativeFactUpdates,
+        narrative: directedDecisionNarrative,
+        relationshipUpdates,
         narrativeWorld
       }
     );
     resolveTurnRecordChoice(run, publicChoice, selectedOption);
-    if (settledAssets) commitNarrativeAssets(run.narrative, settledAssets, assetUpdates, { age: run.age });
-    if (directedDecisionNarrative) {
-      stepped.decisionEvent.summary = directedDecisionNarrative;
+    if (settledAssets) {
+      commitNarrativeAssets(run.narrative, settledAssets, assetUpdates, { age: run.age }, {
+        routeIds: decisionNarrativeLinks?.routeId ? [decisionNarrativeLinks.routeId] : [],
+        factionIds: decisionNarrativeLinks?.factionId ? [decisionNarrativeLinks.factionId] : [],
+        characterIds: decisionNarrativeLinks?.characterIds ?? [],
+        factIds: Array.from(new Set([...(decisionNarrativeLinks?.factIds ?? []), ...stepped.factIds]))
+      }, stepped.sourceEventId);
     }
     if (debugModel) {
       console.log("[model-debug:step-branch]", { branch: "decision", chunkCount: stepped.chunk.length });
@@ -2107,6 +1954,7 @@ async function runStepFlowUnlocked(
     if (wasDirectedMilestone && usesStoryDirectionDecision) {
       const closureCtx = directedDecisionContext!;
       recordDirectedDecisionOutcome(closureCtx, stepped.updated, {
+        sourceEventId: stepped.sourceEventId,
         decision: resolvedDecision,
         label: selectedOption?.label ?? "已选抉择",
         narrative: directedDecisionNarrative ?? stepped.decisionEvent.summary
@@ -2186,6 +2034,7 @@ async function runStepFlowUnlocked(
 
   rememberRequestId(run, body.requestId);
   await saveRun(run, sessionId);
+  scheduleCommittedNarrativeSummary({ providerConfig, apiKey, promptPack: content.promptPack, usageScope: { sessionId, runId: run.runId, worldId: run.worldId } }, run);
   if (onTurn) {
     for (const [index, record] of turnRecords.entries()) {
       await onTurn(record, index, turnRecords.length);

@@ -116,7 +116,10 @@ export interface StoryFactDefinition {
     priority?: number;
     threadId?: string;
     routeIds?: string[];
+    factionIds?: string[];
     characterIds?: string[];
+    locationIds?: string[];
+    abilityIds?: string[];
 }
 export interface StoryFactEffect {
     introduce?: StoryFactDefinition[];
@@ -495,6 +498,14 @@ export interface NarrativeActRuntime {
     growthFocusOptions?: NarrativeGrowthFocusDefinition[];
 }
 /** A player-visible recurring person generated during this particular life. */
+export type NarrativeRelationshipStance = "friendly" | "guarded" | "hostile" | "indebted" | "dependent" | "competitive";
+/** The durable, player-relative state of a generated recurring character. */
+export interface NarrativeCharacterRelationship {
+    stance: NarrativeRelationshipStance;
+    summary: string;
+    relatedFactIds: string[];
+    lastChangedAge: number;
+}
 export interface NarrativeDynamicCharacter {
     id: string;
     name: string;
@@ -503,6 +514,7 @@ export interface NarrativeDynamicCharacter {
     description: string;
     relatedFactIds: string[];
     relatedRouteIds: string[];
+    relationship?: NarrativeCharacterRelationship;
     introducedAge: number;
     lastSeenAge: number;
     importance: NarrativeCharacterImportance;
@@ -561,6 +573,28 @@ export interface NarrativeAssetUpdates {
         mastery: string;
         status: NarrativeAbility["status"];
     }>;
+}
+/**
+ * Optional continuity proposed by the narrator. The engine assigns IDs for
+ * newly introduced facts and only accepts references already in this run.
+ */
+export interface NarrativeFactUpdates {
+    introduce: Array<Pick<StoryFactDefinition, "kind" | "label" | "priority">>;
+    touchFactIds: string[];
+    resolveFactIds: string[];
+    progress?: Array<{
+        factId: string;
+        summary: string;
+    }>;
+    resolutions?: Array<{
+        factId: string;
+        summary: string;
+    }>;
+}
+export interface NarrativeRelationshipUpdate {
+    characterRef: string;
+    stance: NarrativeRelationshipStance;
+    summary: string;
 }
 /** Compact, deterministic local memory. Retrieval never changes engine state. */
 export interface NarrativeMemoryEntry {
@@ -673,6 +707,8 @@ export interface StoryFactRecord extends StoryFactDefinition {
     resolvedAge?: number;
     resolution?: NarrativeFactResolution;
     resolutionSummary?: string;
+    progressSummary?: string;
+    lastSourceEventId?: string;
 }
 export interface StoryFactLedger {
     version: 1;

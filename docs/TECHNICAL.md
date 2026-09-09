@@ -1,5 +1,22 @@
 # 技术文档（v1.0.1）
 
+## 增量对齐：2026-09-09 23:47 +08:00
+
+- `index.ts` 统一计算既有 `allowedTurnKinds`，同步提供给任务记忆投影和工具输入；`storyArc` 传递世界总纲。年龄、属性准入及节拍推进规则保持原链路。
+- `dynamicNarrativeSceneTools` 将总纲、幕说明和当前节拍放入场景工具描述。`dynamicNarrativeScenePrompt` 组装公共年龄、成长、路线和工具提交信息；背景任务使用对应的任务上下文，不增加模型请求。
+- `buildTaskNarrativePlan` 的普通年份 Lore 查询侧重人物设定与近期经历；混合请求保留场景所需知识。事实详情预算分别为背景 1、混合 2、纯场景 4，均先按相关性选取，开放事实引用目录不受详情预算截断。
+- `retrieveNarrativeMemories` 对关联事实全部已收束的记忆投影结果摘要，间接召回分数按结束后的年龄间隔衰减；明确事实引用、本领关联与结局任务保留直接召回权重。同一结果去重，不改写持久化记忆或删除人物、地点、本领。
+- 新增跨世界请求投影、历史结果召回及任务预算回归；后端编译和 53 项测试通过。实际模型文本尚未采样。
+
+## 增量对齐：2026-09-09 12:30 +08:00
+
+- `narrativeRouteBeatGuidance`：setup 读取 `perspective`，escalation/pressure 读取 `escalation`，climax 读取 `crisis`，payoff/ending 读取 `payoffFocus`；缺省回到世界包自身的视角。动态请求对所有路线应用同一投影，抉择结果使用已选路线。
+- `buildTaskNarrativePlan`：总纲与当前任务分层组装，Lore 阶段来自 `actRuntime.beat`；不再依赖滞留的 `arcPhase`。幕间交接在新幕 setup 投影，并与已召回结果去重。
+- `normalizeNarrativeHandoffFact`：仅将 `act:*:consequence`、kind=cost、status=open 的历史交接后果规范化为 resolved，保留引用、标签与结果信息。该规则用于上下文、工具引用合同和引擎账本规范化。
+- `factUpdateContract`：开放的 `dynamic:*` 和旧 `act:*:continuation` 可推进、收束；`act:*:payoff` 及世界核心事实不因此开放给叙事工具。
+- `recordDynamicActHandoff`：新交接三个字段均作为历史结果保存；未完成事项由同轮 `factUpdates` 提交。交接 ID 合并到当前回合记忆并关联出场人物，不新增模型请求。
+- 回归覆盖新交接落盘、旧承诺完成、存档快照隔离、跨世界指引读取和旧 arcPhase 不影响 Lore 阶段。后端编译及 50 项测试通过；未进行真实模型叙事采样。
+
 ## 1. 技术栈
 - 前端：React 18 + Vite 5 + TypeScript
 - 后端：Express + TypeScript（`tsx` 开发，`tsc` 构建）

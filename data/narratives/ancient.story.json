@@ -1,23 +1,23 @@
 {
   "version": 6,
   "worldId": "ancient",
-  "storyBible": "景朝中后段，宗族、门第、科举、军功、商路、地方秩序与皇权共同塑造命运。人生不预设某一份案卷或唯一的敌人：一桩被掩盖的旧事、一次地方失序、一段被改写的功劳或一笔足以伤人的人情，都可能成为人物入局的起点。此后，人物会因前事的后果进入阵营、取得位置或失去依靠，并在更大范围的政局、民生、军事或外患危机中承担与自身身份相称的责任。叙事以符合景朝社会秩序的称谓、行动与后果呈现权力关系。",
+  "storyBible": "景朝中后段，宗族、门第、科举、军功、商路与皇权共同塑造命运。地方有生计与公断之争，朝中有任用与施政之争，军民面对局势变动各有求存之道。人物从自身生活进入纷争，因处理事情而改变关系与位置，在新的处境里结交、任事、竞争或退守；更大危机到来时，以已有能力和牵挂参与其中。礼制与权势落实在人的待遇、资源流动和实际行动中。",
   "styleRules": [
     "以第二人称写景朝人生，让官署、街市、宗祠、军营、驿路与家宅中的细节自然显出身份、礼数和权力关系。",
-    "把案情、民生、声名、人情与局势落到人物当下的处境，让选择经由称谓、行动、文书与关系留下痕迹。",
+    "把案情、民生、声名、人情与局势落到人物当下的处境，用交往、任事和实际得失显出各方的利益与能力。",
     "普通岁月可写读书、营生、行旅、交游、守家或职务中的见闻与积累，使人物逐渐认清自己所在的位置。",
-    "冲突抵达高处时，以人和事的实际代价推动关系、身份或声名转变，并让此前的线索在后果中显影。"
+    "冲突抵达高处时，呈现人物怎样应对正在发生的事，以及行动造成的成败、关系和处境变化；战事中可见进退与交锋，日常中亦有安稳与喜悦。"
   ],
   "endingGuide": "以人物留下的生路、关系、秩序或未竟代价收束；功业、归处与身后影响都可成为这段人生的余响。",
   "opening": {
     "earlyLife": { "maxAge": 3 }
   },
   "mainlineSkeleton": {
-    "premise": "三幕共享同一座景朝，却不复述同一宗案子。第一幕打开人物尚未能置身事外的旧事或裂缝；第二幕由此带来新的阵营位置、关系债务或权力机会；第三幕把人物推入更大范围的危机。前一幕留下的人、后果与责任必须成为后一幕的来处，但具体案由、阵营关系、危机形态和人物身份均由已发生的叙事决定。",
-    "opening": "第一幕让人物从自身经历撞见一桩既存而被遮蔽的矛盾。它可以关乎地方、家门、功名、商路、法度、军政或被遗忘的人；高潮要使人物作出不可逆的站位，而不是穷尽所有真相。",
-    "pressure": "第二幕承接第一幕的实际后果。人物获得或失去进入某个阵营、组织、地方势力或人际网络的机会；高潮要解决这一新位置中的独立挑战，让关系、权力或身份真正改变，而非重复追查原来的线索。",
-    "climax": "第三幕以已积累的身份与代价面对更大范围的危机。它可以是战事、外患、灾乱、政局崩裂、民生失序或其他迫使人物承担责任的局面；人物可以居于主将、谋士、官员、商人、教习或普通人的位置，必须写出相称的行动尺度。",
-    "payoff": "三次高潮的选择、人物和代价在结局前共同兑现。必须回答人为何走到此处、留下了什么可延续或无法挽回的后果，而不是回到一个预设案件的标准答案。",
+    "premise": "人生由案件入局、阵营立身走向战乱担当。身边纷争得到处理，人物因实际得失进入新的利益关系，在组织内外的挑战中形成位置，继而面对战争带来的现实抉择。各幕有自身的事情和结果，人物、能力、关系与处境连接这段人生。",
+    "opening": "案件入局：人物介入生活中的案件或纷争，经历调查、交涉与取舍，使眼前事情得到实际处理。由此获得的认识、关系与得失成为进入更广社会的起点。",
+    "pressure": "阵营立身：人物在阵营或组织中承担实际事务，与不同诉求的人合作、竞争和周旋。通过处理本阶段的独立挑战，形成自己的位置、依靠与责任。",
+    "climax": "战乱担当：外部战争打破原有生活，人物以自身身份参与应对。既有力量、关系与代价在组织、交锋、进退和求存中发挥作用，战事经历形成可见的成败与归宿。",
+    "payoff": "回望已处理的纷争、立身经历与战乱中的选择，交代人物留下的关系、成果和生活。此前付出的代价仍是人生的一部分。",
     "goodEndingDirection": "人物以承担、判断与行动留下可延续的秩序、关系或生路；胜利必须带着已付出的代价。",
     "badEndingDirection": "人物因失势、误判、代价或所处位置的局限失去重要之物；结局仍应承认其曾经作出的真实选择。"
   },
@@ -25,19 +25,19 @@
     {
       "id": "ancient.entry_conflict",
       "label": "案起入局",
-      "prompt": "让人物从自身年龄、身份与既有生活中接触一桩案件、被遮蔽的旧事、制度裂缝或未被承担的现实矛盾。它可以是新近发生的事，也可以带着更早的线索；案由不可预设为特定账册、战报、旧物或地名。用具体人物和代价把它带入视野。高潮要形成一次真实站位，并留下能把人物带向新位置的后果。",
+      "prompt": "案件入局。人物从自身年龄、身份与生活中接触一件案件或现实纷争，逐渐认识各方诉求并参与处理。压力来自采取行动时遇到的阻力和取舍。高潮与收束交代这件事实际怎样落定，以及人物由此得到或失去了什么；这些变化带来新的社会关系与人生位置。",
       "readinessStage": "opening"
     },
     {
       "id": "ancient.position_trial",
       "label": "立身周旋",
-      "prompt": "承接前一幕已经发生的后果，让人物得到或失去进入一个阵营、组织、地方势力或关系网络的机会。此幕必须围绕新的位置展开独立矛盾：举荐、结盟、背叛、资源争夺、制度冲突或承担污名皆可。高潮要改变真实的人际或权力关系，不得把前一幕的案由原样再查一遍。",
+      "prompt": "阵营立身。承接人物已有的声名、能力与关系，在所处组织中展开任事与历练。人物面对同伴、竞争者及组织内外的不同利益，逐渐形成自己的立场和可调动的力量。本幕围绕这段立身经历中的独立挑战推进，收束交代事情的成败、人物取得或失去的位置，以及此后生活的变化。",
       "readinessStage": "pressure"
     },
     {
       "id": "ancient.wider_crisis",
       "label": "大局担当",
-      "prompt": "让前两幕积累的身份、人物与代价进入更大范围的危机。危机可以是外患、战事、灾乱、政局失序、地方崩裂或民生困局，不预设方向、地域或主角职位；根据人物当前的社会位置决定其能承担的尺度。高潮必须让此前关系与责任得到实质兑现，为人生结局留下可回收的后果。",
+      "prompt": "战乱担当。外部战争进入人物所在的社会，原有秩序、关系与生计受到冲击。按人物实际身份展开应对，让组织与调度、交锋与进退、保护与求存产生具体后果。高潮处理本局战事中的核心挑战，收束呈现人物参与造成的成败及战后的生活处境，作为这一生归宿的依据。",
       "readinessStage": "climax"
     }
   ],
@@ -96,12 +96,12 @@
     "completion": { "requireCommittedDirection": true, "requireDecisionConsequence": true, "requireClimax": true, "requirePayoff": true, "requireResolvedCoreFacts": true, "requireNoActiveScene": true, "minCompletedSceneInstances": 3, "requireAllMainlineActs": true }
   },
   "narrativeFactions": [
-    { "id": "guardian", "label": "宗族与地方", "summary": "掌握田产、名册与地方人情，重保全也重体面。", "conflictFactionIds": ["institution", "ambition"] },
-    { "id": "ambition", "label": "朝局与功名", "summary": "掌握举荐、军功与官位，机会总伴随站队。", "conflictFactionIds": ["institution", "outsider"] },
-    { "id": "broker", "label": "商路与账房", "summary": "掌握盐引、漕运和账目，愿以资源交换可信的人。", "conflictFactionIds": ["guardian", "outsider"] },
-    { "id": "mentor", "label": "书院与清议", "summary": "掌握知识、门生与名声，必须面对学问进入现实后的责任。", "conflictFactionIds": ["ambition"] },
-    { "id": "institution", "label": "法度与军府", "summary": "掌握文书、命令与追责，程序能护人也能伤人。", "conflictFactionIds": ["guardian", "ambition"] },
-    { "id": "outsider", "label": "边地与异路", "summary": "带来塘报之外的真相、流民与边军的现实代价。", "conflictFactionIds": ["ambition", "broker"] }
+    { "id": "guardian", "label": "宗族与地方", "summary": "有土地、人手与乡里信任，求生计安稳和家门延续；能互助、调停，也会争夺地方资源。", "conflictFactionIds": ["institution", "ambition"] },
+    { "id": "ambition", "label": "朝局与功名", "summary": "有举荐、任用与政治声望，争取施政空间与地位；可提携合作，也因利益与主张发生分合。", "conflictFactionIds": ["institution", "outsider"] },
+    { "id": "broker", "label": "商路与行会", "summary": "有货源、运力与信用网络，求通路和收益；能筹措周转，也会因风险分担与资源定价起争执。", "conflictFactionIds": ["guardian", "outsider"] },
+    { "id": "mentor", "label": "书院与清议", "summary": "有学识、门生与社会声望，求传承和主张落地；能育才任事，也会因方法与立场分歧。", "conflictFactionIds": ["ambition"] },
+    { "id": "institution", "label": "法度与军府", "summary": "有行政、动员与武力，求秩序和执行成效；能组织救援、守备与公断，也有权限和资源之争。", "conflictFactionIds": ["guardian", "ambition"] },
+    { "id": "outsider", "label": "边地与异路", "summary": "有远行经验、地方技艺与跨地域联系，求生存和自主；可结伴、通商、从军，也会碰撞不同秩序。", "conflictFactionIds": ["ambition", "broker"] }
   ],
   "routeArcs": [
     { "directionId": "ancient.guardian", "label": "家门与人情", "summary": "从亲族、地方、照拂与具体人的生计观察大局；人物可以是守护者、被照顾者或夹在家门与公义之间的人。", "perspective": "让每一场制度或权力冲突都落到相识之人的处境、承诺与归处。", "escalation": "家门、人情、地方资源和名声会让善意变成必须兑现的选择。", "crisis": "更大危机来临时，谁得到照拂、谁被牺牲、谁仍能归家都应成为真实后果。", "payoffFocus": "回应人物曾经承担的照料、名分或保全之责。", "coreThreadIds": ["ancient.guardian_relief"], "characterIds": ["ancient.guardian_elder", "ancient.guardian_clerk"], "loreIds": ["ancient.guardian"], "materialEventIds": ["ancient_guardian_04", "ancient_guardian_01", "ancient_guardian_05", "ancient_guardian_09", "ancient_guardian_10"] },
@@ -135,13 +135,13 @@
   ],
   "lore": [
     { "id": "ancient.protocol", "text": "称谓与礼数是权力关系的一部分：朝堂、书院、宗族、军府的说话方式不可混同。", "priority": 100 },
-    { "id": "ancient.rising", "text": "入局之后的机会从不白来；每次被举荐、受托或结盟，都应留下可追索的人情。", "priority": 80, "phases": ["rising", "pressure", "climax"] },
+    { "id": "ancient.rising", "text": "任事与结盟改变人物能做的事情；信任可在合作中增长，分歧可在具体利益与做法上显露。", "priority": 80, "phases": ["rising", "pressure", "climax"] },
     { "id": "ancient.guardian", "text": "赈济、疫病与宗族田产必须落到具体人身上，不能只写抽象的仁政与牺牲。", "priority": 85, "directionIds": ["ancient.guardian"] },
-    { "id": "ancient.ambition", "text": "功名路线始终伴随功劳来源、派系交换与名节污点，得势不等于清白。", "priority": 85, "directionIds": ["ancient.ambition"] },
-    { "id": "ancient.broker", "text": "人情经营的代价是信誉可被挪用；密信和账本要在后续成为真实筹码。", "priority": 85, "directionIds": ["ancient.broker"] },
+    { "id": "ancient.ambition", "text": "位置带来职责、同僚与可调动的力量；功绩来自实际任事，升迁、失势与退守各会改变日常生活。", "priority": 85, "directionIds": ["ancient.ambition"] },
+    { "id": "ancient.broker", "text": "经营落实为人手、货物、通路与信用的周转；需求变化和利益分配可以促成合作，也可以引发竞争。", "priority": 85, "directionIds": ["ancient.broker"] },
     { "id": "ancient.mentor", "text": "学问路线要持续写师门、门生和教化如何进入现实，不可停在读书与清谈。", "priority": 85, "directionIds": ["ancient.mentor"] },
-    { "id": "ancient.institution", "text": "法度路线必须同时呈现文书程序和其对百姓、宗族、同僚的具体影响。", "priority": 85, "directionIds": ["ancient.institution"] },
-    { "id": "ancient.outsider", "text": "边地路线的真相应逐步显露；禁书、塘报、密册和流民不可在同一段里全部揭晓。", "priority": 85, "directionIds": ["ancient.outsider"] }
+    { "id": "ancient.institution", "text": "政令与军务经由具体的人执行；调度、训练、公断和协作的成败会改变当地秩序与人的生路。", "priority": 85, "directionIds": ["ancient.institution"] },
+    { "id": "ancient.outsider", "text": "远行带来新的地貌、生活方式与相处规则；遭遇危险、交换技艺或共同求生，让不同来处的人建立关系。", "priority": 85, "directionIds": ["ancient.outsider"] }
   ],
   "eventBindings": [
     { "eventId": "ancient_guardian_01", "beat": "escalation", "characterIds": ["ancient.guardian_elder", "ancient.guardian_clerk"], "sceneHint": "灾年粮道受阻，先写清你所见的缺口，再让责任落到一份名单或一个人身上。" },

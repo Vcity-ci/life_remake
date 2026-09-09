@@ -1,5 +1,23 @@
 # 配置指南（v1.0.0）
 
+## 当前配置入口对齐：2026-09-10 00:26 +08:00
+
+本节补充当前动态叙事配置。后文保留的 `gameplayTuning.milestone/death/ascension` 等字段说明属于已有配置结构，不能据此认定当前主线按随机年龄里程碑或到龄飞升运行。
+
+| 内容 | 当前来源与作用 |
+| --- | --- |
+| 世界选择列表 | 首次从 `data/worlds/*.json` 初始化至 `storage/custom-content.json.worlds`，经 bootstrap 提供给前端。已有内容存储不会自动追加新基础世界。 |
+| 世界叙事 | `data/narratives/<worldId>.story.json`；三个内置包均为 v6，按 ID 加载并在进程中缓存。 |
+| 年龄与成长 | 基础世界的 `ageThresholds`，叙事包的 `opening.earlyLife`、`progression.backgroundPacing/growthFocuses/routes/statTiers/statTierPresentation`。 |
+| 生存与家境 | 叙事包的 `progression.survival`：阶段风险线、宽限年、风险上限、恢复成功率与体魄缓冲、年度家境支持。 |
+| 主线结束与品质 | `progression.completion` 与 `endingBlueprints`；每条路线有 good / normal / bad 蓝图。 |
+| 天赋 | `data/cards.json` 种子与内容仓储的 cards；模型接收最终选定卡的叙事画像，开局使用 modifiers。 |
+| 难度 | 前端不开放选项，沿用 bootstrap 首项；后端配置结构保留。 |
+| 部署模式 | 本地会话提供密钥和模型参数；云端使用服务端配置，两个入口不合并。 |
+| 存档 | `storage/anonymous-game-store.json` 与 `ANONYMOUS_*` 环境配置；尚未使用数据库。 |
+
+世界包模板见 [JSON 编写与使用说明](../examples/world-pack/WORLD_PACK_GUIDE.txt)。修改叙事包后需要重启后端以刷新进程缓存；添加基础世界时还需同步既有内容仓储。生存配置的当前数值见 [技术文档](./TECHNICAL.md)。
+
 ## 1. 配置入口与生效范围
 - 运行配置：`storage/runtime-config.json`
 - 内容配置：`storage/custom-content.json`

@@ -1,5 +1,51 @@
 # 技术文档（v1.0.1）
 
+## 增量机制：2026-09-15 13:21 +08:00 — Curator、Horizon 与 Agent Runtime
+
+- `apps/backend/src/narrative/curator.ts` 每次选择 4—6 个尚未覆盖的已提交 Episode；payoff／ending 可提前触发。模型通过 `curate_narrative_memory` 返回 run、act、route、character、faction 作用域摘要及现有事实／人物引用，`store.ts` 在匿名 session/run 锁内按 `memoryRevision` 比较后提交。
+- Curator 调用使用已保存运行态的结构化副本，模型请求期间不读取正在被下一 step 修改的对象。成功后 run Digest 投影到既有 conversation 摘要并移除已覆盖 archive；失败只记录服务端调试信息，保留未整理 Episode 等待下一次调度。
+- `NarrativeHorizonPlan` 由 `plan_narrative_horizon` 在可进入主线场景时生成；纯背景不调用。Horizon 按 act 复用，重大抉择和 payoff 失效，下次主线候选回合再生成。其 Schema 不含 routeId 或 allowedRouteIds。
+- `apps/backend/src/narrative/runtime.ts` 是动态叙事 Agent 的编排入口。它调用 Horizon、`plan_narrative_turn`、第二次 `buildNarrativePromptPlan`、动态 Renderer 和 `refine_narrative_prose`；原有 `runNarrativeTurnTransaction` 与 step 末端 `saveRun` 继续承担发布边界。
+- `refine_narrative_prose` 只返回正文及可选抉择背景。结构化属性、事实、人物、地点、本领、选项与结局定性沿用 Renderer 已验证结果；整理失败使原事务失败，不使用原文或模板作为静默回退。
+- `NarrativeContextProvider` 将原 Collector 拆成固定顺序、可组合的数据提供者；Context Orchestrator 仍统一执行来源去重、任务预算、格式化和 manifest。Attempt 仅持久化 call/act/beat/route/faction/revision/fragment/episode 引用。
+- 回归覆盖 Curator revision/覆盖投影、Digest 与原始 Episode 召回、Horizon 失效和 Provider 顺序。后端 64 项测试、后端编译、前端生产构建及 shared `--noEmit` 检查通过；shared 常规 emit 因本地进程占用 `packages/shared/dist` 返回 EPERM。真实模型表现、Token 增幅和延迟仍需实际游戏采样。
+
+## 增量机制：2026-09-15 12:32 +08:00 — Planner / Renderer 与 Episode 索引
+
+- `apps/backend/src/narrative/turn.ts` 定义内部 `NarrativeTurnEnvelope` 与 `NarrativeTurnPlan`；`ai.ts` 的 `plan_narrative_turn` 只接受世界包合法 ID 和引擎状态，动态 renderer 随后只暴露计划对应的 `render_background_segment`、`render_scene` 或 `render_choice_scene`。
+- `buildNarrativePromptPlan` 新增 planning/rendering 任务视图。planning 读取当前世界幕和完整路线目录，不携带上一条路线偏好；rendering 使用模型已选 route/faction/focus 做第二次确定性召回。Context manifest 同步记录 callId、任务来源、worldId 与 focusIds。
+- Context task profile 已按 origin/background/planning/rendering/decision/closure/ending 分配不同层级比例。会话正文按完整 user/assistant 语义回合进入预算，未摘要回合不做字符级裁剪；历史压缩继续由带 revision 与来源游标的异步摘要提交负责。
+- `apps/backend/src/narrative/commit.ts` 在所有相关更新成功后写入 Episode 引用，并从 payoff handoff 写入 Act Canon；`apps/backend/src/narrative/episodes.ts` 只返回既有 memory ID 和阶段结果，不复制正文或推导状态。
+- 结局申请经过 closure 任务的统一上下文编排。已批准结局的模型文本不再截为固定字符数，也不在渲染失败时替换成本地模板；失败会使当前 step 保持未提交。
+- 验证：后端 61 项回归、后端 TypeScript 编译与前端生产构建通过；没有启动服务或调用真实模型。
+
+## 增量机制：2026-09-15 11:06 +08:00 — Context Orchestrator
+
+- `apps/backend/src/narrative/context/` 提供内部上下文协议：`NarrativeContextFragment` 记录 layer、section、placement、sourceIds、priority、estimatedTokens、required 与回合生命周期；这些类型不进入共享前端协议或存档结构。
+- `collectNarrativePlanFragments` 将现有 `NarrativePromptPlan` 增量适配为带来源的片段。开放事实目录与已召回详情按事实 ID 去重；人物、Lore、地点、本领和局内记忆使用稳定来源 ID。旧的非任务计划只保留迁移适配器，不形成第二套生产模式。
+- `composeNarrativeContext` 是当前动态工具请求与结局渲染的统一用户上下文入口。它复用 `buildConversationPromptMessages` 投影摘要、archive 与近期回合，执行确定性去重和任务预算后，分别输出 provider 历史消息、当前用户上下文和不含正文的 manifest。
+- 预算采用本地估算值，只用于请求前裁剪低优先补充材料；实际 Token 统计继续使用供应商响应。history 保持原有完整回合窗口，必要 task/runtime/active 片段优先保留，空余层级预算可被其他层借用。
+- 回归覆盖来源唯一性、事实目录／详情合并、任务末位投影、conversation 摘要归属和超预算 Lore 裁剪。引擎仍是状态裁决者，编排器不选择路线、不推进节拍、不修改属性或事实。
+- 验证：后端 59 项回归、后端编译和前端生产构建通过；未启动服务、调用真实模型或修改本地存档。
+
+## 增量机制：2026-09-15 01:50 +08:00 — 提交来源与混合召回
+
+- `applyMilestoneDecisionAndAdvance` 对模型提出的事实更新使用回合最终 `sourceEventId`，与 `memory:${sourceEventId}` 以及 `recordDirectedDecisionOutcome` 一致。由此避免账本已经更新、变化摘要却因来源不匹配而遗漏。
+- `isNarrativeFactModelMutable` 统一事实工具合同与生活侧引用目录的可更新范围。目前为局内动态事实及幕间 continuation；世界幕完成事实仍由既有高潮和结算逻辑处理。
+- `buildTaskNarrativePlan` 区分纯场景和包含背景工具的 mixed turn。mixed turn 不再以当前幕提示及幕事实作为公共检索种子；模型尚未选择路线时不随机注入某条路线的专属 Lore，场景工具仍包含完整世界主线、当前幕、节拍、路线和阵营参数。
+- 回归覆盖三世界的纯背景／混合／纯场景投影，并校验抉择事实来源能够进入会话变化记事。
+
+
+## 增量机制：2026-09-15 01:34 +08:00 — 记忆提交与覆盖
+
+- 模型侧 `factUpdates` 提供 `introduce[{kind,label,status,priority?}]` 与 `updates[{factId,status,summary}]`。解析器将更新转换为已有 `progress/resolutions` 等内部操作，复用引擎提交；世界幕完成事实仍由原高潮链路管理。新事实可直接记录为已发生结果。
+- `relationshipUpdates` 沿用稳定 `characterRef`、关系立场和说明，新增可选 `status/description` 更新已有档案。已离场常驻人物仍保留在最近八名公开人物投影中，描述标明状态；既有历史回合快照不回写。
+- `ChatConversationState.summaryThroughMemoryId` 跟随摘要成功提交更新。近期回合和未摘要 archive 仍通过来源 ID 排除重复召回；摘要覆盖条目仅在明确事实／本领用途或结局任务下重新召回。缺少覆盖标记的旧会话不推测其覆盖范围。
+- 待摘要输入优先使用提交时形成的分类变化记事；没有记事的旧回合保留简短正文尾段。完全相同的投影去重，原始 archive 正文仍用于异步摘要，不按模糊相似度删除提交历史。
+- 召回相似性降权只影响补充上下文，不能改变存档事实、候选路线或引擎准入。身世、人设、天赋与完整引用目录保留。普通年份和主线场景继续共用一次动态请求，无新增规划请求。
+- 验证：57 项后端回归通过，后端与前端编译通过。未启动服务、调用真实模型或改写本地存档；对叙事重复率和真实 Token 节省不作未测量承诺。
+
+
 ## 当前机制对齐：2026-09-10 00:26 +08:00
 
 以下补充以当前动态链路为准；旧章节的年度死亡 roll、飞升阈值和静态里程碑参数不能直接视为当前玩法入口。

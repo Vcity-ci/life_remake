@@ -12,7 +12,18 @@ export const defaultPromptPack = {
 };
 
 export type PromptPackResolved = typeof defaultPromptPack;
-export type NarrativeTask = "origin" | "background" | "dynamic" | "decision" | "ending";
+export type NarrativeTask =
+  | "origin"
+  | "background"
+  | "planning"
+  | "curation"
+  | "horizon"
+  | "reviewing"
+  | "rendering"
+  | "dynamic"
+  | "decision"
+  | "closure"
+  | "ending";
 
 export function resolvePromptPack(source: Record<string, string> = {}): PromptPackResolved {
   return Object.fromEntries(Object.entries(defaultPromptPack).map(([key, fallback]) => [
@@ -24,7 +35,13 @@ export function narrativeTaskRule(task: NarrativeTask, pack: PromptPackResolved)
   switch (task) {
     case "origin": return "写一段180-320字的身世，交代家庭与人物来处。";
     case "background": return pack.yearNormalRule;
+    case "planning": return "只规划下一回合的叙事任务，通过工具提交选择，不写玩家正文。";
+    case "curation": return "整理已经提交的经历与引用，不创造新的游戏事实。";
+    case "horizon": return "为当前世界幕提出短程叙事意图，不选择或排除路线，不写玩家正文。";
+    case "reviewing": return "整理已经生成的玩家正文，使其忠于已批准计划和既有事实，不改变结构化结果。";
+    case "rendering": return "依据已批准的回合计划写本轮正文，并通过指定工具同步结构化变化。";
     case "decision": return "写清所选行动实际带来的结果与人物处境，约80-150字。事情可以当场解决，也可以自然留下后续影响。";
+    case "closure": return "主线完成后只提交结局申请，不写结局正文。";
     case "ending": return pack.endingHint;
     case "dynamic": return "依据本轮允许的工具选择叙述任务，正文风格服从当前世界。";
   }

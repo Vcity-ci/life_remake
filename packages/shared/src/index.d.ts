@@ -579,7 +579,9 @@ export interface NarrativeAssetUpdates {
  * newly introduced facts and only accepts references already in this run.
  */
 export interface NarrativeFactUpdates {
-    introduce: Array<Pick<StoryFactDefinition, "kind" | "label" | "priority">>;
+    introduce: Array<Pick<StoryFactDefinition, "kind" | "label" | "priority"> & {
+        status?: "open" | "resolved";
+    }>;
     touchFactIds: string[];
     resolveFactIds: string[];
     progress?: Array<{
@@ -595,6 +597,8 @@ export interface NarrativeRelationshipUpdate {
     characterRef: string;
     stance: NarrativeRelationshipStance;
     summary: string;
+    status?: NarrativeDynamicCharacter["status"];
+    description?: string;
 }
 /** Compact, deterministic local memory. Retrieval never changes engine state. */
 export interface NarrativeMemoryEntry {
@@ -607,6 +611,85 @@ export interface NarrativeMemoryEntry {
     locationIds?: string[];
     abilityIds?: string[];
     text: string;
+}
+/** Reference-only index for one committed narrative turn; prose remains in memory/TurnRecord. */
+export interface NarrativeEpisodeRecord {
+    id: string;
+    callId: string;
+    sourceEventId: string;
+    turnId?: string;
+    turnKind: "origin" | "background" | "scene" | "decision" | "ending";
+    ageFrom?: number;
+    age: number;
+    actId?: string;
+    beat?: Exclude<NarrativeBeat, "ending">;
+    routeId?: string;
+    factionId?: string;
+    memoryIds: string[];
+    factIds: string[];
+    characterIds: string[];
+    locationIds: string[];
+    abilityIds: string[];
+    createdAt: number;
+}
+/** Durable outcome of a completed world act, derived from the payoff handoff. */
+export interface NarrativeActCanon {
+    actId: string;
+    sourceEventId: string;
+    resolvedAge: number;
+    routeId?: string;
+    resolvedTension: string;
+    lastingConsequence: string;
+    continuation: string;
+    factIds: string[];
+}
+export type NarrativeMemoryDigestScope = "run" | "act" | "route" | "character" | "faction";
+/** Model-curated view over committed Episodes. It may summarize, never create game facts. */
+export interface NarrativeMemoryDigest {
+    id: string;
+    scope: NarrativeMemoryDigestScope;
+    scopeId?: string;
+    revision: number;
+    throughEpisodeId: string;
+    coveredEpisodeIds: string[];
+    summary: string;
+    activeFactIds: string[];
+    historicalFactIds: string[];
+    characterIds: string[];
+    updatedAt: number;
+}
+/** Advisory, act-scoped horizon. Route selection remains a per-turn model decision. */
+export interface NarrativeHorizonPlan {
+    id: string;
+    actId: string;
+    revision: number;
+    throughEpisodeId?: string;
+    dramaticQuestion: string;
+    developingTension: string;
+    nearTermIntents: string[];
+    focusRefs: string[];
+    payoffShape: string;
+    status: "active" | "stale";
+    createdAt: number;
+}
+export type NarrativeAgentAttemptStage = "prepare" | "horizon" | "plan" | "render" | "review" | "commit";
+/** Compact internal trace. Prompts and player prose are deliberately not persisted. */
+export interface NarrativeAgentAttemptRecord {
+    id: string;
+    callId: string;
+    attemptId: string;
+    task: string;
+    source: string;
+    stage: NarrativeAgentAttemptStage;
+    actId?: string;
+    beat?: Exclude<NarrativeBeat, "ending">;
+    routeId?: string;
+    factionId?: string;
+    horizonRevision?: number;
+    digestRevision?: number;
+    episodeId?: string;
+    contextFragmentIds: string[];
+    createdAt: number;
 }
 export interface NarrativeComponentRunState {
     id: string;
@@ -655,7 +738,7 @@ export interface CompletedNarrativeScene {
     decisionCount: number;
 }
 export interface NarrativeRunState {
-    version: 1 | 2 | 3 | 4 | 5 | 6 | 7;
+    version: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
     enabled: boolean;
     opening?: NarrativeOpeningState;
     arcPhase: NarrativeArcPhase;
@@ -668,6 +751,12 @@ export interface NarrativeRunState {
     dynamicCharacters: NarrativeDynamicCharacter[];
     assets?: NarrativeAssets;
     memoryEntries: NarrativeMemoryEntry[];
+    episodes: NarrativeEpisodeRecord[];
+    actCanon: NarrativeActCanon[];
+    memoryRevision: number;
+    memoryDigests: NarrativeMemoryDigest[];
+    horizonPlan?: NarrativeHorizonPlan;
+    agentAttempts: NarrativeAgentAttemptRecord[];
     components: NarrativeComponentRunState[];
     activeCharacterIds: string[];
     scene: NarrativeSceneState;
@@ -1124,7 +1213,7 @@ export interface CreateSaveResponse {
     save: SaveSlotSummary;
     recoveryCode: string;
 }
-export type ModelUsageOperation = "narrative" | "summary" | "continuation" | "director" | "planning" | "render" | "origin" | "background" | "scene" | "choice" | "decision" | "ending";
+export type ModelUsageOperation = "narrative" | "summary" | "continuation" | "director" | "planning" | "curation" | "horizon" | "review" | "render" | "origin" | "background" | "scene" | "choice" | "decision" | "ending";
 export type ModelUsageTransport = "chat" | "responses";
 export interface ModelUsageTotals {
     requestCount: number;

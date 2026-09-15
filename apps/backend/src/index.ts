@@ -5,6 +5,7 @@ import express from "express";
 import seedrandom from "seedrandom";
 import { once } from "node:events";
 import path from "node:path";
+import { randomUUID } from "node:crypto";
 import type {
   AgeThreshold,
   AdminConfigPayload,
@@ -35,8 +36,6 @@ import { narrativeFactResolutionModes } from "./narrative-continuity.js";
 import { applyNarrativeAssetUpdates, commitNarrativeAssets } from "./narrative-assets.js";
 import {
   generateEndingNarrative,
-  generateDynamicNarrativeScene,
-  generateDirectedDecisionNarrativeOutcome,
   renderInterruptedBackground,
   generateMilestoneOptions,
   generateNarrativeOrigin,
@@ -45,9 +44,12 @@ import {
   NarrativeOutcomeError,
   recordDirectedDecisionOutcome,
   recordDirectedStoryTurnOutcome,
-  scheduleCommittedNarrativeSummary
+  scheduleCommittedNarrativeCuration
 } from "./ai.js";
 import { generateNarrativeRender, generateNarrativeTurn } from "./narrative-provider.js";
+import { commitNarrativeActCanon, commitNarrativeEpisode, runNarrativeTurnTransaction } from "./narrative/commit.js";
+import type { NarrativeTurnEnvelope } from "./narrative/turn.js";
+import { commitNarrativeAgentTurn, invalidateNarrativeHorizon, runNarrativeAgentDecision, runNarrativeAgentEnding, runNarrativeAgentTurn } from "./narrative/runtime.js";
 import { approveStoryClosure, approveStoryIntent } from "./tool-gateway.js";
 import { providerLimits } from "./constants.js";
 import { getCloudApiKey, getDeployMode, readRuntimeConfig, writeRuntimeConfig } from "./config.js";
@@ -718,6 +720,7 @@ interface GenerationOutput {
   fromAge: number;
   toAge: number;
   rawChunkCount: number;
+  episodeId?: string;
 }
 
 interface RunYearFlowOptions {
@@ -979,27 +982,28 @@ async function generateApprovedDirectedEnding(
   run: InternalRunState,
   world: WorldConfig,
   narrativeCtx: NarrativeCallContext,
-  narrativeWorld?: NarrativeWorldDefinition | null
+  narrativeWorld?: NarrativeWorldDefinition | null,
+  callId = `turn:${run.runId}:${randomUUID()}`
 ): Promise<void> {
   if (!run.ended || run.story.closureState !== "finished") return;
 
   run.aiConversation = run.aiConversation ?? {};
   const endingCtx: NarrativeCallContext = {
     ...narrativeCtx,
+    callId,
     // Ending is rendered only after the engine has locked its route and may use
     // that route's detailed world material.
     narrativePlan: buildNarrativePromptPlan(run, narrativeWorld ?? null, undefined, "ending"),
     conversation: run.aiConversation.ending
   };
-  try {
-    const endingNarrative = await generateEndingNarrative(run, world, endingCtx);
-    run.aiConversation.ending = endingCtx.conversation;
-    if (endingNarrative.trim()) {
-      run.endingSummary = endingNarrative.trim();
-    }
-  } catch {
-    // Keep the engine-approved ending summary.
-  }
+  const endingTurn = await runNarrativeAgentEnding({ run, world, context: endingCtx, callId });
+  const endingNarrative = endingTurn.narrative;
+  run.aiConversation.ending = endingCtx.conversation;
+  run.endingSummary = endingNarrative.trim();
+  const sourceEventId = `ending:${run.age}:${run.history.length}`;
+  commitNarrativeMemory(run.narrative, { id: `memory:${sourceEventId}`, age: run.age, factionIds: [], characterIds: [], factIds: [], text: endingNarrative });
+  const episode = commitNarrativeEpisode(run, { callId, sourceEventId, turnKind: "ending", age: run.age });
+  commitNarrativeAgentTurn(run, endingTurn.attemptId, episode.id);
 }
 
 interface DirectedSegmentOptions {
@@ -1049,8 +1053,10 @@ async function generateOpeningForRun(options: OpeningGenerationOptions): Promise
     talentHookSummary
   } = options;
   if (!narrativeWorld || !run.narrative.enabled || run.narrative.opening?.status === "ready") return undefined;
+  const callId = `turn:${run.runId}:${randomUUID()}`;
 
   const narrativeCtx: NarrativeCallContext = {
+    callId,
     providerConfig,
     apiKey,
     usageScope: { sessionId, runId: run.runId, worldId: run.worldId },
@@ -1078,7 +1084,8 @@ async function generateOpeningForRun(options: OpeningGenerationOptions): Promise
   run.aiConversation = run.aiConversation ?? {};
   recordDirectedStoryTurnOutcome(narrativeCtx, run, { kind: "origin", sourceEventId: "origin", narrative: opening.narrative, statChanges: {} });
   run.aiConversation.year = narrativeCtx.conversation;
-  return appendPublicTurnRecord(run, {
+  const episode = commitNarrativeEpisode(run, { callId, sourceEventId: "origin", turnKind: "origin", age: 0 });
+  const record = appendPublicTurnRecord(run, {
     entryId: "origin",
     age: 0,
     ageStage: { label: resolveAgeStageForStream(0, world).label },
@@ -1086,15 +1093,15 @@ async function generateOpeningForRun(options: OpeningGenerationOptions): Promise
     narrative: opening.narrative,
     statChanges: {}
   });
+  episode.turnId = record.turnId;
+  return record;
 }
 
 async function generateDirectedSegmentForRun(options: DirectedSegmentOptions): Promise<GenerationOutput> {
-  const runBeforeTurn = structuredClone(options.run);
   try {
     return await generateDirectedSegmentForRunUnsafe(options);
   } catch (error) {
     logNarrativeOutcomeFailure(options, error);
-    Object.assign(options.run, runBeforeTurn);
     throw error;
   }
 }
@@ -1120,9 +1127,11 @@ async function generateDirectedSegmentForRunUnsafe(options: DirectedSegmentOptio
     narrativeWorld
   } = options;
   if (!narrativeWorld) throw new Error("narrative_world_required");
+  const callId = `turn:${run.runId}:${randomUUID()}`;
   markRunPhase(run, "generating");
   run.narrative = ensureNarrativeActRuntime(run.narrative, narrativeWorld, run.age);
   const narrativeCtx: NarrativeCallContext = {
+    callId,
     providerConfig,
     apiKey,
     usageScope: { sessionId, runId: run.runId, worldId: run.worldId },
@@ -1131,7 +1140,7 @@ async function generateDirectedSegmentForRunUnsafe(options: DirectedSegmentOptio
     factionSummary,
     eventPoolSummary,
     talentHookSummary,
-    narrativePlan: buildNarrativePromptPlan(run, narrativeWorld, null),
+    narrativePlan: buildNarrativePromptPlan(run, narrativeWorld, null, "planning"),
     conversation: run.aiConversation?.year
   };
   const closureRequestEligible = canRequestDirectedClosure(run, narrativeWorld);
@@ -1140,6 +1149,7 @@ async function generateDirectedSegmentForRunUnsafe(options: DirectedSegmentOptio
       run,
       world,
       input: {
+        callId,
         allowedIntents: [],
         routeOptions: narrativeWorld.routeArcs.map((route) => ({ id: route.directionId, label: route.label || route.directionId, summary: route.summary })),
         allowClosureRequest: true,
@@ -1152,7 +1162,7 @@ async function generateDirectedSegmentForRunUnsafe(options: DirectedSegmentOptio
     if (closure !== "guiding") throw new Error("story_closure_request_required");
     const finished = approveStoryClosure(run, "finish", narrativeWorld);
     if (finished !== "finished") throw new Error("story_closure_finish_unavailable");
-    await generateApprovedDirectedEnding(run, world, narrativeCtx, narrativeWorld);
+    await generateApprovedDirectedEnding(run, world, narrativeCtx, narrativeWorld, callId);
     run.aiConversation = run.aiConversation ?? {};
     run.aiConversation.year = narrativeCtx.conversation;
     return { run, generatedChunk: [], fromAge: run.age, toAge: run.age, rawChunkCount: 0 };
@@ -1212,38 +1222,85 @@ async function generateDirectedSegmentForRunUnsafe(options: DirectedSegmentOptio
     : runtime.beat === "setup"
       ? canEnterAct ? ["scene"] : ["background"]
       : canAdvanceBeat ? ["background", "scene"] : ["background"];
-  narrativeCtx.narrativePlan = buildNarrativePromptPlan(run, narrativeWorld, null, canAdvanceBeat ? "dynamic" : "background", {
+  narrativeCtx.narrativePlan = buildNarrativePromptPlan(run, narrativeWorld, null, allowedTurnKinds.length === 1 && allowedTurnKinds[0] === "background" ? "background" : "planning", {
     backgroundAllowed: allowedTurnKinds.includes("background")
   });
-  const contextSelection = narrativeCtx.narrativePlan!.recall!;
-  const scene = await generateDynamicNarrativeScene(run, world, {
-    storyArc: narrativeWorld.mainlineSkeleton?.premise,
-    act: { id: act.id, label: act.label, prompt: act.prompt, factLabel },
-    beat: runtime.beat,
-    decisionMode,
-    allowedTurnKinds,
+  const routeOptions = narrativeWorld.routeArcs.map((route) => ({
+    id: route.directionId,
+    label: route.label || route.directionId,
+    summary: route.summary
+  }));
+  const factionOptions = (narrativeWorld.narrativeFactions ?? []).map((faction) => ({
+    id: faction.id,
+    label: faction.label,
+    summary: faction.summary
+  }));
+  const planningRecall = narrativeCtx.narrativePlan!.recall!;
+  const focusReferences: NarrativeTurnEnvelope["focusReferences"] = [
+    ...planningRecall.facts.map((fact) => ({ id: fact.id, kind: "fact" as const, label: fact.label })),
+    ...planningRecall.characters.filter((entry) => entry.description || entry.relationship).map((entry) => ({ id: entry.id, kind: "character" as const, label: entry.name })),
+    ...(planningRecall.assetSources ?? []).map((entry) => ({
+      id: entry.id,
+      kind: entry.kind as "location" | "ability",
+      label: (entry.text.split("=")[1] ?? entry.id).split(/[（：]/)[0] || entry.id
+    }))
+  ].filter((entry, index, all) => all.findIndex((candidate) => candidate.id === entry.id) === index).slice(0, 12);
+  const growthFocus = runtime.growthFocusOptions?.find((focus) => focus.id === runtime.growthFocusId);
+  const envelope: NarrativeTurnEnvelope = {
+    callId,
+    source: allowedTurnKinds.length === 1 && allowedTurnKinds[0] === "background" ? "background" : "scene",
+    worldId: run.worldId,
+    currentAge: run.age,
     sceneAge: turnAges.sceneAge,
     backgroundAgeRange: turnAges.backgroundAgeRange,
-    routes: narrativeWorld.routeArcs.map((route) => ({
-      id: route.directionId,
-      label: route.label || route.directionId,
-      summary: route.summary,
-      perspective: narrativeRouteBeatGuidance(route, runtime.beat)
-    })),
-    factions: (narrativeWorld.narrativeFactions ?? []).map((faction) => ({
-      id: faction.id,
-      label: faction.label,
-      summary: faction.summary
-    })),
-    knownCharacters: contextSelection.characters,
-    attributePolicy: runtime.beat === "pressure" || runtime.beat === "climax" ? undefined : dynamicSceneAttributePolicy(),
-    backgroundAttributePolicy,
-    growthFocus: runtime.growthFocusOptions?.find((focus) => focus.id === runtime.growthFocusId),
+    act: { id: act.id, label: act.label, prompt: act.prompt },
+    beat: runtime.beat,
+    allowedTurnKinds,
+    decisionMode,
+    routes: routeOptions,
+    factions: factionOptions,
+    focusReferences,
     statTiers: resolveNarrativeStatTiers(run.stats, run.narrative.statTierConfig),
-    lifeStage: earlyLife && Number.isInteger(earlyLifeMaxAge)
-      ? { label: "早年依赖期", maxAge: earlyLifeMaxAge as number }
-      : undefined
-  }, narrativeCtx);
+    growthFocus,
+    clock: { ...run.narrative.sceneClock }
+  };
+  const agentTurn = await runNarrativeAgentTurn({
+    run,
+    world,
+    narrativeWorld,
+    context: narrativeCtx,
+    envelope,
+    buildRenderInput: (turnPlan, promptPlan) => ({
+      storyArc: narrativeWorld.mainlineSkeleton?.premise,
+      act: { id: act.id, label: act.label, prompt: act.prompt, factLabel },
+      beat: runtime.beat,
+      decisionMode: turnPlan.presentation === "choice" ? "required" : "none",
+      allowedTurnKinds: [turnPlan.turnKind],
+      sceneAge: turnAges.sceneAge,
+      backgroundAgeRange: turnAges.backgroundAgeRange,
+      routes: narrativeWorld.routeArcs.map((route) => ({
+        id: route.directionId,
+        label: route.label || route.directionId,
+        summary: route.summary,
+        perspective: narrativeRouteBeatGuidance(route, runtime.beat)
+      })),
+      factions: (narrativeWorld.narrativeFactions ?? []).map((faction) => ({
+        id: faction.id,
+        label: faction.label,
+        summary: faction.summary
+      })),
+      knownCharacters: promptPlan.recall!.characters,
+      attributePolicy: runtime.beat === "pressure" || runtime.beat === "climax" ? undefined : dynamicSceneAttributePolicy(),
+      backgroundAttributePolicy,
+      growthFocus,
+      statTiers: envelope.statTiers,
+      lifeStage: earlyLife && Number.isInteger(earlyLifeMaxAge)
+        ? { label: "早年依赖期", maxAge: earlyLifeMaxAge as number }
+        : undefined
+    })
+  });
+  const turnPlan = agentTurn.plan;
+  const scene = agentTurn.scene;
   if (scene.turnKind === "background") {
     if (!scene.backgroundAttributeEffects) throw new Error("dynamic_background_outcome_missing");
     const backgroundYears = turnAges.backgroundAgeRange.toAge - run.age;
@@ -1275,13 +1332,13 @@ async function generateDirectedSegmentForRunUnsafe(options: DirectedSegmentOptio
     advanced.chunk.forEach((event, index) => {
       event.summary = index === advanced.chunk.length - 1 ? background.narrative : "";
     });
+    const sourceId = `background:${turnAges.backgroundAgeRange.fromAge}:${run.age}:${run.history.length}`;
     {
       const when = { ageFrom: turnAges.backgroundAgeRange.fromAge, age: run.age };
       const backgroundFactIds = applyNarrativeFactUpdates(run, background.factUpdates, {
-        sourceEventId: `background:${when.ageFrom}:${when.age}:${run.history.length}`
+        sourceEventId: sourceId
       });
       applyNarrativeRelationshipUpdates(run, background.relationshipUpdates, backgroundFactIds);
-      const sourceId = `background:${when.ageFrom}:${when.age}:${run.history.length}`;
       commitNarrativeMemory(run.narrative, {
         id: `memory:${sourceId}`, age: run.age, factionIds: [],
         characterIds: background.relationshipUpdates?.map((entry) => entry.characterRef) ?? [],
@@ -1294,7 +1351,7 @@ async function generateDirectedSegmentForRunUnsafe(options: DirectedSegmentOptio
     recordDirectedStoryTurnOutcome(narrativeCtx, run, {
       kind: "normal",
       narrative: background.narrative,
-      sourceEventId: `background:${turnAges.backgroundAgeRange.fromAge}:${run.age}:${run.history.length}`,
+      sourceEventId: sourceId,
       statChanges: advanced.chunk.reduce<Partial<Record<keyof InternalRunState["stats"], number>>>((total, event) => {
         for (const [stat, value] of Object.entries(event.statChanges)) {
           const key = stat as keyof InternalRunState["stats"];
@@ -1305,13 +1362,24 @@ async function generateDirectedSegmentForRunUnsafe(options: DirectedSegmentOptio
     });
     run.aiConversation = run.aiConversation ?? {};
     run.aiConversation.year = narrativeCtx.conversation;
+    const episode = commitNarrativeEpisode(run, {
+      callId,
+      sourceEventId: sourceId,
+      turnKind: "background",
+      ageFrom: turnAges.backgroundAgeRange.fromAge,
+      age: run.age,
+      actId: act.id,
+      beat: runtime.beat
+    });
+    commitNarrativeAgentTurn(run, agentTurn.attemptId, episode.id);
     const timelineChunk = publishTimelineChunk(advanced.updated, world, advanced.chunk);
     return {
       run: advanced.updated,
       generatedChunk: timelineChunk,
       fromAge: advanced.fromAge,
       toAge: advanced.toAge,
-      rawChunkCount: advanced.chunk.length
+      rawChunkCount: advanced.chunk.length,
+      episodeId: episode.id
     };
   }
   if (!scene.routeId) throw new Error("dynamic_scene_route_missing");
@@ -1350,13 +1418,41 @@ async function generateDirectedSegmentForRunUnsafe(options: DirectedSegmentOptio
   });
   run.aiConversation = run.aiConversation ?? {};
   run.aiConversation.year = narrativeCtx.conversation;
+  const sourceEventId = run.narrative.scene.lastEventId;
+  if (!sourceEventId) throw new Error("dynamic_scene_source_event_missing");
+  const episode = commitNarrativeEpisode(run, {
+    callId,
+    sourceEventId,
+    turnKind: "scene",
+    ageFrom: advanced.fromAge,
+    age: run.age,
+    actId: act.id,
+    beat: runtime.beat,
+    routeId: scene.routeId,
+    factionId: scene.factionId,
+    factIds: advanced.factIds,
+    characterIds: scene.participants.map((entry) => entry.characterRef).filter((id): id is string => Boolean(id && id !== "new"))
+  });
+  commitNarrativeAgentTurn(run, agentTurn.attemptId, episode.id);
+  if (runtime.beat === "payoff" && scene.actHandoff) {
+    commitNarrativeActCanon(run, {
+      actId: act.id,
+      sourceEventId,
+      resolvedAge: run.age,
+      routeId: scene.routeId,
+      handoff: scene.actHandoff,
+      factIds: episode.factIds
+    });
+    invalidateNarrativeHorizon(run);
+  }
   const timelineChunk = publishTimelineChunk(advanced.updated, world, advanced.chunk);
   return {
     run: advanced.updated,
     generatedChunk: timelineChunk,
     fromAge: advanced.fromAge,
     toAge: advanced.toAge,
-    rawChunkCount: advanced.chunk.length
+    rawChunkCount: advanced.chunk.length,
+    episodeId: episode.id
   };
 }
 
@@ -1718,8 +1814,8 @@ async function runStepFlowUnlocked(
     markRunPhase(run, "generating");
     let openingRecord: TurnRecord | undefined;
     try {
-      openingRecord = await generateOpeningForRun({
-        run,
+      const openingTransaction = await runNarrativeTurnTransaction(run, (working) => generateOpeningForRun({
+        run: working,
         world,
         narrativeWorld,
         sessionId,
@@ -1730,7 +1826,8 @@ async function runStepFlowUnlocked(
         factionSummary,
         eventPoolSummary,
         talentHookSummary
-      });
+      }));
+      openingRecord = openingTransaction.result;
     } catch (error) {
       markRunPhase(run, "ready");
       await saveRun(run, sessionId);
@@ -1739,7 +1836,7 @@ async function runStepFlowUnlocked(
     syncRunPhase(run);
     rememberRequestId(run, body.requestId);
     await saveRun(run, sessionId);
-    scheduleCommittedNarrativeSummary({ providerConfig, apiKey, promptPack: content.promptPack, usageScope: { sessionId, runId: run.runId, worldId: run.worldId } }, run);
+    scheduleCommittedNarrativeCuration({ providerConfig, apiKey, promptPack: content.promptPack, usageScope: { sessionId, runId: run.runId, worldId: run.worldId } }, run, world);
     if (openingRecord && onTurn) await onTurn(openingRecord, 0, 1);
     return {
       updatedRun: run,
@@ -1755,6 +1852,7 @@ async function runStepFlowUnlocked(
   let fromAge = run.age;
   let toAge = run.age;
   let rawChunkCount = 0;
+  let committedEpisodeId: string | undefined;
   let resolvedChoice: PublicMilestoneChoice | undefined;
   let resolvedChoiceOutcome: TurnRecord["choiceOutcome"] | undefined;
 
@@ -1868,6 +1966,7 @@ async function runStepFlowUnlocked(
       description: selectedOption.description
     } : undefined;
     await createDecisionCheckpoint(sessionId, run);
+    const decisionCallId = `turn:${run.runId}:${randomUUID()}`;
     let directedDecisionNarrative: string | undefined;
     let directedDecisionContext: NarrativeCallContext | undefined;
     let narrativeOutcome: { effects: import("@reroll/shared").NarrativeAttributeEffect[] } | undefined;
@@ -1882,10 +1981,13 @@ async function runStepFlowUnlocked(
       characterIds: string[];
       factIds: string[];
     } | undefined;
+    let decisionPendingScene: InternalRunState["pendingDynamicScene"];
+    let decisionAgentAttemptId: string | undefined;
     if (wasDirectedMilestone && usesStoryDirectionDecision) {
       const policy = getPendingDirectedDecisionPolicy(run, resolvedDecision);
       if (!policy) throw new Error("decision_outcome_policy_missing");
       directedDecisionContext = {
+        callId: decisionCallId,
         providerConfig,
         apiKey,
         usageScope: { sessionId, runId: run.runId, worldId: run.worldId },
@@ -1898,16 +2000,25 @@ async function runStepFlowUnlocked(
         conversation: run.aiConversation?.year
       };
       const pendingDynamicScene = run.pendingDynamicScene;
+      decisionPendingScene = pendingDynamicScene;
       const activeAct = pendingDynamicScene
         ? narrativeWorld?.mainlineActs?.find((act) => act.id === pendingDynamicScene.mainlineActId)
         : undefined;
-      const outcome = await generateDirectedDecisionNarrativeOutcome(run, world, {
-        decision: resolvedDecision,
-        label: selectedOption?.label ?? "已选抉择",
-        description: selectedOption?.description ?? "人物作出了会改变后续处境的取舍。",
-        attributePolicy: policy,
-        factResolutionModes: narrativeFactResolutionModes(activeAct, pendingDynamicScene)
-      }, directedDecisionContext);
+      const decisionTurn = await runNarrativeAgentDecision({
+        run,
+        world,
+        context: directedDecisionContext,
+        callId: decisionCallId,
+        decision: {
+          decision: resolvedDecision,
+          label: selectedOption?.label ?? "已选抉择",
+          description: selectedOption?.description ?? "人物作出了会改变后续处境的取舍。",
+          attributePolicy: policy,
+          factResolutionModes: narrativeFactResolutionModes(activeAct, pendingDynamicScene)
+        }
+      });
+      decisionAgentAttemptId = decisionTurn.attemptId;
+      const outcome = decisionTurn.outcome;
       directedDecisionNarrative = outcome.narrative;
       narrativeOutcome = { effects: outcome.effects };
       factResolution = outcome.factResolution;
@@ -1961,6 +2072,21 @@ async function runStepFlowUnlocked(
       });
       stepped.updated.aiConversation = stepped.updated.aiConversation ?? {};
       stepped.updated.aiConversation.year = closureCtx.conversation;
+      const decisionEpisode = commitNarrativeEpisode(stepped.updated, {
+        callId: decisionCallId,
+        sourceEventId: stepped.sourceEventId,
+        turnKind: "decision",
+        age: stepped.updated.age,
+        actId: decisionPendingScene?.mainlineActId,
+        beat: decisionPendingScene?.beat,
+        routeId: decisionPendingScene?.routeId,
+        factionId: decisionPendingScene?.factionId,
+        factIds: stepped.factIds,
+        characterIds: decisionPendingScene?.characterIds
+      });
+      if (decisionAgentAttemptId) commitNarrativeAgentTurn(stepped.updated, decisionAgentAttemptId, decisionEpisode.id);
+      invalidateNarrativeHorizon(stepped.updated);
+      committedEpisodeId = decisionEpisode.id;
       generatedChunk = publishTimelineChunk(stepped.updated, world, stepped.chunk);
       fromAge = stepped.fromAge;
       toAge = stepped.toAge;
@@ -2010,6 +2136,7 @@ async function runStepFlowUnlocked(
     fromAge = generated.fromAge;
     toAge = generated.toAge;
     rawChunkCount = generated.rawChunkCount;
+    committedEpisodeId = generated.episodeId;
   }
 
   const timelineChunk: PublicTimelineEntry[] = [];
@@ -2018,7 +2145,7 @@ async function runStepFlowUnlocked(
   if (revealed) {
     timelineChunk.push(revealed);
     const pendingChoice = toPublicMilestoneChoice(run);
-    turnRecords.push(appendPublicTurnRecord(
+    const record = appendPublicTurnRecord(
       run,
       revealed,
       resolvedChoice ?? (
@@ -2027,14 +2154,19 @@ async function runStepFlowUnlocked(
           : undefined
       ),
       resolvedChoiceOutcome
-    ));
+    );
+    turnRecords.push(record);
+    if (committedEpisodeId) {
+      const episode = run.narrative.episodes.find((entry) => entry.id === committedEpisodeId);
+      if (episode) episode.turnId = record.turnId;
+    }
   }
 
   syncRunPhase(run);
 
   rememberRequestId(run, body.requestId);
   await saveRun(run, sessionId);
-  scheduleCommittedNarrativeSummary({ providerConfig, apiKey, promptPack: content.promptPack, usageScope: { sessionId, runId: run.runId, worldId: run.worldId } }, run);
+  scheduleCommittedNarrativeCuration({ providerConfig, apiKey, promptPack: content.promptPack, usageScope: { sessionId, runId: run.runId, worldId: run.worldId } }, run, world);
   if (onTurn) {
     for (const [index, record] of turnRecords.entries()) {
       await onTurn(record, index, turnRecords.length);

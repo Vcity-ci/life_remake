@@ -1,60 +1,53 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="360" viewBox="0 0 1200 360" role="img" aria-labelledby="title desc">
-  <title id="title">Life Remake narrative agent flow</title>
-  <desc id="desc">World context enters the model, the model submits one structured background, scene, or choice tool call, the rules engine approves the state transition, and the result is recorded in the timeline and save.</desc>
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="500" viewBox="0 0 1200 500" role="img" aria-labelledby="title desc">
+  <title id="title">Life Remake 叙事 Agent 完整运行链路</title>
+  <desc id="desc">上下文编排依次进入幕间规划、单回合规划、精确召回与渲染、引擎结算和原子提交，已提交回合由异步记忆整理器生成长期摘要。</desc>
   <style>
     .canvas { fill: #111416; }
     .panel { fill: #1a1f22; stroke: #3a4549; stroke-width: 1.5; }
     .accent { fill: #c69a4b; }
-    .light { fill: #edf0ed; font-family: "Microsoft YaHei", Arial, sans-serif; font-size: 19px; font-weight: 700; }
-    .muted { fill: #afbab8; font-family: "Microsoft YaHei", Arial, sans-serif; font-size: 14px; }
+    .light { fill: #edf0ed; font-family: "Microsoft YaHei", Arial, sans-serif; font-size: 17px; font-weight: 700; }
+    .muted { fill: #afbab8; font-family: "Microsoft YaHei", Arial, sans-serif; font-size: 13px; }
+    .small { fill: #8e9996; font-family: "Microsoft YaHei", Arial, sans-serif; font-size: 12px; }
     .line { stroke: #c69a4b; stroke-width: 2; fill: none; }
+    .soft { stroke: #687470; stroke-width: 1.5; fill: none; stroke-dasharray: 5 5; }
     .tag { fill: #263035; }
-    .tagtext { fill: #d8e0da; font-family: Arial, sans-serif; font-size: 12px; font-weight: 700; }
+    .tagtext { fill: #d8e0da; font-family: Arial, sans-serif; font-size: 11px; font-weight: 700; }
   </style>
-  <rect class="canvas" width="1200" height="360" rx="8"/>
-  <text x="56" y="54" class="light" font-size="24">可控叙事循环</text>
-  <text x="56" y="82" class="muted">模型负责叙事与视角；状态、人物、属性与结局始终由引擎掌控。</text>
-  <path class="line" d="M246 193 H282 M492 193 H528 M738 193 H774 M984 193 H1020"/>
-  <path class="accent" d="M278 187 L290 193 L278 199 Z M524 187 L536 193 L524 199 Z M770 187 L782 193 L770 199 Z M1016 187 L1028 193 L1016 199 Z"/>
-  <g transform="translate(56 130)">
-    <rect class="panel" width="190" height="126" rx="7"/>
-    <circle class="accent" cx="26" cy="28" r="7"/>
-    <text class="light" x="44" y="35">叙事上下文</text>
-    <text class="muted" x="22" y="66">当前世界幕</text>
-    <text class="muted" x="22" y="88">事实与近期回合</text>
-    <text class="muted" x="22" y="110">路线与阵营目录</text>
+  <rect class="canvas" width="1200" height="500" rx="10"/>
+  <text x="54" y="48" class="light" font-size="24">叙事 Agent：规划、生成、裁决与记忆</text>
+  <text x="54" y="75" class="muted">模型获得创作空间；运行状态、数值、时间与结局始终由引擎掌握。</text>
+  <path class="line" d="M224 190 H252 M422 190 H450 M620 190 H648 M818 190 H846 M1016 190 H1044"/>
+  <path class="accent" d="M248 184 L260 190 L248 196 Z M446 184 L458 190 L446 196 Z M644 184 L656 190 L644 196 Z M842 184 L854 190 L842 196 Z M1040 184 L1052 190 L1040 196 Z"/>
+  <g transform="translate(54 118)">
+    <rect class="panel" width="170" height="144" rx="8"/><circle class="accent" cx="24" cy="25" r="6"/>
+    <text class="light" x="39" y="31">Context</text><text class="muted" x="20" y="62">人物与世界幕</text><text class="muted" x="20" y="84">事实、资产、Digest</text><text class="muted" x="20" y="106">近期真实叙事</text><text class="small" x="20" y="130">去重 · 预算 · Manifest</text>
   </g>
-  <g transform="translate(302 130)">
-    <rect class="panel" width="190" height="126" rx="7"/>
-    <circle class="accent" cx="26" cy="28" r="7"/>
-    <text class="light" x="44" y="35">模型回合</text>
-    <rect class="tag" x="22" y="56" width="146" height="26" rx="13"/>
-    <text class="tagtext" x="35" y="74">render_scene</text>
-    <text class="muted" x="22" y="108">视角、正文与抉择</text>
+  <g transform="translate(252 118)">
+    <rect class="panel" width="170" height="144" rx="8"/><circle class="accent" cx="24" cy="25" r="6"/>
+    <text class="light" x="39" y="31">Horizon</text><text class="muted" x="20" y="62">戏剧问题与张力</text><text class="muted" x="20" y="84">数回合短程意图</text><text class="muted" x="20" y="106">可能的阶段结果</text><text class="small" x="20" y="130">不选择或排除路线</text>
   </g>
-  <g transform="translate(548 130)">
-    <rect class="panel" width="190" height="126" rx="7"/>
-    <circle class="accent" cx="26" cy="28" r="7"/>
-    <text class="light" x="44" y="35">规则引擎</text>
-    <text class="muted" x="22" y="66">世界幕五拍</text>
-    <text class="muted" x="22" y="88">事实、人物与属性</text>
-    <text class="muted" x="22" y="110">状态校验与审批</text>
+  <g transform="translate(450 118)">
+    <rect class="panel" width="170" height="144" rx="8"/><circle class="accent" cx="24" cy="25" r="6"/>
+    <text class="light" x="39" y="31">Turn Planner</text><text class="muted" x="20" y="62">背景 / 场景</text><text class="muted" x="20" y="84">路线、阵营、关注</text><text class="muted" x="20" y="106">呈现方式与时间</text><text class="small" x="20" y="130">只规划，不写正文</text>
   </g>
-  <g transform="translate(794 130)">
-    <rect class="panel" width="190" height="126" rx="7"/>
-    <circle class="accent" cx="26" cy="28" r="7"/>
-    <text class="light" x="44" y="35">受控结算</text>
-    <rect class="tag" x="22" y="56" width="132" height="26" rx="13"/>
-    <text class="tagtext" x="35" y="74">engine approval</text>
-    <text class="muted" x="22" y="108">年龄、后果与危机</text>
+  <g transform="translate(648 118)">
+    <rect class="panel" width="170" height="144" rx="8"/><circle class="accent" cx="24" cy="25" r="6"/>
+    <text class="light" x="39" y="31">Renderer</text><text class="muted" x="20" y="62">精确二次召回</text><text class="muted" x="20" y="84">正文与抉择</text><text class="muted" x="20" y="106">结构化变化</text><text class="small" x="20" y="130">随后整理玩家正文</text>
   </g>
-  <g transform="translate(1040 130)">
-    <rect class="panel" width="104" height="126" rx="7"/>
-    <circle class="accent" cx="26" cy="28" r="7"/>
-    <text class="light" x="22" y="65">回合</text>
-    <text class="light" x="22" y="88">记录</text>
-    <text class="muted" x="22" y="110">存档</text>
+  <g transform="translate(846 118)">
+    <rect class="panel" width="170" height="144" rx="8"/><circle class="accent" cx="24" cy="25" r="6"/>
+    <text class="light" x="39" y="31">Engine</text><text class="muted" x="20" y="62">属性、事实与人物</text><text class="muted" x="20" y="84">五拍、年龄与停表</text><text class="muted" x="20" y="106">生存与结局审批</text><text class="small" x="20" y="130">失败不发布半成品</text>
   </g>
-  <path class="line" opacity=".6" d="M1088 276 C1088 322 644 332 644 282"/>
-  <text x="694" y="336" class="muted">已审批回合会压缩为下一轮的叙事上下文。</text>
+  <g transform="translate(1044 118)">
+    <rect class="panel" width="102" height="144" rx="8"/><circle class="accent" cx="22" cy="25" r="6"/>
+    <text class="light" x="18" y="62">Episode</text><text class="muted" x="18" y="86">TurnRecord</text><text class="muted" x="18" y="108">Act Canon</text><text class="small" x="18" y="130">存档</text>
+  </g>
+  <path class="soft" d="M1095 280 V338 H846"/><path class="accent" d="M850 332 L838 338 L850 344 Z"/>
+  <g transform="translate(622 318)">
+    <rect class="panel" width="216" height="112" rx="8"/><circle class="accent" cx="24" cy="25" r="6"/>
+    <text class="light" x="40" y="31">Memory Curator</text><text class="muted" x="20" y="62">按 run / act / route /</text><text class="muted" x="20" y="82">faction / character 整理</text><text class="small" x="20" y="102">异步 · revision 校验</text>
+  </g>
+  <path class="soft" d="M622 374 H140 V280"/><path class="accent" d="M134 284 L140 272 L146 284 Z"/>
+  <text x="274" y="357" class="muted">Digest 与已提交经历进入下一轮按需召回</text>
+  <rect class="tag" x="54" y="456" width="1092" height="24" rx="12"/><text class="tagtext" x="600" y="472" text-anchor="middle">WORLD PACK + TOOL CALLS + DETERMINISTIC ENGINE + ANONYMOUS SAVE</text>
 </svg>

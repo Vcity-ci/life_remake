@@ -92,7 +92,7 @@ export function narrativeAssetUpdatesSchema(assets?: NarrativeAssets): Record<st
             ref: { type: "string", enum: ["new", ...(assets?.abilities ?? []).map((entry) => entry.id)] },
             name: string, description: { type: "string", description: "能力的具体用途及适用情境。" },
             source: { type: "string", description: "已经发生的获得来历；更新时保留原来历。" },
-            mastery: { type: "string", description: "简短自然语言描述当前掌握情况。" },
+            mastery: { type: "string", description: "这项本领当前的掌握程度、能做的事情与实际局限。" },
             status: { type: "string", enum: ["available", "unavailable"] }
           }
         }
@@ -158,8 +158,7 @@ function scoreAsset(
     overlapScore(entry.factIds, query.factIds, 12) +
     overlapScore(entry.characterIds, query.characterIds, 8) +
     overlapScore(entry.routeIds, query.routeIds, 6) +
-    overlapScore(entry.factionIds, query.factionIds, 5) +
-    ("lastSeen" in entry ? entry.lastSeen.age : entry.updated.age) / 10_000
+    overlapScore(entry.factionIds, query.factionIds, 5)
   );
 }
 
@@ -169,9 +168,9 @@ function scoreAsset(
  */
 export function selectNarrativeAssets(assets: NarrativeAssets, query: NarrativeAssetContextQuery) {
   const current = assets.locations.find((entry) => entry.id === assets.currentLocationId);
-  const locations = assets.locations.slice().sort((a, b) => scoreAsset(b, query) - scoreAsset(a, query)).slice(0, query.maxLocations ?? 3);
+  const locations = assets.locations.filter((entry) => scoreAsset(entry, query) > 0).sort((a, b) => scoreAsset(b, query) - scoreAsset(a, query)).slice(0, query.maxLocations ?? 3);
   if (current && !locations.some((entry) => entry.id === current.id)) locations.unshift(current);
-  const abilities = assets.abilities.filter((entry) => entry.status === "available")
+  const abilities = assets.abilities.filter((entry) => entry.status === "available" && scoreAsset(entry, query) > 0)
     .sort((a, b) => scoreAsset(b, query) - scoreAsset(a, query)).slice(0, query.maxAbilities ?? 3);
   return { locations, abilities };
 }

@@ -439,7 +439,8 @@ export function applyNarrativeFactUpdates(
     characterIds: context.characterIds
   }));
   const touched = Array.from(new Set([...accepted.touchFactIds, ...(accepted.progress ?? []).map((entry) => entry.factId)]));
-  const resolved = Array.from(new Set([...accepted.resolveFactIds, ...(accepted.resolutions ?? []).map((entry) => entry.factId)]));
+  const resolved = Array.from(new Set([...accepted.resolveFactIds, ...(accepted.resolutions ?? []).map((entry) => entry.factId),
+    ...introduced.filter((_, index) => accepted.introduce[index].status === "resolved").map((fact) => fact.id)]));
   applyStoryFactEffect(story, { introduce: introduced, modifyFactIds: touched, resolveFactIds: resolved }, run.age, context.sourceEventId);
   const affected = Array.from(new Set([...introduced.map((fact) => fact.id), ...touched, ...resolved]));
   for (const fact of story.factLedger!.facts) {
@@ -449,6 +450,7 @@ export function applyNarrativeFactUpdates(
     const resolution = accepted.resolutions?.find((entry) => entry.factId === fact.id);
     if (progress) fact.progressSummary = progress.summary;
     if (resolution) fact.resolutionSummary = resolution.summary;
+    if (fact.status === "resolved" && !fact.resolutionSummary) fact.resolutionSummary = fact.progressSummary ?? fact.label;
   }
   return affected;
 }
@@ -465,6 +467,8 @@ export function applyNarrativeRelationshipUpdates(
       lastChangedAge: run.age
     };
     character.lastSeenAge = run.age;
+    if (update.status) character.status = update.status;
+    if (update.description) character.description = update.description;
   }
 }
 
@@ -1665,13 +1669,13 @@ function publicItemsSnapshot(run: InternalRunState): TurnRecord["itemsSnapshot"]
 
 function publicNarrativeCharactersSnapshot(run: InternalRunState): NonNullable<TurnRecord["narrativeCharactersSnapshot"]> {
   return run.narrative.dynamicCharacters
-    .filter((character) => character.importance !== "momentary" && character.status === "active")
+    .filter((character) => character.importance !== "momentary")
     .slice(-8)
     .map((character) => ({
       id: character.id,
       name: character.name,
       role: character.role,
-      description: character.description,
+      description: `${character.status === "gone" ? "已离场。" : character.status === "resolved" ? "此前交往已告一段落。" : ""}${character.description}`,
       introducedAge: character.introducedAge
     }));
 }
@@ -3494,7 +3498,7 @@ export function advanceWithDynamicNarrativeScene(
     const characterRef = participant.characterRef?.trim() || "new";
     const referenced = characterRef === "new"
       ? undefined
-      : run.narrative.dynamicCharacters.find((character) => character.id === characterRef && character.status === "active");
+      : run.narrative.dynamicCharacters.find((character) => character.id === characterRef);
     if (characterRef !== "new" && !referenced) {
       throw new Error("dynamic_scene_character_reference_invalid");
     }
@@ -3502,7 +3506,7 @@ export function advanceWithDynamicNarrativeScene(
     // may safely converge on the existing canonical identity once.
     const legacyMatch = characterRef === "new"
       ? run.narrative.dynamicCharacters.find((character) => (
-        character.name === participant.name && character.factionId === participant.factionId && character.status === "active"
+        character.name === participant.name && character.factionId === participant.factionId
       ))
       : undefined;
     const existing = referenced ?? legacyMatch;
@@ -3847,7 +3851,7 @@ export function applyMilestoneDecisionAndAdvance(
     }]
   }), run.age, sourceEventId);
   const narrativeFactIds = applyNarrativeFactUpdates(run, options?.narrativeFactUpdates, {
-    sourceEventId: `decision:${sourceEventId}:${decision}:${run.age}`,
+    sourceEventId,
     routeId: pendingDynamicScene?.routeId ?? committedDirection?.id,
     factionId: pendingDynamicScene?.factionId,
     characterIds: pendingDynamicScene?.characterIds

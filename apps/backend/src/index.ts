@@ -48,7 +48,7 @@ import {
 } from "./ai.js";
 import { generateNarrativeRender, generateNarrativeTurn } from "./narrative-provider.js";
 import { commitNarrativeActCanon, commitNarrativeEpisode, runNarrativeTurnTransaction } from "./narrative/commit.js";
-import type { NarrativeTurnEnvelope } from "./narrative/turn.js";
+import { narrativeTurnCapabilities, type NarrativeTurnEnvelope } from "./narrative/turn.js";
 import { commitNarrativeAgentTurn, invalidateNarrativeHorizon, runNarrativeAgentDecision, runNarrativeAgentEnding, runNarrativeAgentTurn } from "./narrative/runtime.js";
 import { approveStoryClosure, approveStoryIntent } from "./tool-gateway.js";
 import { providerLimits } from "./constants.js";
@@ -153,6 +153,7 @@ type TimelineEntryChunk = NonNullable<InternalRunState["timelineChunk"]>;
 type TimelineEntryItem = PublicTimelineEntry;
 type StreamDonePayload = { run: ReturnType<typeof toClientRun>; timelineChunk: PublicTimelineEntry[]; turns?: TurnRecord[] };
 type GameRequest = express.Request & { anonymousSession?: AnonymousSession };
+type StepProgressStage = "settling" | "rendering" | "committing";
 type GameStreamEvent =
   | {
       type: "meta";
@@ -165,6 +166,7 @@ type GameStreamEvent =
         tuning: StartAllocationConfig;
       };
     }
+  | { type: "progress"; data: { stage: StepProgressStage; requestId?: string } }
   | { type: "started"; data: { run: ReturnType<typeof toClientRun> } }
   | { type: "turn"; data: { index: number; total: number; record: TurnRecord } }
   | { type: "done"; data: StreamDonePayload }
@@ -277,9 +279,14 @@ function initNdjsonResponse(res: express.Response): void {
 }
 
 async function writeNdjsonEvent(res: express.Response, event: GameStreamEvent): Promise<void> {
+  if (res.destroyed || res.writableEnded) return;
   const line = `${JSON.stringify(event)}\n`;
-  if (!res.write(line)) {
-    await once(res, "drain");
+  try {
+    if (!res.write(line)) {
+      await Promise.race([once(res, "drain"), once(res, "close")]);
+    }
+  } catch (error) {
+    if (!res.destroyed && !res.writableEnded) throw error;
   }
 }
 
@@ -1018,10 +1025,8 @@ interface DirectedSegmentOptions {
   factionSummary: string;
   eventPoolSummary: string;
   talentHookSummary: string;
-  eventDefinitions: Awaited<ReturnType<typeof loadEventDefinitions>>;
-  itemDefinitions: Awaited<ReturnType<typeof loadItemDefinitions>>;
-  storyDirections: StoryDirectionDefinition[];
   narrativeWorld?: NarrativeWorldDefinition | null;
+  onProgress?: (stage: StepProgressStage) => Promise<void> | void;
 }
 
 interface OpeningGenerationOptions {
@@ -1210,18 +1215,12 @@ async function generateDirectedSegmentForRunUnsafe(options: DirectedSegmentOptio
     min: Math.min(backgroundMinYears, backgroundMaxYears),
     max: backgroundMaxYears
   });
-  const decisionMode = earlyLife
-    ? "none"
-    : runtime.beat === "pressure" || runtime.beat === "climax"
-    ? "required"
-    : runtime.beat === "escalation"
-      ? "optional"
-      : "none";
   const allowedTurnKinds: Array<"scene" | "background"> = earlyLife
     ? ["background"]
     : runtime.beat === "setup"
       ? canEnterAct ? ["scene"] : ["background"]
       : canAdvanceBeat ? ["background", "scene"] : ["background"];
+  const capabilities = narrativeTurnCapabilities(earlyLife, runtime.beat, allowedTurnKinds);
   narrativeCtx.narrativePlan = buildNarrativePromptPlan(run, narrativeWorld, null, allowedTurnKinds.length === 1 && allowedTurnKinds[0] === "background" ? "background" : "planning", {
     backgroundAllowed: allowedTurnKinds.includes("background")
   });
@@ -1255,8 +1254,7 @@ async function generateDirectedSegmentForRunUnsafe(options: DirectedSegmentOptio
     backgroundAgeRange: turnAges.backgroundAgeRange,
     act: { id: act.id, label: act.label, prompt: act.prompt },
     beat: runtime.beat,
-    allowedTurnKinds,
-    decisionMode,
+    capabilities,
     routes: routeOptions,
     factions: factionOptions,
     focusReferences,
@@ -1270,11 +1268,12 @@ async function generateDirectedSegmentForRunUnsafe(options: DirectedSegmentOptio
     narrativeWorld,
     context: narrativeCtx,
     envelope,
+    onProgress: options.onProgress,
     buildRenderInput: (turnPlan, promptPlan) => ({
       storyArc: narrativeWorld.mainlineSkeleton?.premise,
       act: { id: act.id, label: act.label, prompt: act.prompt, factLabel },
       beat: runtime.beat,
-      decisionMode: turnPlan.presentation === "choice" ? "required" : "none",
+      presentation: turnPlan.presentation,
       allowedTurnKinds: [turnPlan.turnKind],
       sceneAge: turnAges.sceneAge,
       backgroundAgeRange: turnAges.backgroundAgeRange,
@@ -1301,6 +1300,7 @@ async function generateDirectedSegmentForRunUnsafe(options: DirectedSegmentOptio
   });
   const turnPlan = agentTurn.plan;
   const scene = agentTurn.scene;
+  await options.onProgress?.("committing");
   if (scene.turnKind === "background") {
     if (!scene.backgroundAttributeEffects) throw new Error("dynamic_background_outcome_missing");
     const backgroundYears = turnAges.backgroundAgeRange.toAge - run.age;
@@ -1405,11 +1405,17 @@ async function generateDirectedSegmentForRunUnsafe(options: DirectedSegmentOptio
   ].filter(Boolean).join("\n");
   const sceneMemory = run.narrative.memoryEntries.find((entry) => entry.id === `memory:${run.narrative.scene.lastEventId}`);
   if (sceneMemory) commitNarrativeMemory(run.narrative, { ...sceneMemory, text: committedNarrative });
-  commitNarrativeAssets(run.narrative, applyNarrativeAssetUpdates(run.narrative.assets, scene.assetUpdates, { age: run.age }), scene.assetUpdates, { age: run.age }, {
+  const committedSceneAssets = commitNarrativeAssets(run.narrative, applyNarrativeAssetUpdates(run.narrative.assets, scene.assetUpdates, { age: run.age }), scene.assetUpdates, { age: run.age }, {
     routeIds: [scene.routeId], factionIds: scene.factionId ? [scene.factionId] : [],
     characterIds: run.narrative.dynamicCharacters.filter((entry) => scene.participants.some((participant) => participant.characterRef === entry.id || (participant.name === entry.name && participant.factionId === entry.factionId))).map((entry) => entry.id),
     factIds: Array.from(new Set([...(factId ? [factId] : []), ...advanced.factIds]))
   }, run.narrative.scene.lastEventId);
+  if (run.pendingDynamicScene) {
+    const focusedLocationIds = turnPlan.focusRefs.filter((id) => run.narrative.assets?.locations.some((entry) => entry.id === id));
+    const focusedAbilityIds = turnPlan.focusRefs.filter((id) => run.narrative.assets?.abilities.some((entry) => entry.id === id));
+    run.pendingDynamicScene.locationIds = Array.from(new Set([...focusedLocationIds, ...committedSceneAssets.locationIds]));
+    run.pendingDynamicScene.abilityIds = Array.from(new Set([...focusedAbilityIds, ...committedSceneAssets.abilityIds]));
+  }
   recordDirectedStoryTurnOutcome(narrativeCtx, run, {
     kind: scene.createsDecision ? "milestone" : "normal",
     narrative: committedNarrative,
@@ -1469,10 +1475,8 @@ async function generateSegmentForRun(
   eventPoolSummary: string,
   talentHookSummary: string,
   milestoneEventPool: string[],
-  eventDefinitions: Awaited<ReturnType<typeof loadEventDefinitions>>,
-  itemDefinitions: Awaited<ReturnType<typeof loadItemDefinitions>>,
-  storyDirections: StoryDirectionDefinition[],
-  narrativeWorld?: NarrativeWorldDefinition | null
+  narrativeWorld?: NarrativeWorldDefinition | null,
+  onProgress?: (stage: StepProgressStage) => Promise<void> | void
 ): Promise<GenerationOutput> {
   if (run.ended) {
     markRunPhase(run, "ended");
@@ -1533,10 +1537,8 @@ async function generateSegmentForRun(
         factionSummary,
         eventPoolSummary,
         talentHookSummary,
-        eventDefinitions,
-        itemDefinitions,
-        storyDirections,
-        narrativeWorld
+        narrativeWorld,
+        onProgress
       });
     }
   }
@@ -1553,10 +1555,8 @@ async function generateSegmentForRun(
       factionSummary,
       eventPoolSummary,
       talentHookSummary,
-      eventDefinitions,
-      itemDefinitions,
-      storyDirections,
-      narrativeWorld
+      narrativeWorld,
+      onProgress
     });
   }
 
@@ -1621,7 +1621,7 @@ async function runStartFlowUnlocked(
   }
 
   const resources = await loadGameResources(body.worldId);
-  const { content, runtime, worldline, factions, factionEvents, eventDefinitions, itemDefinitions, narrativeWorld } = resources;
+  const { content, runtime, worldline, factions, factionEvents, narrativeWorld } = resources;
   const tuning = resolveGameplayTuning(content);
   const allocation = toStartAllocationConfig(tuning);
   const world = resolveWorld(content.worlds, body.worldId);
@@ -1718,16 +1718,26 @@ interface StepFlowResult {
 async function runStepFlow(
   body: StepRunRequest,
   sessionId: string,
-  onTurn?: (record: TurnRecord, index: number, total: number) => Promise<void> | void
+  onTurn?: (record: TurnRecord, index: number, total: number) => Promise<void> | void,
+  onProgress?: (stage: StepProgressStage) => Promise<void> | void
 ): Promise<StepFlowResult> {
-  return withSessionLock(sessionId, () => withRunLock(body.runId, () => runStepFlowUnlocked(body, sessionId, onTurn)));
+  return withSessionLock(sessionId, () => withRunLock(body.runId, () => runStepFlowUnlocked(body, sessionId, onTurn, onProgress)));
 }
 
 async function runStepFlowUnlocked(
   body: StepRunRequest,
   sessionId: string,
-  onTurn?: (record: TurnRecord, index: number, total: number) => Promise<void> | void
+  onTurn?: (record: TurnRecord, index: number, total: number) => Promise<void> | void,
+  onProgress?: (stage: StepProgressStage) => Promise<void> | void
 ): Promise<StepFlowResult> {
+  const reportProgress = async (stage: StepProgressStage): Promise<void> => {
+    if (!onProgress) return;
+    try {
+      await onProgress(stage);
+    } catch (error) {
+      if (debugModel) console.debug("[game-flow:progress-disconnected]", { stage, error });
+    }
+  };
   const storedRun = await getRun(body.runId) as InternalRunState | undefined;
   // Failed generation must not mutate the live archive held by the store.
   const run = storedRun ? structuredClone(storedRun) : undefined;
@@ -1761,7 +1771,7 @@ async function runStepFlowUnlocked(
     };
   }
   const resources = await loadGameResources(run.worldId);
-  const { content, runtime, worldline, factions, factionEvents, eventDefinitions, itemDefinitions, narrativeWorld } = resources;
+  const { content, runtime, worldline, factions, factionEvents, narrativeWorld } = resources;
   const tuning = resolveGameplayTuning(content);
   const allocation = toStartAllocationConfig(tuning);
   if (run.ended && run.narrativeReservoir.queued.length === 0) {
@@ -2015,7 +2025,8 @@ async function runStepFlowUnlocked(
           description: selectedOption?.description ?? "人物作出了会改变后续处境的取舍。",
           attributePolicy: policy,
           factResolutionModes: narrativeFactResolutionModes(activeAct, pendingDynamicScene)
-        }
+        },
+        onProgress: reportProgress
       });
       decisionAgentAttemptId = decisionTurn.attemptId;
       const outcome = decisionTurn.outcome;
@@ -2035,6 +2046,7 @@ async function runStepFlowUnlocked(
       settledAssets = applyNarrativeAssetUpdates(run.narrative.assets, outcome.assetUpdates, { age: run.age });
       assetUpdates = outcome.assetUpdates;
     }
+    await reportProgress("committing");
     const stepped = applyMilestoneDecisionAndAdvance(
       run,
       world,
@@ -2127,10 +2139,8 @@ async function runStepFlowUnlocked(
       eventPoolSummary,
       talentHookSummary,
       milestoneEventPool,
-      eventDefinitions,
-      itemDefinitions,
-      worldline?.storyDirections ?? [],
-      narrativeWorld
+      narrativeWorld,
+      reportProgress
     );
     generatedChunk = generated.generatedChunk;
     fromAge = generated.fromAge;
@@ -2621,12 +2631,22 @@ app.post("/api/game/step/stream", async (req, res) => {
   }
   initNdjsonResponse(res);
   try {
-    const result = await runStepFlow(body, session.id, async (record, index, total) => {
-      await writeNdjsonEvent(res, {
-        type: "turn",
-        data: { index, total, record }
-      });
-    });
+    const result = await runStepFlow(
+      body,
+      session.id,
+      async (record, index, total) => {
+        await writeNdjsonEvent(res, {
+          type: "turn",
+          data: { index, total, record }
+        });
+      },
+      async (stage) => {
+        await writeNdjsonEvent(res, {
+          type: "progress",
+          data: { stage, requestId: body.requestId }
+        });
+      }
+    );
 
     await writeNdjsonEvent(res, {
       type: "meta",

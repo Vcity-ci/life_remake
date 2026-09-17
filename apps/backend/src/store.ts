@@ -12,7 +12,7 @@ import type {
   SaveSlotSummary
 } from "@reroll/shared";
 import type { InternalRunState } from "./engine.js";
-import { applyNarrativeMemoryCuration, type NarrativeMemoryCurationResult, type NarrativeMemoryCurationWork } from "./narrative/curator.js";
+import { applyNarrativeMemoryCuration, applyNarrativeScopedMemoryCuration, type NarrativeMemoryCurationResult, type NarrativeMemoryCurationWork } from "./narrative/curator.js";
 import { resolveProjectRoot } from "./project-root.js";
 
 interface StoredGameEnv {
@@ -385,6 +385,25 @@ export async function commitRunMemoryCuration(
     if (!record || record.sessionId !== sessionId || record.expiresAt <= Date.now()) return false;
     const updated = structuredClone(record.run);
     if (!applyNarrativeMemoryCuration(updated, work, result)) return false;
+    record.run = updated;
+    record.updatedAt = Date.now();
+    await queuePersist();
+    return true;
+  }));
+}
+
+export async function commitRunScopedMemoryCuration(
+  runId: string,
+  sessionId: string,
+  work: NarrativeMemoryCurationWork,
+  result: NarrativeMemoryCurationResult
+): Promise<boolean> {
+  return withSessionLock(sessionId, () => withRunLock(runId, async () => {
+    await ensureStoreReady();
+    const record = runs.get(runId);
+    if (!record || record.sessionId !== sessionId || record.expiresAt <= Date.now()) return false;
+    const updated = structuredClone(record.run);
+    if (!applyNarrativeScopedMemoryCuration(updated, work, result)) return false;
     record.run = updated;
     record.updatedAt = Date.now();
     await queuePersist();

@@ -1,5 +1,22 @@
 # 技术文档（v1.0.1）
 
+## 增量机制：2026-09-16 19:05 +08:00 — World Card 生命周期一致性
+
+- `selectNarrativeWorldCardMatches` 先验证结构化作用域，再区分直接、关联和粘滞激活。`stickyUntilSequence` 与 `cooldownUntilSequence` 使用排他的 Episode 边界；提交器忽略 sticky continuation，消除隔轮重复卡自我续期。
+- 一层关联召回现与直接召回共享 Cooldown、inclusionGroup、卡片数和字符预算。匹配任务的 `style_example` 保留一个独立席位，避免真实文风样例被通用高优先级设定挤出。
+- `NarrativeWorldCardTask` 仅保留六个消费任务；`ensureNarrativeHorizon` 在请求前重建 task=horizon 的 Plan，不再借用 planning 召回结果。
+- v8 加载校验要求 worldCards 非空，运行期按 `version` 明确选择 v8 worldCards 或 v1—v7 lore。`pendingDynamicScene` 新增 locationIds/abilityIds，承接场景提交后的稳定资产引用。
+- `NarrativeContextManifest` 的后端 trace 可查看 selected/excluded world cards、activationKind、生命周期余量与排除原因；这些字段不会进入格式化 Prompt。
+- 动态导演接口移除未使用的 eventDefinitions、itemDefinitions、storyDirections 传参；资源文件和非导演兼容逻辑未删除。
+
+## 增量机制：2026-09-16 11:48 +08:00 — World Card v8
+
+- `NarrativeWorldCardDefinition` 新增 geography / institution / culture / faction / location / ability / style_example 类型，以及 placement、order、关键词选择逻辑、扫描深度和一层关联召回。`content.ts` 对这些字段做数据校验，v8 世界包不再合并单独的旧组件事件簿。
+- `narrative.ts` 以当前任务、世界幕、拍点、计划路线／阵营、显式 focus、近期 Episode 文本和最近公开叙事构造召回查询。字面关键词与 `/pattern/flags` 均可匹配；状态匹配、文本命中、粘滞、冷却、优先级、互斥组和字符预算共同决定最终卡片。
+- `narrative/context/` 将 world / scenario / example / author_note 放入不同 section，并在 trace 中记录卡片 ID、激活原因、注入位置与估算 Token。标题等作者字段不进入玩家正文。
+- `prepareNarrativeOutcomeRequest` 的事实、人物、地点和本领引用只来自本轮精确召回；provider 返回 incomplete 或截断时，后端区分记录 `tool_arguments_truncated`，不会把协议或校验细节投影给玩家。
+- Memory Curator 的整局摘要上限为 600 字符，并继续以 revision 和 Episode 覆盖范围提交；不进行粗暴裁剪。三套世界包和社区示例均已迁移到 v8。
+
 ## 增量机制：2026-09-15 13:21 +08:00 — Curator、Horizon 与 Agent Runtime
 
 - `apps/backend/src/narrative/curator.ts` 每次选择 4—6 个尚未覆盖的已提交 Episode；payoff／ending 可提前触发。模型通过 `curate_narrative_memory` 返回 run、act、route、character、faction 作用域摘要及现有事实／人物引用，`store.ts` 在匿名 session/run 锁内按 `memoryRevision` 比较后提交。

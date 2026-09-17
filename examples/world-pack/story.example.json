@@ -1,5 +1,5 @@
 {
-  "version": 6,
+  "version": 8,
   "worldId": "my_world",
   "storyBible": "这是一个由人物处境、关系、能力与选择共同塑造的人生世界。故事不预设唯一职业、身份、关系或成功模板。三幕主线应逐步扩大人物需要承担的事：先让一件具体处境进入生活，再让前事的后果带来新的位置与压力，最后让积累的能力、关系和代价面对更大的回响。每一次抉择都必须留下后来能够感受到的影响。",
   "styleRules": [
@@ -41,6 +41,63 @@
       "label": "更大回响",
       "prompt": "让前两幕积累的能力、人物与代价进入更深的生活或世界回响。根据人物实际处境决定承担的尺度；高潮必须让此前的承诺、关系与选择得到实质兑现，为结局留下可回收的后果。",
       "readinessStage": "climax"
+    }
+  ],
+  "worldCards": [
+    {
+      "id": "my_world.rule.consequences_are_lived",
+      "kind": "world_rule",
+      "content": "重要选择通过人物关系、可用资源、生活安排与后来行动产生影响；不要用突兀的身份跃迁代替积累。",
+      "priority": 95,
+      "activation": { "tasks": ["horizon", "planning", "rendering", "dynamic", "decision"] },
+      "stickyTurns": 2
+    },
+    {
+      "id": "my_world.first_act.conflict",
+      "title": "第一幕的可变矛盾",
+      "kind": "conflict",
+      "content": "为第一幕提供可变化的冲突生成原则，描述哪些利益、关系或环境力量会形成问题，不写固定事件和固定人物。",
+      "priority": 90,
+      "placement": "scenario",
+      "activation": { "keys": ["这里填写能从最近叙事中触发此卡的词"], "secondaryKeys": ["可选的二级条件"], "selectiveLogic": "and_any", "scanDepth": 3, "actIds": ["my_world.first_encounter"], "beats": ["setup", "escalation", "pressure"], "tasks": ["planning", "rendering", "dynamic", "decision"] },
+      "inclusionGroup": "my_world.act.conflict",
+      "cooldownTurns": 2
+    },
+    {
+      "id": "my_world.first_act.payoff",
+      "kind": "consequence",
+      "content": "第一幕收束要让当前矛盾得到实际结果；结果可以带来新处境，但已完成的事情不继续伪装成待解悬念。",
+      "priority": 100,
+      "activation": { "actIds": ["my_world.first_encounter"], "beats": ["climax", "payoff"], "tasks": ["horizon", "planning", "rendering", "dynamic", "decision"] },
+      "inclusionGroup": "my_world.act.consequence",
+      "stickyTurns": 2
+    },
+    {
+      "id": "my_world.route.bonds",
+      "kind": "social_role",
+      "content": "关系视角关注信任、照料、边界与归属怎样通过具体行动变化。",
+      "priority": 80,
+      "activation": { "routeIds": ["my_world.bonds"], "tasks": ["planning", "rendering", "dynamic", "decision"] },
+      "inclusionGroup": "my_world.route.lens"
+    },
+    {
+      "id": "my_world.route.undertaking",
+      "kind": "social_role",
+      "content": "承担视角关注能力、行动、成果与底线怎样在现实压力中相互影响。",
+      "priority": 80,
+      "activation": { "routeIds": ["my_world.undertaking"], "tasks": ["planning", "rendering", "dynamic", "decision"] },
+      "inclusionGroup": "my_world.route.lens"
+    },
+    {
+      "id": "my_world.example.choice",
+      "title": "本世界的抉择表达样例",
+      "kind": "style_example",
+      "content": "午后的雨把石阶打得发亮。你刚收好摊布，送信的人便从街角跑来，把一封沾水的短笺压在桌上。对面店主停下算盘，显然也认出了封口的记号；远处钟声已经响过两遍，留给你回应的时间并不多。",
+      "priority": 84,
+      "placement": "example",
+      "activation": { "beats": ["pressure", "climax"], "tasks": ["rendering", "dynamic"] },
+      "inclusionGroup": "my_world.style.turn",
+      "cooldownTurns": 2
     }
   ],
   "progression": {
@@ -152,18 +209,7 @@
   ],
   "threads": [],
   "characters": [],
-  "lore": [
-    {
-      "id": "my_world.grounded_change",
-      "text": "人物的机会、失去和成长都应有具体经历依据；避免用突兀的身份跃迁、财富或关系反转代替长期积累。",
-      "priority": 100
-    },
-    {
-      "id": "my_world.consequence",
-      "text": "每次重要选择都应留下能够被后来人物、关系或生活处境感受到的后果。",
-      "priority": 95
-    }
-  ],
+  "lore": [],
   "eventBindings": [],
   "endingBlueprints": [
     {

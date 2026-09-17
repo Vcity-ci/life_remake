@@ -10,9 +10,12 @@ import type { NarrativeContextComposeInput, NarrativeContextComposition, Narrati
 const LAYERS: NarrativeContextLayer[] = ["stable", "runtime", "active", "recall", "history", "task"];
 
 export function composeNarrativeContext(input: NarrativeContextComposeInput): NarrativeContextComposition {
-  const historyMessages = input.conversation ? buildConversationPromptMessages(input.conversation) : [];
+  const profile = narrativeTaskContextProfile(input.task);
+  const historyMessages = input.conversation ? buildConversationPromptMessages(input.conversation, profile.history) : [];
   const providers = input.providers ?? defaultNarrativeContextProviders;
-  const planFragments = collectNarrativePlanFragments({ plan: input.plan, taskPrompt: input.taskPrompt, task: input.task }, providers);
+  const allowedSections = new Set(profile.allowedSections);
+  const planFragments = collectNarrativePlanFragments({ plan: input.plan, taskPrompt: input.taskPrompt, task: input.task }, providers)
+    .filter((fragment) => allowedSections.has(fragment.section));
   const historyFragments = historyMessages.map((message, index) => narrativeContextFragment({
     id: narrativeContentId(`history:${index}:${message.role}`, message.content),
     layer: "history",
@@ -27,7 +30,7 @@ export function composeNarrativeContext(input: NarrativeContextComposeInput): Na
     order: planFragments.length + index
   })).filter((entry): entry is NarrativeContextFragment => Boolean(entry));
   const deduped = dedupeNarrativeContextFragments([...planFragments, ...historyFragments]);
-  const budgeted = applyNarrativeContextBudget(deduped.fragments, narrativeTaskContextProfile(input.task));
+  const budgeted = applyNarrativeContextBudget(deduped.fragments, profile);
   const layerEstimatedTokens = Object.fromEntries(LAYERS.map((layer) => [
     layer,
     budgeted.fragments.filter((entry) => entry.layer === layer).reduce((sum, entry) => sum + entry.estimatedTokens, 0)
@@ -52,7 +55,8 @@ export function composeNarrativeContext(input: NarrativeContextComposeInput): Na
       historyMessageCount: selectedHistoryMessages.length,
       conversationArchiveCount: input.conversation?.archive.length ?? 0,
       summaryThroughMemoryId: input.conversation?.summaryThroughMemoryId,
-      providerIds: providers.map((provider) => provider.id)
+      providerIds: providers.map((provider) => provider.id),
+      worldCardDiagnostics: input.plan?.worldCardDiagnostics ?? []
     }
   };
 }

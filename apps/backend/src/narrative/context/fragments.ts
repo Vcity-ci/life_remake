@@ -25,6 +25,14 @@ export function narrativeContextFragment(input: {
   placement?: NarrativeContextPlacement;
   expiresAfterTurn?: boolean;
   groupId?: string;
+  activationReason?: string;
+  injectionPosition?: string;
+  worldCardActivationKind?: "direct" | "related" | "sticky";
+  worldCardStickyTurns?: number;
+  worldCardCooldownTurns?: number;
+  worldCardLastActivatedSequence?: number;
+  worldCardRemainingStickyTurns?: number;
+  worldCardRemainingCooldownTurns?: number;
   order: number;
 }): NarrativeContextFragment | undefined {
   const content = input.content.trim();

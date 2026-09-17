@@ -139,6 +139,8 @@ export interface NarrativeAssetContextQuery {
   factionIds?: string[];
   characterIds?: string[];
   factIds?: string[];
+  locationIds?: string[];
+  abilityIds?: string[];
   maxLocations?: number;
   maxAbilities?: number;
   text?: string;
@@ -154,6 +156,7 @@ function scoreAsset(
   query: NarrativeAssetContextQuery
 ): number {
   return (
+    ("mastery" in entry ? overlapScore([entry.id], query.abilityIds, 20) : overlapScore([entry.id], query.locationIds, 20)) +
     narrativeTextOverlap(`${entry.name} ${entry.description}`, query.text ?? "") * 8 +
     overlapScore(entry.factIds, query.factIds, 12) +
     overlapScore(entry.characterIds, query.characterIds, 8) +
@@ -181,9 +184,9 @@ export function formatNarrativeAssets(assets?: NarrativeAssets, query?: Narrativ
   const locations = new Set(selected.locations.map((entry) => entry.id));
   const abilities = new Set(selected.abilities.map((entry) => entry.id));
   return [
-    assets.locations.length ? `地点档案：${assets.locations.map((entry) =>
+    selected.locations.length ? `地点档案：${selected.locations.map((entry) =>
       `${entry.id}=${entry.name}${entry.id === assets.currentLocationId ? "（当前所在）" : ""}${locations.has(entry.id) ? "：" + entry.description.slice(0, 100) : ""}`).join("；")}` : "",
-    assets.abilities.length ? `本领档案：${assets.abilities.map((entry) =>
+    selected.abilities.length ? `本领档案：${selected.abilities.map((entry) =>
       `${entry.id}=${entry.name}（${entry.status === "available" ? "可用" : "不可用"}）${abilities.has(entry.id) ? entry.mastery + "：" + entry.description.slice(0, 120) : ""}`).join("；")}` : ""
   ].filter(Boolean).join("\n");
 }
@@ -196,7 +199,7 @@ export function commitNarrativeAssets(
   when: NarrativeAssetMoment,
   links: NarrativeAssetLinks = {},
   sourceEventId?: string
-): void {
+): { locationIds: string[]; abilityIds: string[] } {
   const locations = assets.locations.filter((entry) => changes?.locations.some((change) => change.ref === entry.id || (change.ref === "new" && identity(change.name) === identity(entry.name))));
   const abilities = assets.abilities.filter((entry) => changes?.abilities.some((change) => change.ref === entry.id || (change.ref === "new" && identity(change.name) === identity(entry.name))));
   for (const entry of [...locations, ...abilities]) {
@@ -207,7 +210,11 @@ export function commitNarrativeAssets(
   state.assets = assets;
   const current = assets.locations.find((entry) => entry.id === assets.currentLocationId);
   if (current) state.scene.place = current.name;
-  if (!locations.length && !abilities.length) return;
+  const committed = {
+    locationIds: locations.map((entry) => entry.id),
+    abilityIds: abilities.map((entry) => entry.id)
+  };
+  if (!locations.length && !abilities.length) return committed;
   const memoryId = `memory:${sourceEventId ?? randomUUID()}`;
   const existing = state.memoryEntries.find((entry) => entry.id === memoryId);
   commitNarrativeMemory(state, {
@@ -215,11 +222,12 @@ export function commitNarrativeAssets(
     age: when.age,
     routeId: links.routeIds?.[0],
     factionIds: links.factionIds ?? [], characterIds: links.characterIds ?? [], factIds: links.factIds ?? [],
-    locationIds: locations.map((entry) => entry.id), abilityIds: abilities.map((entry) => entry.id),
+    locationIds: committed.locationIds, abilityIds: committed.abilityIds,
     text: existing?.text ?? [
       when.ageFrom !== undefined ? `${when.ageFrom}-${when.age}岁间` : `${when.age}岁`,
       ...locations.map((entry) => `${entry.name}：${entry.description}`),
       ...abilities.map((entry) => `${entry.name}：${entry.mastery}，${entry.description}`)
     ].join("；").slice(0, 480)
   });
+  return committed;
 }

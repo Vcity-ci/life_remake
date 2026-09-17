@@ -139,12 +139,28 @@ export function applyNarrativeMemoryCuration(
   if (work.episodeIds.some((id) => !run.narrative.episodes.some((episode) => episode.id === id))) return false;
   const scopeById = new Map(work.scopes.map((scope) => [scope.id, scope]));
   const proposals = result.digests.filter((proposal, index, all) =>
-    scopeById.has(proposal.id) && all.findIndex((entry) => entry.id === proposal.id) === index
+    scopeById.has(proposal.id) && proposal.summary.trim().length > 0 && proposal.summary.trim().length <= 600 &&
+    all.findIndex((entry) => entry.id === proposal.id) === index
   );
   if (!proposals.some((proposal) => proposal.id === "run")) return false;
   const validFacts = new Set(work.validFactIds);
   const resolvedFacts = new Set(work.resolvedFactIds);
   const validCharacters = new Set(work.validCharacterIds);
+  mergeDigestProposals(run, work, proposals, validFacts, resolvedFacts, validCharacters);
+  run.narrative.memoryRevision += 1;
+  projectRunDigestToConversations(run, run.narrative.memoryDigests.find((digest) => digest.id === "run"));
+  return true;
+}
+
+function mergeDigestProposals(
+  run: InternalRunState,
+  work: NarrativeMemoryCurationWork,
+  proposals: NarrativeMemoryDigestProposal[],
+  validFacts = new Set(work.validFactIds),
+  resolvedFacts = new Set(work.resolvedFactIds),
+  validCharacters = new Set(work.validCharacterIds)
+): void {
+  const scopeById = new Map(work.scopes.map((scope) => [scope.id, scope]));
   const now = Date.now();
   const nextDigests = [...run.narrative.memoryDigests];
   for (const proposal of proposals) {
@@ -169,8 +185,23 @@ export function applyNarrativeMemoryCuration(
     else nextDigests.push(digest);
   }
   run.narrative.memoryDigests = nextDigests.slice(-64);
-  run.narrative.memoryRevision += 1;
-  projectRunDigestToConversations(run, run.narrative.memoryDigests.find((digest) => digest.id === "run"));
+}
+
+/** Commits optional object views after the run digest has already secured coverage. */
+export function applyNarrativeScopedMemoryCuration(
+  run: InternalRunState,
+  work: NarrativeMemoryCurationWork,
+  result: NarrativeMemoryCurationResult
+): boolean {
+  const runDigest = run.narrative.memoryDigests.find((digest) => digest.id === "run");
+  if (!runDigest || work.episodeIds.some((id) => !runDigest.coveredEpisodeIds.includes(id))) return false;
+  const allowed = new Set(work.scopes.filter((scope) => scope.id !== "run").map((scope) => scope.id));
+  const proposals = result.digests.filter((proposal, index, all) =>
+    allowed.has(proposal.id) && proposal.summary.trim().length > 0 && proposal.summary.trim().length <= 600 &&
+    all.findIndex((entry) => entry.id === proposal.id) === index
+  );
+  if (!proposals.length) return false;
+  mergeDigestProposals(run, work, proposals);
   return true;
 }
 
@@ -184,6 +215,10 @@ function projectConversationDigest(
   conversation.archive = conversation.archive.filter((round) => !round.id || !coveredMemoryIds.has(round.id));
   conversation.summaryRevision = (conversation.summaryRevision ?? 0) + 1;
   conversation.summaryThroughMemoryId = Array.from(coveredMemoryIds).at(-1) ?? conversation.summaryThroughMemoryId;
+  conversation.summarizedMemoryIds = Array.from(new Set([
+    ...(conversation.summarizedMemoryIds ?? []),
+    ...coveredMemoryIds
+  ])).slice(-240);
 }
 
 function projectRunDigestToConversations(run: InternalRunState, digest: NarrativeMemoryDigest | undefined): void {

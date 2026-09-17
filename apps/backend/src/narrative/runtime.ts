@@ -2,10 +2,11 @@ import { randomUUID } from "node:crypto";
 import type { DecisionType, NarrativeAgentAttemptRecord, NarrativeAttributePolicy, NarrativeFactResolution, NarrativeWorldDefinition, WorldConfig } from "@reroll/shared";
 import {
   generateDynamicNarrativeScene,
-  generateDirectedDecisionNarrativeOutcome,
+  generateDirectedDecisionSettlement,
   generateEndingNarrative,
   generateNarrativeHorizonPlan,
   generateNarrativeTurnPlan,
+  renderDirectedDecisionNarrative,
   refineNarrativeProse,
   type DynamicNarrativeSceneInput,
   type DynamicNarrativeSceneResult,
@@ -23,6 +24,7 @@ export interface NarrativeAgentTurnInput {
   context: NarrativeContext;
   envelope: NarrativeTurnEnvelope;
   buildRenderInput: (plan: NarrativeTurnPlan, promptPlan: NarrativePromptPlan) => Omit<DynamicNarrativeSceneInput, "plan">;
+  onProgress?: (stage: "settling" | "rendering") => Promise<void> | void;
 }
 
 export interface NarrativeAgentTurnResult {
@@ -53,25 +55,37 @@ function currentHorizonIsUsable(run: InternalRunState, actId: string): boolean {
 }
 
 async function ensureNarrativeHorizon(input: NarrativeAgentTurnInput, attemptId: string): Promise<void> {
-  const { run, world, context, envelope } = input;
+  const { run, world, narrativeWorld, context, envelope } = input;
   if (currentHorizonIsUsable(run, envelope.act.id)) {
     envelope.horizon = run.narrative.horizonPlan;
     return;
   }
   const previousRevision = run.narrative.horizonPlan?.revision ?? 0;
-  const horizon = await generateNarrativeHorizonPlan(run, world, {
-    callId: `${envelope.callId}:horizon:${previousRevision + 1}`,
-    worldId: envelope.worldId,
-    act: envelope.act,
-    beat: envelope.beat,
-    routes: envelope.routes,
-    factions: envelope.factions,
-    focusReferences: envelope.focusReferences,
-    previousCanon: (context.narrativePlan?.actCanon ?? []).map((canon) => ({ actId: canon.actId, text: canon.text })),
-    memoryDigests: (context.narrativePlan?.memoryDigests ?? []).map((digest) => ({ id: digest.id, text: digest.text })),
-    throughEpisodeId: run.narrative.episodes.at(-1)?.id,
-    nextRevision: previousRevision + 1
-  }, context);
+  const previousPlan = context.narrativePlan;
+  const horizonPlan = buildNarrativePromptPlan(run, narrativeWorld, null, "horizon", {
+    factionIds: envelope.factions.map((faction) => faction.id),
+    focusIds: envelope.focusReferences.map((entry) => entry.id)
+  });
+  if (!horizonPlan) throw new Error("narrative_horizon_prompt_plan_missing");
+  context.narrativePlan = horizonPlan;
+  let horizon: Awaited<ReturnType<typeof generateNarrativeHorizonPlan>>;
+  try {
+    horizon = await generateNarrativeHorizonPlan(run, world, {
+      callId: `${envelope.callId}:horizon:${previousRevision + 1}`,
+      worldId: envelope.worldId,
+      act: envelope.act,
+      beat: envelope.beat,
+      routes: envelope.routes,
+      factions: envelope.factions,
+      focusReferences: envelope.focusReferences,
+      previousCanon: (horizonPlan.actCanon ?? []).map((canon) => ({ actId: canon.actId, text: canon.text })),
+      memoryDigests: (horizonPlan.memoryDigests ?? []).map((digest) => ({ id: digest.id, text: digest.text })),
+      throughEpisodeId: run.narrative.episodes.at(-1)?.id,
+      nextRevision: previousRevision + 1
+    }, context);
+  } finally {
+    context.narrativePlan = previousPlan;
+  }
   run.narrative.horizonPlan = horizon;
   envelope.horizon = horizon;
   appendAttempt(run, {
@@ -102,7 +116,7 @@ export async function runNarrativeAgentTurn(input: NarrativeAgentTurnInput): Pro
     digestRevision: run.narrative.memoryRevision
   });
 
-  const backgroundOnly = envelope.allowedTurnKinds.length === 1 && envelope.allowedTurnKinds[0] === "background";
+  const backgroundOnly = envelope.capabilities.length === 1 && envelope.capabilities[0] === "background";
   if (!backgroundOnly) await ensureNarrativeHorizon(input, attemptId);
   const plan: NarrativeTurnPlan = backgroundOnly
     ? {
@@ -137,7 +151,14 @@ export async function runNarrativeAgentTurn(input: NarrativeAgentTurnInput): Pro
   });
   if (!promptPlan) throw new Error("narrative_agent_prompt_plan_missing");
   context.narrativePlan = promptPlan;
-  let scene = await generateDynamicNarrativeScene(run, world, { ...input.buildRenderInput(plan, promptPlan), plan }, context);
+  await input.onProgress?.("settling");
+  let scene = await generateDynamicNarrativeScene(
+    run,
+    world,
+    { ...input.buildRenderInput(plan, promptPlan), plan },
+    context,
+    () => input.onProgress?.("rendering")
+  );
   appendAttempt(run, {
     callId: envelope.callId,
     attemptId,
@@ -204,6 +225,34 @@ export function commitNarrativeAgentTurn(run: InternalRunState, attemptId: strin
     digestRevision: previous.digestRevision,
     episodeId
   });
+  const sequence = run.narrative.episodes.length;
+  const cardRefs = run.narrative.agentAttempts
+    .filter((entry) => entry.attemptId === attemptId)
+    .flatMap((entry) => entry.contextFragmentIds ?? [])
+    .filter((id) => id.startsWith("recall:world-card:"));
+  if (cardRefs.length) {
+    const byId = new Map((run.narrative.worldCardActivations ?? []).map((state) => [state.cardId, state]));
+    for (const ref of new Set(cardRefs)) {
+      const [cardId, stickyRaw, cooldownRaw, activationKind] = ref.slice("recall:world-card:".length).split("|");
+      if (!cardId) continue;
+      // Sticky continuation is consumption of an existing activation, not a
+      // fresh activation. Persisting it again would make sticky self-renewing
+      // and prevent cooldown from ever beginning.
+      if (activationKind === "sticky") continue;
+      const sticky = Math.max(0, Math.min(8, Math.trunc(Number(stickyRaw) || 0)));
+      const cooldown = Math.max(0, Math.min(16, Math.trunc(Number(cooldownRaw) || 0)));
+      byId.set(cardId, {
+        cardId,
+        lastActivatedSequence: sequence,
+        stickyUntilSequence: sequence + sticky,
+        cooldownUntilSequence: sequence + sticky + cooldown
+      });
+    }
+    // The set is bounded by the active world's authored cards. Keeping every
+    // card state avoids silently dropping lifecycle data in larger community
+    // world packs.
+    run.narrative.worldCardActivations = Array.from(byId.values());
+  }
 }
 
 export function invalidateNarrativeHorizon(run: InternalRunState): void {
@@ -216,6 +265,7 @@ export async function runNarrativeAgentDecision(input: {
   context: NarrativeContext;
   callId: string;
   decision: { decision: DecisionType; label: string; description: string; attributePolicy: NarrativeAttributePolicy; factResolutionModes?: NarrativeFactResolution[] };
+  onProgress?: (stage: "settling" | "rendering") => Promise<void> | void;
 }): Promise<{ attemptId: string; outcome: DirectedDecisionNarrativeOutcome }> {
   const attemptId = `attempt:${randomUUID()}`;
   appendAttempt(input.run, {
@@ -229,7 +279,11 @@ export async function runNarrativeAgentDecision(input: {
     horizonRevision: input.run.narrative.horizonPlan?.revision,
     digestRevision: input.run.narrative.memoryRevision
   });
-  const outcome = await generateDirectedDecisionNarrativeOutcome(input.run, input.world, input.decision, input.context);
+  await input.onProgress?.("settling");
+  const settlement = await generateDirectedDecisionSettlement(input.run, input.world, input.decision, input.context);
+  await input.onProgress?.("rendering");
+  const narrative = await renderDirectedDecisionNarrative(input.run, input.world, input.decision, settlement, input.context);
+  const outcome: DirectedDecisionNarrativeOutcome = { ...settlement, narrative };
   appendAttempt(input.run, {
     callId: input.callId,
     attemptId,

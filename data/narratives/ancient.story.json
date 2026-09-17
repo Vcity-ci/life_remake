@@ -1,5 +1,5 @@
 {
-  "version": 6,
+  "version": 8,
   "worldId": "ancient",
   "storyBible": "景朝中后段，宗族、门第、科举、军功、商路与皇权共同塑造命运。地方有生计与公断之争，朝中有任用与施政之争，军民面对局势变动各有求存之道。人物从自身生活进入纷争，因处理事情而改变关系与位置，在新的处境里结交、任事、竞争或退守；更大危机到来时，以已有能力和牵挂参与其中。礼制与权势落实在人的待遇、资源流动和实际行动中。",
   "styleRules": [
@@ -39,6 +39,267 @@
       "label": "大局担当",
       "prompt": "战乱担当。外部战争进入人物所在的社会，原有秩序、关系与生计受到冲击。按人物实际身份展开应对，让组织与调度、交锋与进退、保护与求存产生具体后果。高潮处理本局战事中的核心挑战，收束呈现人物参与造成的成败及战后的生活处境，作为这一生归宿的依据。",
       "readinessStage": "climax"
+    }
+  ],
+  "worldCards": [
+    {
+      "id": "ancient.rule.power_is_access",
+      "kind": "world_rule",
+      "content": "权力首先表现为谁能见到谁、谁的文书被受理、谁能调动钱粮与人手。人物身份不同，同一件事应呈现不同入口与代价；不默认人物拥有官职、兵权或门第。",
+      "priority": 96,
+      "activation": { "tasks": ["horizon", "planning", "rendering", "dynamic", "decision"] },
+      "stickyTurns": 2
+    },
+    {
+      "id": "ancient.rule.case_has_lives",
+      "kind": "world_rule",
+      "content": "案件与纷争不是谜面清单，而是正在影响生计、名声、亲缘与地方秩序的现实。线索只有在改变人物判断或行动时才进入正文，处理结果必须落到人的去处与利益。",
+      "priority": 94,
+      "activation": { "actIds": ["ancient.entry_conflict"], "tasks": ["horizon", "planning", "rendering", "dynamic", "decision"] },
+      "relatedCardIds": ["ancient.conflict.case_forms"],
+      "stickyTurns": 2
+    },
+    {
+      "id": "ancient.conflict.case_forms",
+      "kind": "conflict",
+      "content": "入局之事可来自命案、侵占、赈济、河工、税役、契约、失踪、冒名或乡里公断；选择符合人物生活的形态，并由本局已出现的人与地点自然长出，不复用固定案名。",
+      "priority": 88,
+      "activation": { "actIds": ["ancient.entry_conflict"], "beats": ["setup", "escalation", "pressure"], "tasks": ["planning", "rendering", "dynamic"] },
+      "inclusionGroup": "ancient.act.conflict",
+      "cooldownTurns": 2
+    },
+    {
+      "id": "ancient.consequence.case_settlement",
+      "kind": "consequence",
+      "content": "本幕收束应让眼前纷争真正落定：有人获救、受罚、失去依靠、改变立场或承担余债。未被解决的更大结构可以留下，但已经解决的案件不再伪装成同一个悬念反复出现。",
+      "priority": 98,
+      "activation": { "actIds": ["ancient.entry_conflict"], "beats": ["climax", "payoff"], "tasks": ["horizon", "planning", "rendering", "dynamic", "decision"] },
+      "inclusionGroup": "ancient.act.consequence",
+      "stickyTurns": 2,
+      "cooldownTurns": 3
+    },
+    {
+      "id": "ancient.practice.faction_life",
+      "kind": "practice",
+      "content": "阵营生活由任事、请托、奖惩、资源分配、同僚协作与上下级关系组成。让人物通过做成或做坏一件独立事务取得位置，而不是继续追查上一幕的案件。",
+      "priority": 95,
+      "activation": { "actIds": ["ancient.position_trial"], "tasks": ["horizon", "planning", "rendering", "dynamic", "decision"] },
+      "relatedCardIds": ["ancient.conflict.competing_duties"],
+      "stickyTurns": 2
+    },
+    {
+      "id": "ancient.conflict.competing_duties",
+      "kind": "conflict",
+      "content": "阵营挑战可来自内部路线之争、地方与中枢的目标冲突、用人失当、资源短缺、盟友索价或公开声望受损。冲突围绕当前职责形成独立中心，并允许合作、竞争、妥协或离开。",
+      "priority": 90,
+      "activation": { "actIds": ["ancient.position_trial"], "beats": ["escalation", "pressure", "climax"], "tasks": ["planning", "rendering", "dynamic", "decision"] },
+      "inclusionGroup": "ancient.act.conflict",
+      "cooldownTurns": 2
+    },
+    {
+      "id": "ancient.consequence.position_won",
+      "kind": "consequence",
+      "content": "阵营幕的结果落到人物实际位置：获得信任、职责、追随者或自主空间，或失去靠山、被边缘化、转投他处。无论成败，都应形成进入更大危机时可用或必须承担的条件。",
+      "priority": 98,
+      "activation": { "actIds": ["ancient.position_trial"], "beats": ["climax", "payoff"], "tasks": ["horizon", "planning", "rendering", "dynamic", "decision"] },
+      "inclusionGroup": "ancient.act.consequence",
+      "stickyTurns": 2,
+      "cooldownTurns": 3
+    },
+    {
+      "id": "ancient.setting.war_reaches_life",
+      "kind": "setting",
+      "content": "战争从方向、地形、粮道、征发、难民、军令与消息迟滞进入生活。入侵方与战场方位由本局生成；不要默认北境，也不要默认人物是统帅，身份可以从主将、幕僚、军吏到商旅、医者、乡民或士卒。",
+      "priority": 98,
+      "activation": { "actIds": ["ancient.wider_crisis"], "tasks": ["horizon", "planning", "rendering", "dynamic", "decision"] },
+      "relatedCardIds": ["ancient.practice.war_action"],
+      "stickyTurns": 3
+    },
+    {
+      "id": "ancient.practice.war_action",
+      "kind": "practice",
+      "content": "战事行动依据身份展开：判断消息、守护家人、筹措物资、组织撤离、侦察交锋、统筹军民或承担命令。让局势通过具体行动与损耗变化，不以朝堂对白替代所有战火。",
+      "priority": 92,
+      "activation": { "actIds": ["ancient.wider_crisis"], "beats": ["escalation", "pressure", "climax"], "tasks": ["planning", "rendering", "dynamic", "decision"] },
+      "inclusionGroup": "ancient.act.conflict",
+      "cooldownTurns": 2
+    },
+    {
+      "id": "ancient.consequence.war_aftermath",
+      "kind": "consequence",
+      "content": "战争收束必须交代本局核心危机的胜负或止息，以及人物保护、失去或改变了什么。宏观天下仍可延续，但当前战役与责任要有明确结果，随后才能进入人生评价。",
+      "priority": 100,
+      "activation": { "actIds": ["ancient.wider_crisis"], "beats": ["climax", "payoff"], "tasks": ["horizon", "planning", "rendering", "dynamic", "decision"] },
+      "inclusionGroup": "ancient.act.consequence",
+      "stickyTurns": 2
+    },
+    {
+      "id": "ancient.role.guardian",
+      "kind": "social_role",
+      "content": "守护视角关注具体的人与秩序怎样免于受损；保护会带来责任、敌意或资源消耗，不等于被动等待。",
+      "priority": 82,
+      "activation": { "routeIds": ["ancient.guardian"], "tasks": ["planning", "rendering", "dynamic", "decision"] },
+      "inclusionGroup": "ancient.route.lens"
+    },
+    {
+      "id": "ancient.role.ambition",
+      "kind": "social_role",
+      "content": "进取视角关注人物怎样争取决定权、位置与更大影响；每次上升都应显出竞争对象、交换条件和可能失去的关系。",
+      "priority": 82,
+      "activation": { "routeIds": ["ancient.ambition"], "tasks": ["planning", "rendering", "dynamic", "decision"] },
+      "inclusionGroup": "ancient.route.lens"
+    },
+    {
+      "id": "ancient.role.broker",
+      "kind": "social_role",
+      "content": "经营视角关注物资、消息、信用与交换怎样连接不同人群；利润与通路必须对应风险、承诺和实际供给。",
+      "priority": 82,
+      "activation": { "routeIds": ["ancient.broker"], "tasks": ["planning", "rendering", "dynamic", "decision"] },
+      "inclusionGroup": "ancient.route.lens"
+    },
+    {
+      "id": "ancient.role.mentor",
+      "kind": "social_role",
+      "content": "教化视角关注知识、技艺与判断如何传给具体的人；学生、同道与受助者会以自己的选择回应人物，而非只作为赞誉来源。",
+      "priority": 82,
+      "activation": { "routeIds": ["ancient.mentor"], "tasks": ["planning", "rendering", "dynamic", "decision"] },
+      "inclusionGroup": "ancient.route.lens"
+    },
+    {
+      "id": "ancient.role.institution",
+      "kind": "social_role",
+      "content": "制度视角关注程序、任用、法度与执行之间的落差；改变规则需要经手的人、可执行的办法与承受反作用的能力。",
+      "priority": 82,
+      "activation": { "routeIds": ["ancient.institution"], "tasks": ["planning", "rendering", "dynamic", "decision"] },
+      "inclusionGroup": "ancient.route.lens"
+    },
+    {
+      "id": "ancient.role.outsider",
+      "kind": "social_role",
+      "content": "游离视角关注边缘身份如何看见规则缝隙并跨越地域与群体；自由伴随缺少保障、难获信任和必须自选归属。",
+      "priority": 82,
+      "activation": { "routeIds": ["ancient.outsider"], "tasks": ["planning", "rendering", "dynamic", "decision"] },
+      "inclusionGroup": "ancient.route.lens"
+    },
+    {
+      "id": "ancient.culture.household_and_clan",
+      "title": "家宅、宗族与邻里",
+      "kind": "culture",
+      "content": "家宅并非封闭小院：婚丧、借贷、田产、学费、照料与名声会把亲族和邻里连在一起。族中长幼各有体面与难处，家门可以提供人情和庇护，也会要求成员替共同声誉承担代价。",
+      "priority": 86,
+      "placement": "scenario",
+      "activation": { "keys": ["家", "父", "母", "亲", "宗族", "婚", "田产", "邻里"], "scanDepth": 4, "tasks": ["background", "planning", "rendering", "dynamic", "decision"] },
+      "stickyTurns": 2,
+      "cooldownTurns": 2
+    },
+    {
+      "id": "ancient.institution.local_yamen",
+      "title": "县署的实际门径",
+      "kind": "institution",
+      "content": "县署由堂官、佐贰、书吏、差役和地方中人共同运转。告状先要有人写状、认保和递送，查验又依赖熟悉乡情的人；公文上的一句话落到地方，往往还要经过催办、筹措和人情周转。",
+      "priority": 87,
+      "placement": "scenario",
+      "activation": { "keys": ["县衙", "官署", "告状", "差役", "书吏", "公文", "审问"], "scanDepth": 4, "tasks": ["planning", "rendering", "dynamic", "decision"] },
+      "relatedCardIds": ["ancient.rule.power_is_access"],
+      "stickyTurns": 2,
+      "cooldownTurns": 3
+    },
+    {
+      "id": "ancient.geography.roads_and_waterways",
+      "title": "驿路与水路",
+      "kind": "geography",
+      "content": "驿路、水道、渡口与山径决定消息和物资怎样抵达。雨季会改变河面与道路，关津查验会拖慢行程，脚夫、船户、客栈和沿途市镇掌握着官文之外的真实动静。",
+      "priority": 84,
+      "placement": "scenario",
+      "activation": { "keys": ["河", "渡口", "驿路", "行旅", "船", "山路", "客栈", "关津"], "scanDepth": 4, "tasks": ["background", "planning", "rendering", "dynamic", "decision"] },
+      "cooldownTurns": 2
+    },
+    {
+      "id": "ancient.culture.market_and_craft",
+      "title": "街市与营生",
+      "kind": "culture",
+      "content": "街市的秩序由行商、坐贾、工匠、牙人、脚夫和巡街者共同维持。价格背后是货源、时令、赊欠与信用；一门手艺既能换来独立生活，也会让人物卷入行会、主顾和地方权势。",
+      "priority": 84,
+      "placement": "scenario",
+      "activation": { "keys": ["街市", "商", "铺", "工匠", "买卖", "货", "银钱", "营生"], "scanDepth": 4, "tasks": ["background", "planning", "rendering", "dynamic", "decision"] },
+      "cooldownTurns": 2
+    },
+    {
+      "id": "ancient.institution.academy_and_examination",
+      "title": "书院与取士",
+      "kind": "institution",
+      "content": "蒙学、私塾、书院和科场连接着师生、同年、地方声望与家中供养。读书不仅是答卷，也包括拜师、讲学、抄书、游学和对现实事务的判断；功名能打开门径，却不会自动带来办事能力。",
+      "priority": 85,
+      "placement": "scenario",
+      "activation": { "keys": ["读书", "书院", "先生", "科举", "科场", "同窗", "文章", "功名"], "scanDepth": 4, "tasks": ["background", "planning", "rendering", "dynamic", "decision"] },
+      "cooldownTurns": 2
+    },
+    {
+      "id": "ancient.institution.faction_daily_life",
+      "title": "阵营中的日常权力",
+      "kind": "faction",
+      "content": "组织中的位置由能否办事、能调动谁、愿替谁担责以及出了差错谁来收拾共同决定。宴饮和议事只是表面，轮值、荐举、钱粮、差遣、奖惩与消息先后才不断改变人与人的距离。",
+      "priority": 89,
+      "placement": "scenario",
+      "activation": { "actIds": ["ancient.position_trial"], "keys": ["同僚", "上司", "差遣", "阵营", "任事", "荐举", "靠山"], "scanDepth": 5, "tasks": ["planning", "rendering", "dynamic", "decision"] },
+      "relatedCardIds": ["ancient.practice.faction_life"],
+      "stickyTurns": 2,
+      "cooldownTurns": 2
+    },
+    {
+      "id": "ancient.setting.war_supply_and_people",
+      "title": "战事如何抵达人间",
+      "kind": "setting",
+      "content": "战事先改变的是路、粮、价格、征发、迁徙与消息。军队需要营地、向导、医药、马匹和民夫，城镇要决定守、撤或接纳流民；前线一次得失会沿驿路传成截然不同的传闻。",
+      "priority": 92,
+      "placement": "scenario",
+      "activation": { "actIds": ["ancient.wider_crisis"], "keys": ["战", "军", "兵", "敌", "征发", "流民", "粮道", "城防"], "scanDepth": 5, "tasks": ["planning", "rendering", "dynamic", "decision"] },
+      "relatedCardIds": ["ancient.practice.war_action"],
+      "stickyTurns": 3,
+      "cooldownTurns": 2
+    },
+    {
+      "id": "ancient.motif.season_and_status",
+      "title": "时令中的身份",
+      "kind": "motif",
+      "content": "同一场雨落在瓦舍、官道、田亩和军营会显出不同生活：有人担心屋漏，有人盘算河运，有人等待开印，有人检查弓弦。衣料、称呼、座次、灯火与出门时辰都能自然显出人物处境。",
+      "priority": 76,
+      "placement": "scenario",
+      "activation": { "keys": ["春", "夏", "秋", "冬", "雨", "雪", "夜", "节令"], "scanDepth": 3, "tasks": ["background", "rendering", "dynamic"] },
+      "cooldownTurns": 3
+    },
+    {
+      "id": "ancient.example.background",
+      "title": "古代普通人生段节奏",
+      "kind": "style_example",
+      "content": "几年间，你从替家中记账做到能独自去市集交割。春汛冲坏木桥时，你和邻人绕了三日远路，也第一次听见外乡商客谈起山外的光景。日子没有骤然改头换面，只是你看人、办事都比从前稳了些。",
+      "priority": 83,
+      "placement": "example",
+      "activation": { "tasks": ["background"] },
+      "inclusionGroup": "ancient.style.turn",
+      "cooldownTurns": 2
+    },
+    {
+      "id": "ancient.example.choice",
+      "title": "古代抉择场景节奏",
+      "kind": "style_example",
+      "content": "差役把封条按上粮仓时，掌柜仍攥着那本湿透的账册。廊下等米的人越聚越多，主簿却催你在天黑前具名。掌柜低声说账册能证明亏空另有来处，只求你给他半个时辰；身后的差役已经伸手来取钥匙。",
+      "priority": 86,
+      "placement": "example",
+      "activation": { "tasks": ["rendering", "dynamic"], "beats": ["pressure", "climax"] },
+      "inclusionGroup": "ancient.style.turn",
+      "cooldownTurns": 2
+    },
+    {
+      "id": "ancient.example.payoff",
+      "title": "古代收束节奏",
+      "kind": "style_example",
+      "content": "官仓重新开门那日，欠下的粮票按名册补发，掌柜也在堂前认了该认的罪。入冬后，街口多了一间由灾民合办的小铺；有人见你仍会避开，也有人隔着人群点头。那场纷争已经落定，留下的是往后要相处的新秩序。",
+      "priority": 88,
+      "placement": "example",
+      "activation": { "tasks": ["rendering", "dynamic", "decision"], "beats": ["payoff"] },
+      "inclusionGroup": "ancient.style.turn",
+      "cooldownTurns": 2
     }
   ],
   "sceneArchetypes": [
@@ -133,16 +394,7 @@
     { "id": "ancient.outsider_scholar", "label": "异端学者", "role": "禁书与异路的引路人", "description": "所言常违背正统，却能指出被掩盖的裂缝。", "directionIds": ["ancient.outsider"] },
     { "id": "ancient.outsider_scout", "label": "边军游士", "role": "边地事实的传递者", "description": "带来塘报之外的消息，也带来无法回避的风险。", "directionIds": ["ancient.outsider"] }
   ],
-  "lore": [
-    { "id": "ancient.protocol", "text": "称谓与礼数是权力关系的一部分：朝堂、书院、宗族、军府的说话方式不可混同。", "priority": 100 },
-    { "id": "ancient.rising", "text": "任事与结盟改变人物能做的事情；信任可在合作中增长，分歧可在具体利益与做法上显露。", "priority": 80, "phases": ["rising", "pressure", "climax"] },
-    { "id": "ancient.guardian", "text": "赈济、疫病与宗族田产必须落到具体人身上，不能只写抽象的仁政与牺牲。", "priority": 85, "directionIds": ["ancient.guardian"] },
-    { "id": "ancient.ambition", "text": "位置带来职责、同僚与可调动的力量；功绩来自实际任事，升迁、失势与退守各会改变日常生活。", "priority": 85, "directionIds": ["ancient.ambition"] },
-    { "id": "ancient.broker", "text": "经营落实为人手、货物、通路与信用的周转；需求变化和利益分配可以促成合作，也可以引发竞争。", "priority": 85, "directionIds": ["ancient.broker"] },
-    { "id": "ancient.mentor", "text": "学问路线要持续写师门、门生和教化如何进入现实，不可停在读书与清谈。", "priority": 85, "directionIds": ["ancient.mentor"] },
-    { "id": "ancient.institution", "text": "政令与军务经由具体的人执行；调度、训练、公断和协作的成败会改变当地秩序与人的生路。", "priority": 85, "directionIds": ["ancient.institution"] },
-    { "id": "ancient.outsider", "text": "远行带来新的地貌、生活方式与相处规则；遭遇危险、交换技艺或共同求生，让不同来处的人建立关系。", "priority": 85, "directionIds": ["ancient.outsider"] }
-  ],
+  "lore": [],
   "eventBindings": [
     { "eventId": "ancient_guardian_01", "beat": "escalation", "characterIds": ["ancient.guardian_elder", "ancient.guardian_clerk"], "sceneHint": "灾年粮道受阻，先写清你所见的缺口，再让责任落到一份名单或一个人身上。" },
     { "eventId": "ancient_guardian_02", "beat": "escalation", "characterIds": ["ancient.guardian_clerk"], "sceneHint": "流民激增使此前的赈济承诺开始失去余地。" },

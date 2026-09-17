@@ -1,6 +1,7 @@
 import type { NarrativeBeat, NarrativeHorizonPlan, NarrativeStatTier, StatKey } from "@reroll/shared";
 
 export type NarrativeTurnKind = "background" | "scene";
+export type NarrativeTurnCapability = "background" | "scene" | "choice";
 export type NarrativeTurnSource = "background" | "scene" | "closure";
 export type NarrativeFocusKind = "fact" | "character" | "location" | "ability";
 
@@ -20,8 +21,7 @@ export interface NarrativeTurnEnvelope {
   backgroundAgeRange: { fromAge: number; toAge: number };
   act: { id: string; label: string; prompt: string };
   beat: Exclude<NarrativeBeat, "ending">;
-  allowedTurnKinds: NarrativeTurnKind[];
-  decisionMode: "none" | "optional" | "required";
+  capabilities: NarrativeTurnCapability[];
   routes: Array<{ id: string; label: string; summary: string }>;
   factions: Array<{ id: string; label: string; summary: string }>;
   focusReferences: NarrativeTurnFocusReference[];
@@ -55,4 +55,19 @@ export interface NarrativeTurnPlan {
   sceneGoal: string;
   presentation: "summary" | "scene" | "choice";
   clockRequest: "advance" | "hold";
+}
+
+export function narrativeTurnCapabilities(
+  earlyLife: boolean,
+  beat: NarrativeTurnEnvelope["beat"],
+  allowedTurnKinds: NarrativeTurnKind[]
+): NarrativeTurnCapability[] {
+  const capabilities: NarrativeTurnCapability[] = [];
+  if (allowedTurnKinds.includes("background")) capabilities.push("background");
+  if (!earlyLife && allowedTurnKinds.includes("scene")) {
+    if (beat === "pressure" || beat === "climax") capabilities.push("choice");
+    else if (beat === "setup" || beat === "escalation") capabilities.push("scene", "choice");
+    else capabilities.push("scene");
+  }
+  return capabilities;
 }

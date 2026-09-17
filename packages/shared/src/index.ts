@@ -15,6 +15,17 @@ export type NarrativeArcPhase = "setup" | "rising" | "pressure" | "climax" | "af
 export type NarrativeThreadStatus = "seeded" | "escalating" | "climax" | "resolved";
 export type EndingPolarity = "good" | "normal" | "bad";
 export type NarrativeEndingState = "open" | "eligible" | "locked" | "guiding" | "finished";
+
+/** Persisted life-level verdict used to render a concise ending without replaying the full plot ledger. */
+export interface NarrativeEndingBrief {
+  polarity: EndingPolarity;
+  lifeTheme: string;
+  achievement: string;
+  cost: string;
+  legacy: string;
+  anchorIds: string[];
+  createdAt: number;
+}
 export type PassiveEffectType = "candidate_weight" | "negative_reduce" | "death_risk_reduce" | "reward_bonus" | "unlock_event";
 export type StoryFactKind = "open_question" | "stake" | "commitment" | "cost" | "relationship_change";
 export type StoryFactStatus = "open" | "resolved" | "blocked";
@@ -332,6 +343,87 @@ export interface NarrativeLoreEntry {
   threadIds?: string[];
 }
 
+export type NarrativeWorldCardKind =
+  | "world_rule"
+  | "setting"
+  | "geography"
+  | "institution"
+  | "culture"
+  | "faction"
+  | "location"
+  | "ability"
+  | "social_role"
+  | "practice"
+  | "conflict"
+  | "consequence"
+  | "motif"
+  | "style_example";
+
+export type NarrativeWorldCardPlacement = "world" | "scenario" | "example" | "author_note";
+export type NarrativeWorldCardSelectiveLogic = "and_any" | "and_all" | "not_any" | "not_all";
+
+export type NarrativeWorldCardTask =
+  | "background"
+  | "planning"
+  | "horizon"
+  | "rendering"
+  | "dynamic"
+  | "decision";
+
+/**
+ * A self-contained world entry. Authored cards describe what is true or
+ * possible in the setting; facts that actually happened remain run state.
+ */
+export interface NarrativeWorldCardDefinition {
+  id: string;
+  /** Author-facing memo. It is never projected to the model. */
+  title?: string;
+  kind: NarrativeWorldCardKind;
+  content: string;
+  priority: number;
+  /** Controls prompt proximity without changing activation. */
+  placement?: NarrativeWorldCardPlacement;
+  /** Stable order among cards at the same placement and priority. */
+  order?: number;
+  activation?: {
+    /** Primary text triggers. `/pattern/flags` values are treated as regex. */
+    keys?: string[];
+    /** Optional filters evaluated after one primary key has matched. */
+    secondaryKeys?: string[];
+    selectiveLogic?: NarrativeWorldCardSelectiveLogic;
+    /** Number of recent committed prose turns scanned for text triggers. */
+    scanDepth?: number;
+    actIds?: string[];
+    beats?: NarrativeBeat[];
+    routeIds?: string[];
+    factionIds?: string[];
+    factStatuses?: StoryFactStatus[];
+    factIds?: string[];
+    characterIds?: string[];
+    locationIds?: string[];
+    abilityIds?: string[];
+    tasks?: NarrativeWorldCardTask[];
+  };
+  inclusionGroup?: string;
+  relatedCardIds?: string[];
+  /** Related cards can activate this card; recursion is limited by the engine. */
+  recursive?: boolean;
+  /** This card may be selected directly but cannot activate related cards. */
+  preventFurtherRecursion?: boolean;
+  stickyTurns?: number;
+  cooldownTurns?: number;
+}
+
+export interface NarrativeWorldCardActivationState {
+  cardId: string;
+  /** Episode sequence where a direct or related activation was last committed. */
+  lastActivatedSequence: number;
+  /** Exclusive episode boundary for finite sticky continuation. */
+  stickyUntilSequence: number;
+  /** Exclusive episode boundary after which a fresh activation is legal. */
+  cooldownUntilSequence: number;
+}
+
 export interface EndingBlueprint {
   id: string;
   worldId: WorldId;
@@ -483,7 +575,7 @@ export interface NarrativeRouteDefinition {
 }
 
 export interface NarrativeWorldDefinition {
-  version: 1 | 2 | 3 | 4 | 5 | 6;
+  version: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
   worldId: WorldId;
   storyBible: string;
   styleRules: string[];
@@ -505,6 +597,8 @@ export interface NarrativeWorldDefinition {
   threads: NarrativeThreadDefinition[];
   characters: NarrativeCharacterDefinition[];
   lore: NarrativeLoreEntry[];
+  /** Task-aware dynamic world knowledge; replaces broad lore projection when present. */
+  worldCards?: NarrativeWorldCardDefinition[];
   eventBindings: NarrativeEventBinding[];
   endingBlueprints: EndingBlueprint[];
   components?: NarrativeComponentDefinition[];
@@ -812,6 +906,7 @@ export interface NarrativeRunState {
   actCanon: NarrativeActCanon[];
   memoryRevision: number;
   memoryDigests: NarrativeMemoryDigest[];
+  worldCardActivations?: NarrativeWorldCardActivationState[];
   horizonPlan?: NarrativeHorizonPlan;
   agentAttempts: NarrativeAgentAttemptRecord[];
   components: NarrativeComponentRunState[];
@@ -826,6 +921,7 @@ export interface NarrativeRunState {
   endingBlueprintId?: string;
   endingPolarity?: EndingPolarity;
   endingScore?: number;
+  endingBrief?: NarrativeEndingBrief;
   setbackCount: number;
   statTierConfig?: NarrativeStatTierConfig;
   /** Snapshot of world-owned player-facing tier wording for this run. */

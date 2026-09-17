@@ -3,7 +3,7 @@ import type { NarrativeContextFragment, NarrativeContextSection } from "./types.
 const SECTION_ORDER: NarrativeContextSection[] = [
   "raw", "persona", "talents", "seedHints", "origin", "mainline", "route", "handoff",
   "lore", "characters", "factDirectory", "facts", "resolvedFacts", "locations", "abilities",
-  "assets", "digests", "memories", "ending", "task"
+  "assets", "digests", "memories", "styleExamples", "ending", "authorNote", "task"
 ];
 
 function renderSection(section: NarrativeContextSection, values: string[]): string {
@@ -20,6 +20,8 @@ function renderSection(section: NarrativeContextSection, values: string[]): stri
     case "route": return `当前经历视角：${values[0]}`;
     case "handoff": return `前幕形成的处境：${values.join("；")}`;
     case "lore": return `相关世界知识：${values.join("；")}`;
+    case "styleExamples": return `本轮表达样例（只模仿节奏与观察方式，不复刻专名和情节）：${values.join("\n")}`;
+    case "authorNote": return `当前场景关注：${values.join("；")}`;
     case "characters": return `人物档案：${values.join("；")}`;
     case "factDirectory": return `事项引用目录：${values.join("；")}`;
     case "facts": return `当前相关事实：${values.join("；")}`;

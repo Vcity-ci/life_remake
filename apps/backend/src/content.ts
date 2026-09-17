@@ -404,6 +404,9 @@ function mergeNarrativeComponentCatalog(
 export function validateNarrativeWorldFactContract(
   definition: NarrativeWorldDefinition
 ): NarrativeWorldDefinition {
+  if (definition.version >= 8 && !(definition.worldCards?.length)) {
+    throw new Error(`${definition.worldId}_world_cards_required`);
+  }
   const factIds = new Set<string>();
   for (const fact of definition.mainlineFacts ?? []) {
     if (!fact.id?.trim() || factIds.has(fact.id)) {
@@ -429,6 +432,58 @@ export function validateNarrativeWorldFactContract(
       throw new Error(`${definition.worldId}_mainline_act_fact_reference_invalid:${act.id}:${unresolved}`);
     }
   }
+  const routeIds = new Set(definition.routeArcs.map((route) => route.directionId));
+  const factionIds = new Set((definition.narrativeFactions ?? []).map((faction) => faction.id));
+  const cardIds = new Set<string>();
+  const cardKinds = new Set([
+    "world_rule", "setting", "geography", "institution", "culture", "faction", "location", "ability",
+    "social_role", "practice", "conflict", "consequence", "motif", "style_example"
+  ]);
+  const cardTasks = new Set(["background", "planning", "horizon", "rendering", "dynamic", "decision"]);
+  const cardBeats = new Set(["setup", "escalation", "pressure", "climax", "payoff", "ending"]);
+  const factStatuses = new Set(["open", "resolved", "blocked"]);
+  const cardPlacements = new Set(["world", "scenario", "example", "author_note"]);
+  const selectiveLogics = new Set(["and_any", "and_all", "not_any", "not_all"]);
+  const validCardKey = (value: string): boolean => {
+    const key = value.trim();
+    if (!key || key.length > 120) return false;
+    if (!key.startsWith("/")) return true;
+    const end = key.lastIndexOf("/");
+    if (end <= 0) return false;
+    try {
+      new RegExp(key.slice(1, end), key.slice(end + 1));
+      return true;
+    } catch {
+      return false;
+    }
+  };
+  for (const card of definition.worldCards ?? []) {
+    const keys = [...(card.activation?.keys ?? []), ...(card.activation?.secondaryKeys ?? [])];
+    if (!card.id?.trim() || cardIds.has(card.id) || card.id.includes("|") || !card.content?.trim() ||
+        !Number.isFinite(card.priority) || card.priority < 0 || card.priority > 100 || !cardKinds.has(card.kind) ||
+        (card.placement !== undefined && !cardPlacements.has(card.placement)) ||
+        (card.order !== undefined && !Number.isFinite(card.order)) ||
+        (card.stickyTurns !== undefined && (!Number.isInteger(card.stickyTurns) || card.stickyTurns < 0 || card.stickyTurns > 8)) ||
+        (card.cooldownTurns !== undefined && (!Number.isInteger(card.cooldownTurns) || card.cooldownTurns < 0 || card.cooldownTurns > 16)) ||
+        (card.activation?.scanDepth !== undefined && (!Number.isInteger(card.activation.scanDepth) || card.activation.scanDepth < 0 || card.activation.scanDepth > 12)) ||
+        (card.activation?.selectiveLogic !== undefined && !selectiveLogics.has(card.activation.selectiveLogic)) ||
+        keys.some((key) => !validCardKey(key)) ||
+        card.activation?.tasks?.some((task) => !cardTasks.has(task)) ||
+        card.activation?.beats?.some((beat) => !cardBeats.has(beat)) ||
+        card.activation?.factStatuses?.some((status) => !factStatuses.has(status))) {
+      throw new Error(`${definition.worldId}_world_card_definition_invalid:${card.id || "unknown"}`);
+    }
+    cardIds.add(card.id);
+    if (card.activation?.actIds?.some((id) => !actIds.has(id)) ||
+        card.activation?.routeIds?.some((id) => !routeIds.has(id)) ||
+        card.activation?.factionIds?.some((id) => !factionIds.has(id))) {
+      throw new Error(`${definition.worldId}_world_card_activation_reference_invalid:${card.id}`);
+    }
+  }
+  for (const card of definition.worldCards ?? []) {
+    const unresolved = card.relatedCardIds?.find((id) => !cardIds.has(id));
+    if (unresolved) throw new Error(`${definition.worldId}_world_card_relation_invalid:${card.id}:${unresolved}`);
+  }
   return definition;
 }
 
@@ -444,8 +499,8 @@ export async function loadNarrativeWorldDefinition(worldId: string): Promise<Nar
     readJsonFile<NarrativeComponentCatalog>(path.resolve(narrativeWorldDir, `${worldId}.components.json`)).catch(() => null)
   ])
     .then(([definition, catalog]) => {
-      const merged = (definition.version === 1 || definition.version === 2 || definition.version === 3 || definition.version === 4 || definition.version === 5 || definition.version === 6) && definition.worldId === worldId
-        ? mergeNarrativeComponentCatalog(definition, catalog, worldId)
+      const merged = (definition.version === 1 || definition.version === 2 || definition.version === 3 || definition.version === 4 || definition.version === 5 || definition.version === 6 || definition.version === 7 || definition.version === 8) && definition.worldId === worldId
+        ? mergeNarrativeComponentCatalog(definition, definition.version >= 8 ? null : catalog, worldId)
         : null;
       const valid = merged ? validateNarrativeWorldFactContract(merged) : null;
       narrativeWorldCache.set(worldId, valid);

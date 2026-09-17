@@ -368,6 +368,15 @@ export default function App() {
                         action: "consume",
                         requestId: makeStepRequestId(currentRun.runId, "consume", ++requestNonceRef.current)
                     }, async (event) => {
+                if (event.type === "progress") {
+                    const progressText = {
+                        settling: "正在结算这次选择的后果...",
+                        rendering: "正在书写这段经历...",
+                        committing: "正在保存人生记录..."
+                    };
+                    setStatus(progressText[event.data.stage]);
+                    return;
+                }
                 if (event.type === "turn") {
                     appendTurn(event.data.record);
                     setStatus(`人生推进中...(${event.data.index + 1}/${event.data.total})`);

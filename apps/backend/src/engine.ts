@@ -198,6 +198,8 @@ export interface InternalRunState extends RunState {
     factId?: string;
     characterIds?: string[];
     factIds?: string[];
+    locationIds?: string[];
+    abilityIds?: string[];
   };
   narrativeReservoir: NarrativeReservoirState;
   turnRecords: TurnRecord[];

@@ -1,5 +1,5 @@
 import { validateNarrativeEffects, narrativeEffectsSchema, describeNarrativeAttributePolicy, type NarrativeValidationIssue } from "./narrative-attributes.js";
-import { buildConversationPromptMessages, projectConversationUserPrompt } from "./conversation.js";
+import { buildConversationPromptMessages, keepRecentConversationRounds, projectConversationUserPrompt } from "./conversation.js";
 import OpenAI from "openai";
 import { ZodError } from "zod";
 import { factUpdateContract, parseFactUpdates, relationshipStances, relationshipUpdatesSchema, parseRelationshipUpdates, normalizeNarrativeHandoffFact } from "./narrative-continuity.js";
@@ -8,13 +8,13 @@ import { resolvePromptPack, narrativeToolRule, normalizeNarrativeText, isNarrati
 import { createHash, randomUUID } from "node:crypto";
 import type { InternalRunState } from "./engine.js";
 import type { ConversationPromptMessage, ChatConversationState, ChatHistoryMessage, ToolCallRecord } from "./conversation.js";
-import type { AiMilestoneOptions, DecisionType, EventStoryPosition, ModelUsageOperation, NarrativeActHandoff, NarrativeAttributeEffect, NarrativeAttributePolicy, NarrativeBeat, NarrativeCharacterRelationship, NarrativeFactUpdates, NarrativeFactResolution, NarrativeHorizonPlan, NarrativeIntent, NarrativeStatTier, ProviderConfig, StatKey, Stats, WorldConfig, YearEvent } from "@reroll/shared";
+import type { AiMilestoneOptions, DecisionType, EventStoryPosition, ModelUsageOperation, NarrativeActHandoff, NarrativeAttributeEffect, NarrativeAttributePolicy, NarrativeBeat, NarrativeCharacterRelationship, NarrativeEndingBrief, NarrativeFactUpdates, NarrativeFactResolution, NarrativeHorizonPlan, NarrativeIntent, NarrativeStatTier, ProviderConfig, StatKey, Stats, WorldConfig, YearEvent } from "@reroll/shared";
 import { formatNarrativePromptPlan, type NarrativePromptPlan } from "./narrative.js";
 import { composeNarrativeContext } from "./narrative/context/orchestrator.js";
 import type { NarrativeContextComposeInput, NarrativeContextManifest } from "./narrative/context/types.js";
 import { narrativeContextTrace } from "./narrative/context/trace.js";
-import { recordModelUsage, commitRunMemoryCuration, getRun } from "./store.js";
-import type { NarrativeAssetUpdates } from "@reroll/shared";
+import { recordModelUsage, commitRunMemoryCuration, commitRunScopedMemoryCuration, getRun } from "./store.js";
+import type { NarrativeAssets, NarrativeAssetUpdates } from "@reroll/shared";
 import { narrativeAssetUpdatesSchema, parseNarrativeAssetUpdates } from "./narrative-assets.js";
 import type { NarrativeHorizonInput, NarrativeTurnEnvelope, NarrativeTurnPlan } from "./narrative/turn.js";
 import {
@@ -301,13 +301,16 @@ export interface DirectedStoryRenderResult {
   };
 }
 
-export interface DirectedDecisionNarrativeOutcome {
+export interface DirectedDecisionSettlement {
   assetUpdates?: NarrativeAssetUpdates;
   factUpdates?: NarrativeFactUpdates;
   relationshipUpdates?: NarrativeRelationshipUpdate[];
-  narrative: string;
   effects: NarrativeAttributeEffect[];
   factResolution?: NarrativeFactResolution;
+}
+
+export interface DirectedDecisionNarrativeOutcome extends DirectedDecisionSettlement {
+  narrative: string;
 }
 
 export interface NarrativeOriginOutcome {
@@ -324,7 +327,7 @@ export interface DynamicNarrativeSceneInput {
   storyArc?: string;
   act: { id: string; label: string; prompt: string; factLabel?: string };
   beat: Exclude<NarrativeBeat, "ending">;
-  decisionMode: "none" | "optional" | "required";
+  presentation: NarrativeTurnPlan["presentation"];
   allowedTurnKinds: Array<"scene" | "background">;
   /** Age facts are projected by the engine before the model is called. */
   sceneAge: number;
@@ -449,6 +452,7 @@ export interface NarrativeProseReviewInput {
   sceneGoal: string;
   narrative: string;
   background?: string;
+  maxLength?: number;
 }
 
 export function narrativeProseReviewTool(input: NarrativeProseReviewInput): Record<string, unknown> {
@@ -462,7 +466,7 @@ export function narrativeProseReviewTool(input: NarrativeProseReviewInput): Reco
         additionalProperties: false,
         required: ["narrative", ...(input.background === undefined ? [] : ["background"])],
         properties: {
-          narrative: { type: "string", minLength: 10 },
+          narrative: { type: "string", minLength: 10, ...(input.maxLength ? { maxLength: input.maxLength } : {}) },
           ...(input.background === undefined ? {} : { background: { type: "string", minLength: 10 } })
         }
       }
@@ -480,6 +484,7 @@ export async function refineNarrativeProse(
     `正文对应${input.ageLabel}；任务=${input.task}；已批准目标=${input.sceneGoal}。`,
     "整理正文，使人物身份、行动、地点和时间与已发生经历一致；移除工具结构、内部标签和面向模型的说明；避免用重复悬念句强行承上启下。",
     "保留已经生成的事件结果、人物关系、事实含义、选项语义和结局定性，不新增结构化变化。",
+    input.maxLength ? `成稿不得超过${input.maxLength}字。` : "",
     `正文：${input.narrative}`,
     input.background === undefined ? "" : `抉择背景：${input.background}`,
     "必须调用 refine_narrative_prose。"
@@ -491,15 +496,14 @@ export async function refineNarrativeProse(
   });
   const narrative = normalizeNarrativeText(result.raw.narrative);
   const background = input.background === undefined ? undefined : normalizeNarrativeText(result.raw.background);
-  if (!isSafePlayerNarrative(narrative) || (input.background !== undefined && !isSafePlayerNarrative(background ?? ""))) {
+  if (!isSafePlayerNarrative(narrative) || (input.maxLength && narrative.length > input.maxLength) || (input.background !== undefined && !isSafePlayerNarrative(background ?? ""))) {
     throw invalidNarrativeOutcome("narrative_review_invalid");
   }
   return { narrative, background };
 }
 
-function narrativeTurnPlanTool(input: NarrativeTurnEnvelope): Record<string, unknown> {
-  const properties: Record<string, unknown> = {
-    turnKind: { type: "string", enum: input.allowedTurnKinds },
+export function narrativeTurnPlanTools(input: NarrativeTurnEnvelope): Record<string, unknown>[] {
+  const commonProperties: Record<string, unknown> = {
     focusRefs: {
       type: "array",
       maxItems: 3,
@@ -508,40 +512,50 @@ function narrativeTurnPlanTool(input: NarrativeTurnEnvelope): Record<string, unk
         : { type: "string", enum: ["none"] }
     },
     sceneGoal: { type: "string", minLength: 1, maxLength: 180 },
-    presentation: { type: "string", enum: ["summary", "scene", "choice"] },
     clockRequest: { type: "string", enum: ["advance", "hold"] }
   };
-  if (input.routes.length) properties.routeId = { type: "string", enum: input.routes.map((entry) => entry.id) };
-  if (input.factions.length) properties.factionId = { type: "string", enum: input.factions.map((entry) => entry.id) };
-  return {
-    type: "function",
-    function: {
-      name: "plan_narrative_turn",
-      description: "选择下一回合的呈现方式、经历视角与叙事目标。只提出计划，不写正文或改变游戏状态。",
-      parameters: {
-        type: "object",
-        additionalProperties: false,
-        required: ["turnKind", "focusRefs", "sceneGoal", "presentation", "clockRequest"],
-        properties
+  const tool = (name: string, description: string, scene: boolean): Record<string, unknown> => {
+    const properties = scene
+      ? {
+          ...commonProperties,
+          routeId: { type: "string", enum: input.routes.map((entry) => entry.id) },
+          factionId: { type: "string", enum: input.factions.map((entry) => entry.id) }
+        }
+      : commonProperties;
+    return {
+      type: "function",
+      function: {
+        name,
+        description,
+        parameters: {
+          type: "object",
+          additionalProperties: false,
+          required: ["focusRefs", "sceneGoal", "clockRequest", ...(scene ? ["routeId", "factionId"] : [])],
+          properties
+        }
       }
-    }
+    };
   };
+  return input.capabilities.map((capability) => capability === "background"
+    ? tool("plan_background_turn", "规划一段普通人生背景。只提出目标，不写正文或改变游戏状态。", false)
+    : capability === "choice"
+      ? tool("plan_choice_turn", "规划一个真正需要玩家取舍的场景。只提出目标，不写正文或改变游戏状态。", true)
+      : tool("plan_scene_turn", "规划一个无需玩家选择、直接展开并形成结果的场景。只提出目标，不写正文或改变游戏状态。", true));
 }
 
 function narrativeTurnPlanningPrompt(input: NarrativeTurnEnvelope): string {
   return [
     `回合=${input.callId}；当前年龄=${input.currentAge}岁；场景年龄=${input.sceneAge}岁；背景年龄=${input.backgroundAgeRange.fromAge}-${input.backgroundAgeRange.toAge}岁。`,
     `当前世界幕：${input.act.label}。${input.act.prompt}`,
-    `当前节拍=${input.beat}；可选呈现=${input.allowedTurnKinds.join("、")}；抉择状态=${input.decisionMode}。`,
+    `当前节拍=${input.beat}；本轮可用形式=${input.capabilities.join("、")}。`,
     `路线目录：${input.routes.map((entry) => `${entry.id}=${entry.label}：${compactText(entry.summary, 80)}`).join(" | ")}`,
     `阵营目录：${input.factions.map((entry) => `${entry.id}=${entry.label}：${compactText(entry.summary, 60)}`).join(" | ")}`,
     input.focusReferences.length ? `可承接对象：${input.focusReferences.map((entry) => `${entry.id}=${entry.kind}:${entry.label}`).join(" | ")}` : "",
     input.growthFocus ? `人物当前成长侧重：${input.growthFocus.label}。${input.growthFocus.description}` : "",
     input.horizon ? `当前幕短程意图（建议而非路线门槛）：核心问题=${input.horizon.dramaticQuestion}；正在发展的张力=${input.horizon.developingTension}；近期意图=${input.horizon.nearTermIntents.join("、")}；建议关注=${input.horizon.focusRefs.join("、") || "无"}；可能形成的阶段结果=${input.horizon.payoffShape}` : "",
     `人物能力档位：${Object.entries(input.statTiers).map(([key, value]) => `${key}=${value}`).join("；")}`,
-    "根据已发生经历与当前世界幕决定本轮应是人生背景还是节拍场景。场景时从路线与阵营目录各选一个；背景时不指定路线和阵营。focusRefs 只引用本轮确实需要承接的对象，可以为空。",
-    "presentation 与本轮目的保持一致：背景用 summary；无需玩家决定的场景用 scene；真正需要玩家取舍时用 choice。clockRequest 只表达该场景是否适合同年连续发展，最终由引擎执行。",
-    "必须调用 plan_narrative_turn；不要写玩家可见正文。"
+    "根据已发生经历与当前世界幕，从本轮提供的规划工具中选择一种。场景工具需要从路线与阵营目录各选一个；背景工具不指定路线和阵营。focusRefs 只引用本轮确实需要承接的对象，可以为空。",
+    "clockRequest 只表达该场景是否适合同年连续发展，最终由引擎执行。必须调用一个规划工具；不要写玩家可见正文。"
   ].filter(Boolean).join("\n");
 }
 
@@ -555,30 +569,32 @@ export async function generateNarrativeTurnPlan(
     run,
     world,
     ctx,
-    narrativeTurnPlanTool(input),
+    narrativeTurnPlanTools(input),
     narrativeTurnPlanningPrompt(input),
     { task: "planning", callId: input.callId, source: input.source, focusIds: input.focusReferences.map((entry) => entry.id) }
   );
   const raw = result.raw;
-  const turnKind = raw.turnKind === "background" || raw.turnKind === "scene" ? raw.turnKind : undefined;
-  if (!turnKind || !input.allowedTurnKinds.includes(turnKind)) throw invalidNarrativeOutcome("narrative_turn_plan_kind_invalid");
+  const presentation = result.toolName === "plan_background_turn"
+    ? "summary"
+    : result.toolName === "plan_scene_turn"
+      ? "scene"
+      : result.toolName === "plan_choice_turn"
+        ? "choice"
+        : undefined;
+  const turnKind = presentation === "summary" ? "background" : presentation ? "scene" : undefined;
+  if (!turnKind || !presentation) throw invalidNarrativeOutcome("narrative_turn_plan_kind_invalid");
   const focusRefs = Array.isArray(raw.focusRefs)
     ? Array.from(new Set(raw.focusRefs.filter((id): id is string => typeof id === "string" && input.focusReferences.some((entry) => entry.id === id)))).slice(0, 3)
     : [];
   const sceneGoal = normalizeNarrativeText(raw.sceneGoal);
-  const presentation = raw.presentation === "summary" || raw.presentation === "scene" || raw.presentation === "choice" ? raw.presentation : undefined;
   const clockRequest = raw.clockRequest === "hold" || raw.clockRequest === "advance" ? raw.clockRequest : undefined;
-  if (!sceneGoal || !presentation || !clockRequest) throw invalidNarrativeOutcome("narrative_turn_plan_content_invalid");
+  if (!sceneGoal || !clockRequest) throw invalidNarrativeOutcome("narrative_turn_plan_content_invalid");
   if (turnKind === "background") {
-    if (presentation !== "summary") throw invalidNarrativeOutcome("narrative_turn_plan_presentation_invalid");
     return { callId: input.callId, turnKind, focusRefs, sceneGoal, presentation, clockRequest: "advance" };
   }
-  if (presentation === "summary") throw invalidNarrativeOutcome("narrative_turn_plan_presentation_invalid");
   const routeId = typeof raw.routeId === "string" && input.routes.some((entry) => entry.id === raw.routeId) ? raw.routeId : undefined;
   const factionId = typeof raw.factionId === "string" && input.factions.some((entry) => entry.id === raw.factionId) ? raw.factionId : undefined;
   if (!routeId || !factionId) throw invalidNarrativeOutcome("narrative_turn_plan_identity_invalid");
-  if (input.decisionMode === "required" && presentation !== "choice") throw invalidNarrativeOutcome("narrative_turn_plan_decision_required");
-  if (input.decisionMode === "none" && presentation === "choice") throw invalidNarrativeOutcome("narrative_turn_plan_decision_disallowed");
   return { callId: input.callId, turnKind, routeId, factionId, focusRefs, sceneGoal, presentation, clockRequest };
 }
 
@@ -623,7 +639,9 @@ function nestedValidationIssue(error: unknown, path: string): NarrativeValidatio
 }
 
 type SystemPromptMode = "year" | "milestone" | "ending";
-const debugModel = process.env.DEBUG_MODEL_CALLS === "1";
+function debugModelEnabled(): boolean {
+  return process.env.DEBUG_MODEL_CALLS === "1";
+}
 const promptCache = new Map<string, { text: string; ts: number }>();
 const PROMPT_CACHE_TTL_MS = 60 * 1000;
 const PROMPT_CACHE_MAX = 600;
@@ -750,7 +768,8 @@ function createConversationState(systemHash: string, headCore: string): ChatConv
     headCore: normalizeChatText(headCore, 2600),
     headMemory: "",
     history: [],
-    archive: []
+    archive: [],
+    summarizedMemoryIds: []
   };
 }
 
@@ -819,6 +838,9 @@ function ensureConversationState(
     headCore: normalizeChatText(headCore, 2600),
     summaryRevision: conversation.summaryRevision ?? 0,
     summaryThroughMemoryId: conversation.summaryThroughMemoryId,
+    summarizedMemoryIds: Array.isArray(conversation.summarizedMemoryIds)
+      ? Array.from(new Set(conversation.summarizedMemoryIds.filter((id): id is string => typeof id === "string" && Boolean(id.trim())))).slice(-240)
+      : [],
     headMemory: normalizeConversationText(conversation.headMemory || ""),
     history: conversation.history
       .map(normalizeChatHistoryMessage)
@@ -962,54 +984,14 @@ function pushToolResult(
   conversation.history.push({ role: "tool", toolCallId, name, content: normalized });
 }
 
-function isTextHistoryMessage(
-  item: ChatHistoryMessage
-): item is Extract<ChatHistoryMessage, { role: "user" | "assistant"; content: string }> {
-  return item.role === "user" || (item.role === "assistant" && "content" in item);
-}
-
-interface ConversationRound {
-  id?: string;
-  user: string;
-  assistant: string;
-  messages: ChatHistoryMessage[];
-}
-
-function collectConversationRounds(history: ChatHistoryMessage[]): ConversationRound[] {
-  const rounds: ConversationRound[] = [];
-  let pendingUser = "";
-  let pendingId: string | undefined;
-  let pendingMessages: ChatHistoryMessage[] = [];
-  for (const item of history) {
-    if (isTextHistoryMessage(item) && item.role === "user") {
-      pendingUser = item.content;
-      pendingId = item.turnId;
-      pendingMessages = [item];
-      continue;
-    }
-    if (!pendingUser) continue;
-    pendingMessages.push(item);
-    if (isTextHistoryMessage(item) && item.role === "assistant") {
-      rounds.push({ id: pendingId, user: pendingUser, assistant: item.content, messages: pendingMessages });
-      pendingUser = "";
-      pendingMessages = [];
-    }
-  }
-  return rounds;
-}
-
 function keepRecentRounds(conversation: ChatConversationState): void {
-  const rounds = collectConversationRounds(conversation.history);
-  const recentRounds = rounds.slice(-CHAT_WINDOW_ROUNDS);
-  const pairs = rounds.map(({ id, user, assistant }) => ({ id, user, assistant }));
-  const overflowPairs = pairs.slice(0, Math.max(0, pairs.length - CHAT_WINDOW_ROUNDS));
-  if (overflowPairs.length > 0) {
-    conversation.archive.push(...overflowPairs);
-  }
-  conversation.history = recentRounds.flatMap((round) => round.messages);
+  keepRecentConversationRounds(conversation, CHAT_WINDOW_ROUNDS);
 }
 
-export function memoryCurationTool(work: NarrativeMemoryCurationWork): Record<string, unknown> {
+export function memoryCurationTool(
+  work: NarrativeMemoryCurationWork,
+  scopes = work.scopes
+): Record<string, unknown> {
   const factIds = work.validFactIds.length ? work.validFactIds : ["none"];
   const characterIds = work.validCharacterIds.length ? work.validCharacterIds : ["none"];
   return {
@@ -1024,14 +1006,14 @@ export function memoryCurationTool(work: NarrativeMemoryCurationWork): Record<st
         properties: {
           digests: {
             type: "array",
-            minItems: work.scopes.length,
-            maxItems: work.scopes.length,
+            minItems: 1,
+            maxItems: scopes.length,
             items: {
               type: "object",
               additionalProperties: false,
               required: ["id", "summary", "activeFactIds", "historicalFactIds", "characterIds"],
               properties: {
-                id: { type: "string", enum: work.scopes.map((scope) => scope.id) },
+                id: { type: "string", enum: scopes.map((scope) => scope.id) },
                 summary: { type: "string", minLength: 1, maxLength: 600 },
                 activeFactIds: { type: "array", maxItems: 8, items: { type: "string", enum: factIds } },
                 historicalFactIds: { type: "array", maxItems: 8, items: { type: "string", enum: factIds } },
@@ -1045,11 +1027,13 @@ export function memoryCurationTool(work: NarrativeMemoryCurationWork): Record<st
   };
 }
 
-function memoryCurationPrompt(work: NarrativeMemoryCurationWork): string {
+function memoryCurationPrompt(work: NarrativeMemoryCurationWork, scopes: NarrativeMemoryCurationWork["scopes"]): string {
   return [
-    "整理以下已经提交的经历。run 视图必须返回；其余作用域只在本批经历确实改变该对象时返回。",
-    "摘要保留人物身份、关系、能力、处境以及事情的实际结果。未完成事实放入 activeFactIds；已解决事实放入 historicalFactIds。只能引用目录中的 ID。",
-    `作用域：${work.scopes.map((scope) => `${scope.id}；此前摘要=${scope.previousSummary || "无"}；本批=${scope.episodeIds.join("、")}`).join("\n")}`,
+    scopes.some((scope) => scope.id === "run")
+      ? "整理以下已经提交的经历，只返回 run 长期摘要。"
+      : "为确实被本批经历改变的对象更新长期视图；没有变化的对象可以不返回。",
+    "run 摘要写成当前局势：保留人物身份、当下处境、主要关系、能力、不可逆变化与尚未兑现的承诺，不按年份复述流水账。对象摘要只保留该对象目前有效的状态。未完成事实放入 activeFactIds；已解决事实放入 historicalFactIds并只保留其结果。只能引用目录中的 ID。",
+    `作用域：${scopes.map((scope) => `${scope.id}；此前摘要=${scope.previousSummary || "无"}；本批=${scope.episodeIds.join("、")}`).join("\n")}`,
     `事实目录：${work.validFactIds.join("、") || "无"}；其中已解决：${work.resolvedFactIds.join("、") || "无"}。`,
     `人物目录：${work.validCharacterIds.join("、") || "无"}。`,
     ...work.episodes.map((episode) => [
@@ -1064,14 +1048,16 @@ async function generateNarrativeMemoryCuration(
   ctx: NarrativeContext,
   run: InternalRunState,
   world: WorldConfig,
-  work: NarrativeMemoryCurationWork
+  work: NarrativeMemoryCurationWork,
+  scopes: NarrativeMemoryCurationWork["scopes"],
+  requireEveryScope: boolean
 ): Promise<NarrativeMemoryCurationResult> {
-  const result = await requestNarrativeOutcomeTool(run, world, ctx, memoryCurationTool(work), memoryCurationPrompt(work), {
+  const result = await requestNarrativeOutcomeTool(run, world, ctx, memoryCurationTool(work, scopes), memoryCurationPrompt(work, scopes), {
     task: "curation",
     callId: `curation:${run.runId}:${work.revision}`
   });
   const rawDigests = Array.isArray(result.raw.digests) ? result.raw.digests : [];
-  const validScopeIds = new Set(work.scopes.map((scope) => scope.id));
+  const validScopeIds = new Set(scopes.map((scope) => scope.id));
   const digests = rawDigests.map((value) => {
     const entry = value as Record<string, unknown>;
     const id = typeof entry.id === "string" ? entry.id : "";
@@ -1086,8 +1072,8 @@ async function generateNarrativeMemoryCuration(
       historicalFactIds: ids(entry.historicalFactIds),
       characterIds: ids(entry.characterIds)
     };
-  }).filter((entry) => validScopeIds.has(entry.id) && isNarrativePlainText(entry.summary, 1));
-  if (digests.length !== work.scopes.length || !work.scopes.every((scope) => digests.some((entry) => entry.id === scope.id))) {
+  }).filter((entry) => validScopeIds.has(entry.id) && entry.summary.length <= 600 && isNarrativePlainText(entry.summary, 1));
+  if (!digests.length || (requireEveryScope && !scopes.every((scope) => digests.some((entry) => entry.id === scope.id)))) {
     throw invalidNarrativeOutcome("narrative_curation_scope_missing");
   }
   return { digests };
@@ -1100,8 +1086,20 @@ export function scheduleCommittedNarrativeCuration(ctx: NarrativeContext, run: I
   const key = run.runId;
   if (!work || memoryCuratorJobs.has(key)) return;
   const snapshot = structuredClone(run);
-  const task = generateNarrativeMemoryCuration(ctx, snapshot, world, work)
-    .then((result) => commitRunMemoryCuration(run.runId, sessionId, work, result))
+  const runScope = work.scopes.filter((scope) => scope.id === "run");
+  const objectScopes = work.scopes.filter((scope) => scope.id !== "run");
+  const task = generateNarrativeMemoryCuration(ctx, snapshot, world, work, runScope, true)
+    .then(async (result) => {
+      const committed = await commitRunMemoryCuration(run.runId, sessionId, work, result);
+      if (!committed || !objectScopes.length) return committed;
+      try {
+        const scoped = await generateNarrativeMemoryCuration(ctx, snapshot, world, work, objectScopes, false);
+        await commitRunScopedMemoryCuration(run.runId, sessionId, work, scoped);
+      } catch (error) {
+        debugError("memory-curator-scoped", error);
+      }
+      return committed;
+    })
     .catch((error) => { debugError("memory-curator", error); return false; })
     .then(async (committed) => {
       memoryCuratorJobs.delete(key);
@@ -1218,7 +1216,7 @@ function writePromptCache(key: string, text: string): void {
 }
 
 function debugError(tag: string, error: unknown): void {
-  if (!debugModel) return;
+  if (!debugModelEnabled()) return;
   const maybe = error as { message?: string; status?: number; code?: string; name?: string; type?: string; reason?: string; error?: unknown };
   console.log(`[model-debug:${tag}:error]`, {
     message: maybe?.message ?? String(error),
@@ -1242,7 +1240,7 @@ function debugDirectedStoryTurn(
   structuredOutput: boolean,
   error?: unknown
 ): void {
-  if (!debugModel) return;
+  if (!debugModelEnabled()) return;
   console.log("[model-debug:directed-story-turn]", {
     status,
     elapsedMs: Date.now() - startedAt,
@@ -1628,37 +1626,97 @@ function shrinkPromptText(text: string, maxLen: number): string {
   return `${normalized.slice(0, Math.max(1, maxLen - 1))}…`;
 }
 
-function summarizeEndingRecent(events: YearEvent[]): string {
-  const recent = events.slice(-5);
-  if (recent.length === 0) return "无";
-  return recent
-    .map((e) => `${e.age}岁 ${shrinkPromptText(e.title, 18)}：${shrinkPromptText(e.summary, 40)}`)
-    .join(" | ");
+function endingBriefText(brief: NarrativeEndingBrief): string {
+  return `结局定性=${brief.polarity}；人生主题=${brief.lifeTheme}；完成之事=${brief.achievement}；付出代价=${brief.cost}；留下影响=${brief.legacy}`;
 }
 
-function fallbackEndingSummary(run: InternalRunState): string {
-  const existing = (run.endingSummary ?? "").trim();
-  if (existing) return existing;
-  if (run.outcome === "dead") {
-    return `你在${run.age}岁因${run.deathCause ?? "意外"}离世。最终名望：${run.fame}。`;
-  }
-  if (run.outcome === "ascended") {
-    const title = run.ascension.title?.trim() || "飞升";
-    return `你触发了“${title}”，在人世规则之外延展了命运。`;
-  }
-  if (run.outcome === "completed") {
-    const quality = run.narrative.endingPolarity === "good"
-      ? "好结局"
-      : run.narrative.endingPolarity === "normal"
-        ? "普通结局"
-        : "坏结局";
-    return `你在${run.age}岁走到这段人生的收束处。引擎已裁定为${quality}，最终名望：${run.fame}。`;
-  }
-  return `你在${run.age}岁走完此生。最终名望：${run.fame}。`;
+function endingAnchorCatalog(run: InternalRunState): Array<{ id: string; label: string }> {
+  const anchors: Array<{ id: string; label: string }> = [];
+  if (run.outcome === "dead") anchors.push({ id: "death:cause", label: `死因：${run.deathCause ?? "意外"}` });
+  anchors.push(...run.narrative.actCanon.slice(-3).map((canon) => ({
+    id: `canon:${canon.actId}`,
+    label: `${canon.resolvedTension}；${canon.lastingConsequence}`
+  })));
+  anchors.push(...(run.story.factLedger?.facts ?? []).filter((fact) => fact.status === "resolved").slice(-4).map((fact) => ({
+    id: `fact:${fact.id}`,
+    label: fact.resolutionSummary ?? fact.label
+  })));
+  anchors.push(...run.narrative.dynamicCharacters.filter((character) => character.importance !== "momentary").slice(-3).map((character) => ({
+    id: `character:${character.id}`,
+    label: `${character.name}：${character.relationship?.summary ?? character.description}`
+  })));
+  return anchors.filter((anchor, index, all) => all.findIndex((entry) => entry.id === anchor.id) === index).slice(-12);
 }
 
-function buildEndingPrompt(run: InternalRunState, baseEnding: string): string {
-  const cards = run.cards.map((c) => `${c.name}(${c.rarity})`).join("、") || "无";
+function endingBriefTool(run: InternalRunState, anchors: Array<{ id: string; label: string }>): Record<string, unknown> {
+  const anchorIds = anchors.length ? anchors.map((anchor) => anchor.id) : ["none"];
+  const polarity = run.narrative.endingPolarity ?? "bad";
+  return {
+    type: "function",
+    function: {
+      name: "distill_life_verdict",
+      description: "把已经锁定的游戏结局提炼为一次人生评价提要，不改变引擎裁定。",
+      parameters: {
+        type: "object",
+        additionalProperties: false,
+        required: ["polarity", "lifeTheme", "achievement", "cost", "legacy", "anchorIds"],
+        properties: {
+          polarity: { type: "string", enum: [polarity] },
+          lifeTheme: { type: "string", minLength: 2, maxLength: 120 },
+          achievement: { type: "string", minLength: 2, maxLength: 180 },
+          cost: { type: "string", minLength: 2, maxLength: 180 },
+          legacy: { type: "string", minLength: 2, maxLength: 180 },
+          anchorIds: { type: "array", maxItems: 3, items: { type: "string", enum: anchorIds } }
+        }
+      }
+    }
+  };
+}
+
+async function ensureEndingBrief(run: InternalRunState, world: WorldConfig, ctx: NarrativeContext): Promise<NarrativeEndingBrief> {
+  if (run.narrative.endingBrief && run.narrative.endingBrief.polarity === run.narrative.endingPolarity) {
+    return run.narrative.endingBrief;
+  }
+  const anchors = endingAnchorCatalog(run);
+  const prompt = [
+    `引擎已锁定结局=${run.narrative.endingPolarity ?? "bad"}；人生终点=${run.age}岁；名望=${run.fame}。`,
+    `最终属性=${summarizeStatsShort(run.stats)}；天赋=${run.cards.map((card) => card.name).join("、") || "无"}。`,
+    anchors.length ? `可引用的人生锚点：${anchors.map((anchor) => `${anchor.id}=${compactText(anchor.label, 100)}`).join(" | ")}` : "本局没有额外锚点。",
+    run.outcome === "dead" ? `死亡事实必须保留：${run.deathCause ?? "意外"}。` : "",
+    "提炼其一生完成了什么、付出什么、留下什么。只调用 distill_life_verdict，不展开场景，不续写新剧情。"
+  ].filter(Boolean).join("\n");
+  const result = await requestNarrativeOutcomeTool(run, world, ctx, endingBriefTool(run, anchors), prompt, {
+    task: "closure",
+    callId: `${ctx.callId ?? `ending:${run.runId}:${run.age}`}:brief`,
+    source: "closure"
+  });
+  const raw = result.raw;
+  const validIds = new Set(anchors.map((anchor) => anchor.id));
+  const selectedAnchorIds = Array.isArray(raw.anchorIds)
+    ? Array.from(new Set(raw.anchorIds.filter((id): id is string => typeof id === "string" && validIds.has(id)))).slice(0, 3)
+    : [];
+  if (run.outcome === "dead" && validIds.has("death:cause") && !selectedAnchorIds.includes("death:cause")) {
+    selectedAnchorIds.unshift("death:cause");
+    selectedAnchorIds.splice(3);
+  }
+  const brief: NarrativeEndingBrief = {
+    polarity: run.narrative.endingPolarity ?? "bad",
+    lifeTheme: normalizeNarrativeText(raw.lifeTheme),
+    achievement: normalizeNarrativeText(raw.achievement),
+    cost: normalizeNarrativeText(raw.cost),
+    legacy: normalizeNarrativeText(raw.legacy),
+    anchorIds: selectedAnchorIds,
+    createdAt: Date.now()
+  };
+  if (![brief.lifeTheme, brief.achievement, brief.cost, brief.legacy].every((value) => isNarrativePlainText(value, 2)) ||
+      (run.outcome === "dead" && !brief.anchorIds.includes("death:cause"))) {
+    throw invalidNarrativeOutcome("ending_brief_invalid");
+  }
+  run.narrative.endingBrief = brief;
+  return brief;
+}
+
+function buildEndingPrompt(run: InternalRunState, brief?: NarrativeEndingBrief): string {
   const legacyAscensionInfo = !run.narrative.enabled && run.ascension.unlocked
     ? `${run.ascension.title ?? "未知称号"} / ${run.ascension.type ?? "unknown"} / ${run.ascension.unlockedAge ?? run.age}岁`
     : "";
@@ -1674,18 +1732,13 @@ function buildEndingPrompt(run: InternalRunState, baseEnding: string): string {
       : run.outcome === "completed"
         ? `必须按引擎锁定的${endingQuality}写出人生收束与总体评价；不得更改结局等级，不得把坏结局擅自写成死亡，也不得新增支线。`
         : "必须点明人生收束与总体评价。";
-  const lengthRule = run.outcome === "ascended"
-    ? "R:ELEN 110-170字，2-3句；只输出结算文案；先写飞升原因，再一句带过结果；不做同义重复。"
-    : "R:ELEN 80-140字，2-3句；只输出结算文案；不扩写新支线；不做同义重复。";
-
   return [
     "T:E 结局收束任务。",
     `S0 type=${run.outcome} age=${run.age} fame=${run.fame}(${fameGrade(run.fame)}) ending=${run.narrative.endingPolarity ?? "none"} score=${run.narrative.endingScore ?? "none"}`,
     `S1 stats=${summarizeStatsShort(run.stats)} death=${compactText(run.deathCause ?? "none", 32)}${legacyAscensionInfo ? ` asc=${compactText(legacyAscensionInfo, 56)}` : ""}`,
-    `S2 cards=${compactText(cards, 52)} key=${compactText(summarizeEndingRecent(run.history), 120)}`,
-    `S3 base=${compactText(baseEnding, 70)}`,
+    brief ? `S2 ${endingBriefText(brief)}` : "S2 人生评价提要已在本次上下文中给出。",
     `R:E ${outcomeRule}`,
-    lengthRule
+    "R:ELEN 120-180字，最多240字，2-4句；这是对一生的评价，不复述逐幕案情，不罗列事实，不开启新事件。"
   ].join("\n");
 }
 
@@ -1784,7 +1837,7 @@ async function callModel(
   if (canUseLocalPromptCache) {
     const semanticHit = readSemanticCache(ctx.providerConfig, mode, hashSystemPrompt(systemMessage), semanticQuery);
     if (semanticHit !== null) {
-      if (debugModel) {
+      if (debugModelEnabled()) {
         console.log("[model-debug:semantic-cache-hit]", { len: semanticHit.length, mode });
       }
       recordProviderUsage(ctx, usageOperation, "chat", { cacheHit: true, durationMs: 0 });
@@ -1792,7 +1845,7 @@ async function callModel(
     }
     const cached = readPromptCache(cacheKey);
     if (cached !== null) {
-      if (debugModel) {
+      if (debugModelEnabled()) {
         console.log("[model-debug:cache-hit]", { len: cached.length });
       }
       recordProviderUsage(ctx, usageOperation, "chat", { cacheHit: true, durationMs: 0 });
@@ -2130,14 +2183,13 @@ export function narrativeDecisionOutcomeTool(policy: NarrativeAttributePolicy, f
     type: "function",
     function: {
       name: "resolve_decision_outcome",
-      description: "提交玩家做出抉择后的自然后果正文与受控属性后果。",
+      description: "提交玩家抉择已经造成的受控属性、事实、关系与叙事资产变化；不写玩家正文。",
       parameters: {
         type: "object",
         additionalProperties: false,
-        required: ["narrative", "effects", ...(factResolutionModes?.length ? ["factResolution"] : [])],
+        required: ["effects", ...(factResolutionModes?.length ? ["factResolution"] : [])],
         properties: {
           ...(factResolutionModes?.length ? { factResolution: { type: "string", enum: factResolutionModes } } : {}),
-          narrative: { type: "string", minLength: 10 },
           effects: narrativeEffectsSchema(policy)
         }
       }
@@ -2145,7 +2197,26 @@ export function narrativeDecisionOutcomeTool(policy: NarrativeAttributePolicy, f
   };
 }
 
-type DynamicNarrativeToolName = "render_background_segment" | "render_scene" | "render_choice_scene";
+export function narrativeDecisionRenderTool(): Record<string, unknown> {
+  return {
+    type: "function",
+    function: {
+      name: "render_decision_outcome",
+      description: "依据已经审批的抉择结算写玩家可见正文，不新增或修改结构化结果。",
+      parameters: {
+        type: "object",
+        additionalProperties: false,
+        required: ["narrative"],
+        properties: {
+          narrative: { type: "string", minLength: 10, maxLength: 600 }
+        }
+      }
+    }
+  };
+}
+
+type DynamicNarrativeToolName = "resolve_background_outcome" | "resolve_scene_outcome" | "resolve_choice_scene";
+type DynamicNarrativeRenderToolName = "render_background_prose" | "render_scene_prose" | "render_choice_prose";
 
 interface DynamicNarrativeToolSet {
   tools: Record<string, unknown>[];
@@ -2153,7 +2224,6 @@ interface DynamicNarrativeToolSet {
 }
 
 export function dynamicNarrativeSceneTools(input: DynamicNarrativeSceneInput): DynamicNarrativeToolSet {
-  const routeIds = input.plan?.routeId ? [input.plan.routeId] : input.routes.map((route) => route.id);
   const factionIds = input.plan?.factionId ? [input.plan.factionId] : input.factions.map((faction) => faction.id);
   const characterRefs = ["new", ...input.knownCharacters.map((character) => character.id)];
   const effectsSchema = narrativeEffectsSchema;
@@ -2202,22 +2272,6 @@ export function dynamicNarrativeSceneTools(input: DynamicNarrativeSceneInput): D
       continuation: { type: "string", minLength: 1, maxLength: 180, description: "由此形成的新处境与发展可能，作为后续经历的起点。" }
     }
   };
-  const optionOverrides = {
-    type: "array",
-    minItems: 3,
-    maxItems: 3,
-    description: "safe、balanced、risky各对应一个选项，分别表达稳健、权衡和冒险；每个ID只出现一次。",
-    items: {
-      type: "object",
-      additionalProperties: false,
-      required: ["id", "label", "description"],
-      properties: {
-        id: { type: "string", enum: ["safe", "balanced", "risky"] },
-        label: { type: "string" },
-        description: { type: "string" }
-      }
-    }
-  };
   const sceneTask = [
     input.storyArc,
     `${input.act.label}：${input.act.prompt}`,
@@ -2229,14 +2283,13 @@ export function dynamicNarrativeSceneTools(input: DynamicNarrativeSceneInput): D
   const backgroundTool: Record<string, unknown> = {
     type: "function",
     function: {
-      name: "render_background_segment",
-      description: "概述这段岁月里的生活、练习、交往与变化，让成长侧重自然落在经历中，并提交成长标签。",
+      name: "resolve_background_outcome",
+      description: "提交这段普通人生背景已经形成的成长与记忆变化，不写玩家正文。",
       parameters: {
         type: "object",
         additionalProperties: false,
-        required: ["narrative", "effects"],
+        required: ["effects"],
         properties: {
-          narrative: { type: "string" },
           effects: effectsSchema(input.backgroundAttributePolicy)
         }
       }
@@ -2245,16 +2298,13 @@ export function dynamicNarrativeSceneTools(input: DynamicNarrativeSceneInput): D
   const sceneTool = (attributePolicy: NarrativeAttributePolicy): Record<string, unknown> => ({
     type: "function",
     function: {
-      name: "render_scene",
-      description: `叙述本次场景的经历与结果。\n${sceneTask}`,
+      name: "resolve_scene_outcome",
+      description: `提交本次场景已经形成的结构化结果，不写玩家正文。\n${sceneTask}`,
       parameters: {
         type: "object",
         additionalProperties: false,
-        required: ["routeId", "factionId", "narrative", "scenePacing", "participants", "effects", ...(input.beat === "payoff" ? ["actHandoff"] : [])],
+        required: ["scenePacing", "participants", "effects", ...(input.beat === "payoff" ? ["actHandoff"] : [])],
         properties: {
-          routeId: { type: "string", enum: routeIds },
-          factionId: { type: "string", enum: factionIds },
-          narrative: { type: "string" },
           scenePacing,
           participants,
           effects: effectsSchema(attributePolicy),
@@ -2266,42 +2316,74 @@ export function dynamicNarrativeSceneTools(input: DynamicNarrativeSceneInput): D
   const choiceSceneTool: Record<string, unknown> = {
     type: "function",
     function: {
-      name: "render_choice_scene",
-      description: `叙述本次场景并呈现玩家的取舍。\n${sceneTask}`,
+      name: "resolve_choice_scene",
+      description: `提交抉择出现前已经形成的场景状态，不结算尚未选择的行动，也不写玩家正文。\n${sceneTask}`,
       parameters: {
         type: "object",
         additionalProperties: false,
-        required: ["routeId", "factionId", "narrative", "scenePacing", "participants", "background", "optionOverrides", ...(input.beat === "payoff" ? ["actHandoff"] : [])],
+        required: ["scenePacing", "participants"],
         properties: {
-          routeId: { type: "string", enum: routeIds },
-          factionId: { type: "string", enum: factionIds },
-          narrative: { type: "string" },
           scenePacing,
-          participants,
-          background: { type: "string", minLength: 10 },
-          optionOverrides,
-          actHandoff
+          participants
         }
       }
     }
   };
   const tools: Record<string, unknown>[] = [];
   const names: DynamicNarrativeToolName[] = [];
-  if (input.allowedTurnKinds.includes("background") && (!input.plan || input.plan.presentation === "summary")) {
+  if (input.allowedTurnKinds.includes("background") && input.presentation === "summary") {
     tools.push(backgroundTool);
-    names.push("render_background_segment");
+    names.push("resolve_background_outcome");
   }
   if (input.allowedTurnKinds.includes("scene")) {
-    if (input.decisionMode !== "required" && input.attributePolicy && (!input.plan || input.plan.presentation === "scene")) {
+    if (input.attributePolicy && input.presentation === "scene") {
       tools.push(sceneTool(input.attributePolicy));
-      names.push("render_scene");
+      names.push("resolve_scene_outcome");
     }
-    if (input.decisionMode !== "none" && (!input.plan || input.plan.presentation === "choice")) {
+    if (input.presentation === "choice") {
       tools.push(choiceSceneTool);
-      names.push("render_choice_scene");
+      names.push("resolve_choice_scene");
     }
   }
   return { tools, names };
+}
+
+function dynamicNarrativeRenderTool(input: DynamicNarrativeSceneInput): { tool: Record<string, unknown>; name: DynamicNarrativeRenderToolName } {
+  const optionOverrides = {
+    type: "array", minItems: 3, maxItems: 3,
+    description: "safe、balanced、risky各对应一个选项，分别表达稳健、权衡和冒险；每个ID只出现一次。",
+    items: {
+      type: "object", additionalProperties: false, required: ["id", "label", "description"],
+      properties: {
+        id: { type: "string", enum: ["safe", "balanced", "risky"] },
+        label: { type: "string" }, description: { type: "string" }
+      }
+    }
+  };
+  const name: DynamicNarrativeRenderToolName = input.presentation === "summary"
+    ? "render_background_prose"
+    : input.presentation === "choice"
+      ? "render_choice_prose"
+      : "render_scene_prose";
+  const choice = input.presentation === "choice";
+  return {
+    name,
+    tool: {
+      type: "function",
+      function: {
+        name,
+        description: choice ? "依据已审批场景写玩家可见的抉择背景与三个选项。" : "依据已审批结果写玩家可见正文。",
+        parameters: {
+          type: "object", additionalProperties: false,
+          required: ["narrative", ...(choice ? ["background", "optionOverrides"] : [])],
+          properties: {
+            narrative: { type: "string", minLength: 10 },
+            ...(choice ? { background: { type: "string", minLength: 10 }, optionOverrides } : {})
+          }
+        }
+      }
+    }
+  };
 }
 
 function responseTool(tool: Record<string, unknown>): Record<string, unknown> {
@@ -2348,6 +2430,35 @@ function parseDirectedToolArguments(raw: unknown): Record<string, unknown> | nul
       : null;
   } catch {
     return null;
+  }
+}
+
+function directedToolArgumentsFailure(raw: unknown): { reason: string; validation: NarrativeValidationIssue } {
+  if (typeof raw !== "string" || !raw.trim()) {
+    return {
+      reason: "tool_contract_invalid",
+      validation: { rule: "object_required", path: "arguments", received: raw === null ? "null" : typeof raw }
+    };
+  }
+  let source = raw.trim();
+  const fenced = source.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
+  if (fenced) source = fenced[1].trim();
+  try {
+    let parsed: unknown = JSON.parse(source);
+    if (typeof parsed === "string") parsed = JSON.parse(parsed);
+    return {
+      reason: "tool_contract_invalid",
+      validation: { rule: "object_required", path: "arguments", received: Array.isArray(parsed) ? "array" : typeof parsed }
+    };
+  } catch (error) {
+    return {
+      reason: "tool_arguments_json_invalid",
+      validation: {
+        rule: "json_parse_error",
+        path: "arguments",
+        received: error instanceof Error ? error.message.slice(0, 180) : "invalid_json"
+      }
+    };
   }
 }
 
@@ -3034,14 +3145,18 @@ function parseNarrativeEffects(raw: unknown, policy: NarrativeAttributePolicy, r
 }
 
 function narrativeToolUsageOperation(toolNames: string[]): ModelUsageOperation {
-  if (toolNames.includes("plan_narrative_turn")) return "planning";
+  if (toolNames.some((name) => name === "plan_background_turn" || name === "plan_scene_turn" || name === "plan_choice_turn")) return "planning";
   if (toolNames.includes("curate_narrative_memory")) return "curation";
   if (toolNames.includes("plan_narrative_horizon")) return "horizon";
   if (toolNames.includes("refine_narrative_prose")) return "review";
   if (toolNames.includes("render_origin")) return "origin";
   if (toolNames.includes("render_background_segment")) return "background";
+  if (toolNames.includes("resolve_background_outcome") || toolNames.includes("render_background_prose")) return "background";
+  if (toolNames.includes("resolve_choice_scene") || toolNames.includes("render_choice_prose")) return "choice";
+  if (toolNames.includes("resolve_scene_outcome") || toolNames.includes("render_scene_prose")) return "scene";
   if (toolNames.includes("render_choice_scene")) return "choice";
   if (toolNames.includes("render_scene")) return "scene";
+  if (toolNames.includes("render_decision_outcome")) return "render";
   if (toolNames.includes("resolve_decision_outcome")) return "decision";
   return "narrative";
 }
@@ -3056,21 +3171,32 @@ export function prepareNarrativeOutcomeRequest(
   const conversation = ensureConversationState(ctx.conversation, hashSystemPrompt(systemPrompt), systemPrompt);
   ctx.conversation = conversation;
   const tools = Array.isArray(toolInput) ? toolInput : [toolInput];
-  const assetTools = new Set(["render_origin", "render_background_segment", "render_scene", "render_choice_scene", "resolve_decision_outcome"]);
-  const factTools = new Set(["render_background_segment", "render_scene", "render_choice_scene", "resolve_decision_outcome"]);
+  const assetTools = new Set(["render_origin", "render_background_segment", "resolve_background_outcome", "resolve_scene_outcome", "resolve_choice_scene", "resolve_decision_outcome"]);
+  const factTools = new Set(["render_background_segment", "resolve_background_outcome", "resolve_scene_outcome", "resolve_choice_scene", "resolve_decision_outcome"]);
+  const recalledFactIds = new Set([
+    ...(ctx.narrativePlan?.recall?.facts ?? []).map((entry) => entry.id),
+    ...(ctx.narrativePlan?.factDirectory ?? []).map((entry) => entry.id)
+  ]);
   const openFactIds = (run.story.factLedger?.facts ?? [])
     .map(normalizeNarrativeHandoffFact)
-    .filter((fact) => fact.status === "open")
+    .filter((fact) => fact.status === "open" && recalledFactIds.has(fact.id))
     .map((fact) => fact.id);
   const factContract = factUpdateContract(openFactIds);
-  const characterIds = run.narrative.dynamicCharacters.map((entry) => entry.id);
+  const characterIds = (ctx.narrativePlan?.recall?.characters ?? []).map((entry) => entry.id);
+  const locationIds = new Set((ctx.narrativePlan?.recall?.assetSources ?? []).filter((entry) => entry.kind === "location").map((entry) => entry.id));
+  const abilityIds = new Set((ctx.narrativePlan?.recall?.assetSources ?? []).filter((entry) => entry.kind === "ability").map((entry) => entry.id));
+  const allowedAssets: NarrativeAssets = {
+    locations: (run.narrative.assets?.locations ?? []).filter((entry) => locationIds.has(entry.id)),
+    abilities: (run.narrative.assets?.abilities ?? []).filter((entry) => abilityIds.has(entry.id)),
+    currentLocationId: locationIds.has(run.narrative.assets?.currentLocationId ?? "") ? run.narrative.assets?.currentLocationId : undefined
+  };
   for (const tool of tools) {
     const definition = tool.function as { name: string; parameters: { properties: Record<string, unknown> } };
     if (assetTools.has(definition.name)) {
       if (definition.parameters.properties.narrative) {
         definition.parameters.properties.narrative = { type: "string", minLength: 10, description: narrativeToolRule(definition.name, resolvePromptPack(ctx.promptPack)) };
       }
-      definition.parameters.properties.assetUpdates = narrativeAssetUpdatesSchema(run.narrative.assets);
+      definition.parameters.properties.assetUpdates = narrativeAssetUpdatesSchema(allowedAssets);
     }
     if (factTools.has(definition.name)) {
       definition.parameters.properties.factUpdates = factContract.schema;
@@ -3097,8 +3223,18 @@ export function prepareNarrativeOutcomeRequest(
   });
   const requestPrompt = composition.renderedContext;
   const history = [...composition.historyMessages, { role: "user" as const, content: requestPrompt }];
-  if (debugModel) console.log("[model-debug:narrative-context]", { ...narrativeContextTrace(composition.manifest), toolNames });
-  return { conversation, tools, toolNames, toolChoice, factContract, characterIds, assetTools, factTools, history, contextManifest: composition.manifest };
+  if (debugModelEnabled()) console.log("[model-debug:narrative-context]", {
+    ...narrativeContextTrace(composition.manifest),
+    toolNames,
+    toolSchemaEstimatedTokens: Math.ceil(JSON.stringify(tools).length / 4),
+    allowedReferences: {
+      facts: factContract.mutableIds,
+      characters: characterIds,
+      locations: allowedAssets.locations.map((entry) => entry.id),
+      abilities: allowedAssets.abilities.map((entry) => entry.id)
+    }
+  });
+  return { conversation, tools, toolNames, toolChoice, factContract, characterIds, allowedAssets, assetTools, factTools, history, contextManifest: composition.manifest };
 }
 
 async function requestNarrativeOutcomeTool(
@@ -3117,7 +3253,7 @@ async function requestNarrativeOutcomeTool(
   relationshipUpdates?: NarrativeRelationshipUpdate[];
 }> {
   if (!ctx.apiKey.trim()) throw new NarrativeOutcomeError("narrative_outcome_unavailable", "api_key_missing");
-  const { conversation, tools, toolNames, toolChoice, factContract, characterIds, assetTools, factTools, history, contextManifest } = prepareNarrativeOutcomeRequest(run, world, ctx, toolInput, prompt, options);
+  const { conversation, tools, toolNames, toolChoice, factContract, characterIds, allowedAssets, assetTools, factTools, history, contextManifest } = prepareNarrativeOutcomeRequest(run, world, ctx, toolInput, prompt, options);
   ctx.lastContextManifest = contextManifest;
   const isResponsesApi = ctx.providerConfig.apiPath === "/responses";
   const usageOperation: ModelUsageOperationInput = {
@@ -3155,18 +3291,40 @@ async function requestNarrativeOutcomeTool(
           tool_choice: toolChoice as never,
           parallel_tool_calls: false
         } as never, usageOperation);
+    if (debugModelEnabled()) {
+      console.log("[model-debug:narrative-outcome-raw]");
+      console.dir(completion, { depth: null, maxArrayLength: null, maxStringLength: null, colors: false });
+    }
     const call = isResponsesApi
       ? toolNames.map((toolName) => findResponseFunctionCall(completion as { output?: unknown[] }, toolName)).find(Boolean)
       : toolNames.map((toolName) => findDirectedToolCall((completion as { choices?: Array<{ message?: unknown }> }).choices?.[0]?.message, toolName)).find(Boolean);
+    const finishReason = isResponsesApi
+      ? (completion as { status?: unknown; incomplete_details?: unknown }).status
+      : (completion as { choices?: Array<{ finish_reason?: string | null }> }).choices?.[0]?.finish_reason;
+    const incomplete = isResponsesApi
+      ? finishReason === "incomplete" || Boolean((completion as { incomplete_details?: unknown }).incomplete_details)
+      : finishReason === "length";
+    if (debugModelEnabled()) console.log("[model-debug:narrative-outcome]", {
+      task: options?.task ?? ctx.narrativePlan?.task ?? "dynamic",
+      toolNames,
+      selectedTool: call?.toolCall.name,
+      finishReason,
+      incomplete,
+      rawArgumentCharacters: typeof call?.rawArguments === "string" ? call.rawArguments.length : undefined
+    });
+    if (incomplete) throw invalidNarrativeOutcome("tool_arguments_truncated", { rule: "provider_output_incomplete", path: "arguments", expected: toolNames });
     const raw = call ? parseDirectedToolArguments(call.rawArguments) : null;
     if (!call) throw invalidNarrativeOutcome("tool_call_missing");
-    if (!raw) throw invalidNarrativeOutcome("tool_arguments_invalid");
+    if (!raw) {
+      const failure = directedToolArgumentsFailure(call.rawArguments);
+      throw invalidNarrativeOutcome(failure.reason, failure.validation);
+    }
     let assetUpdates: NarrativeAssetUpdates | undefined;
     let factUpdates: NarrativeFactUpdates | undefined;
     let relationshipUpdates: NarrativeRelationshipUpdate[] | undefined;
     if (assetTools.has(call.toolCall.name)) {
       try {
-        assetUpdates = parseNarrativeAssetUpdates(raw.assetUpdates, run.narrative.assets);
+        assetUpdates = parseNarrativeAssetUpdates(raw.assetUpdates, allowedAssets);
         const descriptions = [
           ...(assetUpdates?.locations ?? []).flatMap((entry) => [entry.name, entry.description]),
           ...(assetUpdates?.abilities ?? []).flatMap((entry) => [entry.name, entry.description, entry.source, entry.mastery])
@@ -3256,39 +3414,71 @@ export async function generateNarrativeOrigin(
   return { narrative, profile: { summary, seedHints }, assetUpdates: result.assetUpdates };
 }
 
-export async function generateDirectedDecisionNarrativeOutcome(
+export async function generateDirectedDecisionSettlement(
   run: InternalRunState,
   world: WorldConfig,
   input: { decision: DecisionType; label: string; description: string; attributePolicy: NarrativeAttributePolicy; factResolutionModes?: NarrativeFactResolution[] },
   ctx: NarrativeContext
-): Promise<DirectedDecisionNarrativeOutcome> {
+): Promise<DirectedDecisionSettlement> {
   const prompt = [
     `人物在${run.age}岁选择了“${compactText(input.label, 36)}”：${compactText(input.description, 90)}。`,
-
-    "叙述已经选定行动的实际结果，并在对应字段同步本次真正发生的变化。",
+    "判断这项行动已经造成的结构化后果，并在对应字段提交本次真正发生的变化。",
     input.factResolutionModes?.length ? `本次正处于世界幕高潮，必须同时选择一个事实收束方式：${input.factResolutionModes.join("、")}。` : "",
+    "本次只结算结果，不生成玩家正文。",
     "必须调用 resolve_decision_outcome。"
-  ].join("\n");
+  ].filter(Boolean).join("\n");
   const tool = narrativeDecisionOutcomeTool(input.attributePolicy, input.factResolutionModes);
   const result = await requestNarrativeOutcomeTool(run, world, ctx, tool, prompt, {
-    task: "decision"
+    task: "settlement",
+    callId: `${ctx.callId ?? `decision:${run.runId}:${run.age}`}:settlement`,
+    source: "decision"
   });
-  const narrative = normalizeNarrativeText(result.raw.narrative);
   const effects = parseNarrativeEffects(result.raw.effects, input.attributePolicy, "decision_outcome_invalid");
   const rawResolution = typeof result.raw.factResolution === "string" ? result.raw.factResolution : undefined;
   const factResolution = input.factResolutionModes?.includes(rawResolution as NarrativeFactResolution)
     ? rawResolution as NarrativeFactResolution
     : undefined;
-  if (!isSafePlayerNarrative(narrative)) throw invalidNarrativeOutcome("decision_outcome_invalid", { rule: "narrative_text_invalid", path: "narrative" });
   if (input.factResolutionModes?.length && !factResolution) throw invalidNarrativeOutcome("decision_outcome_invalid", { rule: "fact_resolution_required", path: "factResolution", expected: input.factResolutionModes });
-  const reviewed = await refineNarrativeProse(run, world, {
-    callId: ctx.callId ?? `decision:${run.runId}:${run.age}`,
+  return { effects, factResolution, assetUpdates: result.assetUpdates, relationshipUpdates: result.relationshipUpdates, factUpdates: result.factUpdates };
+}
+
+function decisionSettlementForPrompt(settlement: DirectedDecisionSettlement): string {
+  return JSON.stringify({
+    effects: settlement.effects.map((effect) => ({
+      stat: labelStat(effect.stat),
+      direction: effect.direction === "up" ? "上升" : "下降",
+      band: effect.band === "light" ? "轻度" : effect.band === "medium" ? "中度" : "显著"
+    })),
+    factResolution: settlement.factResolution,
+    facts: settlement.factUpdates,
+    relationships: settlement.relationshipUpdates,
+    assets: settlement.assetUpdates
+  });
+}
+
+export async function renderDirectedDecisionNarrative(
+  run: InternalRunState,
+  world: WorldConfig,
+  input: { decision: DecisionType; label: string; description: string },
+  settlement: DirectedDecisionSettlement,
+  ctx: NarrativeContext
+): Promise<string> {
+  const prompt = [
+    `人物在${run.age}岁选择了“${compactText(input.label, 36)}”：${compactText(input.description, 90)}。`,
+    `已审批结算：${decisionSettlementForPrompt(settlement)}`,
+    "依据抉择前处境和已审批结算，写清行动经过、直接结果与人物当下处境。结构化结算是事实边界，不要照抄字段、标签或内部标识。",
+    "必须调用 render_decision_outcome。"
+  ].join("\n");
+  const result = await requestNarrativeOutcomeTool(run, world, ctx, narrativeDecisionRenderTool(), prompt, {
     task: "decision",
-    ageLabel: `${run.age}岁`,
-    sceneGoal: `呈现选择“${compactText(input.label, 36)}”已经造成的结果`,
-    narrative
-  }, ctx);
-  return { narrative: reviewed.narrative, effects, factResolution, assetUpdates: result.assetUpdates, relationshipUpdates: result.relationshipUpdates, factUpdates: result.factUpdates };
+    callId: `${ctx.callId ?? `decision:${run.runId}:${run.age}`}:render`,
+    source: "decision"
+  });
+  const narrative = normalizeNarrativeText(result.raw.narrative);
+  if (!isSafePlayerNarrative(narrative)) {
+    throw invalidNarrativeOutcome("decision_narrative_invalid", { rule: "narrative_text_invalid", path: "narrative" });
+  }
+  return narrative;
 }
 
 function parseParticipantRelationship(raw: unknown): Pick<NarrativeCharacterRelationship, "stance" | "summary"> | null | undefined {
@@ -3360,9 +3550,9 @@ export function dynamicNarrativeScenePrompt(
     throw invalidNarrativeOutcome("dynamic_scene_catalog_missing");
   }
   if (toolSet.tools.length === 0) throw invalidNarrativeOutcome("dynamic_scene_tools_missing");
-  const canRenderBackground = toolSet.names.includes("render_background_segment");
-  const canRenderScene = toolSet.names.includes("render_scene");
-  const canRenderChoice = toolSet.names.includes("render_choice_scene");
+  const resolvesBackground = toolSet.names.includes("resolve_background_outcome");
+  const resolvesScene = toolSet.names.includes("resolve_scene_outcome");
+  const resolvesChoice = toolSet.names.includes("resolve_choice_scene");
   const prompt = [
     input.plan ? `已批准回合计划：目标=${input.plan.sceneGoal}；呈现=${input.plan.presentation}；时间请求=${input.plan.clockRequest}。` : "",
     sceneAllowed ? `场景发生年龄：${input.sceneAge}岁。` : "",
@@ -3371,63 +3561,88 @@ export function dynamicNarrativeScenePrompt(
     sceneAllowed ? "人物已具备展开当前节拍经历的条件。结合眼前处境选择适合的经历视角；生活片段用于表现实际的成长与生活变化，场景用于展开当下可以发生的相遇、行动或取舍。" : "",
     sceneAllowed ? `本轮经历视角：${input.routes.filter((route) => !input.plan?.routeId || route.id === input.plan.routeId).map((route) => `${route.id}=${route.label}：${compactText(route.summary, 88)}${route.perspective ? `；本拍视角：${compactText(route.perspective, 88)}` : ""}`).join(" | ")}` : "",
     sceneAllowed ? `本轮相关阵营：${input.factions.filter((faction) => !input.plan?.factionId || faction.id === input.plan.factionId).map((faction) => `${faction.id}=${faction.label}：${compactText(faction.summary, 60)}`).join(" | ")}` : "",
-    canRenderBackground && input.growthFocus ? `这段人生的成长侧重：${input.growthFocus.label}。${input.growthFocus.description}` : "",
-    canRenderBackground
-      ? `render_background_segment 表示${input.backgroundAgeRange.fromAge}岁至${input.backgroundAgeRange.toAge}岁的一段平静人生片段；正文只覆盖这个固定年龄范围。提交一组轻度或中度成长标签，引擎会将其应用于其中每个实际年龄。`
+    resolvesBackground && input.growthFocus ? `这段人生的成长侧重：${input.growthFocus.label}。${input.growthFocus.description}` : "",
+    resolvesBackground
+      ? `本次结算覆盖${input.backgroundAgeRange.fromAge}岁至${input.backgroundAgeRange.toAge}岁。提交一组轻度或中度成长标签，引擎会将其应用于其中每个实际年龄。`
       : "",
-    canRenderScene
-      ? `render_scene 表示推进当前节拍的场景，必须提交${input.attributePolicy?.minEffects ?? 1}-${input.attributePolicy?.maxEffects ?? 2}项受控属性后果。`
+    resolvesScene
+      ? `本次场景推进当前节拍，必须提交${input.attributePolicy?.minEffects ?? 1}-${input.attributePolicy?.maxEffects ?? 2}项受控属性后果。`
       : "",
-    canRenderChoice
-      ? "render_choice_scene 表示真正影响人物关系、资源、立场或后续处境的取舍，必须写正文、抉择背景和三个自然语言选项；不要写风险标签。"
+    resolvesChoice
+      ? "本次只登记抉择出现前已经发生的人物、事实、关系与叙事资产变化；尚未选择的行动不产生属性后果。"
       : "",
-    input.decisionMode === "required" && canRenderChoice ? "选择推进本拍时调用 render_choice_scene，呈现人物此刻需要作出的取舍。" : "",
-    input.decisionMode === "none" && canRenderScene && !canRenderBackground ? "本拍调用 render_scene。" : "",
     "路线是观察和人物经历的视角，不是独占分支；不得生成世界包之外的路线或阵营 ID。已有角色再次出场时用 characterRef 引用档案，按实际经历更新处境与关系；只有首次出现的人物使用 characterRef=new，并提交创建信息。只有 recurring=true 的新人物才会进入命运人物档案。人物对主角的态度确实改变时，可在 participant.relationship 写入变化。事实与关系的实际变化放入 factUpdates 和 relationshipUpdates。",
-    `本轮通过以下工具提交叙事：${toolSet.names.join("、")}。narrative 写人物经历的自然正文，结构化变化放入相应工具字段。`
+    `本轮通过${toolSet.names.join("、")}提交结构化结果，不写玩家正文。`
   ].filter(Boolean).join("\n");
   return prompt;
 }
 
+function dynamicNarrativeRenderPrompt(input: DynamicNarrativeSceneInput, settlement: Record<string, unknown>): string {
+  const age = input.presentation === "summary"
+    ? `${input.backgroundAgeRange.fromAge}-${input.backgroundAgeRange.toAge}岁`
+    : `${input.sceneAge}岁`;
+  return [
+    `已批准回合计划：目标=${input.plan?.sceneGoal ?? "延续人物经历"}；呈现=${input.presentation}；年龄=${age}。`,
+    `已审批结构化结果：${JSON.stringify(settlement)}。`,
+    input.presentation === "choice"
+      ? "写清取舍前已经发生的处境，并给出safe、balanced、risky三个自然语言行动选项；不要写风险标签或尚未选择的结果。"
+      : "依据已审批结果写人物经历与当下结果；不要照抄字段、标签或内部标识。",
+    `必须调用${dynamicNarrativeRenderTool(input).name}。`
+  ].join("\n");
+}
+
 export async function generateDynamicNarrativeScene(
-  run: InternalRunState, world: WorldConfig, input: DynamicNarrativeSceneInput, ctx: NarrativeContext
+  run: InternalRunState,
+  world: WorldConfig,
+  input: DynamicNarrativeSceneInput,
+  ctx: NarrativeContext,
+  onSettlementComplete?: () => Promise<void> | void
 ): Promise<DynamicNarrativeSceneResult> {
   const toolSet = dynamicNarrativeSceneTools(input);
   const sceneAllowed = input.allowedTurnKinds.includes("scene");
-  const canRenderBackground = toolSet.names.includes("render_background_segment");
-  const canRenderScene = toolSet.names.includes("render_scene");
-  const canRenderChoice = toolSet.names.includes("render_choice_scene");
-  const result = await requestNarrativeOutcomeTool(run, world, ctx, toolSet.tools,
+  const resolvesBackground = toolSet.names.includes("resolve_background_outcome");
+  const resolvesScene = toolSet.names.includes("resolve_scene_outcome");
+  const resolvesChoice = toolSet.names.includes("resolve_choice_scene");
+  const settlement = await requestNarrativeOutcomeTool(run, world, ctx, toolSet.tools,
     dynamicNarrativeScenePrompt(input, toolSet), {
-      task: ctx.narrativePlan?.task ?? "dynamic",
-      callId: input.plan?.callId,
+      task: "settlement",
+      callId: `${input.plan?.callId ?? `turn:${run.runId}:${run.age}`}:settlement`,
       source: input.plan?.turnKind === "background" ? "background" : "scene",
       focusIds: input.plan?.focusRefs
     });
-  const narrative = normalizeNarrativeText(result.raw.narrative);
+  await onSettlementComplete?.();
+  const render = dynamicNarrativeRenderTool(input);
+  const rendered = await requestNarrativeOutcomeTool(run, world, ctx, render.tool,
+    dynamicNarrativeRenderPrompt(input, settlement.raw), {
+      task: input.presentation === "summary" ? "background" : "rendering",
+      callId: `${input.plan?.callId ?? `turn:${run.runId}:${run.age}`}:render`,
+      source: input.plan?.turnKind === "background" ? "background" : "scene",
+      focusIds: input.plan?.focusRefs
+    });
+  const narrative = normalizeNarrativeText(rendered.raw.narrative);
   if (!isSafePlayerNarrative(narrative)) throw invalidNarrativeOutcome("dynamic_scene_narrative_unsafe", { rule: "narrative_text_invalid", path: "narrative" });
 
-  if (result.toolName === "render_background_segment") {
-    if (!canRenderBackground) throw invalidNarrativeOutcome("dynamic_background_tool_disallowed");
-    const effects = parseNarrativeEffects(result.raw.effects, input.backgroundAttributePolicy, "dynamic_background_effects_invalid");
+  if (settlement.toolName === "resolve_background_outcome") {
+    if (!resolvesBackground) throw invalidNarrativeOutcome("dynamic_background_tool_disallowed");
+    const effects = parseNarrativeEffects(settlement.raw.effects, input.backgroundAttributePolicy, "dynamic_background_effects_invalid");
     return {
       turnKind: "background",
-      assetUpdates: result.assetUpdates,
-      relationshipUpdates: result.relationshipUpdates, factUpdates: result.factUpdates,
+      assetUpdates: settlement.assetUpdates,
+      relationshipUpdates: settlement.relationshipUpdates, factUpdates: settlement.factUpdates,
       narrative,
       participants: [],
       backgroundAttributeEffects: effects
     };
   }
 
-  const routeId = typeof result.raw.routeId === "string" ? result.raw.routeId.trim() : "";
-  const factionId = typeof result.raw.factionId === "string" ? result.raw.factionId.trim() : "";
-  const participants = parseDynamicNarrativeParticipants(result.raw.participants, input.factions, input.knownCharacters);
-  const scenePacing = result.raw.scenePacing === "continuous" || result.raw.scenePacing === "spanning"
-    ? result.raw.scenePacing
+  const routeId = input.plan?.routeId ?? "";
+  const factionId = input.plan?.factionId ?? "";
+  const participants = parseDynamicNarrativeParticipants(settlement.raw.participants, input.factions, input.knownCharacters);
+  const scenePacing = settlement.raw.scenePacing === "continuous" || settlement.raw.scenePacing === "spanning"
+    ? settlement.raw.scenePacing
     : undefined;
   const actHandoff = input.beat === "payoff"
-    ? parseDynamicNarrativeActHandoff(result.raw.actHandoff) ?? undefined
+    ? parseDynamicNarrativeActHandoff(settlement.raw.actHandoff) ?? undefined
     : undefined;
   if (
     !sceneAllowed ||
@@ -3440,24 +3655,23 @@ export async function generateDynamicNarrativeScene(
     throw invalidNarrativeOutcome("dynamic_scene_identity_or_participants_invalid");
   }
 
-  if (result.toolName === "render_scene") {
-    const attributeEffects = input.attributePolicy ? parseNarrativeEffects(result.raw.effects, input.attributePolicy, "dynamic_scene_effects_invalid") : null;
-    if (!canRenderScene || !attributeEffects) throw invalidNarrativeOutcome("dynamic_scene_effects_invalid");
+  if (settlement.toolName === "resolve_scene_outcome") {
+    const attributeEffects = input.attributePolicy ? parseNarrativeEffects(settlement.raw.effects, input.attributePolicy, "dynamic_scene_effects_invalid") : null;
+    if (!resolvesScene || !attributeEffects) throw invalidNarrativeOutcome("dynamic_scene_effects_invalid");
     if (input.beat === "payoff" && !actHandoff) throw invalidNarrativeOutcome("dynamic_scene_act_handoff_invalid");
-    return { turnKind: "scene", routeId, factionId, narrative, scenePacing, participants, createsDecision: false, attributeEffects, actHandoff, assetUpdates: result.assetUpdates, relationshipUpdates: result.relationshipUpdates, factUpdates: result.factUpdates };
+    return { turnKind: "scene", routeId, factionId, narrative, scenePacing, participants, createsDecision: false, attributeEffects, actHandoff, assetUpdates: settlement.assetUpdates, relationshipUpdates: settlement.relationshipUpdates, factUpdates: settlement.factUpdates };
   }
 
-  if (result.toolName === "render_choice_scene") {
-    const background = normalizeNarrativeText(result.raw.background);
-    const optionOverrides = normalizeMilestoneOptionOverrides(result.raw.optionOverrides, true);
-    if (!canRenderChoice || !isSafePlayerNarrative(background) || !optionOverrides) {
+  if (settlement.toolName === "resolve_choice_scene") {
+    const background = normalizeNarrativeText(rendered.raw.background);
+    const optionOverrides = normalizeMilestoneOptionOverrides(rendered.raw.optionOverrides, true);
+    if (!resolvesChoice || !isSafePlayerNarrative(background) || !optionOverrides) {
       throw invalidNarrativeOutcome("dynamic_choice_presentation_invalid");
     }
-    if (input.beat === "payoff" && !actHandoff) throw invalidNarrativeOutcome("dynamic_choice_act_handoff_invalid");
     return {
       turnKind: "scene",
-      assetUpdates: result.assetUpdates,
-      relationshipUpdates: result.relationshipUpdates, factUpdates: result.factUpdates,
+      assetUpdates: settlement.assetUpdates,
+      relationshipUpdates: settlement.relationshipUpdates, factUpdates: settlement.factUpdates,
       routeId,
       factionId,
       narrative,
@@ -3465,7 +3679,7 @@ export async function generateDynamicNarrativeScene(
       participants,
       createsDecision: true,
       milestoneCopy: { background, optionOverrides },
-      actHandoff
+      actHandoff: undefined
     };
   }
 
@@ -3555,7 +3769,7 @@ export async function generateYearNarrative(
   const userPrompt = buildYearPrompt(run, event, promptPack, ctx.narrativePlan, options?.background);
   const avoidNarratives = options?.avoidNarratives ?? [];
   const isMilestoneYear = event.tags.includes("milestone");
-  if (debugModel) {
+  if (debugModelEnabled()) {
     console.log("[model-debug:prompt-shape:year]", {
       systemPromptLen: systemPrompt.length,
       userPromptLen: userPrompt.length,
@@ -3612,7 +3826,7 @@ export async function generateYearNarrative(
     }
     pushHistory(conversation, "assistant", text || "");
     keepRecentRounds(conversation);
-    if (debugModel) {
+    if (debugModelEnabled()) {
       console.log("[model-debug:year-narrative]", {
         hasText: Boolean(text?.trim()),
         len: text?.length ?? 0,
@@ -3626,7 +3840,7 @@ export async function generateYearNarrative(
   } catch (error) {
     keepRecentRounds(conversation);
     debugError("year-narrative", error);
-    if (debugModel) {
+    if (debugModelEnabled()) {
       console.log("[model-debug:year-narrative]", { hasText: false, len: 0, fallback: true });
     }
     return "";
@@ -3889,7 +4103,7 @@ export async function generateMilestoneOptions(
   const conversation = ensureConversationState(ctx.conversation, systemHash, systemPrompt);
   ctx.conversation = conversation;
   const userPrompt = buildMilestoneOptionsPrompt(run, recent, promptPack, ctx.narrativePlan);
-  if (debugModel) {
+  if (debugModelEnabled()) {
     console.log("[model-debug:prompt-shape:milestone]", {
       systemPromptLen: systemPrompt.length,
       userPromptLen: userPrompt.length,
@@ -3911,7 +4125,7 @@ export async function generateMilestoneOptions(
       usageOperation: "choice"
     });
     const text = first.result.text;
-    if (debugModel) {
+    if (debugModelEnabled()) {
       console.log("[model-debug:milestone-options]", {
         hasText: Boolean(text?.trim()),
         len: text?.length ?? 0,
@@ -3956,7 +4170,7 @@ export async function generateMilestoneOptions(
   } catch (error) {
     keepRecentRounds(conversation);
     debugError("milestone-options", error);
-    if (debugModel) {
+    if (debugModelEnabled()) {
       console.log("[model-debug:milestone-options]", { hasText: false, parseFailed: true, fallback: true });
     }
     return fallback;
@@ -3969,8 +4183,10 @@ export async function generateEndingNarrative(
   ctx: NarrativeContext
 ): Promise<string> {
   if (!run.ended) return (run.endingSummary ?? "").trim();
-  const fallback = fallbackEndingSummary(run);
   if (!ctx.apiKey.trim()) throw new DirectedStoryRenderError("directed_story_render_unavailable");
+
+  const brief = await ensureEndingBrief(run, world, ctx);
+  if (ctx.narrativePlan) ctx.narrativePlan.ending = endingBriefText(brief);
 
   const promptPack = normalizePromptPackForModel(ctx.promptPack);
   const systemPrompt = buildSystemPrompt(promptPack, world, ctx, "ending");
@@ -3981,14 +4197,14 @@ export async function generateEndingNarrative(
   const composition = composeNarrativeContext({
     plan: ctx.narrativePlan,
     task: "ending",
-    taskPrompt: buildEndingPrompt(run, fallback),
+    taskPrompt: buildEndingPrompt(run, ctx.narrativePlan ? undefined : brief),
     conversation,
     callId: ctx.callId,
     source: "ending",
     worldId: run.worldId
   });
   const userPrompt = composition.renderedContext;
-  if (debugModel) {
+  if (debugModelEnabled()) {
     console.log("[model-debug:prompt-shape:ending]", {
       systemPromptLen: systemPrompt.length,
       userPromptLen: userPrompt.length,
@@ -4016,7 +4232,8 @@ export async function generateEndingNarrative(
       task: "ending",
       ageLabel: `${run.age}岁的人生结算`,
       sceneGoal: "依据已经锁定的结局定性回望人物一生并完成收束",
-      narrative: text
+      narrative: text,
+      maxLength: 240
     }, ctx);
     pushHistory(conversation, "assistant", reviewed.narrative);
     keepRecentRounds(conversation);

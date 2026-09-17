@@ -4,7 +4,7 @@
 本目录提供两个相互配对的模板：
 
 - world.example.json：世界在前端的名称、简介、年龄段与基础时间线配置。
-- story.example.json：世界的叙事骨架、三幕主线、阵营、路线、成长门槛与结局蓝图。
+- story.example.json：世界的叙事骨架、三幕主线、动态世界卡、阵营、路线、成长门槛与结局蓝图。
 
 一、文件放置
 ------------
@@ -43,8 +43,12 @@ story.example.json 是运行中的叙事世界包。请保留以下结构，再�
 - mainlineActs：必须按顺序提供三幕。每一幕写清独立的处境、压力与高潮职责；不要把具体情节写死成唯一答案。
 - narrativeFactions：能够参与当前世界矛盾的阵营或压力来源。模型可据此生成本局人物与互动。
 - routeArcs：可供模型选择的叙事视角/经历路线。路线数量由世界包决定，不要求固定六条。
+- worldCards：按当前情景动态召回的世界知识。content 必须脱离标题仍能独立理解，优先写地点、组织、生活方式、资源、人物立场、行动入口和后果，不写固定事件或 NPC。activation 除 actIds、beats、routeIds、factionIds、factStatuses、locationIds、abilityIds、tasks 外，还可用 keys 扫描最近真实叙事；secondaryKeys 与 selectiveLogic 支持 and_any、and_all、not_any、not_all，scanDepth 控制扫描的最近叙事数量。`/表达式/flags` 形式的 key 会按正则处理。
+- worldCards.placement：world 为稳定世界知识，scenario 为当前情景，example 为只模仿节奏的表达样例，author_note 为当前场景附近的短期关注点。kind 可使用 world_rule、setting、geography、institution、culture、faction、location、ability、social_role、practice、conflict、consequence、motif、style_example。
+- worldCards 的 priority 决定预算内优先级，inclusionGroup 用于同组择一。stickyTurns 表示首次命中后额外延续的已提交回合数，延续不会自我续期；结束后才进入 cooldownTurns。relatedCardIds 只递归一层并同样服从作用域、冷却、互斥组和预算。recursive=false 的条目只能直接激活；preventFurtherRecursion=true 的条目不会继续激活关联卡。
+- worldCards.activation.tasks 仅可填写 background、planning、horizon、rendering、dynamic、decision。style_example 应直接写一段可供模仿的短正文，不写“应该怎样写”的说明，也不放入必须复刻的专名或既成事实。
 - progression：普通年份的跨度、属性档位显示、成长方向和各路线的属性准入门槛。
-- lore：按需提供给模型的世界事实与文本约束。
+- lore：v8 保留为空数组，静态世界资料全部写入 worldCards；只有 v1—v7 旧世界包继续读取 lore。
 - endingBlueprints：每条 routeArcs 路线都必须各有 good、normal、bad 三个结局蓝图；directionId 必须与路线 ID 完全一致。
 
 threads、characters、eventBindings 可以先保留为空数组。运行时人物与幕间事实由模型输出和引擎记录；不要用空白占位文本替代真实世界设定。
@@ -53,7 +57,9 @@ threads、characters、eventBindings 可以先保留为空数组。运行时人�
 ------------
 
 1. 两个文件都是合法 JSON，且所有 my_world 已替换为同一个新 ID。
-2. story JSON 的 version 为 6，worldId 与 world JSON 的 id 相同。
+2. story JSON 的 version 为 8（加载器仍兼容旧版本），worldId 与 world JSON 的 id 相同。
 3. mainlineActs 有三幕，routeArcs 至少有一条路线，narrativeFactions 至少有一个阵营。
 4. 每条路线均有 good、normal、bad 三个 endingBlueprints，且 directionId 对应正确。
 5. 玩家可见的叙事不要输出路线 ID、幕名、工具调用内容或内部标签。
+6. worldCards 的 actIds、routeIds、factionIds 与 relatedCardIds 必须引用本包已有 ID；卡片 ID 不得包含竖线字符。
+7. v8 的 worldCards 不得为空；确认 style_example 是实际短正文，并检查 Sticky 不会被误写成长期常驻设定。

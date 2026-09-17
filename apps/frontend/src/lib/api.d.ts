@@ -25,6 +25,12 @@ export type GameStreamEvent = {
         tuning: StartAllocationConfig;
     };
 } | {
+    type: "progress";
+    data: {
+        stage: "settling" | "rendering" | "committing";
+        requestId?: string;
+    };
+} | {
     type: "started";
     data: {
         run: PublicRunState;

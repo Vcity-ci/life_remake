@@ -18,6 +18,14 @@ interface FragmentInput {
   content: string;
   required?: boolean;
   expiresAfterTurn?: boolean;
+  activationReason?: string;
+  injectionPosition?: string;
+  worldCardActivationKind?: "direct" | "related" | "sticky";
+  worldCardStickyTurns?: number;
+  worldCardCooldownTurns?: number;
+  worldCardLastActivatedSequence?: number;
+  worldCardRemainingStickyTurns?: number;
+  worldCardRemainingCooldownTurns?: number;
 }
 
 function fragment(input: FragmentInput): NarrativeContextFragment[] {
@@ -59,7 +67,16 @@ const storyProvider: NarrativeContextProvider = {
         sourceIds: [`event:${canon.sourceEventId}`, ...canon.factIds.map((id) => `fact:${id}`)],
         priority: 94,
         content: canon.text
-      }))
+      })),
+      ...(plan.authorNote ? fragment({
+        id: "active:author-note",
+        layer: "active",
+        section: "authorNote",
+        sourceType: "author-note",
+        priority: 96,
+        content: plan.authorNote,
+        expiresAfterTurn: true
+      }) : [])
     ];
   }
 };
@@ -73,6 +90,36 @@ const loreProvider: NarrativeContextProvider = {
       : plan.activeLore.map((text) => ({ id: narrativeContentId("lore", text), text }));
     return sources.flatMap((lore) => fragment({ id: `recall:lore:${lore.id}`, layer: "recall", section: "lore", sourceType: "lore", sourceIds: [`lore:${lore.id}`], priority: 72, content: lore.text }));
   }
+};
+
+const worldCardProvider: NarrativeContextProvider = {
+  id: "world-cards",
+  collect: ({ plan }) => !plan?.task ? [] : (plan.activeWorldCardSources ?? []).flatMap((card) => {
+    const target = card.placement === "world"
+      ? { layer: "stable" as const, section: "lore" as const, priority: 86 }
+      : card.placement === "example"
+        ? { layer: "recall" as const, section: "styleExamples" as const, priority: 78 }
+        : card.placement === "author_note"
+          ? { layer: "active" as const, section: "authorNote" as const, priority: 92 }
+          : { layer: "recall" as const, section: "lore" as const, priority: 80 };
+    return fragment({
+      id: `recall:world-card:${card.id}|${card.stickyTurns}|${card.cooldownTurns}|${card.activationKind}`,
+      layer: target.layer,
+      section: target.section,
+      sourceType: "world-card",
+      sourceIds: [`world-card:${card.id}`],
+      priority: target.priority,
+      content: card.text,
+      activationReason: card.activationReason,
+      injectionPosition: card.placement,
+      worldCardActivationKind: card.activationKind,
+      worldCardStickyTurns: card.stickyTurns,
+      worldCardCooldownTurns: card.cooldownTurns,
+      worldCardLastActivatedSequence: card.lastActivatedSequence,
+      worldCardRemainingStickyTurns: card.remainingStickyTurns,
+      worldCardRemainingCooldownTurns: card.remainingCooldownTurns
+    });
+  })
 };
 
 const characterProvider: NarrativeContextProvider = {
@@ -148,8 +195,7 @@ const memoryProvider: NarrativeContextProvider = {
 const endingProvider: NarrativeContextProvider = {
   id: "ending",
   collect: ({ plan, task }) => !plan?.task || task !== "ending" ? [] : [
-    ...(plan.ending ? fragment({ id: "active:ending-blueprint", layer: "active", section: "ending", sourceType: "ending-blueprint", priority: 100, content: plan.ending, required: true }) : []),
-    ...(plan.endingGuide ? fragment({ id: "active:ending-guide", layer: "active", section: "ending", sourceType: "ending-guide", priority: 96, content: `结局文风：${plan.endingGuide}`, required: true }) : [])
+    ...(plan.ending ? fragment({ id: "active:ending-brief", layer: "active", section: "ending", sourceType: "ending-brief", priority: 100, content: plan.ending, required: true }) : [])
   ]
 };
 
@@ -163,6 +209,7 @@ export const defaultNarrativeContextProviders: NarrativeContextProvider[] = [
   legacyProvider,
   stableProvider,
   storyProvider,
+  worldCardProvider,
   loreProvider,
   characterProvider,
   factProvider,

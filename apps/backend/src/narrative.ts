@@ -1,5 +1,4 @@
 import { representedConversationMemoryIds, summarizedConversationMemoryIds, type AiConversationState } from "./conversation.js";
-import { isNarrativeFactModelMutable } from "./narrative-continuity.js";
 import type {
   BackgroundCard,
   EndingPolarity,
@@ -22,6 +21,7 @@ import type {
   NarrativeHorizonPlan,
   NarrativeMemoryDigest,
   NarrativeEndingState,
+  NarrativeEndingBrief,
   NarrativeRouteProgress,
   NarrativeRunState,
   NarrativeStatTierConfig,
@@ -30,6 +30,8 @@ import type {
   NarrativeProgressGateStage,
   NarrativeThreadState,
   NarrativeWorldDefinition,
+  NarrativeWorldCardDefinition,
+  NarrativeWorldCardActivationState,
   Stats,
   StoryFactLedger,
   StoryDirectorState,
@@ -83,6 +85,19 @@ export interface NarrativePromptPlan {
   endingGuide?: string;
   activeLore: string[];
   activeLoreSources?: Array<{ id: string; text: string }>;
+  activeWorldCardSources?: Array<{
+    id: string;
+    text: string;
+    placement: NonNullable<NarrativeWorldCardDefinition["placement"]>;
+    activationReason: string;
+    activationKind: "direct" | "related" | "sticky";
+    stickyTurns: number;
+    cooldownTurns: number;
+    lastActivatedSequence?: number;
+    remainingStickyTurns: number;
+    remainingCooldownTurns: number;
+  }>;
+  worldCardDiagnostics?: Array<{ id: string; reason: string }>;
   plotEssentials: string[];
   activeThreads: string[];
   activeCharacters: string[];
@@ -128,6 +143,237 @@ export interface DynamicNarrativeContextSelection {
   memories: string[];
   memorySources?: Array<{ id: string; text: string }>;
   resolvedFacts?: Array<{ id: string; label: string }>;
+}
+
+interface NarrativeWorldCardQuery {
+  task: NarrativeTask;
+  actId?: string;
+  beat?: NarrativeBeat;
+  routeId?: string;
+  factionIds: string[];
+  factStatuses: string[];
+  factIds: string[];
+  characterIds: string[];
+  locationIds: string[];
+  abilityIds: string[];
+  text: string;
+  recentTexts: string[];
+}
+
+interface NarrativeWorldCardMatch {
+  card: NarrativeWorldCardDefinition;
+  score: number;
+  activationReason: string;
+  activationKind: "direct" | "related" | "sticky";
+  lastActivatedSequence?: number;
+  remainingStickyTurns: number;
+  remainingCooldownTurns: number;
+}
+
+const WORLD_CARD_TASKS = new Set<NarrativeTask>([
+  "background", "planning", "horizon", "rendering", "dynamic", "decision"
+]);
+
+function worldCardKeyMatch(key: string, text: string): boolean {
+  const value = key.trim();
+  if (!value) return false;
+  if (value.startsWith("/")) {
+    const end = value.lastIndexOf("/");
+    if (end > 0) {
+      try {
+        return new RegExp(value.slice(1, end), value.slice(end + 1)).test(text);
+      } catch {
+        return false;
+      }
+    }
+  }
+  return text.toLocaleLowerCase().includes(value.toLocaleLowerCase());
+}
+
+function worldCardTextMatch(card: NarrativeWorldCardDefinition, query: NarrativeWorldCardQuery): { matched: boolean; hits: number } {
+  const keys = card.activation?.keys ?? [];
+  if (!keys.length) return { matched: true, hits: 0 };
+  const depth = Math.max(0, Math.min(12, Math.trunc(card.activation?.scanDepth ?? 3)));
+  const recentTexts = depth > 0 ? query.recentTexts.slice(-depth) : [];
+  const scanText = [query.text, ...recentTexts].filter(Boolean).join("\n");
+  const primaryHits = keys.filter((key) => worldCardKeyMatch(key, scanText)).length;
+  if (!primaryHits) return { matched: false, hits: 0 };
+  const secondary = card.activation?.secondaryKeys ?? [];
+  if (!secondary.length) return { matched: true, hits: primaryHits };
+  const secondaryHits = secondary.filter((key) => worldCardKeyMatch(key, scanText)).length;
+  const logic = card.activation?.selectiveLogic ?? "and_any";
+  const secondaryMatched = logic === "and_all"
+    ? secondaryHits === secondary.length
+    : logic === "not_any"
+      ? secondaryHits === 0
+      : logic === "not_all"
+        ? secondaryHits < secondary.length
+        : secondaryHits > 0;
+  return { matched: secondaryMatched, hits: secondaryMatched ? primaryHits + secondaryHits : 0 };
+}
+
+function worldCardMatches(
+  card: NarrativeWorldCardDefinition,
+  query: NarrativeWorldCardQuery,
+  ignoreText = false
+): { matched: boolean; textHits: number; specificity: number } {
+  const activation = card.activation;
+  if (!activation) return { matched: true, textHits: 0, specificity: 0 };
+  if (activation.tasks?.length && !activation.tasks.some((task) => task === query.task)) return { matched: false, textHits: 0, specificity: 0 };
+  if (activation.actIds?.length && (!query.actId || !activation.actIds.includes(query.actId))) return { matched: false, textHits: 0, specificity: 0 };
+  if (activation.beats?.length && (!query.beat || !activation.beats.includes(query.beat))) return { matched: false, textHits: 0, specificity: 0 };
+  if (activation.routeIds?.length && (!query.routeId || !activation.routeIds.includes(query.routeId))) return { matched: false, textHits: 0, specificity: 0 };
+  if (activation.factionIds?.length && !activation.factionIds.some((id) => query.factionIds.includes(id))) return { matched: false, textHits: 0, specificity: 0 };
+  if (activation.factStatuses?.length && !activation.factStatuses.some((status) => query.factStatuses.includes(status))) return { matched: false, textHits: 0, specificity: 0 };
+  if (activation.factIds?.length && !activation.factIds.some((id) => query.factIds.includes(id))) return { matched: false, textHits: 0, specificity: 0 };
+  if (activation.characterIds?.length && !activation.characterIds.some((id) => query.characterIds.includes(id))) return { matched: false, textHits: 0, specificity: 0 };
+  if (activation.locationIds?.length && !activation.locationIds.some((id) => query.locationIds.includes(id))) return { matched: false, textHits: 0, specificity: 0 };
+  if (activation.abilityIds?.length && !activation.abilityIds.some((id) => query.abilityIds.includes(id))) return { matched: false, textHits: 0, specificity: 0 };
+  const text = ignoreText ? { matched: true, hits: 0 } : worldCardTextMatch(card, query);
+  const specificity = Object.entries(activation).filter(([key, value]) =>
+    key !== "keys" && key !== "secondaryKeys" && key !== "selectiveLogic" && key !== "scanDepth" && Array.isArray(value) && value.length
+  ).length;
+  return { matched: text.matched, textHits: text.hits, specificity };
+}
+
+function selectNarrativeWorldCardMatches(
+  source: NarrativePromptSource,
+  world: NarrativeWorldDefinition,
+  query: {
+    task: NarrativeTask;
+    actId?: string;
+    beat?: NarrativeBeat;
+    routeId?: string;
+    factionIds?: string[];
+    factIds?: string[];
+    characterIds?: string[];
+    locationIds?: string[];
+    abilityIds?: string[];
+    text?: string;
+    recentTexts?: string[];
+  },
+  maxCards = 6,
+  maxCharacters = 1400,
+  diagnostics?: Array<{ id: string; reason: string }>
+): NarrativeWorldCardMatch[] {
+  if (!WORLD_CARD_TASKS.has(query.task)) {
+    for (const card of world.worldCards ?? []) diagnostics?.push({ id: card.id, reason: "task_unsupported" });
+    return [];
+  }
+  const cards = world.worldCards ?? [];
+  if (!cards.length) return [];
+  const sequence = source.narrative.episodes.length;
+  const activationById = new Map((source.narrative.worldCardActivations ?? []).map((state) => [state.cardId, state]));
+  const currentLocationId = source.narrative.assets?.currentLocationId;
+  const cardQuery = {
+    task: query.task,
+    actId: query.actId,
+    beat: query.beat,
+    routeId: query.routeId,
+    factionIds: query.factionIds ?? [],
+    factStatuses: Array.from(new Set((source.story.factLedger?.facts ?? []).map((fact) => fact.status))),
+    factIds: query.factIds ?? [],
+    characterIds: query.characterIds ?? [],
+    locationIds: Array.from(new Set([...(currentLocationId ? [currentLocationId] : []), ...(query.locationIds ?? [])])),
+    abilityIds: query.abilityIds ?? [],
+    text: query.text ?? "",
+    recentTexts: query.recentTexts ?? []
+  };
+  const scored = cards.flatMap((card) => {
+    const state = activationById.get(card.id);
+    const sticky = Boolean(state && state.stickyUntilSequence > sequence);
+    const scoped = worldCardMatches(card, cardQuery, true);
+    if (!scoped.matched) {
+      diagnostics?.push({ id: card.id, reason: "scope" });
+      return [];
+    }
+    if (!sticky && state && state.cooldownUntilSequence > sequence) {
+      diagnostics?.push({ id: card.id, reason: `cooldown:${state.cooldownUntilSequence - sequence}` });
+      return [];
+    }
+    // Sticky continuation bypasses only keyword matching. Task, act, beat,
+    // route, faction and state scopes remain authoritative.
+    const match = sticky ? scoped : worldCardMatches(card, cardQuery);
+    if (!match.matched) {
+      diagnostics?.push({ id: card.id, reason: "trigger" });
+      return [];
+    }
+    return [{
+      card,
+      score: card.priority + match.specificity * 4 + match.textHits * 8 + (sticky ? 20 : 0),
+      activationReason: sticky ? "sticky" : match.textHits ? `text:${match.textHits}` : match.specificity ? `state:${match.specificity}` : "constant",
+      activationKind: sticky ? "sticky" as const : "direct" as const,
+      lastActivatedSequence: state?.lastActivatedSequence,
+      remainingStickyTurns: sticky && state ? state.stickyUntilSequence - sequence : 0,
+      remainingCooldownTurns: state ? Math.max(0, state.cooldownUntilSequence - Math.max(sequence, state.stickyUntilSequence)) : 0
+    }];
+  }).sort((a, b) => b.score - a.score || (b.card.order ?? 0) - (a.card.order ?? 0) || a.card.id.localeCompare(b.card.id));
+  const groupSeen = new Set<string>();
+  const selected: NarrativeWorldCardMatch[] = [];
+  let characters = 0;
+  const add = (entry: NarrativeWorldCardMatch): boolean => {
+    const card = entry.card;
+    if (selected.some((selectedEntry) => selectedEntry.card.id === card.id)) return false;
+    if (selected.length >= maxCards) {
+      diagnostics?.push({ id: card.id, reason: "card_budget" });
+      return false;
+    }
+    if (characters + card.content.length > maxCharacters) {
+      diagnostics?.push({ id: card.id, reason: "character_budget" });
+      return false;
+    }
+    if (card.inclusionGroup && groupSeen.has(card.inclusionGroup)) {
+      diagnostics?.push({ id: card.id, reason: `inclusion_group:${card.inclusionGroup}` });
+      return false;
+    }
+    selected.push(entry);
+    characters += card.content.length;
+    if (card.inclusionGroup) groupSeen.add(card.inclusionGroup);
+    return true;
+  };
+  // A task-matched prose example is a distinct context layer, not ordinary
+  // lore competing for the final slot. Reserve at most one example so the
+  // authored voice cannot be starved by higher-priority setting cards.
+  const styleExample = scored.find((entry) => entry.card.kind === "style_example");
+  if (styleExample) add(styleExample);
+  for (const entry of scored) {
+    if (!add(entry)) continue;
+    // A continued sticky card must not repeatedly fan out or renew its
+    // related cards. Relations are followed only on a fresh activation.
+    if (entry.activationKind === "sticky" || entry.card.preventFurtherRecursion) continue;
+    for (const relatedId of entry.card.relatedCardIds ?? []) {
+      const related = cards.find((card) => card.id === relatedId);
+      if (!related || related.recursive === false) continue;
+      const relatedState = activationById.get(related.id);
+      const relatedSticky = Boolean(relatedState && relatedState.stickyUntilSequence > sequence);
+      if (!relatedSticky && relatedState && relatedState.cooldownUntilSequence > sequence) {
+        diagnostics?.push({ id: related.id, reason: `cooldown:${relatedState.cooldownUntilSequence - sequence}` });
+        continue;
+      }
+      const relatedMatch = worldCardMatches(related, cardQuery, true);
+      if (relatedMatch.matched) add({
+        card: related,
+        score: entry.score - 1,
+        activationReason: relatedSticky ? "sticky" : `related:${entry.card.id}`,
+        activationKind: relatedSticky ? "sticky" : "related",
+        lastActivatedSequence: relatedState?.lastActivatedSequence,
+        remainingStickyTurns: relatedSticky && relatedState ? relatedState.stickyUntilSequence - sequence : 0,
+        remainingCooldownTurns: relatedState ? Math.max(0, relatedState.cooldownUntilSequence - Math.max(sequence, relatedState.stickyUntilSequence)) : 0
+      });
+      else diagnostics?.push({ id: related.id, reason: "related_scope" });
+    }
+  }
+  return selected;
+}
+
+export function selectNarrativeWorldCards(
+  source: NarrativePromptSource,
+  world: NarrativeWorldDefinition,
+  query: Parameters<typeof selectNarrativeWorldCardMatches>[2],
+  maxCards = 6,
+  maxCharacters = 1400
+): NarrativeWorldCardDefinition[] {
+  return selectNarrativeWorldCardMatches(source, world, query, maxCards, maxCharacters).map((entry) => entry.card);
 }
 
 const relationshipStances: NarrativeCharacterRelationship["stance"][] = [
@@ -180,6 +426,7 @@ export function createNarrativeRunState(enabled = false): NarrativeRunState {
     actCanon: [],
     memoryRevision: 0,
     memoryDigests: [],
+    worldCardActivations: [],
     agentAttempts: [],
     components: [],
     activeCharacterIds: [],
@@ -506,6 +753,29 @@ export function ensureNarrativeRunState(
         maxSameAgeTurns: Math.max(1, Math.min(5, Number(rawClock.maxSameAgeTurns) || defaults.sceneClock.maxSameAgeTurns))
       }
     : defaults.sceneClock;
+  const worldCardActivations: NarrativeWorldCardActivationState[] = Array.isArray(state.worldCardActivations)
+    ? state.worldCardActivations.filter((entry): entry is NarrativeWorldCardActivationState => Boolean(entry?.cardId))
+      .slice(-64).map((entry) => ({
+        cardId: compactText(entry.cardId, 120),
+        lastActivatedSequence: Math.max(0, Math.trunc(Number(entry.lastActivatedSequence) || 0)),
+        stickyUntilSequence: Math.max(0, Math.trunc(Number(entry.stickyUntilSequence) || 0)),
+        cooldownUntilSequence: Math.max(0, Math.trunc(Number(entry.cooldownUntilSequence) || 0))
+      }))
+    : [];
+  const rawEndingBrief = state.endingBrief as NarrativeEndingBrief | undefined;
+  const endingBrief: NarrativeEndingBrief | undefined = rawEndingBrief &&
+    (rawEndingBrief.polarity === "good" || rawEndingBrief.polarity === "normal" || rawEndingBrief.polarity === "bad") &&
+    rawEndingBrief.lifeTheme?.trim() && rawEndingBrief.achievement?.trim() && rawEndingBrief.cost?.trim() && rawEndingBrief.legacy?.trim()
+      ? {
+          polarity: rawEndingBrief.polarity,
+          lifeTheme: compactText(rawEndingBrief.lifeTheme, 120),
+          achievement: compactText(rawEndingBrief.achievement, 180),
+          cost: compactText(rawEndingBrief.cost, 180),
+          legacy: compactText(rawEndingBrief.legacy, 180),
+          anchorIds: uniqueRecent(rawEndingBrief.anchorIds ?? [], 3),
+          createdAt: Math.max(0, Math.trunc(Number(rawEndingBrief.createdAt) || 0))
+        }
+      : undefined;
   return {
     ...defaults,
     ...state,
@@ -529,6 +799,7 @@ export function ensureNarrativeRunState(
     actCanon,
     memoryRevision: Math.max(0, Math.trunc(Number(state.memoryRevision) || 0)),
     memoryDigests,
+    worldCardActivations,
     horizonPlan,
     agentAttempts,
     activeCharacterIds: uniqueRecent(Array.isArray(state.activeCharacterIds) ? state.activeCharacterIds : [], 8),
@@ -550,6 +821,7 @@ export function ensureNarrativeRunState(
       ? state.endingPolarity
       : undefined,
     endingScore: typeof state.endingScore === "number" ? state.endingScore : undefined,
+    endingBrief,
     setbackCount: Math.max(0, Math.min(8, Number(state.setbackCount) || 0)),
     statTierConfig: normalizeStatTierConfig(state.statTierConfig),
     statTierPresentation: normalizeStatTierPresentation(state.statTierPresentation)
@@ -1339,7 +1611,18 @@ function overlapCount(values: string[] | undefined, selected: string[] | undefin
  */
 export function selectDynamicNarrativeContext(
   source: NarrativePromptSource,
-  query: { task?: NarrativeTask; routeId?: string; factionIds?: string[]; factIds?: string[]; memoryIds?: string[]; text?: string; backgroundAllowed?: boolean }
+  query: {
+    task?: NarrativeTask;
+    routeId?: string;
+    factionIds?: string[];
+    factIds?: string[];
+    characterIds?: string[];
+    locationIds?: string[];
+    abilityIds?: string[];
+    memoryIds?: string[];
+    text?: string;
+    backgroundAllowed?: boolean;
+  }
 ): DynamicNarrativeContextSelection {
   const origin = query.task === "origin";
   const background = query.task === "background";
@@ -1361,19 +1644,32 @@ export function selectDynamicNarrativeContext(
   const factIds = [...selectedFacts, ...resolvedFacts.filter((fact) => query.factIds?.includes(fact.id))].map((fact) => fact.id);
   const rankedCharacters = source.narrative.dynamicCharacters
     .map((character) => ({ character, score:
+      overlapCount([character.id], query.characterIds) * 20 +
+      overlapCount([character.id], source.narrative.activeCharacterIds) * 8 +
       narrativeTextOverlap(`${character.name} ${character.description} ${character.relationship?.summary ?? ""}`, query.text ?? "") * 10 +
       overlapCount(character.relatedFactIds, factIds) * 5 +
       overlapCount(character.relatedRouteIds, query.routeId ? [query.routeId] : []) * 4 +
       (character.factionId && query.factionIds?.includes(character.factionId) ? 4 : 0)
     })).sort((a, b) => b.score - a.score);
   const detailed = rankedCharacters.filter(({ score }) => score > 0).slice(0, 5).map(({ character }) => character.id);
-  const characters = rankedCharacters.map(({ character }) => ({
+  const characters = rankedCharacters.filter(({ character }) => detailed.includes(character.id)).map(({ character }) => ({
     id: character.id, name: character.name, factionId: character.factionId, role: character.role,
     description: `${character.status === "active" ? "" : character.status === "gone" ? "已离场。" : "此前交往已告一段落。"}${detailed.includes(character.id) ? character.description : ""}`,
     relationship: detailed.includes(character.id) && character.relationship ? `${character.relationship.stance}：${character.relationship.summary}` : undefined
   }));
-  const directCharacters = rankedCharacters.filter(({ character }) => query.text?.includes(character.name)).map(({ character }) => character.id);
-  const assetQuery = { characterIds: directCharacters, factIds: query.factIds, routeIds: query.routeId ? [query.routeId] : undefined, factionIds: query.factionIds, text: query.text };
+  const directCharacters = Array.from(new Set([
+    ...(query.characterIds ?? []),
+    ...rankedCharacters.filter(({ character }) => query.text?.includes(character.name)).map(({ character }) => character.id)
+  ]));
+  const assetQuery = {
+    characterIds: directCharacters,
+    factIds: query.factIds,
+    routeIds: query.routeId ? [query.routeId] : undefined,
+    factionIds: query.factionIds,
+    locationIds: query.locationIds,
+    abilityIds: query.abilityIds,
+    text: query.text
+  };
   const assets = source.narrative.assets ?? normalizeNarrativeAssets();
   const selectedAssets = selectNarrativeAssets(assets, assetQuery);
   const selectedLocationIds = new Set(selectedAssets.locations.map((entry) => entry.id));
@@ -1385,12 +1681,12 @@ export function selectDynamicNarrativeContext(
   return {
     assetContext: formatNarrativeAssets(assets, assetQuery),
     assetSources: [
-      ...assets.locations.map((entry) => ({
+      ...selectedAssets.locations.map((entry) => ({
         id: entry.id,
         kind: "location" as const,
         text: `${entry.id}=${entry.name}${entry.id === assets.currentLocationId ? "（当前所在）" : ""}${selectedLocationIds.has(entry.id) ? "：" + entry.description.slice(0, 100) : ""}`
       })),
-      ...assets.abilities.map((entry) => ({
+      ...selectedAssets.abilities.map((entry) => ({
         id: entry.id,
         kind: "ability" as const,
         text: `${entry.id}=${entry.name}（${entry.status === "available" ? "可用" : "不可用"}）${selectedAbilityIds.has(entry.id) ? entry.mastery + "：" + entry.description.slice(0, 120) : ""}`
@@ -1423,7 +1719,14 @@ function buildTaskNarrativePlan(
   options?: { backgroundAllowed?: boolean; factionIds?: string[]; focusIds?: string[] }
 ): NarrativePromptPlan {
   const act = world.mainlineActs?.find((entry) => entry.id === source.narrative.actRuntime?.actId);
-  const pending = (source as NarrativePromptSource & { pendingDynamicScene?: { routeId: string; factionId?: string; factIds?: string[] } }).pendingDynamicScene;
+  const pending = (source as NarrativePromptSource & { pendingDynamicScene?: {
+    routeId: string;
+    factionId?: string;
+    factIds?: string[];
+    characterIds?: string[];
+    locationIds?: string[];
+    abilityIds?: string[];
+  } }).pendingDynamicScene;
   const selectedRouteId = task === "decision"
     ? pending?.routeId
     : task === "ending"
@@ -1472,6 +1775,15 @@ function buildTaskNarrativePlan(
           ...((task === "dynamic" || task === "rendering") && !mixedTurn && act?.factId ? [act.factId] : []),
           ...focusFactIds
         ])),
+    characterIds: task === "decision"
+      ? pending?.characterIds
+      : (options?.focusIds ?? []).filter((id) => source.narrative.dynamicCharacters.some((character) => character.id === id)),
+    locationIds: task === "decision"
+      ? pending?.locationIds
+      : (options?.focusIds ?? []).filter((id) => source.narrative.assets?.locations.some((location) => location.id === id)),
+    abilityIds: task === "decision"
+      ? pending?.abilityIds
+      : (options?.focusIds ?? []).filter((id) => source.narrative.assets?.abilities.some((ability) => ability.id === id)),
     memoryIds: episodeRecall.memoryIds,
     text: taskQuery
   });
@@ -1489,13 +1801,51 @@ function buildTaskNarrativePlan(
     task === "decision" ? world.narrativeFactions?.find((entry) => entry.id === pending?.factionId)?.summary : "",
     lifeContext ? focus?.description : ""
   ].filter(Boolean).join(" ");
-  const loreSources = world.lore
+  // v8 makes worldCards the single source of authored recall. Earlier world
+  // packages retain their legacy lore path for compatibility.
+  const loreSources = (world.version >= 8 ? [] : world.lore)
     .filter((entry) => !entry.phases?.length || entry.phases.includes(phase))
     .filter((entry) => !entry.directionIds?.length || Boolean(selectedRouteId && entry.directionIds.includes(selectedRouteId)))
     .map((entry) => ({ entry, score: entry.priority / 100 +
       narrativeTextOverlap(entry.text, loreQuery) * 10 +
       (selectedRouteId && entry.directionIds?.includes(selectedRouteId) ? 2 : 0) }))
     .sort((a, b) => b.score - a.score).slice(0, 3).map(({ entry }) => ({ id: entry.id, text: entry.text }));
+  const selectedCharacterIds = recall.characters
+    .filter((entry) => entry.description || entry.relationship)
+    .map((entry) => entry.id);
+  const selectedLocationIds = recall.assetSources?.filter((entry) => entry.kind === "location").map((entry) => entry.id) ?? [];
+  const selectedAbilityIds = recall.assetSources?.filter((entry) => entry.kind === "ability").map((entry) => entry.id) ?? [];
+  const worldCardDiagnostics: Array<{ id: string; reason: string }> = [];
+  const worldCardSources = selectNarrativeWorldCardMatches(source, world, {
+    task,
+    actId: act?.id,
+    beat,
+    routeId: selectedRouteId ?? undefined,
+    factionIds: task === "decision" && pending?.factionId ? [pending.factionId] : options?.factionIds,
+    factIds: recall.facts.map((entry) => entry.id),
+    characterIds: selectedCharacterIds,
+    locationIds: selectedLocationIds,
+    abilityIds: selectedAbilityIds,
+    text: [taskQuery, loreQuery, recall.facts.map((entry) => entry.label).join(" "), recall.assetContext].filter(Boolean).join("\n"),
+    recentTexts: [
+      ...source.narrative.memoryEntries.slice(-12).map((entry) => entry.text),
+      ...recentNarratives.map((entry) => entry.summary)
+    ]
+  }, 6, 1400, worldCardDiagnostics).map(({ card, activationReason, activationKind, lastActivatedSequence, remainingStickyTurns, remainingCooldownTurns }) => ({
+    id: card.id,
+    text: card.content,
+    placement: card.placement ?? (card.kind === "style_example" ? "example" : card.kind === "world_rule" ? "world" : "scenario"),
+    activationReason,
+    activationKind,
+    stickyTurns: Math.max(0, Math.min(8, Math.trunc(card.stickyTurns ?? 0))),
+    cooldownTurns: Math.max(0, Math.min(16, Math.trunc(card.cooldownTurns ?? 0))),
+    lastActivatedSequence,
+    remainingStickyTurns,
+    remainingCooldownTurns
+  }));
+  const selectedWorldCardIds = new Set(worldCardSources.map((card) => card.id));
+  const excludedWorldCards = worldCardDiagnostics.filter((entry, index, all) =>
+    !selectedWorldCardIds.has(entry.id) && all.findIndex((candidate) => candidate.id === entry.id && candidate.reason === entry.reason) === index);
   const previousActId = source.narrative.completedScenes.filter((scene) => scene.mainlineActId).at(-1)?.mainlineActId;
   const facts = (source.story.factLedger?.facts ?? []).map(normalizeNarrativeHandoffFact);
   const handoff = task === "origin" || task === "ending" || beat !== "setup" ? [] : facts.filter((fact) =>
@@ -1517,11 +1867,13 @@ function buildTaskNarrativePlan(
       card.narrative?.riskTone ? `取舍：${card.narrative.riskTone}` : ""
     ].filter(Boolean).join("；")),
     seedHints,
-    factDirectory: facts.filter((fact) => fact.status === "open" && (!lifeContext || isNarrativeFactModelMutable(fact.id)))
-      .map((fact) => ({ id: fact.id, label: fact.progressSummary ?? fact.label, status: fact.status })),
+    // Detailed, relevant facts are already projected through recall. Keeping a
+    // second global directory here would defeat scene-level retrieval and grow
+    // both prompt and tool schemas with the lifetime of the save.
+    factDirectory: [],
     storyBible: world.storyBible, styleRules: world.styleRules,
     origin: source.narrative.opening?.profile?.summary ?? "",
-    activeLore: loreSources.map((entry) => entry.text), activeLoreSources: loreSources, activeThreads: [],
+    activeLore: loreSources.map((entry) => entry.text), activeLoreSources: loreSources, activeWorldCardSources: worldCardSources, worldCardDiagnostics: excludedWorldCards, activeThreads: [],
     plotEssentials: recall.facts.map((fact) => `${fact.id}：${fact.label}`),
     activeCharacters: recall.characters.map((person) =>
       `${person.id}=${person.name}（${person.factionId ?? "无阵营"}，${person.role}）${person.description ? "：" + person.description : ""}${person.relationship ? "；关系：" + person.relationship : ""}`),

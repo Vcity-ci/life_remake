@@ -17,6 +17,8 @@ export interface ChatConversationState {
   archive: Array<{ id?: string; user: string; assistant: string }>;
   summaryRevision?: number;
   summaryThroughMemoryId?: string;
+  /** Memory ids already represented by headMemory and therefore never re-archived as raw rounds. */
+  summarizedMemoryIds?: string[];
 }
 
 export interface AiConversationState {
@@ -61,6 +63,10 @@ export function applyConversationSummary(
   conversation.archive = conversation.archive.slice(work.rounds.length);
   conversation.summaryRevision = work.revision + 1;
   conversation.summaryThroughMemoryId = work.rounds.at(-1)?.id ?? conversation.summaryThroughMemoryId;
+  conversation.summarizedMemoryIds = Array.from(new Set([
+    ...(conversation.summarizedMemoryIds ?? []),
+    ...work.rounds.flatMap((round) => round.id ? [round.id] : [])
+  ])).slice(-240);
   return true;
 }
 
@@ -129,29 +135,59 @@ export function projectConversationUserPrompt(prompt: string): string {
  * remain internal; committed assistant prose and compacted memory retain the
  * conversational continuity seen by the narrator.
  */
-export function buildConversationPromptMessages(conversation: ChatConversationState): ConversationPromptMessage[] {
+export interface ConversationProjectionPolicy {
+  includeHeadMemory?: boolean;
+  includeArchive?: boolean;
+  recentRoundLimit?: number;
+  requiredRecentRounds?: number;
+}
+
+export function buildConversationPromptMessages(
+  conversation: ChatConversationState,
+  policy: ConversationProjectionPolicy = {}
+): ConversationPromptMessage[] {
+  const includeHeadMemory = policy.includeHeadMemory !== false;
+  const includeArchive = policy.includeArchive !== false;
+  const recentRoundLimit = Math.max(0, Math.trunc(policy.recentRoundLimit ?? Number.MAX_SAFE_INTEGER));
+  const requiredRecentRounds = Math.max(0, Math.trunc(policy.requiredRecentRounds ?? recentRoundLimit));
   const memory = conversation.headMemory.trim() ? `已发生经历的摘要：${conversation.headMemory.trim()}` : "";
-  const archived = conversation.archive.flatMap((round, index) => {
+  const archived = (includeArchive ? conversation.archive : []).flatMap((round, index) => {
     const groupId = `archive:${round.id ?? index}`;
     return [
-      { role: "user" as const, content: projectConversationUserPrompt(round.user), groupId, sourceId: round.id, required: true },
-      { role: "assistant" as const, content: round.assistant, groupId, sourceId: round.id, required: true }
+      { role: "user" as const, content: projectConversationUserPrompt(round.user), groupId, sourceId: round.id, required: false },
+      { role: "assistant" as const, content: round.assistant, groupId, sourceId: round.id, required: false }
     ];
   });
+  const recent = collectConversationRounds(conversation.history).slice(-recentRoundLimit);
+  const requiredFrom = Math.max(0, recent.length - requiredRecentRounds);
   return [
-    ...(memory ? [{ role: "user" as const, content: memory, groupId: "summary", sourceId: conversation.summaryThroughMemoryId, required: true }] : []),
+    ...(includeHeadMemory && memory ? [{ role: "user" as const, content: memory, groupId: "summary", sourceId: conversation.summaryThroughMemoryId, required: true }] : []),
     ...archived,
-    ...collectConversationRounds(conversation.history).flatMap((round, index) => {
+    ...recent.flatMap((round, index) => {
       const assistantContent = round.messages.slice(1).map(formatConversationHistoryMessage).filter(Boolean).join("\n");
       const groupId = `recent:${round.id ?? index}`;
+      const required = index >= requiredFrom;
       return assistantContent
         ? [
-            { role: "user" as const, content: projectConversationUserPrompt(round.user), groupId, sourceId: round.id, required: true },
-            { role: "assistant" as const, content: assistantContent, groupId, sourceId: round.id, required: true }
+            { role: "user" as const, content: projectConversationUserPrompt(round.user), groupId, sourceId: round.id, required },
+            { role: "assistant" as const, content: assistantContent, groupId, sourceId: round.id, required }
           ]
         : [];
     })
   ];
+}
+
+export function keepRecentConversationRounds(conversation: ChatConversationState, maxRounds: number): void {
+  const rounds = collectConversationRounds(conversation.history);
+  const recentRounds = rounds.slice(-maxRounds);
+  const summarized = new Set(conversation.summarizedMemoryIds ?? []);
+  const overflowPairs = rounds
+    .slice(0, Math.max(0, rounds.length - maxRounds))
+    .filter((round) => !round.id || !summarized.has(round.id))
+    .map(({ id, user, assistant }) => ({ id, user, assistant }));
+  const archivedIds = new Set(conversation.archive.flatMap((round) => round.id ? [round.id] : []));
+  conversation.archive.push(...overflowPairs.filter((round) => !round.id || !archivedIds.has(round.id)));
+  conversation.history = recentRounds.flatMap((round) => round.messages);
 }
 
 export function summarizedConversationMemoryIds(conversation: ChatConversationState | undefined, orderedIds: string[]): string[] {

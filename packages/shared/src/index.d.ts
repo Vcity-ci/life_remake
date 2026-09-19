@@ -740,7 +740,7 @@ export interface NarrativeHorizonPlan {
     status: "active" | "stale";
     createdAt: number;
 }
-export type NarrativeAgentAttemptStage = "prepare" | "horizon" | "plan" | "render" | "review" | "commit";
+export type NarrativeAgentAttemptStage = "prepare" | "horizon" | "plan" | "render" | "review" | "sync" | "commit";
 /** Compact internal trace. Prompts and player prose are deliberately not persisted. */
 export interface NarrativeAgentAttemptRecord {
     id: string;
@@ -1283,13 +1283,16 @@ export interface CreateSaveResponse {
     save: SaveSlotSummary;
     recoveryCode: string;
 }
-export type ModelUsageOperation = "narrative" | "summary" | "continuation" | "director" | "planning" | "curation" | "horizon" | "review" | "render" | "origin" | "background" | "scene" | "choice" | "decision" | "ending";
+export type ModelUsageOperation = "narrative" | "summary" | "continuation" | "director" | "planning" | "settlement" | "continuity" | "curation" | "horizon" | "review" | "render" | "origin" | "background" | "scene" | "choice" | "decision" | "ending";
 export type ModelUsageTransport = "chat" | "responses";
 export interface ModelUsageTotals {
     requestCount: number;
     successCount: number;
     failureCount: number;
     cacheHitCount: number;
+    providerCacheReportedCount: number;
+    cachedInputTokens: number;
+    uncachedInputTokens: number;
     reportedUsageCount: number;
     unreportedUsageCount: number;
     inputTokens: number;

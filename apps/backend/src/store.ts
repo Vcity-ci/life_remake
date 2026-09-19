@@ -61,6 +61,9 @@ export interface ModelUsageRecordInput {
     inputTokens?: number;
     outputTokens?: number;
     totalTokens?: number;
+    cachedInputTokens?: number;
+    uncachedInputTokens?: number;
+    providerCacheReported?: boolean;
   };
 }
 
@@ -126,6 +129,8 @@ const modelUsageOperations: ModelUsageOperation[] = [
   "continuation",
   "director",
   "planning",
+  "settlement",
+  "continuity",
   "curation",
   "horizon",
   "review",
@@ -150,6 +155,9 @@ function emptyModelUsageTotals(): ModelUsageTotals {
     successCount: 0,
     failureCount: 0,
     cacheHitCount: 0,
+    providerCacheReportedCount: 0,
+    cachedInputTokens: 0,
+    uncachedInputTokens: 0,
     reportedUsageCount: 0,
     unreportedUsageCount: 0,
     inputTokens: 0,
@@ -188,6 +196,9 @@ function normalizeStoredModelUsage(value: unknown): StoredModelUsage | undefined
     successCount: nonNegativeInteger(entry.successCount),
     failureCount: nonNegativeInteger(entry.failureCount),
     cacheHitCount: nonNegativeInteger(entry.cacheHitCount),
+    providerCacheReportedCount: nonNegativeInteger(entry.providerCacheReportedCount),
+    cachedInputTokens: nonNegativeInteger(entry.cachedInputTokens),
+    uncachedInputTokens: nonNegativeInteger(entry.uncachedInputTokens),
     reportedUsageCount: nonNegativeInteger(entry.reportedUsageCount),
     unreportedUsageCount: nonNegativeInteger(entry.unreportedUsageCount),
     inputTokens: nonNegativeInteger(entry.inputTokens),
@@ -514,12 +525,19 @@ export async function recordModelUsage(sessionId: string, input: ModelUsageRecor
       const inputTokens = nonNegativeInteger(usage?.inputTokens);
       const outputTokens = nonNegativeInteger(usage?.outputTokens);
       const totalTokens = nonNegativeInteger(usage?.totalTokens);
+      const cachedInputTokens = nonNegativeInteger(usage?.cachedInputTokens);
+      const uncachedInputTokens = nonNegativeInteger(usage?.uncachedInputTokens);
       const hasReportedUsage = inputTokens > 0 || outputTokens > 0 || totalTokens > 0;
       if (hasReportedUsage) {
         entry.reportedUsageCount += 1;
         entry.inputTokens += inputTokens;
         entry.outputTokens += outputTokens;
         entry.totalTokens += totalTokens || inputTokens + outputTokens;
+        if (usage?.providerCacheReported) {
+          entry.providerCacheReportedCount += 1;
+          entry.cachedInputTokens += cachedInputTokens;
+          entry.uncachedInputTokens += uncachedInputTokens;
+        }
       } else {
         entry.unreportedUsageCount += 1;
       }
@@ -552,6 +570,9 @@ export async function getModelUsageSummary(sessionId: string): Promise<ModelUsag
     totals.successCount += entry.successCount;
     totals.failureCount += entry.failureCount;
     totals.cacheHitCount += entry.cacheHitCount;
+    totals.providerCacheReportedCount += entry.providerCacheReportedCount;
+    totals.cachedInputTokens += entry.cachedInputTokens;
+    totals.uncachedInputTokens += entry.uncachedInputTokens;
     totals.reportedUsageCount += entry.reportedUsageCount;
     totals.unreportedUsageCount += entry.unreportedUsageCount;
     totals.inputTokens += entry.inputTokens;

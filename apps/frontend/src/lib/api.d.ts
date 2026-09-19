@@ -27,7 +27,7 @@ export type GameStreamEvent = {
 } | {
     type: "progress";
     data: {
-        stage: "settling" | "rendering" | "committing";
+        stage: "settling" | "rendering" | "syncing" | "committing";
         requestId?: string;
     };
 } | {

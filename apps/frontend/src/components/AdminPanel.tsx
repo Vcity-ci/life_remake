@@ -68,6 +68,8 @@ const usageOperationLabels: Record<ModelUsageOperation, string> = {
   continuation: "文本续写",
   director: "方向选择",
   planning: "剧情规划",
+  settlement: "状态结算",
+  continuity: "连续性同步",
   horizon: "幕间规划",
   curation: "长期记忆",
   review: "正文整理",
@@ -87,6 +89,12 @@ function formatUsageNumber(value: number): string {
 function formatUsageDuration(durationMs: number): string {
   if (durationMs < 1000) return `${durationMs} ms`;
   return `${(durationMs / 1000).toFixed(1)} 秒`;
+}
+
+function formatProviderCacheRate(cached: number, uncached: number, reportedCount: number): string {
+  if (!reportedCount) return "未上报";
+  const total = cached + uncached;
+  return total > 0 ? `${((cached / total) * 100).toFixed(1)}%` : "0.0%";
 }
 
 export function AdminPanel(props: Props): React.JSX.Element {
@@ -365,7 +373,7 @@ export function AdminPanel(props: Props): React.JSX.Element {
               <div className="row between model-usage-heading">
                 <div>
                   <h3>模型用量</h3>
-                  <small>仅统计本浏览器会话中服务商已上报的 Token，不估算费用或账户余额。</small>
+                  <small>区分本地结果复用与服务商上报的前缀缓存 Token；不估算费用或账户余额。</small>
                 </div>
                 <button className="ghost" disabled={usageLoading} onClick={() => void loadModelUsage()}>
                   {usageLoading ? "读取中" : "刷新"}
@@ -379,9 +387,11 @@ export function AdminPanel(props: Props): React.JSX.Element {
                 <>
                   <dl className="model-usage-totals">
                     <div><dt>实际请求</dt><dd>{formatUsageNumber(modelUsage.totals.requestCount)}</dd></div>
-                    <div><dt>已上报 Token</dt><dd>{formatUsageNumber(modelUsage.totals.totalTokens)}</dd></div>
+                    <div><dt>本地结果复用</dt><dd>{formatUsageNumber(modelUsage.totals.cacheHitCount)}</dd></div>
+                    <div><dt>服务商缓存率</dt><dd>{formatProviderCacheRate(modelUsage.totals.cachedInputTokens, modelUsage.totals.uncachedInputTokens, modelUsage.totals.providerCacheReportedCount)}</dd></div>
+                    <div><dt>缓存 / 未缓存输入</dt><dd>{formatUsageNumber(modelUsage.totals.cachedInputTokens)} / {formatUsageNumber(modelUsage.totals.uncachedInputTokens)}</dd></div>
                     <div><dt>输入 / 输出</dt><dd>{formatUsageNumber(modelUsage.totals.inputTokens)} / {formatUsageNumber(modelUsage.totals.outputTokens)}</dd></div>
-                    <div><dt>未上报 / 缓存命中</dt><dd>{formatUsageNumber(modelUsage.totals.unreportedUsageCount)} / {formatUsageNumber(modelUsage.totals.cacheHitCount)}</dd></div>
+                    <div><dt>失败 / 未上报</dt><dd>{formatUsageNumber(modelUsage.totals.failureCount)} / {formatUsageNumber(modelUsage.totals.unreportedUsageCount)}</dd></div>
                   </dl>
                   <div className="model-usage-list">
                     {modelUsage.entries.map((entry) => (
@@ -391,10 +401,11 @@ export function AdminPanel(props: Props): React.JSX.Element {
                           <small>{entry.model} · {entry.transport === "responses" ? "Responses" : "Chat Completions"}</small>
                         </div>
                         <small>
-                          {entry.requestCount} 次请求 · {entry.inputTokens} / {entry.outputTokens} / {entry.totalTokens} Token · {formatUsageDuration(entry.durationMs)}
+                          {entry.requestCount} 次请求 · 输入/输出 {entry.inputTokens} / {entry.outputTokens} Token · 平均 {formatUsageDuration(entry.requestCount ? Math.round(entry.durationMs / entry.requestCount) : 0)} / 总计 {formatUsageDuration(entry.durationMs)}
+                          {entry.providerCacheReportedCount ? ` · 服务商缓存 ${entry.cachedInputTokens}/${entry.cachedInputTokens + entry.uncachedInputTokens} (${formatProviderCacheRate(entry.cachedInputTokens, entry.uncachedInputTokens, entry.providerCacheReportedCount)})` : " · 服务商缓存未上报"}
                           {entry.failureCount ? ` · ${entry.failureCount} 次失败` : ""}
                           {entry.unreportedUsageCount ? ` · ${entry.unreportedUsageCount} 次未上报` : ""}
-                          {entry.cacheHitCount ? ` · ${entry.cacheHitCount} 次缓存` : ""}
+                          {entry.cacheHitCount ? ` · ${entry.cacheHitCount} 次本地复用` : ""}
                         </small>
                       </div>
                     ))}

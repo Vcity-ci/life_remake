@@ -19,6 +19,7 @@ export type NarrativeTask =
   | "curation"
   | "horizon"
   | "settlement"
+  | "continuity"
   | "reviewing"
   | "rendering"
   | "dynamic"
@@ -40,6 +41,7 @@ export function narrativeTaskRule(task: NarrativeTask, pack: PromptPackResolved)
     case "curation": return "整理已经提交的经历与引用，不创造新的游戏事实。";
     case "horizon": return "为当前世界幕提出短程叙事意图，不选择或排除路线，不写玩家正文。";
     case "settlement": return "只通过指定工具提交本轮已经形成的结构化变化，不写玩家正文。";
+    case "continuity": return "依据本轮已经批准的结果与最终正文，同步其中实际发生的事实、关系、地点与本领变化。";
     case "reviewing": return "整理已经生成的玩家正文，使其忠于已批准计划和既有事实，不改变结构化结果。";
     case "rendering": return "依据已批准的回合计划与结构化结果写本轮正文，不再改变结算内容。";
     case "decision": return "写清所选行动实际带来的结果与人物处境，约80-150字。事情可以当场解决，也可以自然留下后续影响。";

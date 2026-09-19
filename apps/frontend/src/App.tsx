@@ -446,6 +446,7 @@ export default function App(): React.JSX.Element {
             const progressText = {
               settling: "正在结算这次选择的后果...",
               rendering: "正在书写这段经历...",
+              syncing: "正在整理人物与故事脉络...",
               committing: "正在保存人生记录..."
             } as const;
             setStatus(progressText[event.data.stage]);

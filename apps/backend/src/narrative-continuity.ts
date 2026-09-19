@@ -24,7 +24,7 @@ export function factUpdateContract(factIds: string[]) {
       status: { type: "string", enum: ["open", "resolved"], description: "仍有待处理内容为 open；事情已有结果、义务已履行或不再需要处理为 resolved。" },
       summary: { type: "string", description: "这件事情现在的进展或实际结果。" }
     }
-  }, ...(mutableIds.length ? {} : { maxItems: 0 }) };
+  }};
   return {
     factIds, mutableIds,
     schema: {
@@ -35,7 +35,7 @@ export function factUpdateContract(factIds: string[]) {
           type: "object", additionalProperties: false, required: ["kind", "label", "status"],
           properties: { kind: { type: "string", enum: factKinds }, label: { type: "string" }, status: { type: "string", enum: ["open", "resolved"] }, priority: { type: "integer", minimum: 1, maximum: 4 } }
         }},
-        updates: changes
+        ...(mutableIds.length ? { updates: changes } : {})
       }
     }
   };

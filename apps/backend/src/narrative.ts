@@ -660,7 +660,7 @@ export function ensureNarrativeRunState(
           createdAt: Math.max(0, Math.trunc(Number(rawHorizon.createdAt) || 0))
         }
       : undefined;
-  const attemptStages = ["prepare", "horizon", "plan", "render", "review", "commit"] as const;
+  const attemptStages = ["prepare", "horizon", "plan", "render", "review", "sync", "commit"] as const;
   const agentAttempts: NarrativeAgentAttemptRecord[] = Array.isArray(state.agentAttempts)
     ? state.agentAttempts.filter((entry): entry is NarrativeAgentAttemptRecord => Boolean(
       entry?.id && entry?.callId && entry?.attemptId && attemptStages.includes(entry.stage)
@@ -1742,21 +1742,10 @@ function buildTaskNarrativePlan(
   const lifeContext = task === "background" || mixedTurn;
   const recentNarratives = source.history?.filter((event) => event.summary.trim()).slice(-2) ?? [];
   const focus = source.narrative.actRuntime?.growthFocusOptions?.find((entry) => entry.id === source.narrative.actRuntime?.growthFocusId);
-  const focusQuery = (options?.focusIds ?? []).map((id) => {
-    const fact = source.story.factLedger?.facts.find((entry) => entry.id === id);
-    if (fact) return fact.label;
-    const character = source.narrative.dynamicCharacters.find((entry) => entry.id === id);
-    if (character) return `${character.name} ${character.description} ${character.relationship?.summary ?? ""}`;
-    const location = source.narrative.assets?.locations.find((entry) => entry.id === id);
-    if (location) return `${location.name} ${location.description}`;
-    const ability = source.narrative.assets?.abilities.find((entry) => entry.id === id);
-    return ability ? `${ability.name} ${ability.description}` : "";
-  }).filter(Boolean).join(" ");
   const taskQuery = [
     lifeContext || task === "origin" ? source.personaPrompt : act?.prompt,
     lifeContext ? focus?.description : selectedRoute?.summary,
-    recentNarratives.at(-1)?.summary,
-    focusQuery
+    recentNarratives.at(-1)?.summary
   ].filter(Boolean).join(" ");
   const episodeRecall = selectNarrativeEpisodeRecall(source.narrative, {
     actId: act?.id,
@@ -1764,7 +1753,7 @@ function buildTaskNarrativePlan(
     focusIds: options?.focusIds
   });
   const focusFactIds = (options?.focusIds ?? []).filter((id) => source.story.factLedger?.facts.some((fact) => fact.id === id));
-  const recall = selectDynamicNarrativeContext(source, {
+  const selectedRecall = selectDynamicNarrativeContext(source, {
     task,
     backgroundAllowed: options?.backgroundAllowed,
     routeId: selectedRouteId,
@@ -1787,6 +1776,18 @@ function buildTaskNarrativePlan(
     memoryIds: episodeRecall.memoryIds,
     text: taskQuery
   });
+  const exactFocusIds = new Set(options?.focusIds ?? []);
+  const exactAssetSources = (selectedRecall.assetSources ?? []).filter((entry) => exactFocusIds.has(entry.id));
+  const recall = task === "continuity" ? {
+    ...selectedRecall,
+    facts: selectedRecall.facts.filter((entry) => exactFocusIds.has(entry.id)),
+    resolvedFacts: selectedRecall.resolvedFacts?.filter((entry) => exactFocusIds.has(entry.id)),
+    characters: selectedRecall.characters.filter((entry) => exactFocusIds.has(entry.id)),
+    assetSources: exactAssetSources,
+    assetContext: exactAssetSources.map((entry) => entry.text).join("\n"),
+    memories: [],
+    memorySources: []
+  } : selectedRecall;
   const seedQuery = source.history?.filter((event) => event.summary).slice(-2).map((event) => event.summary).join(" ") || source.personaPrompt;
   const seedHints = task === "origin" || task === "ending" ? [] : (source.narrative.opening?.profile?.seedHints ?? [])
     .map((hint) => ({ hint, score: narrativeTextOverlap(hint, seedQuery) }))

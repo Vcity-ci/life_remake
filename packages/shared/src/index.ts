@@ -814,7 +814,7 @@ export interface NarrativeHorizonPlan {
   createdAt: number;
 }
 
-export type NarrativeAgentAttemptStage = "prepare" | "horizon" | "plan" | "render" | "review" | "commit";
+export type NarrativeAgentAttemptStage = "prepare" | "horizon" | "plan" | "render" | "review" | "sync" | "commit";
 
 /** Compact internal trace. Prompts and player prose are deliberately not persisted. */
 export interface NarrativeAgentAttemptRecord {
@@ -1549,6 +1549,8 @@ export type ModelUsageOperation =
   | "continuation"
   | "director"
   | "planning"
+  | "settlement"
+  | "continuity"
   | "curation"
   | "horizon"
   | "review"
@@ -1567,6 +1569,9 @@ export interface ModelUsageTotals {
   successCount: number;
   failureCount: number;
   cacheHitCount: number;
+  providerCacheReportedCount: number;
+  cachedInputTokens: number;
+  uncachedInputTokens: number;
   reportedUsageCount: number;
   unreportedUsageCount: number;
   inputTokens: number;

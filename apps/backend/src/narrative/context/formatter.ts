@@ -35,8 +35,11 @@ function renderSection(section: NarrativeContextSection, values: string[]): stri
   }
 }
 
-export function formatNarrativeContextFragments(fragments: NarrativeContextFragment[]): string {
-  const userFragments = fragments.filter((entry) => entry.placement === "user_context");
+export function formatNarrativeContextFragments(
+  fragments: NarrativeContextFragment[],
+  layers?: Set<NarrativeContextFragment["layer"]>
+): string {
+  const userFragments = fragments.filter((entry) => entry.placement === "user_context" && (!layers || layers.has(entry.layer)));
   return SECTION_ORDER.map((section) => renderSection(
     section,
     userFragments.filter((entry) => entry.section === section).sort((a, b) => a.order - b.order).map((entry) => entry.content)

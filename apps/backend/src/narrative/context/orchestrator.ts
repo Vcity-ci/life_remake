@@ -38,8 +38,14 @@ export function composeNarrativeContext(input: NarrativeContextComposeInput): Na
   const selectedHistoryIds = new Set(budgeted.fragments.filter((entry) => entry.placement === "message_history").map((entry) => entry.id));
   const selectedHistoryMessages = historyMessages.filter((message, index) => selectedHistoryIds.has(narrativeContentId(`history:${index}:${message.role}`, message.content)));
   const droppedFragmentIds = Array.from(new Set([...deduped.droppedFragmentIds, ...budgeted.droppedFragmentIds]));
+  const stableContext = formatNarrativeContextFragments(budgeted.fragments, new Set(["stable", "runtime"]));
+  const activeContext = formatNarrativeContextFragments(budgeted.fragments, new Set(["active", "recall"]));
+  const taskContext = formatNarrativeContextFragments(budgeted.fragments, new Set(["task"]));
   return {
-    renderedContext: formatNarrativeContextFragments(budgeted.fragments),
+    renderedContext: [stableContext, activeContext, taskContext].filter(Boolean).join("\n"),
+    stableContext,
+    activeContext,
+    taskContext,
     historyMessages: selectedHistoryMessages,
     manifest: {
       callId: input.callId,

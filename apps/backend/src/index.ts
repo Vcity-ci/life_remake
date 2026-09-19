@@ -153,7 +153,7 @@ type TimelineEntryChunk = NonNullable<InternalRunState["timelineChunk"]>;
 type TimelineEntryItem = PublicTimelineEntry;
 type StreamDonePayload = { run: ReturnType<typeof toClientRun>; timelineChunk: PublicTimelineEntry[]; turns?: TurnRecord[] };
 type GameRequest = express.Request & { anonymousSession?: AnonymousSession };
-type StepProgressStage = "settling" | "rendering" | "committing";
+type StepProgressStage = "settling" | "rendering" | "syncing" | "committing";
 type GameStreamEvent =
   | {
       type: "meta";
@@ -496,7 +496,7 @@ function logGameFlowError(operation: string, error: unknown): void {
 function logNarrativeOutcomeFailure(
   options: Pick<DirectedSegmentOptions, "run" | "providerConfig">,
   error: unknown,
-  tool = "dynamic_narrative_scene"
+  tool = "narrative_agent_turn"
 ): void {
   if (!debugModel || !(error instanceof NarrativeOutcomeError)) return;
   console.error("[model-debug:narrative-outcome]", {
@@ -2017,6 +2017,7 @@ async function runStepFlowUnlocked(
       const decisionTurn = await runNarrativeAgentDecision({
         run,
         world,
+        narrativeWorld: narrativeWorld!,
         context: directedDecisionContext,
         callId: decisionCallId,
         decision: {
@@ -2097,7 +2098,10 @@ async function runStepFlowUnlocked(
         characterIds: decisionPendingScene?.characterIds
       });
       if (decisionAgentAttemptId) commitNarrativeAgentTurn(stepped.updated, decisionAgentAttemptId, decisionEpisode.id);
-      invalidateNarrativeHorizon(stepped.updated);
+      const nextActId = stepped.updated.narrative.actRuntime?.actId;
+      if (!nextActId || nextActId !== decisionPendingScene?.mainlineActId || stepped.updated.story.mainlineCompleted) {
+        invalidateNarrativeHorizon(stepped.updated);
+      }
       committedEpisodeId = decisionEpisode.id;
       generatedChunk = publishTimelineChunk(stepped.updated, world, stepped.chunk);
       fromAge = stepped.fromAge;

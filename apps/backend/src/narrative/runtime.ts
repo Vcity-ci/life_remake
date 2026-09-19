@@ -7,7 +7,11 @@ import {
   generateNarrativeHorizonPlan,
   generateNarrativeTurnPlan,
   renderDirectedDecisionNarrative,
+  synchronizeNarrativeContinuity,
   refineNarrativeProse,
+  shouldRefineNarrativeProse,
+  buildNarrativeContinuityWriteSet,
+  narrativeContinuityReadSet,
   type DynamicNarrativeSceneInput,
   type DynamicNarrativeSceneResult,
   type DirectedDecisionNarrativeOutcome,
@@ -24,7 +28,7 @@ export interface NarrativeAgentTurnInput {
   context: NarrativeContext;
   envelope: NarrativeTurnEnvelope;
   buildRenderInput: (plan: NarrativeTurnPlan, promptPlan: NarrativePromptPlan) => Omit<DynamicNarrativeSceneInput, "plan">;
-  onProgress?: (stage: "settling" | "rendering") => Promise<void> | void;
+  onProgress?: (stage: "settling" | "rendering" | "syncing") => Promise<void> | void;
 }
 
 export interface NarrativeAgentTurnResult {
@@ -175,36 +179,106 @@ export async function runNarrativeAgentTurn(input: NarrativeAgentTurnInput): Pro
   });
 
   if (scene.turnKind === "scene") {
-    const reviewed = await refineNarrativeProse(run, world, {
+    const reviewInput = {
       callId: envelope.callId,
-      task: scene.createsDecision ? "choice" : "scene",
+      task: scene.createsDecision ? "choice" as const : "scene" as const,
       ageLabel: `${envelope.sceneAge}岁`,
       sceneGoal: plan.sceneGoal,
       narrative: scene.narrative,
-      background: scene.milestoneCopy?.background
-    }, context);
-    scene = {
-      ...scene,
-      narrative: reviewed.narrative,
-      milestoneCopy: scene.milestoneCopy && reviewed.background
-        ? { ...scene.milestoneCopy, background: reviewed.background }
-        : scene.milestoneCopy
+      background: scene.milestoneCopy?.background,
+      interactionState: scene.createsDecision ? "choice_pending" as const : "none" as const,
+      immutableOptions: scene.milestoneCopy?.optionOverrides
     };
-    appendAttempt(run, {
-      callId: envelope.callId,
-      attemptId,
-      task: "reviewing",
-      source: "scene",
-      stage: "review",
-      actId: envelope.act.id,
-      beat: envelope.beat,
+    if (shouldRefineNarrativeProse(reviewInput)) {
+      const reviewPlan = buildNarrativePromptPlan(run, narrativeWorld, scene.routeId ?? plan.routeId ?? null, "reviewing", {
+        factionIds: scene.factionId ? [scene.factionId] : undefined,
+        focusIds: plan.focusRefs
+      });
+      if (!reviewPlan) throw new Error("narrative_review_prompt_plan_missing");
+      context.narrativePlan = reviewPlan;
+      const reviewed = await refineNarrativeProse(run, world, reviewInput, context);
+      scene = {
+        ...scene,
+        narrative: reviewed.narrative,
+        milestoneCopy: scene.milestoneCopy && reviewed.background
+          ? { ...scene.milestoneCopy, background: reviewed.background }
+          : scene.milestoneCopy
+      };
+      appendAttempt(run, {
+        callId: envelope.callId,
+        attemptId,
+        task: "reviewing",
+        source: "scene",
+        stage: "review",
+        actId: envelope.act.id,
+        beat: envelope.beat,
+        routeId: scene.routeId,
+        factionId: scene.factionId,
+        horizonRevision: run.narrative.horizonPlan?.revision,
+        digestRevision: run.narrative.memoryRevision,
+        contextFragmentIds: contextFragmentIds(context)
+      });
+    }
+  }
+  await input.onProgress?.("syncing");
+  const participantIds = scene.participants.map((participant) => participant.characterRef).filter((ref) => ref !== "new");
+  const writeSet = buildNarrativeContinuityWriteSet(
+    run,
+    narrativeContinuityReadSet(promptPlan),
+    scene.continuityRefs,
+    participantIds
+  );
+  const continuityFocusIds = Array.from(new Set([
+    ...writeSet.factIds,
+    ...writeSet.characterIds,
+    ...writeSet.locationIds,
+    ...writeSet.abilityIds
+  ]));
+  const continuityPlan = buildNarrativePromptPlan(run, narrativeWorld, scene.routeId ?? plan.routeId ?? null, "continuity", {
+    factionIds: scene.factionId ? [scene.factionId] : undefined,
+    focusIds: continuityFocusIds
+  });
+  if (!continuityPlan) throw new Error("narrative_continuity_prompt_plan_missing");
+  context.narrativePlan = continuityPlan;
+  const continuity = await synchronizeNarrativeContinuity(run, world, {
+    callId: envelope.callId,
+    source: plan.turnKind,
+    subject: plan.sceneGoal,
+    approvedResult: {
+      turnKind: scene.turnKind,
       routeId: scene.routeId,
       factionId: scene.factionId,
-      horizonRevision: run.narrative.horizonPlan?.revision,
-      digestRevision: run.narrative.memoryRevision,
-      contextFragmentIds: contextFragmentIds(context)
-    });
-  }
+      scenePacing: scene.scenePacing,
+      participants: scene.participants.map((participant) => ({
+        characterRef: participant.characterRef,
+        name: participant.name,
+        role: participant.role,
+        recurring: participant.recurring
+      })),
+      createsDecision: scene.createsDecision,
+      attributeEffects: scene.attributeEffects,
+      backgroundAttributeEffects: scene.backgroundAttributeEffects,
+      actHandoff: scene.actHandoff
+    },
+    narrative: [scene.narrative, scene.milestoneCopy?.background].filter(Boolean).join("\n"),
+    focusIds: continuityFocusIds,
+    writeSet
+  }, context);
+  scene = { ...scene, ...continuity };
+  appendAttempt(run, {
+    callId: envelope.callId,
+    attemptId,
+    task: "continuity",
+    source: plan.turnKind,
+    stage: "sync",
+    actId: envelope.act.id,
+    beat: envelope.beat,
+    routeId: scene.routeId,
+    factionId: scene.factionId,
+    horizonRevision: run.narrative.horizonPlan?.revision,
+    digestRevision: run.narrative.memoryRevision,
+    contextFragmentIds: contextFragmentIds(context)
+  });
   return { attemptId, plan, scene };
 }
 
@@ -262,10 +336,11 @@ export function invalidateNarrativeHorizon(run: InternalRunState): void {
 export async function runNarrativeAgentDecision(input: {
   run: InternalRunState;
   world: WorldConfig;
+  narrativeWorld: NarrativeWorldDefinition;
   context: NarrativeContext;
   callId: string;
   decision: { decision: DecisionType; label: string; description: string; attributePolicy: NarrativeAttributePolicy; factResolutionModes?: NarrativeFactResolution[] };
-  onProgress?: (stage: "settling" | "rendering") => Promise<void> | void;
+  onProgress?: (stage: "settling" | "rendering" | "syncing") => Promise<void> | void;
 }): Promise<{ attemptId: string; outcome: DirectedDecisionNarrativeOutcome }> {
   const attemptId = `attempt:${randomUUID()}`;
   appendAttempt(input.run, {
@@ -282,14 +357,42 @@ export async function runNarrativeAgentDecision(input: {
   await input.onProgress?.("settling");
   const settlement = await generateDirectedDecisionSettlement(input.run, input.world, input.decision, input.context);
   await input.onProgress?.("rendering");
-  const narrative = await renderDirectedDecisionNarrative(input.run, input.world, input.decision, settlement, input.context);
-  const outcome: DirectedDecisionNarrativeOutcome = { ...settlement, narrative };
+  const rendered = await renderDirectedDecisionNarrative(input.run, input.world, input.decision, settlement, input.context);
+  const narrative = rendered.narrative;
+  await input.onProgress?.("syncing");
+  const writeSet = buildNarrativeContinuityWriteSet(
+    input.run,
+    narrativeContinuityReadSet(input.context.narrativePlan),
+    rendered.continuityRefs
+  );
+  const continuityFocusIds = Array.from(new Set([
+    ...writeSet.factIds,
+    ...writeSet.characterIds,
+    ...writeSet.locationIds,
+    ...writeSet.abilityIds
+  ]));
+  const continuityPlan = buildNarrativePromptPlan(input.run, input.narrativeWorld, input.run.pendingDynamicScene?.routeId ?? null, "continuity", {
+    factionIds: input.run.pendingDynamicScene?.factionId ? [input.run.pendingDynamicScene.factionId] : undefined,
+    focusIds: continuityFocusIds
+  });
+  if (!continuityPlan) throw new Error("decision_continuity_prompt_plan_missing");
+  input.context.narrativePlan = continuityPlan;
+  const continuity = await synchronizeNarrativeContinuity(input.run, input.world, {
+    callId: input.callId,
+    source: "decision",
+    subject: `人物选择“${input.decision.label}”：${input.decision.description}`,
+    approvedResult: settlement,
+    narrative,
+    focusIds: continuityFocusIds,
+    writeSet
+  }, input.context);
+  const outcome: DirectedDecisionNarrativeOutcome = { ...settlement, narrative, ...continuity };
   appendAttempt(input.run, {
     callId: input.callId,
     attemptId,
     task: "decision",
     source: "decision",
-    stage: "review",
+    stage: "sync",
     actId: input.run.narrative.actRuntime?.actId,
     beat: input.run.narrative.actRuntime?.beat,
     horizonRevision: input.run.narrative.horizonPlan?.revision,

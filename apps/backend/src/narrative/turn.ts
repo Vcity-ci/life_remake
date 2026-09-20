@@ -5,6 +5,14 @@ export type NarrativeTurnCapability = "background" | "scene" | "choice";
 export type NarrativeTurnSource = "background" | "scene" | "closure";
 export type NarrativeFocusKind = "fact" | "character" | "location" | "ability";
 
+export interface NarrativeSocialForceReference {
+  id: string;
+  label: string;
+  summary: string;
+  methods?: string[];
+  tensions?: string[];
+}
+
 export interface NarrativeTurnFocusReference {
   id: string;
   kind: NarrativeFocusKind;
@@ -22,8 +30,8 @@ export interface NarrativeTurnEnvelope {
   act: { id: string; label: string; prompt: string };
   beat: Exclude<NarrativeBeat, "ending">;
   capabilities: NarrativeTurnCapability[];
-  routes: Array<{ id: string; label: string; summary: string }>;
-  factions: Array<{ id: string; label: string; summary: string }>;
+  storyPatterns: Array<{ id: string; label: string; summary: string }>;
+  socialForces: NarrativeSocialForceReference[];
   focusReferences: NarrativeTurnFocusReference[];
   statTiers: Record<StatKey, NarrativeStatTier>;
   growthFocus?: { id: string; label: string; description: string };
@@ -36,8 +44,8 @@ export interface NarrativeHorizonInput {
   worldId: string;
   act: { id: string; label: string; prompt: string };
   beat: Exclude<NarrativeBeat, "ending">;
-  routes: Array<{ id: string; label: string; summary: string }>;
-  factions: Array<{ id: string; label: string; summary: string }>;
+  storyPatterns: Array<{ id: string; label: string; summary: string }>;
+  socialForces: NarrativeSocialForceReference[];
   focusReferences: NarrativeTurnFocusReference[];
   previousCanon: Array<{ actId: string; text: string }>;
   memoryDigests: Array<{ id: string; text: string }>;
@@ -49,8 +57,8 @@ export interface NarrativeHorizonInput {
 export interface NarrativeTurnPlan {
   callId: string;
   turnKind: NarrativeTurnKind;
-  routeId?: string;
-  factionId?: string;
+  patternIds: string[];
+  forceIds: string[];
   focusRefs: string[];
   sceneGoal: string;
   presentation: "summary" | "scene" | "choice";

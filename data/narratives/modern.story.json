@@ -1,7 +1,7 @@
 {
-  "version": 8,
+  "version": 9,
   "worldId": "modern",
-  "storyBible": "这是一个当代都市人生世界。教育、职业、家庭、社交网络、组织规则与个人兴趣共同塑造机会，但人生不预设唯一成功模板。人物可以在学校、家庭、工作、迁移、创作、关系或公共生活中形成道路；每一次选择都应留下可被后来的人和自己感受到的后果。婚姻只是亲密关系的一种可能，成就也可以是事业、技艺、照料、社群、独立生活或被自己认可的平静。",
+  "storyBible": "现代都市人生由家庭、教育、工作、迁移、亲密关系、公共制度和个人创造共同组成。学生、求职、升学、婚姻与成就是常见入口而非固定关卡；人物也可能创业、照料家人、转行、远行、创作或拒绝主流答案。本局故事应优先兑现玩家人设中真正想体验的生活命题。",
   "styleRules": [
     "以第二人称贴近当代生活，校园、通勤、家庭、工作空间、线上往来与城市街区都可成为人物感受变化的现场。",
     "让叙事从对话、协作、停顿、消费、时间安排和日常选择中显出关系的亲疏、压力与机会。",
@@ -9,142 +9,720 @@
     "重要冲突落在具体生活安排与人的选择上，高潮后保留现实代价、关系变化或新的自我理解。"
   ],
   "endingGuide": "以人物最终的生活方式、关系、工作或创造回望一路选择；安稳、转向、成就和自我认同都可形成余响。",
-  "opening": { "earlyLife": { "maxAge": 3 } },
+  "opening": {
+    "earlyLife": {
+      "maxAge": 3
+    }
+  },
   "mainlineSkeleton": {
-    "premise": "这段都市人生由学习成长、选择与迷茫走向关系与成就。成长环境形成兴趣、能力与愿望，进入社会后的经历使人物重新认识自己，长期选择逐渐落实为自己的生活。每阶段的事情有实际结果，关系、经验和得失带入后来。",
-    "opening": "学习成长：人物在家庭、学校与同伴生活中形成兴趣、能力和愿望。经历一次对成长有意义的挑战后，更清楚自己在意什么以及想往哪里走。",
-    "pressure": "选择与迷茫：升学、求职与独立生活让愿望接受现实检验。人物尝试、取舍与调整，处理眼前关键问题，形成实际生活安排与自己的方向。",
-    "climax": "关系与成就：人物面对长期关系、事业与生活安排中的关键选择，将积累的能力和认识落实为可持续的生活。事情的结果体现其真正重视的人与成果。",
-    "payoff": "回望成长时的愿望、走向社会后的调整，以及长期选择形成的生活，交代关系与成果怎样延续，承认其中的收获与遗憾。",
-    "goodEndingDirection": "人物以判断、行动和承担形成可延续的关系、事业、技艺或生活秩序；收获必须承认已付出的代价。",
-    "badEndingDirection": "人物因误判、失去、资源限制或关系破裂失去重要之物；结局仍应尊重其做过的真实选择。"
+    "premise": "世界提供规律和压力，本局人设、天赋与身世建立长期故事承诺；每段经历从已发生事实生长，而非复刻世界包范例。",
+    "opening": "让人物最有辨识度的处境与世界发生真实接触。",
+    "pressure": "扩大人物选择的影响范围，使关系、能力与代价改变后续可能。",
+    "climax": "让一生积累面对更大尺度的检验，并形成不可忽略的结果。",
+    "payoff": "评价这一生实际形成的成就、关系、代价与影响。",
+    "goodEndingDirection": "能力、选择和关系共同形成可延续的成果。",
+    "badEndingDirection": "失败或代价改变人生方向，但仍承认人物真实走过的道路。"
   },
   "mainlineActs": [
     {
-      "id": "modern.learning_growth",
-      "label": "学习成长",
-      "prompt": "学习成长。人物在符合年龄的家庭、学习与同伴生活中积累能力，逐渐形成兴趣和愿望。一件切身的挑战使其开始主动选择，经历压力与行动后形成实际结果。收束交代人物学会了什么、关系如何变化，以及对未来产生的认识。",
+      "id": "modern.arc.one",
+      "label": "故事初潮",
+      "prompt": "由本局人物前提决定第一段核心经历，使人物与世界发生真实接触并形成可以继续发展的矛盾。",
       "readinessStage": "opening"
     },
     {
-      "id": "modern.choice_and_drift",
-      "label": "选择与迷茫",
-      "prompt": "选择与迷茫。人物带着成长中形成的愿望进入升学、求职与独立生活，面对现实条件与自身期待的落差。通过尝试、合作、取舍或转向处理当前阶段的核心问题。收束交代现实安排怎样落定，以及人物对能力、关系和未来方向形成的新认识。",
+      "id": "modern.arc.two",
+      "label": "命运转流",
+      "prompt": "承接本局已有事实、人物与能力，扩大人物选择的影响范围，使新的冲突和代价真正改变生活。",
       "readinessStage": "pressure"
     },
     {
-      "id": "modern.relationship_and_achievement",
-      "label": "关系与成就",
-      "prompt": "关系与成就。已有的工作、能力与人际经历汇聚为关于长期生活的关键选择，人物需要把真正重视的关系与追求落实到行动和安排中。高潮处理这段生活的核心矛盾，收束展现已经形成的成果、关系和生活方式，成为这一生结算的依据。",
+      "id": "modern.arc.three",
+      "label": "此生大势",
+      "prompt": "让人物一生积累的能力、关系与代价面对更大尺度的检验，形成足以评价这段人生的结果。",
       "readinessStage": "climax"
     }
   ],
   "worldCards": [
-    { "id": "modern.rule.success_is_plural", "kind": "world_rule", "content": "都市人生没有唯一成功模板。学历、职业、亲密关系、家庭责任、技艺、社群与独立生活都可以成为成果；叙事按人物实际愿望衡量选择，不默认升职、婚姻或财富就是终点。", "priority": 98, "activation": { "tasks": ["horizon", "planning", "rendering", "dynamic", "decision"] }, "stickyTurns": 2 },
-    { "id": "modern.rule.life_has_logistics", "kind": "world_rule", "content": "现实压力通过时间、收入、住处、通勤、照料、制度流程与沟通成本进入选择。让机会和代价落到具体安排，但不把人生写成简历或指标清单。", "priority": 94, "activation": { "tasks": ["horizon", "planning", "rendering", "dynamic", "decision"] }, "stickyTurns": 2 },
-    { "id": "modern.conflict.learning", "kind": "conflict", "content": "成长挑战可来自学习方法、同伴关系、家庭期待、兴趣投入、环境变化或第一次独立承担。选择符合年龄与出身的一种，使人物通过实际尝试形成能力和愿望，不预设固定考试。", "priority": 94, "activation": { "actIds": ["modern.learning_growth"], "beats": ["setup", "escalation", "pressure"], "tasks": ["horizon", "planning", "rendering", "dynamic", "decision"] }, "inclusionGroup": "modern.act.conflict", "cooldownTurns": 2 },
-    { "id": "modern.consequence.learning", "kind": "consequence", "content": "成长幕收束要让当前挑战有结果：人物学会一种方法、确认或放下一项愿望、改变一段关系，并把由此形成的能力与自我认识带入社会选择。", "priority": 100, "activation": { "actIds": ["modern.learning_growth"], "beats": ["climax", "payoff"], "tasks": ["horizon", "planning", "rendering", "dynamic", "decision"] }, "inclusionGroup": "modern.act.consequence", "stickyTurns": 2 },
-    { "id": "modern.practice.independence", "kind": "practice", "content": "进入社会的经历由申请、面试、协作、试错、迁移、收入安排与生活自理组成。升学、就业、自由职业、照料或转向都可成立，关键是人物如何把愿望变成可持续安排。", "priority": 96, "activation": { "actIds": ["modern.choice_and_drift"], "tasks": ["horizon", "planning", "rendering", "dynamic", "decision"] }, "stickyTurns": 2 },
-    { "id": "modern.conflict.direction", "kind": "conflict", "content": "迷茫阶段的独立难题可来自能力与岗位错位、现实资源不足、合作破裂、家庭责任、城市迁移或价值观冲突。让人物尝试并修正，而不是只反复内心犹豫。", "priority": 92, "activation": { "actIds": ["modern.choice_and_drift"], "beats": ["escalation", "pressure", "climax"], "tasks": ["planning", "rendering", "dynamic", "decision"] }, "inclusionGroup": "modern.act.conflict", "cooldownTurns": 2 },
-    { "id": "modern.consequence.direction", "kind": "consequence", "content": "第二幕收束交代现实安排如何落定：工作或学习方向、住处、经济状态、重要关系与自我判断发生什么变化。旧的迷茫应转化成此后的条件，而非继续作为同一悬念。", "priority": 100, "activation": { "actIds": ["modern.choice_and_drift"], "beats": ["climax", "payoff"], "tasks": ["horizon", "planning", "rendering", "dynamic", "decision"] }, "inclusionGroup": "modern.act.consequence", "stickyTurns": 2 },
-    { "id": "modern.practice.long_term_life", "kind": "practice", "content": "长期生活由反复选择与维护构成：关系需要沟通和边界，事业需要作品、责任与协作，家庭与个人空间需要安排。人物可以成为带头者，也可以选择规模较小但由自己认可的生活。", "priority": 98, "activation": { "actIds": ["modern.relationship_and_achievement"], "tasks": ["horizon", "planning", "rendering", "dynamic", "decision"] }, "stickyTurns": 3 },
-    { "id": "modern.consequence.life_shape", "kind": "consequence", "content": "终幕收束明确人物最终形成的关系、事业、技艺或生活方式，以及为此承担的限制与失去。不要再开启新的职业危机替代结果，余下的不确定可以作为人生余韵。", "priority": 100, "activation": { "actIds": ["modern.relationship_and_achievement"], "beats": ["climax", "payoff"], "tasks": ["horizon", "planning", "rendering", "dynamic", "decision"] }, "inclusionGroup": "modern.act.consequence", "stickyTurns": 2 },
-    { "id": "modern.route.guardian", "kind": "social_role", "content": "照料视角关注人物怎样保护具体的人、关系或公共空间，同时保留被照料者的自主性与自己的生活边界。", "priority": 82, "activation": { "routeIds": ["modern.guardian"], "tasks": ["planning", "rendering", "dynamic", "decision"] }, "inclusionGroup": "modern.route.lens" },
-    { "id": "modern.route.ambition", "kind": "social_role", "content": "进取视角关注人物怎样争取能力、作品、职位或影响力；上升通过实际工作和竞争发生，也会挤压时间与关系。", "priority": 82, "activation": { "routeIds": ["modern.ambition"], "tasks": ["planning", "rendering", "dynamic", "decision"] }, "inclusionGroup": "modern.route.lens" },
-    { "id": "modern.route.broker", "kind": "social_role", "content": "经营视角关注资源、客户、伙伴、信用与现金流怎样连接生活；交易不是万能解法，合作关系与风险共同增长。", "priority": 82, "activation": { "routeIds": ["modern.broker"], "tasks": ["planning", "rendering", "dynamic", "decision"] }, "inclusionGroup": "modern.route.lens" },
-    { "id": "modern.route.mentor", "kind": "social_role", "content": "教育与分享视角关注知识如何通过课程、作品、陪伴或共同实践影响别人；受影响的人会以自己的道路回应。", "priority": 82, "activation": { "routeIds": ["modern.mentor"], "tasks": ["planning", "rendering", "dynamic", "decision"] }, "inclusionGroup": "modern.route.lens" },
-    { "id": "modern.route.institution", "kind": "social_role", "content": "组织改进视角关注规则、流程与真实需求的落差；改变需要协作、试行和承担反作用，而非一句理念立即生效。", "priority": 82, "activation": { "routeIds": ["modern.institution"], "tasks": ["planning", "rendering", "dynamic", "decision"] }, "inclusionGroup": "modern.route.lens" },
-    { "id": "modern.route.outsider", "kind": "social_role", "content": "独立探索视角允许迁移、跨界与非标准生活；自由伴随资源不稳和归属问题，也能形成独特技能与关系网络。", "priority": 82, "activation": { "routeIds": ["modern.outsider"], "tasks": ["planning", "rendering", "dynamic", "decision"] }, "inclusionGroup": "modern.route.lens" },
-    { "id": "modern.culture.family_rhythm", "title": "家庭的日常节拍", "kind": "culture", "content": "家庭关系藏在接送、饭桌、学费、家务、照料、沉默和临时改变的计划里。父母与亲属既可能提供资源，也有自己的工作、疲惫与愿望；人物长大后，彼此的依赖和边界会随生活安排改变。", "priority": 86, "placement": "scenario", "activation": { "keys": ["父母", "家里", "亲属", "饭桌", "照料", "家务", "家庭"], "scanDepth": 4, "tasks": ["background", "planning", "rendering", "dynamic", "decision"] }, "stickyTurns": 2, "cooldownTurns": 2 },
-    { "id": "modern.institution.school_ecology", "title": "学校不只有考试", "kind": "institution", "content": "学校由课程、社团、同伴圈、老师的关注、家庭期待和有限的时间共同构成。成绩会改变机会，却不是唯一尺度；一次合作、公开展示、冲突或长期兴趣，也可能让人物看见自己的能力与位置。", "priority": 88, "placement": "scenario", "activation": { "actIds": ["modern.learning_growth"], "keys": ["学校", "老师", "同学", "课程", "社团", "考试", "作业"], "scanDepth": 5, "tasks": ["background", "planning", "rendering", "dynamic", "decision"] }, "stickyTurns": 2, "cooldownTurns": 2 },
-    { "id": "modern.geography.city_mobility", "title": "城市距离", "kind": "geography", "content": "住处、学校、办公区、医院、商业街和公共交通把城市切成不同生活半径。通勤时间、租金、搬家与熟悉的小店会改变人物能见到谁、能坚持什么，也让一次迁移同时意味着机会和关系距离。", "priority": 84, "placement": "scenario", "activation": { "keys": ["城市", "地铁", "公交", "通勤", "租房", "搬家", "街区", "住处"], "scanDepth": 4, "tasks": ["background", "planning", "rendering", "dynamic", "decision"] }, "cooldownTurns": 2 },
-    { "id": "modern.institution.workplace_reality", "title": "工作如何真正运转", "kind": "institution", "content": "工作由任务、协作、客户、交付、排班、预算和责任边界构成。职位名称不能代替实际能力；同事和管理者各自承担风险，做成一件事会积累信用，长期救火也可能吞掉健康、关系与个人方向。", "priority": 89, "placement": "scenario", "activation": { "actIds": ["modern.choice_and_drift", "modern.relationship_and_achievement"], "keys": ["工作", "公司", "同事", "客户", "项目", "加班", "面试", "职业"], "scanDepth": 5, "tasks": ["planning", "rendering", "dynamic", "decision"] }, "stickyTurns": 2, "cooldownTurns": 2 },
-    { "id": "modern.culture.online_and_offline", "title": "线上关系与公开形象", "kind": "culture", "content": "消息、群聊、平台账号和公开评价会把私人表达带进更大的关系网。线上联系可以维持远距离友谊、带来工作和创作机会，也会制造误解、比较和随时回应的压力；屏幕之外的时间与行动仍决定关系能否落地。", "priority": 82, "placement": "scenario", "activation": { "keys": ["手机", "群聊", "网络", "平台", "账号", "消息", "视频", "社交"], "scanDepth": 4, "tasks": ["background", "planning", "rendering", "dynamic", "decision"] }, "cooldownTurns": 3 },
-    { "id": "modern.practice.relationship_maintenance", "title": "关系需要实际安排", "kind": "practice", "content": "友情、亲密关系和家人之间的承诺通过见面、倾听、共同支出、照料、边界和冲突后的修复维持。爱与责任并不自动一致，长期关系会不断要求人物在个人空间和共同生活之间重新协商。", "priority": 87, "placement": "scenario", "activation": { "keys": ["朋友", "恋人", "伴侣", "婚姻", "约会", "关系", "分手", "照顾"], "scanDepth": 5, "tasks": ["background", "planning", "rendering", "dynamic", "decision"] }, "stickyTurns": 2, "cooldownTurns": 2 },
-    { "id": "modern.practice.skill_and_creation", "title": "技能、作品与长期积累", "kind": "practice", "content": "技能从反复练习、具体作品、失败记录和他人反馈中形成。兴趣可能成为职业，也可能只为人物保留一块不被工作占满的生活；真正的积累会改变能做的事、认识的人和面对选择时的底气。", "priority": 84, "placement": "scenario", "activation": { "keys": ["兴趣", "练习", "作品", "创作", "技能", "比赛", "表演", "研究"], "scanDepth": 4, "tasks": ["background", "planning", "rendering", "dynamic", "decision"] }, "cooldownTurns": 2 },
-    { "id": "modern.example.background", "title": "现代普通人生段节奏", "kind": "style_example", "content": "那几年，你习惯在晚班地铁上整理第二天的笔记，也渐渐记住了便利店换班的时间。一次课程调整让你认识了新的同伴，周末偶尔一起做项目。生活没有突然变好，但你开始知道什么事值得长期投入。", "priority": 84, "placement": "example", "activation": { "tasks": ["background"] }, "inclusionGroup": "modern.style.turn", "cooldownTurns": 2 },
-    { "id": "modern.example.choice", "title": "现代抉择场景节奏", "kind": "style_example", "content": "邮件在下班前十分钟送达：新岗位要求下月搬去另一座城市，答复期限只有三天。主管愿意替你争取名额，家里的复诊安排却刚刚确定，合租室友也在等你续约。你把几张车票页面并排打开，电话就在这时响了。", "priority": 87, "placement": "example", "activation": { "tasks": ["rendering", "dynamic"], "beats": ["pressure", "climax"] }, "inclusionGroup": "modern.style.turn", "cooldownTurns": 2 },
-    { "id": "modern.example.payoff", "title": "现代收束节奏", "kind": "style_example", "content": "半年后，新的排班表终于稳定下来，你能在周三准时赶上家里的晚饭。那项没有接受的机会偶尔仍会被提起，但共同完成的项目成了你此后转向的凭据。旧住处已经退租，钥匙交还时，你知道这段犹豫已经有了结果。", "priority": 88, "placement": "example", "activation": { "tasks": ["rendering", "dynamic", "decision"], "beats": ["payoff"] }, "inclusionGroup": "modern.style.turn", "cooldownTurns": 2 }
+    {
+      "id": "modern.rule.success_is_plural",
+      "kind": "world_rule",
+      "content": "都市人生没有唯一成功模板。学历、职业、亲密关系、家庭责任、技艺、社群与独立生活都可以成为成果；叙事按人物实际愿望衡量选择，不默认升职、婚姻或财富就是终点。",
+      "priority": 98,
+      "activation": {
+        "tasks": [
+          "horizon",
+          "planning",
+          "rendering",
+          "dynamic",
+          "decision"
+        ]
+      },
+      "stickyTurns": 2
+    },
+    {
+      "id": "modern.rule.life_has_logistics",
+      "kind": "world_rule",
+      "content": "现实压力通过时间、收入、住处、通勤、照料、制度流程与沟通成本进入选择。让机会和代价落到具体安排，但不把人生写成简历或指标清单。",
+      "priority": 94,
+      "activation": {
+        "tasks": [
+          "horizon",
+          "planning",
+          "rendering",
+          "dynamic",
+          "decision"
+        ]
+      },
+      "stickyTurns": 2
+    },
+    {
+      "id": "modern.culture.family_rhythm",
+      "title": "家庭的日常节拍",
+      "kind": "culture",
+      "content": "家庭关系藏在接送、饭桌、学费、家务、照料、沉默和临时改变的计划里。父母与亲属既可能提供资源，也有自己的工作、疲惫与愿望；人物长大后，彼此的依赖和边界会随生活安排改变。",
+      "priority": 86,
+      "placement": "scenario",
+      "activation": {
+        "keys": [
+          "父母",
+          "家里",
+          "亲属",
+          "饭桌",
+          "照料",
+          "家务",
+          "家庭"
+        ],
+        "scanDepth": 4,
+        "tasks": [
+          "background",
+          "planning",
+          "rendering",
+          "dynamic",
+          "decision"
+        ]
+      },
+      "stickyTurns": 2,
+      "cooldownTurns": 2
+    },
+    {
+      "id": "modern.geography.city_mobility",
+      "title": "城市距离",
+      "kind": "geography",
+      "content": "住处、学校、办公区、医院、商业街和公共交通把城市切成不同生活半径。通勤时间、租金、搬家与熟悉的小店会改变人物能见到谁、能坚持什么，也让一次迁移同时意味着机会和关系距离。",
+      "priority": 84,
+      "placement": "scenario",
+      "activation": {
+        "keys": [
+          "城市",
+          "地铁",
+          "公交",
+          "通勤",
+          "租房",
+          "搬家",
+          "街区",
+          "住处"
+        ],
+        "scanDepth": 4,
+        "tasks": [
+          "background",
+          "planning",
+          "rendering",
+          "dynamic",
+          "decision"
+        ]
+      },
+      "cooldownTurns": 2
+    },
+    {
+      "id": "modern.culture.online_and_offline",
+      "title": "线上关系与公开形象",
+      "kind": "culture",
+      "content": "消息、群聊、平台账号和公开评价会把私人表达带进更大的关系网。线上联系可以维持远距离友谊、带来工作和创作机会，也会制造误解、比较和随时回应的压力；屏幕之外的时间与行动仍决定关系能否落地。",
+      "priority": 82,
+      "placement": "scenario",
+      "activation": {
+        "keys": [
+          "手机",
+          "群聊",
+          "网络",
+          "平台",
+          "账号",
+          "消息",
+          "视频",
+          "社交"
+        ],
+        "scanDepth": 4,
+        "tasks": [
+          "background",
+          "planning",
+          "rendering",
+          "dynamic",
+          "decision"
+        ]
+      },
+      "cooldownTurns": 3
+    },
+    {
+      "id": "modern.practice.relationship_maintenance",
+      "title": "关系需要实际安排",
+      "kind": "practice",
+      "content": "友情、亲密关系和家人之间的承诺通过见面、倾听、共同支出、照料、边界和冲突后的修复维持。爱与责任并不自动一致，长期关系会不断要求人物在个人空间和共同生活之间重新协商。",
+      "priority": 87,
+      "placement": "scenario",
+      "activation": {
+        "keys": [
+          "朋友",
+          "恋人",
+          "伴侣",
+          "婚姻",
+          "约会",
+          "关系",
+          "分手",
+          "照顾"
+        ],
+        "scanDepth": 5,
+        "tasks": [
+          "background",
+          "planning",
+          "rendering",
+          "dynamic",
+          "decision"
+        ]
+      },
+      "stickyTurns": 2,
+      "cooldownTurns": 2
+    },
+    {
+      "id": "modern.practice.skill_and_creation",
+      "title": "技能、作品与长期积累",
+      "kind": "practice",
+      "content": "技能从反复练习、具体作品、失败记录和他人反馈中形成。兴趣可能成为职业，也可能只为人物保留一块不被工作占满的生活；真正的积累会改变能做的事、认识的人和面对选择时的底气。",
+      "priority": 84,
+      "placement": "scenario",
+      "activation": {
+        "keys": [
+          "兴趣",
+          "练习",
+          "作品",
+          "创作",
+          "技能",
+          "比赛",
+          "表演",
+          "研究"
+        ],
+        "scanDepth": 4,
+        "tasks": [
+          "background",
+          "planning",
+          "rendering",
+          "dynamic",
+          "decision"
+        ]
+      },
+      "cooldownTurns": 2
+    },
+    {
+      "id": "modern.example.background",
+      "title": "现代普通人生段节奏",
+      "kind": "style_example",
+      "content": "那几年，你习惯在晚班地铁上整理第二天的笔记，也渐渐记住了便利店换班的时间。一次课程调整让你认识了新的同伴，周末偶尔一起做项目。生活没有突然变好，但你开始知道什么事值得长期投入。",
+      "priority": 84,
+      "placement": "example",
+      "activation": {
+        "tasks": [
+          "background"
+        ]
+      },
+      "inclusionGroup": "modern.style.turn",
+      "cooldownTurns": 2
+    },
+    {
+      "id": "modern.example.choice",
+      "title": "现代抉择场景节奏",
+      "kind": "style_example",
+      "content": "邮件在下班前十分钟送达：新岗位要求下月搬去另一座城市，答复期限只有三天。主管愿意替你争取名额，家里的复诊安排却刚刚确定，合租室友也在等你续约。你把几张车票页面并排打开，电话就在这时响了。",
+      "priority": 87,
+      "placement": "example",
+      "activation": {
+        "tasks": [
+          "rendering",
+          "dynamic"
+        ],
+        "beats": [
+          "pressure",
+          "climax"
+        ]
+      },
+      "inclusionGroup": "modern.style.turn",
+      "cooldownTurns": 2
+    },
+    {
+      "id": "modern.example.payoff",
+      "title": "现代收束节奏",
+      "kind": "style_example",
+      "content": "半年后，新的排班表终于稳定下来，你能在周三准时赶上家里的晚饭。那项没有接受的机会偶尔仍会被提起，但共同完成的项目成了你此后转向的凭据。旧住处已经退租，钥匙交还时，你知道这段犹豫已经有了结果。",
+      "priority": 88,
+      "placement": "example",
+      "activation": {
+        "tasks": [
+          "rendering",
+          "dynamic",
+          "decision"
+        ],
+        "beats": [
+          "payoff"
+        ]
+      },
+      "inclusionGroup": "modern.style.turn",
+      "cooldownTurns": 2
+    }
   ],
   "progression": {
-    "backgroundPacing": { "minYears": 1, "maxYears": 3, "personalReflectionChance": 0.35 },
-    "statTiers": { "lowMax": 8, "highMin": 22 },
+    "backgroundPacing": {
+      "minYears": 1,
+      "maxYears": 3,
+      "personalReflectionChance": 0.35
+    },
+    "statTiers": {
+      "lowMax": 8,
+      "highMin": 22
+    },
     "statTierPresentation": {
-      "intelligence": { "low": "学思未定", "steady": "融会贯通", "high": "见微知著" },
-      "charisma": { "low": "拘谨青涩", "steady": "待人得体", "high": "众望所归" },
-      "family": { "low": "家计维艰", "steady": "家境可持", "high": "根基丰足" },
-      "fortune": { "low": "时运未至", "steady": "机缘恰逢", "high": "顺势而起" },
-      "physique": { "low": "体弱易倦", "steady": "精力充沛", "high": "身心康健" }
+      "intelligence": {
+        "low": "学思未定",
+        "steady": "融会贯通",
+        "high": "见微知著"
+      },
+      "charisma": {
+        "low": "拘谨青涩",
+        "steady": "待人得体",
+        "high": "众望所归"
+      },
+      "family": {
+        "low": "家计维艰",
+        "steady": "家境可持",
+        "high": "根基丰足"
+      },
+      "fortune": {
+        "low": "时运未至",
+        "steady": "机缘恰逢",
+        "high": "顺势而起"
+      },
+      "physique": {
+        "low": "体弱易倦",
+        "steady": "精力充沛",
+        "high": "身心康健"
+      }
     },
     "survival": {
       "startAge": 4,
       "graceYears": 3,
       "stages": [
-        { "id": "child", "label": "幼年", "ageStageIds": ["child"], "dangerBelowPhysique": 1, "baseCrisisRisk": 0.04, "additionalYearRisk": 0.03, "maxCrisisRisk": 0.14 },
-        { "id": "youth", "label": "青年", "ageStageIds": ["youth"], "dangerBelowPhysique": 2, "baseCrisisRisk": 0.06, "additionalYearRisk": 0.04, "maxCrisisRisk": 0.22 },
-        { "id": "adult", "label": "成年", "ageStageIds": ["prime", "middle"], "dangerBelowPhysique": 3, "baseCrisisRisk": 0.08, "additionalYearRisk": 0.05, "maxCrisisRisk": 0.3 },
-        { "id": "elder", "label": "晚年", "ageStageIds": ["elder"], "dangerBelowPhysique": 5, "baseCrisisRisk": 0.12, "additionalYearRisk": 0.06, "maxCrisisRisk": 0.42 }
+        {
+          "id": "child",
+          "label": "幼年",
+          "ageStageIds": [
+            "child"
+          ],
+          "dangerBelowPhysique": 1,
+          "baseCrisisRisk": 0.04,
+          "additionalYearRisk": 0.03,
+          "maxCrisisRisk": 0.14
+        },
+        {
+          "id": "youth",
+          "label": "青年",
+          "ageStageIds": [
+            "youth"
+          ],
+          "dangerBelowPhysique": 2,
+          "baseCrisisRisk": 0.06,
+          "additionalYearRisk": 0.04,
+          "maxCrisisRisk": 0.22
+        },
+        {
+          "id": "adult",
+          "label": "成年",
+          "ageStageIds": [
+            "prime",
+            "middle"
+          ],
+          "dangerBelowPhysique": 3,
+          "baseCrisisRisk": 0.08,
+          "additionalYearRisk": 0.05,
+          "maxCrisisRisk": 0.3
+        },
+        {
+          "id": "elder",
+          "label": "晚年",
+          "ageStageIds": [
+            "elder"
+          ],
+          "dangerBelowPhysique": 5,
+          "baseCrisisRisk": 0.12,
+          "additionalYearRisk": 0.06,
+          "maxCrisisRisk": 0.42
+        }
       ],
-      "recovery": { "successRateByTier": { "low": 0.25, "steady": 0.55, "high": 1 }, "restoreBuffer": 5 },
+      "recovery": {
+        "successRateByTier": {
+          "low": 0.25,
+          "steady": 0.55,
+          "high": 1
+        },
+        "restoreBuffer": 5
+      },
       "familyPhysiqueSupport": {
-        "low": { "outcomes": [{ "delta": -1, "weight": 20 }, { "delta": 0, "weight": 60 }, { "delta": 1, "weight": 20 }] },
-        "steady": { "outcomes": [{ "delta": 0, "weight": 60 }, { "delta": 1, "weight": 40 }] },
-        "high": { "outcomes": [{ "delta": 0, "weight": 45 }, { "delta": 1, "weight": 45 }, { "delta": 2, "weight": 10 }] }
+        "low": {
+          "outcomes": [
+            {
+              "delta": -1,
+              "weight": 20
+            },
+            {
+              "delta": 0,
+              "weight": 60
+            },
+            {
+              "delta": 1,
+              "weight": 20
+            }
+          ]
+        },
+        "steady": {
+          "outcomes": [
+            {
+              "delta": 0,
+              "weight": 60
+            },
+            {
+              "delta": 1,
+              "weight": 40
+            }
+          ]
+        },
+        "high": {
+          "outcomes": [
+            {
+              "delta": 0,
+              "weight": 45
+            },
+            {
+              "delta": 1,
+              "weight": 45
+            },
+            {
+              "delta": 2,
+              "weight": 10
+            }
+          ]
+        }
       }
     },
     "growthFocuses": [
-      { "id": "study", "label": "学识与技艺", "description": "将日常积累更多放在学习、专业能力与创造之上。", "primaryStats": ["intelligence", "fortune"], "secondaryStats": ["charisma"] },
-      { "id": "bond", "label": "关系与根基", "description": "将日常积累更多放在人情、家庭与可依靠的关系之上。", "primaryStats": ["charisma", "family"], "secondaryStats": ["fortune"] },
-      { "id": "resolve", "label": "行动与韧性", "description": "将日常积累更多放在行动、体魄与承受现实的能力之上。", "primaryStats": ["physique", "fortune"], "secondaryStats": ["intelligence"] }
+      {
+        "id": "study",
+        "label": "学识与技艺",
+        "description": "将日常积累更多放在学习、专业能力与创造之上。",
+        "primaryStats": [
+          "intelligence",
+          "fortune"
+        ],
+        "secondaryStats": [
+          "charisma"
+        ]
+      },
+      {
+        "id": "bond",
+        "label": "关系与根基",
+        "description": "将日常积累更多放在人情、家庭与可依靠的关系之上。",
+        "primaryStats": [
+          "charisma",
+          "family"
+        ],
+        "secondaryStats": [
+          "fortune"
+        ]
+      },
+      {
+        "id": "resolve",
+        "label": "行动与韧性",
+        "description": "将日常积累更多放在行动、体魄与承受现实的能力之上。",
+        "primaryStats": [
+          "physique",
+          "fortune"
+        ],
+        "secondaryStats": [
+          "intelligence"
+        ]
+      }
     ],
-    "routes": [
-      { "directionId": "modern.guardian", "gates": { "opening": { "weights": { "charisma": 0.55, "family": 0.3, "physique": 0.15 }, "threshold": 6 }, "escalation": { "weights": { "charisma": 0.55, "family": 0.3, "physique": 0.15 }, "threshold": 12 }, "pressure": { "weights": { "charisma": 0.55, "family": 0.3, "physique": 0.15 }, "threshold": 18 }, "climax": { "weights": { "charisma": 0.55, "family": 0.3, "physique": 0.15 }, "threshold": 26 } } },
-      { "directionId": "modern.ambition", "gates": { "opening": { "weights": { "intelligence": 0.55, "charisma": 0.25, "fortune": 0.2 }, "threshold": 6 }, "escalation": { "weights": { "intelligence": 0.55, "charisma": 0.25, "fortune": 0.2 }, "threshold": 13 }, "pressure": { "weights": { "intelligence": 0.55, "charisma": 0.25, "fortune": 0.2 }, "threshold": 20 }, "climax": { "weights": { "intelligence": 0.55, "charisma": 0.25, "fortune": 0.2 }, "threshold": 28 } } },
-      { "directionId": "modern.broker", "gates": { "opening": { "weights": { "family": 0.45, "charisma": 0.35, "fortune": 0.2 }, "threshold": 6 }, "escalation": { "weights": { "family": 0.45, "charisma": 0.35, "fortune": 0.2 }, "threshold": 12 }, "pressure": { "weights": { "family": 0.45, "charisma": 0.35, "fortune": 0.2 }, "threshold": 19 }, "climax": { "weights": { "family": 0.45, "charisma": 0.35, "fortune": 0.2 }, "threshold": 27 } } },
-      { "directionId": "modern.mentor", "gates": { "opening": { "weights": { "intelligence": 0.7, "charisma": 0.3 }, "threshold": 6 }, "escalation": { "weights": { "intelligence": 0.7, "charisma": 0.3 }, "threshold": 13 }, "pressure": { "weights": { "intelligence": 0.7, "charisma": 0.3 }, "threshold": 20 }, "climax": { "weights": { "intelligence": 0.7, "charisma": 0.3 }, "threshold": 28 } } },
-      { "directionId": "modern.institution", "gates": { "opening": { "weights": { "intelligence": 0.55, "charisma": 0.35, "family": 0.1 }, "threshold": 6 }, "escalation": { "weights": { "intelligence": 0.55, "charisma": 0.35, "family": 0.1 }, "threshold": 13 }, "pressure": { "weights": { "intelligence": 0.55, "charisma": 0.35, "family": 0.1 }, "threshold": 20 }, "climax": { "weights": { "intelligence": 0.55, "charisma": 0.35, "family": 0.1 }, "threshold": 28 } } },
-      { "directionId": "modern.outsider", "gates": { "opening": { "weights": { "fortune": 0.4, "physique": 0.35, "intelligence": 0.25 }, "threshold": 6 }, "escalation": { "weights": { "fortune": 0.4, "physique": 0.35, "intelligence": 0.25 }, "threshold": 12 }, "pressure": { "weights": { "fortune": 0.4, "physique": 0.35, "intelligence": 0.25 }, "threshold": 18 }, "climax": { "weights": { "fortune": 0.4, "physique": 0.35, "intelligence": 0.25 }, "threshold": 26 } } }
-    ],
-    "completion": { "requireCommittedDirection": true, "requireDecisionConsequence": true, "requireClimax": true, "requirePayoff": true, "requireResolvedCoreFacts": true, "requireNoActiveScene": true, "minCompletedSceneInstances": 3, "requireAllMainlineActs": true }
+    "completion": {
+      "requireCommittedDirection": true,
+      "requireDecisionConsequence": true,
+      "requireClimax": true,
+      "requirePayoff": true,
+      "requireResolvedCoreFacts": true,
+      "requireNoActiveScene": true,
+      "minCompletedSceneInstances": 3,
+      "requireAllMainlineActs": true
+    },
+    "gates": {
+      "opening": {
+        "weights": {
+          "intelligence": 0.342,
+          "charisma": 0.3,
+          "family": 0.142,
+          "fortune": 0.133,
+          "physique": 0.083
+        },
+        "threshold": 6
+      },
+      "escalation": {
+        "weights": {
+          "intelligence": 0.342,
+          "charisma": 0.3,
+          "family": 0.142,
+          "fortune": 0.133,
+          "physique": 0.083
+        },
+        "threshold": 13
+      },
+      "pressure": {
+        "weights": {
+          "intelligence": 0.342,
+          "charisma": 0.3,
+          "family": 0.142,
+          "fortune": 0.133,
+          "physique": 0.083
+        },
+        "threshold": 19
+      },
+      "climax": {
+        "weights": {
+          "intelligence": 0.342,
+          "charisma": 0.3,
+          "family": 0.142,
+          "fortune": 0.133,
+          "physique": 0.083
+        },
+        "threshold": 27
+      }
+    }
   },
-  "narrativeFactions": [
-    { "id": "guardian", "label": "家庭与社区", "summary": "由亲属、照料者、邻里与共同生活构成，既能提供归处，也会提出责任。", "conflictFactionIds": ["ambition", "institution"] },
-    { "id": "ambition", "label": "学业与职业竞争", "summary": "由成绩、机会、行业与竞争者构成，提供上升可能，也不断追问代价。", "conflictFactionIds": ["guardian", "outsider"] },
-    { "id": "broker", "label": "关系与资源网络", "summary": "由朋友、同事、合作者与资源往来构成，信任从不完全免费。", "conflictFactionIds": ["institution", "outsider"] },
-    { "id": "mentor", "label": "师友与专业共同体", "summary": "由老师、前辈、伙伴与技艺传统构成，重视积累，也可能形成期待。", "conflictFactionIds": ["ambition"] },
-    { "id": "institution", "label": "学校与组织规则", "summary": "由学校、公司、行业或公共体系构成，规则能提供机会，也能遮蔽具体的人。", "conflictFactionIds": ["broker", "outsider"] },
-    { "id": "outsider", "label": "迁移与非常规生活", "summary": "由新城市、边缘社群、自由职业或不同生活方式构成，带来突破也带来不安。", "conflictFactionIds": ["ambition", "institution"] }
-  ],
-  "routeArcs": [
-    { "directionId": "modern.guardian", "label": "家人与归处", "summary": "从家庭、照料、亲密关系与社区责任观察人生；人物可以守护他人，也可能寻求被理解和安放。", "perspective": "让宏大的选择落到相识之人的处境、承诺与归处。", "escalation": "照料、亏欠、陪伴与边界会让善意变成必须回答的选择。", "crisis": "更深的生活危机来临时，谁得到陪伴、谁被忽略、谁仍能回家应成为真实后果。", "payoffFocus": "回应人物曾经承担或期待的照料、名分与归属。", "coreThreadIds": [] },
-    { "directionId": "modern.ambition", "label": "学习与上升", "summary": "从学习、竞争、职业与个人目标观察人生；人物可以追求位置，也可能重新定义什么值得追求。", "perspective": "让每次获得机会都伴随能力、底线和会被追问的代价。", "escalation": "成绩、履历、作品、同侪与机会会把私人愿望变成现实判断。", "crisis": "人生的重要关口中，得到的位置、放弃的位置或未被看见的努力都应决定人物能承担什么。", "payoffFocus": "让人物说明自己为何取得、放弃或重新定义成就。", "coreThreadIds": [] },
-    { "directionId": "modern.broker", "label": "关系与资源", "summary": "从信任、协商、资源往来与关系网络观察人生；人物可以撮合、借力、回避或被关系牵动。", "perspective": "让信息、金钱、时间、人情和信用成为可见的生活筹码。", "escalation": "多方需求会要求人物用承诺、时间、资源或信任换取立足之处。", "crisis": "压力来临时，资源的断绝与重新分配应落到具体人的生活和关系。", "payoffFocus": "说明人物经营的信任最终保住、伤害或改变了谁。", "coreThreadIds": [] },
-    { "directionId": "modern.mentor", "label": "能力与传承", "summary": "从学习、技艺、师友、创造与传承观察人生；人物可以求学、带人、创作或在专业中寻找责任。", "perspective": "让能力如何进入现实、帮助他人或改变自身始终成为可追问的选择。", "escalation": "师友期待、作品压力、学习门槛与职业现实会要求人物证明积累的意义。", "crisis": "更大选择到来时，知识、作品、技术与人才可以成为行动资源，也可能成为必须保护的东西。", "payoffFocus": "回应一段师友关系、创造尝试或由能力引出的责任。", "coreThreadIds": [] },
-    { "directionId": "modern.institution", "label": "规则与责任", "summary": "从学校、公司、行业和公共规则观察人生；人物可以执行、质疑、修补或承受组织留下的缺口。", "perspective": "让程序既成为机会的门槛，也成为追问责任的凭据。", "escalation": "上级、同侪、客户、家庭与规则会要求人物在正确流程和具体代价之间取舍。", "crisis": "重要压力下，每项决定、审批或承担都应产生帮助、伤害或失效的现实后果。", "payoffFocus": "让一项判断、规则或职责留下可被承担的影响。", "coreThreadIds": [] },
-    { "directionId": "modern.outsider", "label": "异地与新路", "summary": "从迁移、转行、创作、边缘社群与非典型生活观察人生；人物可以远行、试错、离开或重新选择归属。", "perspective": "让人物的视野持续被陌生环境、不同生活方式与被忽略的人纠正。", "escalation": "迁徙、转向、自由与不稳定会使每次选择都伴随新的关系和风险。", "crisis": "当生活需要答案时，远方机会、边缘处境与不被主流承认的道路应成为实际行动的一部分。", "payoffFocus": "回应人物选择离开、留下、创造或守住的那条新路。", "coreThreadIds": [] }
-  ],
   "threads": [],
   "characters": [],
   "lore": [],
   "eventBindings": [],
   "endingBlueprints": [
-    { "id": "modern.guardian.good", "worldId": "modern", "directionId": "modern.guardian", "polarity": "good", "title": "灯火有归", "premise": "你让重要的人拥有了可继续生活的安稳，也没有遗失自己。", "finalConflict": "在最后一次关系与责任的取舍中决定怎样留下。", "payoffFocus": "回应照料、陪伴或归属的承诺。", "epilogueFocus": "以可被彼此看见的关系与生活收束。", "statWeights": { "charisma": 0.3, "family": 0.28, "physique": 0.16, "intelligence": 0.14, "fortune": 0.12 }, "requiredThreadIds": [] },
-    { "id": "modern.guardian.normal", "worldId": "modern", "directionId": "modern.guardian", "polarity": "normal", "title": "仍有人等你", "premise": "你未能照顾所有人，却守住了最不能放下的关系。", "finalConflict": "在遗憾与责任之间留下可承受的安排。", "payoffFocus": "回应曾经许下的陪伴。", "epilogueFocus": "以有限安稳和持续牵挂收束。", "statWeights": { "charisma": 0.3, "family": 0.28, "physique": 0.16, "intelligence": 0.14, "fortune": 0.12 }, "requiredThreadIds": [] },
-    { "id": "modern.guardian.bad", "worldId": "modern", "directionId": "modern.guardian", "polarity": "bad", "title": "未竟的归处", "premise": "你失去了重要的陪伴或安稳，但仍留下过真实的守护。", "finalConflict": "在无法两全的关系中承认最后的失去。", "payoffFocus": "回应曾经试图保全的人。", "epilogueFocus": "以离散、牺牲与被记住的善意收束。", "statWeights": { "charisma": 0.3, "family": 0.28, "physique": 0.16, "intelligence": 0.14, "fortune": 0.12 }, "requiredThreadIds": [] },
-    { "id": "modern.ambition.good", "worldId": "modern", "directionId": "modern.ambition", "polarity": "good", "title": "自成其路", "premise": "你取得了位置或成果，也保住了自己认可的尺度。", "finalConflict": "在最后一次机会前说明何种成功值得付出。", "payoffFocus": "回应能力、目标与底线之间的选择。", "epilogueFocus": "以成果、清醒与后续可能收束。", "statWeights": { "intelligence": 0.3, "charisma": 0.25, "fortune": 0.2, "physique": 0.15, "family": 0.1 }, "requiredThreadIds": [] },
-    { "id": "modern.ambition.normal", "worldId": "modern", "directionId": "modern.ambition", "polarity": "normal", "title": "未负来路", "premise": "你未得到所有期待，却留下了能继续前行的能力与位置。", "finalConflict": "在得失之间承认真正想带走的东西。", "payoffFocus": "回应一次关键的上升或放弃。", "epilogueFocus": "以有限成果与仍可继续的生活收束。", "statWeights": { "intelligence": 0.3, "charisma": 0.25, "fortune": 0.2, "physique": 0.15, "family": 0.1 }, "requiredThreadIds": [] },
-    { "id": "modern.ambition.bad", "worldId": "modern", "directionId": "modern.ambition", "polarity": "bad", "title": "高处有痕", "premise": "你得到或错失的位置最终要求偿还代价，仍必须面对自己走过的路。", "finalConflict": "在保住表面成功和承认真实损失之间作最后选择。", "payoffFocus": "让一次关键竞争的代价回到眼前。", "epilogueFocus": "以失衡、转身或迟来的清醒收束。", "statWeights": { "intelligence": 0.3, "charisma": 0.25, "fortune": 0.2, "physique": 0.15, "family": 0.1 }, "requiredThreadIds": [] },
-    { "id": "modern.broker.good", "worldId": "modern", "directionId": "modern.broker", "polarity": "good", "title": "信任成网", "premise": "你让关系和资源成为彼此成全的力量，没有把任何人只当作筹码。", "finalConflict": "在最后一次交换中决定信任应如何被保留。", "payoffFocus": "回应人情、协商与资源承诺。", "epilogueFocus": "以可信赖的关系和可持续的生活收束。", "statWeights": { "family": 0.3, "charisma": 0.25, "fortune": 0.24, "intelligence": 0.14, "physique": 0.07 }, "requiredThreadIds": [] },
-    { "id": "modern.broker.normal", "worldId": "modern", "directionId": "modern.broker", "polarity": "normal", "title": "人情尚在", "premise": "你没有赢下所有往来，却保住了几段值得信任的关系。", "finalConflict": "在利益与情义之间留下可承受的答案。", "payoffFocus": "回应一次重要的协商或帮助。", "epilogueFocus": "以谨慎往来和仍在的联系收束。", "statWeights": { "family": 0.3, "charisma": 0.25, "fortune": 0.24, "intelligence": 0.14, "physique": 0.07 }, "requiredThreadIds": [] },
-    { "id": "modern.broker.bad", "worldId": "modern", "directionId": "modern.broker", "polarity": "bad", "title": "关系余债", "premise": "你被关系和资源的代价拖住，却仍明白自己曾想守住什么。", "finalConflict": "在交出筹码和保住重要之人之间作最后交换。", "payoffFocus": "让旧日信任兑现其真实代价。", "epilogueFocus": "以疏离、亏欠或重新开始收束。", "statWeights": { "family": 0.3, "charisma": 0.25, "fortune": 0.24, "intelligence": 0.14, "physique": 0.07 }, "requiredThreadIds": [] },
-    { "id": "modern.mentor.good", "worldId": "modern", "directionId": "modern.mentor", "polarity": "good", "title": "所学有用", "premise": "你让积累的能力进入真实生活，也留下了能继续生长的影响。", "finalConflict": "在最后一次能力与责任的取舍中决定所学服务于谁。", "payoffFocus": "回应师友、作品或长期练习。", "epilogueFocus": "以技艺、创造和被传下去的东西收束。", "statWeights": { "intelligence": 0.35, "charisma": 0.24, "family": 0.16, "physique": 0.14, "fortune": 0.11 }, "requiredThreadIds": [] },
-    { "id": "modern.mentor.normal", "worldId": "modern", "directionId": "modern.mentor", "polarity": "normal", "title": "微光未灭", "premise": "你未必站在最显眼的位置，却让一项能力和一段关系没有白费。", "finalConflict": "在现实压力前决定什么仍值得留下。", "payoffFocus": "回应一段学习、创作或师友情谊。", "epilogueFocus": "以持续积累和有限传承收束。", "statWeights": { "intelligence": 0.35, "charisma": 0.24, "family": 0.16, "physique": 0.14, "fortune": 0.11 }, "requiredThreadIds": [] },
-    { "id": "modern.mentor.bad", "worldId": "modern", "directionId": "modern.mentor", "polarity": "bad", "title": "技艺留白", "premise": "你未能让所学完全抵达想去的地方，但它仍记录着你做过的努力。", "finalConflict": "在放下、保存和重新定义之间作最后决定。", "payoffFocus": "回应一次未能兑现的学习或创造。", "epilogueFocus": "以中断、转向或沉默的坚持收束。", "statWeights": { "intelligence": 0.35, "charisma": 0.24, "family": 0.16, "physique": 0.14, "fortune": 0.11 }, "requiredThreadIds": [] },
-    { "id": "modern.institution.good", "worldId": "modern", "directionId": "modern.institution", "polarity": "good", "title": "规则有人", "premise": "你让制度和职责不只停在纸面，也为具体的人留下了余地。", "finalConflict": "在最后一次责任判断中保住真正重要的部分。", "payoffFocus": "回应规则、职责与人之间的取舍。", "epilogueFocus": "以可信的承担和可被延续的改变收束。", "statWeights": { "intelligence": 0.3, "charisma": 0.25, "family": 0.16, "fortune": 0.15, "physique": 0.14 }, "requiredThreadIds": [] },
-    { "id": "modern.institution.normal", "worldId": "modern", "directionId": "modern.institution", "polarity": "normal", "title": "留下余地", "premise": "你没能改变全部规则，却让少数人和一部分事情有了更好的去处。", "finalConflict": "在职责边界前决定还能坚持什么。", "payoffFocus": "回应一项长期承担的责任。", "epilogueFocus": "以有限改变与日常信誉收束。", "statWeights": { "intelligence": 0.3, "charisma": 0.25, "family": 0.16, "fortune": 0.15, "physique": 0.14 }, "requiredThreadIds": [] },
-    { "id": "modern.institution.bad", "worldId": "modern", "directionId": "modern.institution", "polarity": "bad", "title": "程序之外", "premise": "规则没有保护住你想保护的人，你也必须承担留下的缺口。", "finalConflict": "在服从与拒绝之间承认最后的代价。", "payoffFocus": "让此前的职责和判断回到人物面前。", "epilogueFocus": "以失职、离开或艰难的补偿收束。", "statWeights": { "intelligence": 0.3, "charisma": 0.25, "family": 0.16, "fortune": 0.15, "physique": 0.14 }, "requiredThreadIds": [] },
-    { "id": "modern.outsider.good", "worldId": "modern", "directionId": "modern.outsider", "polarity": "good", "title": "另辟生路", "premise": "你没有照搬既定答案，而是走出了适合自己也能照亮他人的道路。", "finalConflict": "决定新生活应如何面对旧关系与现实。", "payoffFocus": "回应远行、转向或创造的初心。", "epilogueFocus": "以新居所、作品、社群或自由生活收束。", "statWeights": { "fortune": 0.3, "physique": 0.25, "intelligence": 0.2, "charisma": 0.15, "family": 0.1 }, "requiredThreadIds": [] },
-    { "id": "modern.outsider.normal", "worldId": "modern", "directionId": "modern.outsider", "polarity": "normal", "title": "仍在路上", "premise": "你未得到所有确认，却为自己争得了继续尝试的空间。", "finalConflict": "在安定与探索之间留下最后的选择。", "payoffFocus": "回应一次离开、迁移或转行。", "epilogueFocus": "以尚未定型的人生和可信的自由收束。", "statWeights": { "fortune": 0.3, "physique": 0.25, "intelligence": 0.2, "charisma": 0.15, "family": 0.1 }, "requiredThreadIds": [] },
-    { "id": "modern.outsider.bad", "worldId": "modern", "directionId": "modern.outsider", "polarity": "bad", "title": "远方余响", "premise": "你为突破付出了沉重代价，却没有否认当初为何要走出去。", "finalConflict": "在回头、坚持和告别之间作最后决定。", "payoffFocus": "让那条非常规道路的代价得到回应。", "epilogueFocus": "以漂泊、失落或重新寻找归处收束。", "statWeights": { "fortune": 0.3, "physique": 0.25, "intelligence": 0.2, "charisma": 0.15, "family": 0.1 }, "requiredThreadIds": [] }
-  ]
+    {
+      "id": "modern.world.good",
+      "worldId": "modern",
+      "polarity": "good",
+      "title": "自成生活",
+      "premise": "你获得了足以支撑理想的能力与关系，并把选择变成了可以继续的生活。",
+      "finalConflict": "回望本局已经完成的人生经历，确认人物最终保住、改变或失去了什么。",
+      "payoffFocus": "以本局事实、人物关系、能力、选择和代价为依据，不逐项复述账本。",
+      "epilogueFocus": "交代人物认可的成就、关系和生活如何共存。",
+      "statWeights": {
+        "intelligence": 0.22,
+        "charisma": 0.2,
+        "family": 0.18,
+        "fortune": 0.18,
+        "physique": 0.22
+      },
+      "requiredThreadIds": []
+    },
+    {
+      "id": "modern.world.normal",
+      "worldId": "modern",
+      "polarity": "normal",
+      "title": "人间有路",
+      "premise": "你没有得到所有答案，却守住了重要的人与继续前行的能力。",
+      "finalConflict": "回望本局已经完成的人生经历，确认人物最终保住、改变或失去了什么。",
+      "payoffFocus": "以本局事实、人物关系、能力、选择和代价为依据，不逐项复述账本。",
+      "epilogueFocus": "交代有限成果、真实遗憾和稳定下来的生活。",
+      "statWeights": {
+        "intelligence": 0.22,
+        "charisma": 0.2,
+        "family": 0.18,
+        "fortune": 0.18,
+        "physique": 0.22
+      },
+      "requiredThreadIds": []
+    },
+    {
+      "id": "modern.world.bad",
+      "worldId": "modern",
+      "polarity": "bad",
+      "title": "未竟人生",
+      "premise": "压力、失衡或选择的代价改变了原本的期待，但这段人生仍留下真实痕迹。",
+      "finalConflict": "回望本局已经完成的人生经历，确认人物最终保住、改变或失去了什么。",
+      "payoffFocus": "以本局事实、人物关系、能力、选择和代价为依据，不逐项复述账本。",
+      "epilogueFocus": "交代失去、转向以及人物曾经坚持的东西。",
+      "statWeights": {
+        "intelligence": 0.22,
+        "charisma": 0.2,
+        "family": 0.18,
+        "fortune": 0.18,
+        "physique": 0.22
+      },
+      "requiredThreadIds": []
+    }
+  ],
+  "worldCore": {
+    "identity": "信息密集、机会与压力并存的现代社会，个人选择总与家庭、组织、市场和城市环境相连。",
+    "laws": [
+      "时间、金钱、学历、健康与关系都是有限资源",
+      "制度提供机会也制造门槛",
+      "网络声誉与私人生活会相互影响"
+    ],
+    "powerStructure": "家庭、学校、公司、市场、平台、公共机构与社群分散掌握资源和评价权。",
+    "everydayLife": "学习、通勤、工作、消费、居住、恋爱、照料、社交与休息构成生活的真实重量。",
+    "tone": "贴近当代生活，重视具体选择、人情关系与个人成长，也允许事业跃迁和时代浪潮的震动。"
+  },
+  "socialForces": [
+    {
+      "id": "modern.family",
+      "label": "家庭与亲密关系",
+      "summary": "提供情感、照料和资源，也带来期待、边界与长期责任。",
+      "methods": [
+        "支持",
+        "劝说",
+        "照料",
+        "约束"
+      ]
+    },
+    {
+      "id": "modern.education",
+      "label": "教育与专业共同体",
+      "summary": "以知识、资格、作品和师友关系塑造能力与机会。",
+      "methods": [
+        "培养",
+        "评审",
+        "竞争",
+        "传承"
+      ]
+    },
+    {
+      "id": "modern.work",
+      "label": "职场与市场",
+      "summary": "通过岗位、资本、客户和行业规则分配机会，并要求持续交换。",
+      "methods": [
+        "招聘",
+        "投资",
+        "合作",
+        "淘汰"
+      ]
+    },
+    {
+      "id": "modern.institutions",
+      "label": "公共机构与规则",
+      "summary": "影响住房、医疗、司法、福利和公共生活，程序与个体处境并不总一致。",
+      "methods": [
+        "审批",
+        "服务",
+        "监管",
+        "救济"
+      ]
+    },
+    {
+      "id": "modern.peers",
+      "label": "同侪与公众",
+      "summary": "朋友、同学、同事、社群和舆论共同塑造认同、竞争与归属。",
+      "methods": [
+        "陪伴",
+        "比较",
+        "传播",
+        "排斥"
+      ]
+    },
+    {
+      "id": "modern.city",
+      "label": "城市与流动网络",
+      "summary": "地域、平台、交通和迁移不断带来新入口，也制造孤独和不稳定。",
+      "methods": [
+        "连接",
+        "迁移",
+        "聚集",
+        "挤压"
+      ]
+    }
+  ],
+  "narrativePalette": {
+    "sceneModes": [
+      "家庭日常",
+      "校园成长",
+      "求职与职场",
+      "亲密关系",
+      "城市迁移",
+      "公共事件",
+      "创业与创造",
+      "人生转向"
+    ],
+    "conflictSources": [
+      "期待与自我",
+      "稳定与机会",
+      "亲密与边界",
+      "能力与门槛",
+      "效率与尊严",
+      "成功与生活",
+      "留下与离开"
+    ],
+    "actionVocabulary": [
+      "学习",
+      "应聘",
+      "协商",
+      "照料",
+      "创作",
+      "创业",
+      "维权",
+      "搬迁",
+      "表白",
+      "拒绝",
+      "转行",
+      "重建生活"
+    ],
+    "scalePossibilities": [
+      "个人习惯",
+      "家庭与关系",
+      "学校或团队",
+      "公司与行业",
+      "城市和时代变化"
+    ]
+  },
+  "storyPatterns": [
+    {
+      "id": "modern.growth",
+      "label": "学习成长",
+      "summary": "以学习、技能、作品和师友写能力怎样真正进入生活。"
+    },
+    {
+      "id": "modern.career",
+      "label": "职业与创造",
+      "summary": "以岗位、事业、创业或创作写个人目标和现实交换。"
+    },
+    {
+      "id": "modern.intimacy",
+      "label": "亲密与家庭",
+      "summary": "以恋爱、婚姻、亲情、照料和边界写长期关系。"
+    },
+    {
+      "id": "modern.mobility",
+      "label": "迁移与新路",
+      "summary": "以升学、搬迁、转行和不同生活方式打开新的社会关系。"
+    },
+    {
+      "id": "modern.public",
+      "label": "公共生活",
+      "summary": "让制度、社区、舆论和现实问题进入人物选择。"
+    },
+    {
+      "id": "modern.reinvention",
+      "label": "人生重启",
+      "summary": "人物可以在失去、迷茫或成功之后重新定义自己的生活。"
+    }
+  ],
+  "mainlineFacts": []
 }

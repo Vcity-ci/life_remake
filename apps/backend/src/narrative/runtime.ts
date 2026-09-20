@@ -1,11 +1,12 @@
 import { randomUUID } from "node:crypto";
-import type { DecisionType, NarrativeAgentAttemptRecord, NarrativeAttributePolicy, NarrativeFactResolution, NarrativeWorldDefinition, WorldConfig } from "@reroll/shared";
+import type { DecisionType, NarrativeAgentAttemptRecord, NarrativeAttributePolicy, NarrativeBeatObservation, NarrativeFactResolution, NarrativeWorldDefinition, WorldConfig } from "@reroll/shared";
 import {
   generateDynamicNarrativeScene,
   generateDirectedDecisionSettlement,
   generateEndingNarrative,
   generateNarrativeHorizonPlan,
   generateNarrativeTurnPlan,
+  observeNarrativeBeat,
   renderDirectedDecisionNarrative,
   synchronizeNarrativeContinuity,
   refineNarrativeProse,
@@ -67,7 +68,7 @@ async function ensureNarrativeHorizon(input: NarrativeAgentTurnInput, attemptId:
   const previousRevision = run.narrative.horizonPlan?.revision ?? 0;
   const previousPlan = context.narrativePlan;
   const horizonPlan = buildNarrativePromptPlan(run, narrativeWorld, null, "horizon", {
-    factionIds: envelope.factions.map((faction) => faction.id),
+    factionIds: envelope.socialForces.map((force) => force.id),
     focusIds: envelope.focusReferences.map((entry) => entry.id)
   });
   if (!horizonPlan) throw new Error("narrative_horizon_prompt_plan_missing");
@@ -79,8 +80,8 @@ async function ensureNarrativeHorizon(input: NarrativeAgentTurnInput, attemptId:
       worldId: envelope.worldId,
       act: envelope.act,
       beat: envelope.beat,
-      routes: envelope.routes,
-      factions: envelope.factions,
+      storyPatterns: envelope.storyPatterns,
+      socialForces: envelope.socialForces,
       focusReferences: envelope.focusReferences,
       previousCanon: (horizonPlan.actCanon ?? []).map((canon) => ({ actId: canon.actId, text: canon.text })),
       memoryDigests: (horizonPlan.memoryDigests ?? []).map((digest) => ({ id: digest.id, text: digest.text })),
@@ -126,6 +127,8 @@ export async function runNarrativeAgentTurn(input: NarrativeAgentTurnInput): Pro
     ? {
         callId: envelope.callId,
         turnKind: "background",
+        patternIds: [],
+        forceIds: [],
         focusRefs: [],
         sceneGoal: `叙述${envelope.backgroundAgeRange.fromAge}岁至${envelope.backgroundAgeRange.toAge}岁的人生变化`,
         presentation: "summary",
@@ -140,18 +143,20 @@ export async function runNarrativeAgentTurn(input: NarrativeAgentTurnInput): Pro
     stage: "plan",
     actId: envelope.act.id,
     beat: envelope.beat,
-    routeId: plan.routeId,
-    factionId: plan.factionId,
+    routeId: plan.patternIds[0],
+    factionId: plan.forceIds[0],
     horizonRevision: run.narrative.horizonPlan?.revision,
     digestRevision: run.narrative.memoryRevision,
     contextFragmentIds: contextFragmentIds(context)
   });
 
   const renderTask = plan.turnKind === "background" ? "background" : "rendering";
-  const promptPlan = buildNarrativePromptPlan(run, narrativeWorld, plan.routeId ?? null, renderTask, {
+  const promptPlan = buildNarrativePromptPlan(run, narrativeWorld, null, renderTask, {
     backgroundAllowed: plan.turnKind === "background",
-    factionIds: plan.factionId ? [plan.factionId] : undefined,
-    focusIds: plan.focusRefs
+    factionIds: plan.forceIds,
+    patternIds: plan.patternIds,
+    focusIds: plan.focusRefs,
+    semanticQuery: plan.sceneGoal
   });
   if (!promptPlan) throw new Error("narrative_agent_prompt_plan_missing");
   context.narrativePlan = promptPlan;
@@ -171,8 +176,8 @@ export async function runNarrativeAgentTurn(input: NarrativeAgentTurnInput): Pro
     stage: "render",
     actId: envelope.act.id,
     beat: envelope.beat,
-    routeId: scene.routeId,
-    factionId: scene.factionId,
+    routeId: scene.patternIds[0],
+    factionId: scene.forceIds[0],
     horizonRevision: run.narrative.horizonPlan?.revision,
     digestRevision: run.narrative.memoryRevision,
     contextFragmentIds: contextFragmentIds(context)
@@ -190,8 +195,9 @@ export async function runNarrativeAgentTurn(input: NarrativeAgentTurnInput): Pro
       immutableOptions: scene.milestoneCopy?.optionOverrides
     };
     if (shouldRefineNarrativeProse(reviewInput)) {
-      const reviewPlan = buildNarrativePromptPlan(run, narrativeWorld, scene.routeId ?? plan.routeId ?? null, "reviewing", {
-        factionIds: scene.factionId ? [scene.factionId] : undefined,
+      const reviewPlan = buildNarrativePromptPlan(run, narrativeWorld, null, "reviewing", {
+        factionIds: scene.forceIds,
+        patternIds: scene.patternIds,
         focusIds: plan.focusRefs
       });
       if (!reviewPlan) throw new Error("narrative_review_prompt_plan_missing");
@@ -212,8 +218,8 @@ export async function runNarrativeAgentTurn(input: NarrativeAgentTurnInput): Pro
         stage: "review",
         actId: envelope.act.id,
         beat: envelope.beat,
-        routeId: scene.routeId,
-        factionId: scene.factionId,
+        routeId: scene.patternIds[0],
+        factionId: scene.forceIds[0],
         horizonRevision: run.narrative.horizonPlan?.revision,
         digestRevision: run.narrative.memoryRevision,
         contextFragmentIds: contextFragmentIds(context)
@@ -234,8 +240,9 @@ export async function runNarrativeAgentTurn(input: NarrativeAgentTurnInput): Pro
     ...writeSet.locationIds,
     ...writeSet.abilityIds
   ]));
-  const continuityPlan = buildNarrativePromptPlan(run, narrativeWorld, scene.routeId ?? plan.routeId ?? null, "continuity", {
-    factionIds: scene.factionId ? [scene.factionId] : undefined,
+  const continuityPlan = buildNarrativePromptPlan(run, narrativeWorld, null, "continuity", {
+    factionIds: scene.forceIds,
+    patternIds: scene.patternIds,
     focusIds: continuityFocusIds
   });
   if (!continuityPlan) throw new Error("narrative_continuity_prompt_plan_missing");
@@ -246,8 +253,8 @@ export async function runNarrativeAgentTurn(input: NarrativeAgentTurnInput): Pro
     subject: plan.sceneGoal,
     approvedResult: {
       turnKind: scene.turnKind,
-      routeId: scene.routeId,
-      factionId: scene.factionId,
+      patternIds: scene.patternIds,
+      forceIds: scene.forceIds,
       scenePacing: scene.scenePacing,
       participants: scene.participants.map((participant) => ({
         characterRef: participant.characterRef,
@@ -265,6 +272,20 @@ export async function runNarrativeAgentTurn(input: NarrativeAgentTurnInput): Pro
     writeSet
   }, context);
   scene = { ...scene, ...continuity };
+  if (scene.turnKind === "scene" && !scene.createsDecision) {
+    const arc = run.narrative.sessionPremise?.arcs.find((entry) => entry.actId === envelope.act.id);
+    const observation = await observeNarrativeBeat(run, world, {
+      callId: envelope.callId,
+      actId: envelope.act.id,
+      beat: envelope.beat,
+      arcQuestion: arc?.dramaticQuestion ?? envelope.act.prompt,
+      narrative: scene.narrative
+    }, context);
+    run.narrative.lastBeatObservation = observation;
+    scene = { ...scene, beatDecision: observation.decision };
+  } else if (scene.createsDecision) {
+    scene = { ...scene, beatDecision: "hold" };
+  }
   appendAttempt(run, {
     callId: envelope.callId,
     attemptId,
@@ -273,8 +294,8 @@ export async function runNarrativeAgentTurn(input: NarrativeAgentTurnInput): Pro
     stage: "sync",
     actId: envelope.act.id,
     beat: envelope.beat,
-    routeId: scene.routeId,
-    factionId: scene.factionId,
+    routeId: scene.patternIds[0],
+    factionId: scene.forceIds[0],
     horizonRevision: run.narrative.horizonPlan?.revision,
     digestRevision: run.narrative.memoryRevision,
     contextFragmentIds: contextFragmentIds(context)
@@ -341,7 +362,7 @@ export async function runNarrativeAgentDecision(input: {
   callId: string;
   decision: { decision: DecisionType; label: string; description: string; attributePolicy: NarrativeAttributePolicy; factResolutionModes?: NarrativeFactResolution[] };
   onProgress?: (stage: "settling" | "rendering" | "syncing") => Promise<void> | void;
-}): Promise<{ attemptId: string; outcome: DirectedDecisionNarrativeOutcome }> {
+}): Promise<{ attemptId: string; outcome: DirectedDecisionNarrativeOutcome; observation: NarrativeBeatObservation }> {
   const attemptId = `attempt:${randomUUID()}`;
   appendAttempt(input.run, {
     callId: input.callId,
@@ -371,8 +392,9 @@ export async function runNarrativeAgentDecision(input: {
     ...writeSet.locationIds,
     ...writeSet.abilityIds
   ]));
-  const continuityPlan = buildNarrativePromptPlan(input.run, input.narrativeWorld, input.run.pendingDynamicScene?.routeId ?? null, "continuity", {
-    factionIds: input.run.pendingDynamicScene?.factionId ? [input.run.pendingDynamicScene.factionId] : undefined,
+  const continuityPlan = buildNarrativePromptPlan(input.run, input.narrativeWorld, null, "continuity", {
+    factionIds: input.run.pendingDynamicScene?.forceIds,
+    patternIds: input.run.pendingDynamicScene?.patternIds,
     focusIds: continuityFocusIds
   });
   if (!continuityPlan) throw new Error("decision_continuity_prompt_plan_missing");
@@ -387,6 +409,18 @@ export async function runNarrativeAgentDecision(input: {
     writeSet
   }, input.context);
   const outcome: DirectedDecisionNarrativeOutcome = { ...settlement, narrative, ...continuity };
+  const runtime = input.run.narrative.actRuntime;
+  if (!runtime) throw new Error("decision_beat_observer_runtime_missing");
+  const arc = input.run.narrative.sessionPremise?.arcs.find((entry) => entry.actId === runtime.actId);
+  const observation = await observeNarrativeBeat(input.run, input.world, {
+    callId: input.callId,
+    actId: runtime.actId,
+    beat: runtime.beat,
+    arcQuestion: arc?.dramaticQuestion ?? input.narrativeWorld.mainlineActs?.find((entry) => entry.id === runtime.actId)?.prompt ?? "当前经历",
+    narrative,
+    decisionOutcome: `${input.decision.label}：${input.decision.description}`
+  }, input.context);
+  input.run.narrative.lastBeatObservation = observation;
   appendAttempt(input.run, {
     callId: input.callId,
     attemptId,
@@ -399,7 +433,7 @@ export async function runNarrativeAgentDecision(input: {
     digestRevision: input.run.narrative.memoryRevision,
     contextFragmentIds: contextFragmentIds(input.context)
   });
-  return { attemptId, outcome };
+  return { attemptId, outcome, observation };
 }
 
 export async function runNarrativeAgentEnding(input: {

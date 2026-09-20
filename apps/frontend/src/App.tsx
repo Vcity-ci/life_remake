@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import type { CurrentGameRunResponse, ProviderConfig, ProviderLimits, PublicBackgroundCard, PublicRunState, RunPhase, SaveSlotSummary, StartAllocationConfig, StatKey, Stats, StepAction, SurvivalChoice, TurnRecord } from "@reroll/shared";
 import { AdminPanel } from "./components/AdminPanel";
-import { NarrativeAssetsPanel, NarrativeAssetChanges } from "./components/NarrativeAssets";
+import { FateArchiveContent, TalentArchive, type DecisionHistoryGroup } from "./components/FateArchive";
+import { NarrativeAssetChanges } from "./components/NarrativeAssets";
 import {
   ApiError,
   createSaveSlot,
@@ -118,6 +119,18 @@ function endingBadgeText(run: PublicRunState): string {
   return "尘世落幕";
 }
 
+function useMediaQuery(query: string): boolean {
+  const [matches, setMatches] = useState(() => typeof window !== "undefined" && window.matchMedia(query).matches);
+  useEffect(() => {
+    const media = window.matchMedia(query);
+    const update = (): void => setMatches(media.matches);
+    update();
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, [query]);
+  return matches;
+}
+
 function formatSaveTime(updatedAt: number): string {
   return new Date(updatedAt).toLocaleString("zh-CN", {
     month: "numeric",
@@ -157,13 +170,18 @@ export default function App(): React.JSX.Element {
   const [isGenerating, setIsGenerating] = useState(false);
   const [autoAdvance, setAutoAdvance] = useState(false);
   const [showGrowthFocus, setShowGrowthFocus] = useState(false);
+  const [showFateArchive, setShowFateArchive] = useState(false);
   const [expandedOriginIds, setExpandedOriginIds] = useState<Set<string>>(() => new Set());
   const timelineRef = useRef<HTMLDivElement | null>(null);
+  const archiveTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const archiveCloseRef = useRef<HTMLButtonElement | null>(null);
+  const archiveDrawerRef = useRef<HTMLElement | null>(null);
   const followLatestTimelineRef = useRef(true);
   const isGeneratingRef = useRef(false);
   const runRef = useRef<PublicRunState | null>(null);
   const requestNonceRef = useRef(0);
   const [flippedCards, setFlippedCards] = useState<Record<string, boolean>>({});
+  const isMobileArchive = useMediaQuery("(max-width: 720px)");
 
   const timeline = turns;
   const visibleAssets = turns.length ? turns[turns.length - 1].narrativeAssetsSnapshot : run?.narrativeAssets;
@@ -171,9 +189,9 @@ export default function App(): React.JSX.Element {
     [...turns].reverse().find((turn) => turn.choice && !turn.choiceOutcome)?.choice
   ), [turns]);
   const activeSurvivalCrisis: SurvivalCrisis | undefined = run?.survivalCrisis;
-  const decisionHistory = useMemo(() => {
+  const decisionHistory = useMemo<DecisionHistoryGroup[]>(() => {
     const seen = new Set<string>();
-    return [...turns].reverse().flatMap((turn) => {
+    const entries = [...turns].reverse().flatMap((turn) => {
       if (turn.kind !== "choice_outcome" || !turn.choice || !turn.choiceOutcome || seen.has(turn.choice.sceneId)) return [];
       seen.add(turn.choice.sceneId);
       return [{
@@ -186,7 +204,65 @@ export default function App(): React.JSX.Element {
         rollLabels: extractDeltaLabels(turn)
       }];
     }).reverse();
+    const groups: DecisionHistoryGroup[] = [];
+    for (const entry of entries) {
+      const group = groups.find((candidate) => candidate.age === entry.age && candidate.ageStageLabel === entry.ageStageLabel);
+      const decision = {
+        id: entry.id,
+        background: entry.background,
+        choiceLabel: entry.choiceLabel,
+        choiceDescription: entry.choiceDescription,
+        rollLabels: entry.rollLabels
+      };
+      if (group) group.entries.push(decision);
+      else groups.push({ age: entry.age, ageStageLabel: entry.ageStageLabel, entries: [decision] });
+    }
+    return groups;
   }, [turns]);
+  const archivedDecisionCount = useMemo(() => decisionHistory.reduce((total, group) => total + group.entries.length, 0), [decisionHistory]);
+
+  function closeFateArchive(): void {
+    setShowFateArchive(false);
+    window.requestAnimationFrame(() => archiveTriggerRef.current?.focus());
+  }
+
+  useEffect(() => {
+    if (!isMobileArchive && showFateArchive) setShowFateArchive(false);
+  }, [isMobileArchive, showFateArchive]);
+
+  useEffect(() => {
+    setShowFateArchive(false);
+  }, [run?.runId]);
+
+  useEffect(() => {
+    if (!isMobileArchive || !showFateArchive) return;
+    const previousOverflow = document.body.style.overflow;
+    const onKeyDown = (event: KeyboardEvent): void => {
+      if (event.key === "Escape") {
+        closeFateArchive();
+        return;
+      }
+      if (event.key !== "Tab" || !archiveDrawerRef.current) return;
+      const focusable = Array.from(archiveDrawerRef.current.querySelectorAll<HTMLElement>("button, summary, a[href], input, select, textarea, [tabindex]:not([tabindex='-1'])"));
+      const first = focusable[0];
+      const last = focusable.at(-1);
+      if (!first || !last) return;
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", onKeyDown);
+    window.requestAnimationFrame(() => archiveCloseRef.current?.focus());
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [isMobileArchive, showFateArchive]);
 
   const [localApiKey, setLocalApiKey] = useState("");
   const [localProvider, setLocalProvider] = useState<ProviderConfig>({
@@ -1082,6 +1158,16 @@ export default function App(): React.JSX.Element {
                 })}
               </dl>
               <div className="rail-meta"><span>名望 {run.fame}</span><span>{run.outcome === "ongoing" ? "命途未定" : outcomeLabel(run.outcome)}</span></div>
+              <TalentArchive cards={run.cards} />
+              {isMobileArchive ? <button
+                className="mobile-archive-trigger"
+                type="button"
+                ref={archiveTriggerRef}
+                aria-haspopup="dialog"
+                aria-expanded={showFateArchive}
+                aria-controls="mobile-fate-archive"
+                onClick={() => setShowFateArchive(true)}
+              ><span>命运档案</span><small>{(run.narrativeCharacters?.length ?? 0) + (visibleAssets?.locations.length ?? 0) + (visibleAssets?.abilities.length ?? 0) + archivedDecisionCount}项记录</small></button> : null}
             </aside>
 
             <section className="story-reader" aria-label="人生叙事">
@@ -1197,27 +1283,21 @@ export default function App(): React.JSX.Element {
               <p className="status">{status}</p>
             </section>
 
-            <aside className="reader-rail fate-rail" aria-label="命运档案">
-              <section className="rail-section"><h3>天赋</h3><div className="asset-list">{run.cards.map((card) => <span className={`asset-chip ${rarityClass(card.rarity)}`} key={card.id} title={card.description}>{card.name}</span>)}</div></section>
-              <section className="rail-section"><h3>命运人物</h3><div className="asset-list">{(run.narrativeCharacters?.length ?? 0) === 0 ? <small>尚无常驻人物</small> : run.narrativeCharacters!.map((character) => <span className="asset-chip item-chip" key={character.id} title={`${character.role}：${character.description}`}>{character.name}</span>)}</div></section>
-              <NarrativeAssetsPanel assets={visibleAssets} />
-              <section className="decision-history">
-                <div className="decision-history-head"><h3>已作抉择</h3></div>
-                {decisionHistory.length === 0 ? <p className="decision-history-empty">尚未走到分岔处。</p> : (
-                  <div className="decision-history-list">{decisionHistory.map((entry) => (
-                    <article className="decision-history-item" key={entry.id}>
-                      <p className="decision-history-meta">{entry.age}岁 · {entry.ageStageLabel}</p>
-                      <p className="decision-history-bg">{entry.background || "你走到了命运分岔口。"}</p>
-                      <p className="decision-history-choice"><span>{entry.choiceLabel}</span>{entry.choiceDescription}</p>
-                      {entry.rollLabels.length > 0 ? <div className="decision-history-rolls">{entry.rollLabels.map((label, idx) => <small key={`${entry.id}-roll-${idx}`}>{label}</small>)}</div> : null}
-                    </article>
-                  ))}</div>
-                )}
-              </section>
-            </aside>
+            {!isMobileArchive ? <aside className="reader-rail fate-rail" aria-label="命运档案">
+              <FateArchiveContent assets={visibleAssets} characters={run.narrativeCharacters ?? []} decisions={decisionHistory} />
+            </aside> : null}
           </section>
         )}
       </div>
+
+      {run && isMobileArchive && showFateArchive ? (
+        <div className="archive-drawer-mask" onMouseDown={(event) => { if (event.target === event.currentTarget) closeFateArchive(); }}>
+          <aside ref={archiveDrawerRef} id="mobile-fate-archive" className="archive-drawer" role="dialog" aria-modal="true" aria-labelledby="mobile-fate-archive-title">
+            <button ref={archiveCloseRef} className="archive-drawer-close" type="button" aria-label="关闭命运档案" onClick={closeFateArchive}>×</button>
+            <FateArchiveContent headingId="mobile-fate-archive-title" assets={visibleAssets} characters={run.narrativeCharacters ?? []} decisions={decisionHistory} />
+          </aside>
+        </div>
+      ) : null}
 
       {showSettings ? (
         <AdminPanel

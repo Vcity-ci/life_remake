@@ -34,40 +34,40 @@ const TASK_LAYER_RATIOS: Record<NarrativeTask, Record<NarrativeContextLayer, num
 };
 
 const ALL_SECTIONS: NarrativeContextSection[] = [
-  "persona", "talents", "seedHints", "origin", "mainline", "route", "handoff", "lore",
+  "persona", "talents", "seedHints", "origin", "world", "palette", "mainline", "route", "handoff", "lore",
   "styleExamples", "authorNote",
   "characters", "factDirectory", "facts", "resolvedFacts", "locations", "abilities", "assets",
   "memories", "digests", "ending", "history", "raw", "task"
 ];
 
 const TASK_SECTIONS: Record<NarrativeTask, NarrativeContextSection[]> = {
-  origin: ["persona", "talents", "seedHints", "origin", "task"],
+  origin: ["persona", "talents", "seedHints", "origin", "world", "task"],
   curation: ["task"],
-  horizon: ["persona", "origin", "mainline", "route", "handoff", "lore", "characters", "facts", "locations", "abilities", "digests", "history", "task"],
+  horizon: ["persona", "origin", "world", "palette", "mainline", "route", "handoff", "lore", "characters", "facts", "locations", "abilities", "digests", "history", "task"],
   settlement: ["persona", "talents", "origin", "mainline", "route", "characters", "factDirectory", "facts", "locations", "abilities", "history", "task"],
   continuity: ["characters", "facts", "locations", "abilities", "task"],
-  planning: ["persona", "talents", "origin", "mainline", "route", "handoff", "lore", "characters", "factDirectory", "facts", "locations", "abilities", "digests", "history", "authorNote", "task"],
-  background: ["persona", "talents", "origin", "lore", "characters", "factDirectory", "facts", "locations", "abilities", "styleExamples", "history", "authorNote", "task"],
-  rendering: ["persona", "talents", "origin", "mainline", "route", "handoff", "lore", "characters", "factDirectory", "facts", "locations", "abilities", "memories", "digests", "styleExamples", "history", "authorNote", "task"],
-  dynamic: ["persona", "talents", "origin", "mainline", "route", "handoff", "lore", "characters", "factDirectory", "facts", "locations", "abilities", "memories", "digests", "styleExamples", "history", "authorNote", "task"],
+  planning: ["persona", "talents", "origin", "world", "palette", "mainline", "route", "handoff", "lore", "characters", "factDirectory", "facts", "locations", "abilities", "digests", "history", "authorNote", "task"],
+  background: ["persona", "talents", "origin", "world", "palette", "lore", "characters", "factDirectory", "facts", "locations", "abilities", "styleExamples", "history", "authorNote", "task"],
+  rendering: ["persona", "talents", "origin", "world", "palette", "route", "handoff", "lore", "characters", "factDirectory", "facts", "locations", "abilities", "memories", "styleExamples", "history", "authorNote", "task"],
+  dynamic: ["persona", "talents", "origin", "world", "palette", "route", "handoff", "lore", "characters", "factDirectory", "facts", "locations", "abilities", "memories", "styleExamples", "history", "authorNote", "task"],
   reviewing: ["persona", "origin", "characters", "facts", "locations", "abilities", "task"],
-  decision: ["persona", "talents", "origin", "mainline", "route", "characters", "facts", "locations", "abilities", "memories", "styleExamples", "history", "authorNote", "task"],
+  decision: ["persona", "talents", "origin", "world", "palette", "route", "characters", "facts", "locations", "abilities", "memories", "styleExamples", "history", "authorNote", "task"],
   closure: ["persona", "origin", "mainline", "handoff", "facts", "digests", "task"],
-  ending: ["persona", "talents", "origin", "ending", "task"]
+  ending: ["persona", "talents", "origin", "world", "ending", "task"]
 };
 
 const TASK_HISTORY: Record<NarrativeTask, NarrativeTaskContextProfile["history"]> = {
   origin: { includeHeadMemory: false, includeArchive: false, recentRoundLimit: 0, requiredRecentRounds: 0 },
   curation: { includeHeadMemory: false, includeArchive: false, recentRoundLimit: 0, requiredRecentRounds: 0 },
-  horizon: { includeHeadMemory: true, includeArchive: false, recentRoundLimit: 1, requiredRecentRounds: 1 },
+  horizon: { includeHeadMemory: false, includeArchive: false, recentRoundLimit: 1, requiredRecentRounds: 1 },
   settlement: { includeHeadMemory: true, includeArchive: false, recentRoundLimit: 1, requiredRecentRounds: 1 },
   continuity: { includeHeadMemory: false, includeArchive: false, recentRoundLimit: 0, requiredRecentRounds: 0 },
-  planning: { includeHeadMemory: true, includeArchive: false, recentRoundLimit: 2, requiredRecentRounds: 1 },
+  planning: { includeHeadMemory: false, includeArchive: false, recentRoundLimit: 2, requiredRecentRounds: 1 },
   background: { includeHeadMemory: true, includeArchive: false, recentRoundLimit: 1, requiredRecentRounds: 1 },
-  rendering: { includeHeadMemory: true, includeArchive: false, recentRoundLimit: 2, requiredRecentRounds: 1 },
-  dynamic: { includeHeadMemory: true, includeArchive: false, recentRoundLimit: 2, requiredRecentRounds: 1 },
+  rendering: { includeHeadMemory: false, includeArchive: false, recentRoundLimit: 2, requiredRecentRounds: 1 },
+  dynamic: { includeHeadMemory: false, includeArchive: false, recentRoundLimit: 2, requiredRecentRounds: 1 },
   reviewing: { includeHeadMemory: false, includeArchive: false, recentRoundLimit: 0, requiredRecentRounds: 0 },
-  decision: { includeHeadMemory: true, includeArchive: false, recentRoundLimit: 1, requiredRecentRounds: 1 },
+  decision: { includeHeadMemory: false, includeArchive: false, recentRoundLimit: 1, requiredRecentRounds: 1 },
   closure: { includeHeadMemory: true, includeArchive: false, recentRoundLimit: 1, requiredRecentRounds: 0 },
   ending: { includeHeadMemory: false, includeArchive: false, recentRoundLimit: 0, requiredRecentRounds: 0 }
 };

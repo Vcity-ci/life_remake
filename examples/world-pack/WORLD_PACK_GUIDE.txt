@@ -1,65 +1,54 @@
-世界包 JSON 模板说明
-===================
+世界包 JSON 模板说明（v9）
+==========================
 
-本目录提供两个相互配对的模板：
+本目录包含：
+- world.example.json：前端世界名称、简介、年龄段和基础时间线配置。
+- story.example.json：模型使用的世界规律、社会力量、叙事素材和数值规则。
 
-- world.example.json：世界在前端的名称、简介、年龄段与基础时间线配置。
-- story.example.json：世界的叙事骨架、三幕主线、动态世界卡、阵营、路线、成长门槛与结局蓝图。
-
-一、文件放置
+一、使用方法
 ------------
+1. 为新世界选择唯一 ID，例如 my_world。
+2. 将 world.example.json 复制到 data/worlds/<世界ID>.json。
+3. 将 story.example.json 复制到 data/narratives/<世界ID>.story.json。
+4. 把两个文件内的 my_world 全部替换为同一个 ID，保持合法 JSON。
+5. 新源码副本或首次初始化会从 data/worlds 载入世界列表；现有内容存储暂未提供热导入界面。
 
-为新世界选择一个唯一 ID（例如 my_world），并将两个模板中所有 my_world 同步替换为该 ID。
+二、世界包的职责
+----------------
+世界包说明“这里是什么世界、哪些力量会行动、能够发生什么类型的故事”，不规定玩家必走的剧情。
 
-将 world.example.json 复制为：
-  data/worlds/<世界ID>.json
+- storyBible：世界总览。不要写成唯一剧情梗概。
+- worldCore：每轮稳定可用的 identity、laws、powerStructure、everydayLife、tone。
+- socialForces：能够产生人物、资源和压力的真实社会力量。它们不是路线，也不要求模型每轮选择。
+- narrativePalette：题材常见的场景形态、冲突来源、行动词汇和故事尺度。
+- storyPatterns：可选的故事形态。模型可选 0—2 项作为当轮素材，不能把它们当作互斥路线。
+- styleRules：正向文风与表现材料，不写“不要做什么”的防御性清单。
+- worldCards：像世界卡一样按任务、节拍、关键词、事实、人物、地点或本领动态召回的局部知识。
 
-将 story.example.json 复制为：
-  data/narratives/<世界ID>.story.json
+开局身世生成后，引擎会用玩家人设、最终天赋、身世和 worldCore 生成本局 session premise。mainlineActs 的三个条目只是既有五节拍与结局完整性的结构槽位；具体问题、压力和阶段结果由本局 premise 生成，不应在世界包里写死。
 
-两个 JSON 内的 worldId / id 必须一致；文件名也应使用同一个世界 ID。
-
-当前世界列表会在项目首次初始化时从 data/worlds 载入并写入本地内容存储。模板保证可用于全新的源码副本或首次初始化环境。已完成初始化的项目暂未提供“导入已有世界包到内容存储”的界面流程，因此仅复制文件不会让既有内容存储自动出现新世界。
-
-二、world JSON
+三、数值与结局
 --------------
+- progression.gates：世界级 opening / escalation / pressure / climax 能力门槛，不再按故事路线分别配置。
+- growthFocuses、statTiers、statTierPresentation、survival：沿用现有属性成长、展示和生存规则。
+- endingBlueprints：恰好提供 good、normal、bad 三项世界级结局蓝图。属性、名望、抉择轨迹和历史代价决定品质；不再为每条故事形态复制结局。
+- completion：仍可要求三段完整经历、抉择后果、高潮、回收和无活动场景。
 
-world.example.json 的根节点是数组，单个对象需要：
-
-- id：世界唯一 ID。
-- name / intro：世界选择界面显示的名称与介绍。
-- stylePrompt：该世界的基础叙事风格。
-- ageThresholds：五个年龄段。id 使用 child、youth、prime、middle、elder。
-- milestoneAges、endAgeRange、yearlyEventHints：与现有内容格式兼容的基础时间线字段；它们不是故事完成的硬性年龄条件。
-
-三、story JSON
+四、worldCards
 --------------
+- activation.tasks：background、planning、horizon、rendering、dynamic、decision。
+- activation 还可使用 keys、secondaryKeys、selectiveLogic、scanDepth、actIds、beats、factionIds、factIds、characterIds、locationIds、abilityIds。
+- v9 不使用 routeIds 激活世界卡。
+- placement：world、scenario、example、author_note。
+- priority 决定预算内优先级；inclusionGroup 同组择一；stickyTurns、cooldownTurns 和 relatedCardIds 控制生命周期。
+- style_example 直接写可供模仿的短正文，不写创作说明，不放入必须复刻的专名或事实。
 
-story.example.json 是运行中的叙事世界包。请保留以下结构，再替换其中的题材内容：
-
-- storyBible 与 styleRules：世界背景和正向文风素材。写人物会经历的场所、行动、关系、冲突与感官质地，不写玩家可见的内部标签。
-- endingGuide：该世界的结局余味。写人物如何回望关系、成果、代价与去处；它只在结局渲染时投影。
-- mainlineSkeleton：三幕整体的因果关系和好/坏结局方向。它是模型的叙事骨架，不会作为章节标题显示。
-- mainlineActs：必须按顺序提供三幕。每一幕写清独立的处境、压力与高潮职责；不要把具体情节写死成唯一答案。
-- narrativeFactions：能够参与当前世界矛盾的阵营或压力来源。模型可据此生成本局人物与互动。
-- routeArcs：可供模型选择的叙事视角/经历路线。路线数量由世界包决定，不要求固定六条。
-- worldCards：按当前情景动态召回的世界知识。content 必须脱离标题仍能独立理解，优先写地点、组织、生活方式、资源、人物立场、行动入口和后果，不写固定事件或 NPC。activation 除 actIds、beats、routeIds、factionIds、factStatuses、locationIds、abilityIds、tasks 外，还可用 keys 扫描最近真实叙事；secondaryKeys 与 selectiveLogic 支持 and_any、and_all、not_any、not_all，scanDepth 控制扫描的最近叙事数量。`/表达式/flags` 形式的 key 会按正则处理。
-- worldCards.placement：world 为稳定世界知识，scenario 为当前情景，example 为只模仿节奏的表达样例，author_note 为当前场景附近的短期关注点。kind 可使用 world_rule、setting、geography、institution、culture、faction、location、ability、social_role、practice、conflict、consequence、motif、style_example。
-- worldCards 的 priority 决定预算内优先级，inclusionGroup 用于同组择一。stickyTurns 表示首次命中后额外延续的已提交回合数，延续不会自我续期；结束后才进入 cooldownTurns。relatedCardIds 只递归一层并同样服从作用域、冷却、互斥组和预算。recursive=false 的条目只能直接激活；preventFurtherRecursion=true 的条目不会继续激活关联卡。
-- worldCards.activation.tasks 仅可填写 background、planning、horizon、rendering、dynamic、decision。style_example 应直接写一段可供模仿的短正文，不写“应该怎样写”的说明，也不放入必须复刻的专名或既成事实。
-- progression：普通年份的跨度、属性档位显示、成长方向和各路线的属性准入门槛。
-- lore：v8 保留为空数组，静态世界资料全部写入 worldCards；只有 v1—v7 旧世界包继续读取 lore。
-- endingBlueprints：每条 routeArcs 路线都必须各有 good、normal、bad 三个结局蓝图；directionId 必须与路线 ID 完全一致。
-
-threads、characters、eventBindings 可以先保留为空数组。运行时人物与幕间事实由模型输出和引擎记录；不要用空白占位文本替代真实世界设定。
-
-四、检查清单
+五、检查清单
 ------------
-
-1. 两个文件都是合法 JSON，且所有 my_world 已替换为同一个新 ID。
-2. story JSON 的 version 为 8（加载器仍兼容旧版本），worldId 与 world JSON 的 id 相同。
-3. mainlineActs 有三幕，routeArcs 至少有一条路线，narrativeFactions 至少有一个阵营。
-4. 每条路线均有 good、normal、bad 三个 endingBlueprints，且 directionId 对应正确。
-5. 玩家可见的叙事不要输出路线 ID、幕名、工具调用内容或内部标签。
-6. worldCards 的 actIds、routeIds、factionIds 与 relatedCardIds 必须引用本包已有 ID；卡片 ID 不得包含竖线字符。
-7. v8 的 worldCards 不得为空；确认 style_example 是实际短正文，并检查 Sticky 不会被误写成长期常驻设定。
+1. story JSON 的 version 为 9，两个文件 ID 与文件名一致。
+2. worldCore、socialForces、narrativePalette、storyPatterns 均非空。
+3. mainlineActs 保留三个结构槽位，但不预写固定案件、职业或升级路线。
+4. progression 使用 gates，不使用 routes。
+5. endingBlueprints 只有 good、normal、bad 三项。
+6. worldCards 引用的 actIds、factionIds 与 relatedCardIds 均存在，卡片 ID 不含竖线。
+7. 玩家正文不显示工具调用、内部 ID、幕名或状态标签。

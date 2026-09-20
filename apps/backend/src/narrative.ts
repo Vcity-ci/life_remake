@@ -23,6 +23,7 @@ import type {
   NarrativeEndingState,
   NarrativeEndingBrief,
   NarrativeRouteProgress,
+  NarrativeRouteDefinition,
   NarrativeRunState,
   NarrativeStatTierConfig,
   NarrativeStatTierPresentation,
@@ -70,6 +71,13 @@ export interface NarrativePromptPlan {
   task?: NarrativeTask;
   recall?: DynamicNarrativeContextSelection;
   storyBible: string;
+  /** Stable world truths are projected separately so genre vocabulary cannot be truncated behind them. */
+  worldCoreContext?: string;
+  /** Task-aware possibilities for scene texture; these are invitations, never required plot events. */
+  narrativePaletteContext?: {
+    background: string;
+    scene: string;
+  };
   origin?: string;
   persona?: string;
   talents?: string[];
@@ -733,6 +741,20 @@ export function ensureNarrativeRunState(
     : state.opening?.status === "pending"
       ? { status: "pending" as const }
       : undefined;
+  const sessionPremise = state.sessionPremise?.protagonistAnchor?.trim() && state.sessionPremise.centralTension?.trim() && state.sessionPremise.storyPromise?.trim()
+    ? {
+        protagonistAnchor: compactText(state.sessionPremise.protagonistAnchor, 220),
+        centralTension: compactText(state.sessionPremise.centralTension, 220),
+        storyPromise: compactText(state.sessionPremise.storyPromise, 260),
+        keywords: uniqueRecent(state.sessionPremise.keywords ?? [], 6).map((value) => compactText(value, 32)),
+        arcs: (state.sessionPremise.arcs ?? []).filter((arc) => arc?.actId).slice(0, 8).map((arc) => ({
+          actId: compactText(arc.actId, 120),
+          dramaticQuestion: compactText(arc.dramaticQuestion, 180),
+          pressureSource: compactText(arc.pressureSource, 180),
+          payoffPossibility: compactText(arc.payoffPossibility, 180)
+        }))
+      }
+    : undefined;
   const actRuntime = state.actRuntime && typeof state.actRuntime.actId === "string" && validBeats.includes(state.actRuntime.beat)
     ? {
       actId: compactText(state.actRuntime.actId, 120),
@@ -782,6 +804,7 @@ export function ensureNarrativeRunState(
     version: 9,
     enabled: enabled && state.enabled !== false,
     opening,
+    sessionPremise,
     arcPhase: phase.includes(state.arcPhase) ? state.arcPhase : defaults.arcPhase,
     climaxCount: Math.max(0, Math.min(8, Number(state.climaxCount) || 0)),
     payoffCount: Math.max(0, Math.min(8, Number(state.payoffCount) || 0)),
@@ -903,6 +926,7 @@ export function advanceNarrativeActBeat(
       selectedRouteIds,
       decisionCount: runtime.decisionCount + (options?.decision ? 1 : 0)
     };
+    if (next.horizonPlan) next.horizonPlan = { ...next.horizonPlan, status: "stale" };
     return { state: next };
   }
   const completedActId = runtime.actId;
@@ -922,6 +946,7 @@ export function advanceNarrativeActBeat(
     // The previous per-route marker is legacy state; a new act never inherits it.
     next.routeProgress = [];
   }
+  if (next.horizonPlan) next.horizonPlan = { ...next.horizonPlan, status: "stale" };
   return { state: next, completedActId };
 }
 
@@ -1241,7 +1266,7 @@ function hasResolvedCoreFacts(
     )));
   }
   const directionId = source.story.closureExperienceId ?? currentDirectionId(source);
-  const coreThreadIds = world.routeArcs.find((route) => route.directionId === directionId)?.coreThreadIds
+  const coreThreadIds = world.routeArcs?.find((route) => route.directionId === directionId)?.coreThreadIds
     ?? source.story.contract.coreThreadIds;
   if (coreThreadIds.length === 0) return false;
   const resolvedThreads = new Set(source.narrative.threads
@@ -1268,8 +1293,8 @@ export function isNarrativeStageReady(
   directionIdOverride?: string
 ): boolean {
   const directionId = directionIdOverride ?? currentDirectionId(source);
-  const gate = world?.progression?.routes
-    .find((route) => route.directionId === directionId)
+  const gate = world?.progression?.gates?.[stage] ?? world?.progression?.routes
+    ?.find((route) => route.directionId === directionId)
     ?.gates?.[stage];
   if (!gate || !source.stats) return true;
   return weightedStatScore(source.stats, gate.weights) >= gate.threshold;
@@ -1286,6 +1311,7 @@ export function isNarrativeWorldStageReady(
   world: NarrativeWorldDefinition | null | undefined,
   stage: NarrativeProgressGateStage
 ): boolean {
+  if (world?.progression?.gates?.[stage]) return isNarrativeStageReady(source, world, stage);
   const routes = world?.progression?.routes ?? [];
   if (routes.length === 0) return isNarrativeStageReady(source, world, stage);
   return routes.some((route) => isNarrativeStageReady(source, world, stage, route.directionId));
@@ -1395,14 +1421,15 @@ export function assessClosureReadiness(
   source: NarrativePromptSource,
   world: NarrativeWorldDefinition | null
 ): ClosureReadiness {
-  const directionId = source.story.closureExperienceId ?? currentDirectionId(source);
+  const directionId = world?.version && world.version >= 9
+    ? world.worldId
+    : source.story.closureExperienceId ?? currentDirectionId(source);
   if (!source.narrative.enabled) return { eligible: true, directionId };
   if (source.narrative.actRuntime && world?.mainlineActs?.length) {
-    // Dynamic world acts own their route choice in closureExperienceId. The
-    // legacy contract is not created by this mode and must not block closure.
-    if (!directionId) return { eligible: false, reason: "no_mainline" };
     if (!refreshNarrativeMainlineCompletion(source, world)) return { eligible: false, reason: "mainline_incomplete" };
-    const blueprints = world.endingBlueprints.filter((item) => item.directionId === directionId);
+    const blueprints = world.version >= 9
+      ? world.endingBlueprints
+      : world.endingBlueprints.filter((item) => item.directionId === directionId);
     const good = blueprints.find((item) => item.polarity === "good");
     const normal = blueprints.find((item) => item.polarity === "normal");
     const bad = blueprints.find((item) => item.polarity === "bad");
@@ -1444,7 +1471,7 @@ function flagScore(flags: string[], blueprint: EndingBlueprint): number {
 }
 
 function affinityScore(source: NarrativePromptSource, blueprint: EndingBlueprint): number {
-  const routeTag = blueprint.directionId.split(".")[1] ?? "";
+  const routeTag = blueprint.directionId?.split(".")[1] ?? "";
   const tags = new Set([
     ...source.cards.flatMap((card) => card.tags),
     ...source.items.flatMap((item) => item.tags ?? [])
@@ -1473,7 +1500,9 @@ export function assessEnding(
   const readiness = assessClosureReadiness(source, world);
   const directionId = readiness.directionId;
   if (!readiness.eligible || !directionId) return { eligible: false };
-  const blueprints = world?.endingBlueprints.filter((item) => item.directionId === directionId) ?? [];
+  const blueprints = world?.version && world.version >= 9
+    ? world.endingBlueprints
+    : world?.endingBlueprints.filter((item) => item.directionId === directionId) ?? [];
   const good = blueprints.find((item) => item.polarity === "good");
   const normal = blueprints.find((item) => item.polarity === "normal");
   const bad = blueprints.find((item) => item.polarity === "bad");
@@ -1585,7 +1614,6 @@ function factContextEntries(source: NarrativePromptSource, directionId: string |
   const activeThreadId = source.narrative.activeScene?.threadId;
   return (source.story.factLedger?.facts ?? [])
     .filter((fact) => fact.status === "open")
-    .filter((fact) => !fact.routeIds?.length || !directionId || fact.routeIds.includes(directionId))
     .sort((a, b) => {
       const aScene = a.threadId === activeThreadId ? 1 : 0;
       const bScene = b.threadId === activeThreadId ? 1 : 0;
@@ -1632,7 +1660,6 @@ export function selectDynamicNarrativeContext(
   const relevance = (fact: NonNullable<StoryDirectorState["factLedger"]>["facts"][number]) =>
     overlapCount([fact.id], query.factIds) * 12 +
     narrativeTextOverlap(factText(fact), query.text ?? "") * 10 +
-    overlapCount(fact.routeIds, query.routeId ? [query.routeId] : []) * 4 +
     overlapCount(fact.factionIds, query.factionIds) * 4;
   const rankFact = (fact: NonNullable<StoryDirectorState["factLedger"]>["facts"][number]) => relevance(fact) +
     (fact.priority ?? 0) / 4 + 1 / (1 + Math.max(0, source.age - fact.lastTouchedAge));
@@ -1648,7 +1675,6 @@ export function selectDynamicNarrativeContext(
       overlapCount([character.id], source.narrative.activeCharacterIds) * 8 +
       narrativeTextOverlap(`${character.name} ${character.description} ${character.relationship?.summary ?? ""}`, query.text ?? "") * 10 +
       overlapCount(character.relatedFactIds, factIds) * 5 +
-      overlapCount(character.relatedRouteIds, query.routeId ? [query.routeId] : []) * 4 +
       (character.factionId && query.factionIds?.includes(character.factionId) ? 4 : 0)
     })).sort((a, b) => b.score - a.score);
   const detailed = rankedCharacters.filter(({ score }) => score > 0).slice(0, 5).map(({ character }) => character.id);
@@ -1664,7 +1690,6 @@ export function selectDynamicNarrativeContext(
   const assetQuery = {
     characterIds: directCharacters,
     factIds: query.factIds,
-    routeIds: query.routeId ? [query.routeId] : undefined,
     factionIds: query.factionIds,
     locationIds: query.locationIds,
     abilityIds: query.abilityIds,
@@ -1701,7 +1726,7 @@ export function selectDynamicNarrativeContext(
 }
 
 export function narrativeRouteBeatGuidance(
-  route: NarrativeWorldDefinition["routeArcs"][number], beat: NarrativeBeat
+  route: NarrativeRouteDefinition, beat: NarrativeBeat
 ): string {
   switch (beat) {
     case "escalation":
@@ -1716,23 +1741,18 @@ export function narrativeRouteBeatGuidance(
 function buildTaskNarrativePlan(
   source: NarrativePromptSource, world: NarrativeWorldDefinition, task: NarrativeTask,
   routeId?: string | null,
-  options?: { backgroundAllowed?: boolean; factionIds?: string[]; focusIds?: string[] }
+  options?: { backgroundAllowed?: boolean; factionIds?: string[]; patternIds?: string[]; focusIds?: string[]; semanticQuery?: string }
 ): NarrativePromptPlan {
   const act = world.mainlineActs?.find((entry) => entry.id === source.narrative.actRuntime?.actId);
   const pending = (source as NarrativePromptSource & { pendingDynamicScene?: {
-    routeId: string;
-    factionId?: string;
+    patternIds: string[];
+    forceIds: string[];
     factIds?: string[];
     characterIds?: string[];
     locationIds?: string[];
     abilityIds?: string[];
   } }).pendingDynamicScene;
-  const selectedRouteId = task === "decision"
-    ? pending?.routeId
-    : task === "ending"
-      ? routeId ?? currentDirectionId(source)
-      : routeId ?? undefined;
-  const selectedRoute = world.routeArcs.find((route) => route.directionId === selectedRouteId);
+  const selectedRouteId = undefined;
   const beat = source.narrative.actRuntime?.beat ?? "setup";
   const phaseByBeat: Record<NarrativeBeat, NarrativeArcPhase> = {
     setup: "setup", escalation: "rising", pressure: "pressure", climax: "climax", payoff: "aftermath", ending: "ending"
@@ -1742,22 +1762,44 @@ function buildTaskNarrativePlan(
   const lifeContext = task === "background" || mixedTurn;
   const recentNarratives = source.history?.filter((event) => event.summary.trim()).slice(-2) ?? [];
   const focus = source.narrative.actRuntime?.growthFocusOptions?.find((entry) => entry.id === source.narrative.actRuntime?.growthFocusId);
+  const premiseKeywords = task === "horizon"
+    ? source.narrative.sessionPremise?.keywords.join(" ") ?? ""
+    : "";
+  const heldObservation = source.narrative.lastBeatObservation?.decision === "hold" &&
+    source.narrative.lastBeatObservation.actId === act?.id &&
+    source.narrative.lastBeatObservation.beat === beat
+      ? source.narrative.lastBeatObservation
+      : undefined;
   const taskQuery = [
+    options?.semanticQuery,
     lifeContext || task === "origin" ? source.personaPrompt : act?.prompt,
-    lifeContext ? focus?.description : selectedRoute?.summary,
+    lifeContext ? focus?.description : "",
+    task === "horizon" ? source.narrative.sessionPremise?.storyPromise : "",
+    premiseKeywords,
+    task === "planning" && source.narrative.horizonPlan?.status === "active" && source.narrative.horizonPlan.actId === act?.id
+      ? [
+          source.narrative.horizonPlan.developingTension,
+          ...source.narrative.horizonPlan.nearTermIntents,
+          source.narrative.horizonPlan.payoffShape
+        ].join(" ")
+      : "",
+    task === "planning" ? heldObservation?.keywords.join(" ") : "",
     recentNarratives.at(-1)?.summary
   ].filter(Boolean).join(" ");
+  const recalledPatternIds = task === "decision" ? pending?.patternIds : options?.patternIds;
+  const recalledForceIds = task === "decision" ? pending?.forceIds : options?.factionIds;
+  const episodeFocusIds = Array.from(new Set([...(options?.focusIds ?? []), ...(recalledForceIds ?? [])]));
   const episodeRecall = selectNarrativeEpisodeRecall(source.narrative, {
     actId: act?.id,
-    routeId: selectedRouteId,
-    focusIds: options?.focusIds
+    routeId: recalledPatternIds?.[0],
+    focusIds: episodeFocusIds
   });
   const focusFactIds = (options?.focusIds ?? []).filter((id) => source.story.factLedger?.facts.some((fact) => fact.id === id));
   const selectedRecall = selectDynamicNarrativeContext(source, {
     task,
     backgroundAllowed: options?.backgroundAllowed,
-    routeId: selectedRouteId,
-    factionIds: task === "decision" && pending?.factionId ? [pending.factionId] : options?.factionIds,
+    routeId: recalledPatternIds?.[0],
+    factionIds: task === "decision" ? pending?.forceIds : options?.factionIds,
     factIds: task === "decision"
       ? pending?.factIds
       : Array.from(new Set([
@@ -1796,10 +1838,13 @@ function buildTaskNarrativePlan(
     .sort((a, b) => b.score - a.score).slice(0, 1).map(({ hint }) => hint);
   const ending = world.endingBlueprints.find((entry) => entry.id === source.narrative.endingBlueprintId);
   const loreQuery = [
+    options?.semanticQuery,
     task === "origin" || lifeContext ? source.personaPrompt : act?.prompt,
     recentNarratives.at(-1)?.summary,
-    selectedRoute?.summary,
-    task === "decision" ? world.narrativeFactions?.find((entry) => entry.id === pending?.factionId)?.summary : "",
+    task === "origin" || task === "horizon" ? source.narrative.sessionPremise?.storyPromise : "",
+    premiseKeywords,
+    task === "planning" ? heldObservation?.keywords.join(" ") : "",
+    task === "decision" ? (world.socialForces ?? []).filter((entry) => pending?.forceIds.includes(entry.id)).map((entry) => entry.summary).join("；") : "",
     lifeContext ? focus?.description : ""
   ].filter(Boolean).join(" ");
   // v8 makes worldCards the single source of authored recall. Earlier world
@@ -1821,8 +1866,8 @@ function buildTaskNarrativePlan(
     task,
     actId: act?.id,
     beat,
-    routeId: selectedRouteId ?? undefined,
-    factionIds: task === "decision" && pending?.factionId ? [pending.factionId] : options?.factionIds,
+    routeId: recalledPatternIds?.[0],
+    factionIds: task === "decision" ? pending?.forceIds : options?.factionIds,
     factIds: recall.facts.map((entry) => entry.id),
     characterIds: selectedCharacterIds,
     locationIds: selectedLocationIds,
@@ -1851,13 +1896,28 @@ function buildTaskNarrativePlan(
   const facts = (source.story.factLedger?.facts ?? []).map(normalizeNarrativeHandoffFact);
   const handoff = task === "origin" || task === "ending" || beat !== "setup" ? [] : facts.filter((fact) =>
     previousActId && previousActId !== act?.id && fact.id.startsWith(`act:${previousActId}:`) && fact.status === "resolved");
+  const premise = source.narrative.sessionPremise;
+  const premiseArc = premise?.arcs.find((entry) => entry.actId === act?.id);
+  const premiseAnchor = [
+    premise?.storyPromise ?? world.mainlineSkeleton?.premise,
+    premise ? `人物锚点：${premise.protagonistAnchor}；核心张力：${premise.centralTension}` : ""
+  ].filter(Boolean);
+  const mainlineSkeleton = task === "horizon"
+    ? [
+        ...premiseAnchor,
+        premiseArc
+          ? `${act?.label}的初始命题：${premiseArc.dramaticQuestion}；压力来源=${premiseArc.pressureSource}；可能结果=${premiseArc.payoffPossibility}`
+          : act ? `${act.label}：${act.prompt}` : ""
+      ].filter(Boolean).join("\n")
+    : task === "planning"
+      ? premiseAnchor.join("\n")
+      : task === "closure" || task === "ending"
+        ? [premiseAnchor[0], world.mainlineSkeleton?.payoff].filter(Boolean).join("\n")
+        : undefined;
   return {
     task, recall: { ...recall, resolvedFacts: recall.resolvedFacts?.filter((fact) => !handoff.some((entry) => entry.id === fact.id)) },
-    mainlineSkeleton: task === "origin" || task === "background" ? undefined : [
-      world.mainlineSkeleton?.premise,
-      task === "ending" ? world.mainlineSkeleton?.payoff : act ? `${act.label}：${act.prompt}` : ""
-    ].filter(Boolean).join("\n"),
-    routeGuidance: selectedRoute ? `${selectedRoute.label}：${narrativeRouteBeatGuidance(selectedRoute, task === "ending" ? "ending" : beat)}` : undefined,
+    mainlineSkeleton,
+    routeGuidance: undefined,
     actHandoff: handoff.map((fact) => fact.resolutionSummary ?? fact.progressSummary ?? fact.label),
     actCanon: episodeRecall.canon,
     memoryDigests: episodeRecall.digests,
@@ -1872,7 +1932,27 @@ function buildTaskNarrativePlan(
     // second global directory here would defeat scene-level retrieval and grow
     // both prompt and tool schemas with the lifetime of the save.
     factDirectory: [],
-    storyBible: world.storyBible, styleRules: world.styleRules,
+    storyBible: world.worldCore?.identity ?? world.storyBible,
+    worldCoreContext: world.worldCore ? [
+      world.worldCore.identity,
+      `世界规律：${world.worldCore.laws.join("；")}`,
+      `力量结构：${world.worldCore.powerStructure}`,
+      `日常生活：${world.worldCore.everydayLife}`,
+      `叙事基调：${world.worldCore.tone}`
+    ].join("\n") : world.storyBible,
+    narrativePaletteContext: world.narrativePalette ? {
+      background: [
+        `生活场景：${world.narrativePalette.sceneModes.join("、")}`,
+        `生活中的张力来源：${world.narrativePalette.conflictSources.join("、")}`
+      ].join("；"),
+      scene: [
+        `可用场景：${world.narrativePalette.sceneModes.join("、")}`,
+        `可用冲突：${world.narrativePalette.conflictSources.join("、")}`,
+        `可用行动表达：${world.narrativePalette.actionVocabulary.join("、")}`,
+        `故事尺度可能性：${world.narrativePalette.scalePossibilities.join("、")}`
+      ].join("；")
+    } : undefined,
+    styleRules: world.styleRules,
     origin: source.narrative.opening?.profile?.summary ?? "",
     activeLore: loreSources.map((entry) => entry.text), activeLoreSources: loreSources, activeWorldCardSources: worldCardSources, worldCardDiagnostics: excludedWorldCards, activeThreads: [],
     plotEssentials: recall.facts.map((fact) => `${fact.id}：${fact.label}`),
@@ -1880,7 +1960,10 @@ function buildTaskNarrativePlan(
       `${person.id}=${person.name}（${person.factionId ?? "无阵营"}，${person.role}）${person.description ? "：" + person.description : ""}${person.relationship ? "；关系：" + person.relationship : ""}`),
     assetContext: recall.assetContext,
     scene: source.narrative.assets?.locations.find((entry) => entry.id === source.narrative.assets?.currentLocationId)?.name ?? "",
-    authorNote: "", endingGuide: world.endingGuide,
+    authorNote: task === "planning" && heldObservation?.keywords.length
+      ? `当前节拍仍在发展，可承接刚才已经出现的动作线索：${heldObservation.keywords.join("、")}`
+      : "",
+    endingGuide: world.endingGuide,
     ending: ending ? `结算品质：${ending.polarity}；${ending.title}。以本局已完成经历交代归宿。` : ""
   };
 }
@@ -1914,7 +1997,7 @@ export function buildNarrativePromptPlan(
   world: NarrativeWorldDefinition | null,
   selectedRouteId?: string | null,
   task: NarrativeTask = "dynamic",
-  options?: { backgroundAllowed?: boolean; factionIds?: string[]; focusIds?: string[] }
+  options?: { backgroundAllowed?: boolean; factionIds?: string[]; patternIds?: string[]; focusIds?: string[]; semanticQuery?: string }
 ): NarrativePromptPlan | undefined {
   if (!source.narrative.enabled || !world || world.worldId !== source.worldId) return undefined;
   if (world.mainlineActs?.length) return buildTaskNarrativePlan(source, world, task, selectedRouteId, options);
@@ -1922,7 +2005,7 @@ export function buildNarrativePromptPlan(
   // ending narration; `null` deliberately means global-only planning context.
   const directionId = selectedRouteId === undefined ? currentDirectionId(source) : selectedRouteId;
   const selectedRoute = directionId
-    ? world.routeArcs.find((route) => route.directionId === directionId)
+    ? world.routeArcs?.find((route) => route.directionId === directionId)
     : undefined;
   const threadIds = new Set(source.narrative.threads.filter((thread) => thread.status !== "resolved").map((thread) => thread.id));
   const activeThreads = source.narrative.threads
@@ -2055,7 +2138,7 @@ export function buildNarrativePromptPlan(
     endingGuide: world.endingGuide ? compactText(world.endingGuide, 150) : undefined,
     ending: [
       ending
-        ? `结局倾向=${ending.title}/${ending.polarity}；按该路线的身份与代价收束。最终冲突、伏笔回收与余响必须以本局已完成三幕的事实、人物和后果为准，不可把世界包中的示例情节当作本局既定经历。`
+        ? `结局倾向=${ending.title}/${ending.polarity}；评价人物这一生实际形成的选择、关系、能力与代价。最终余响以本局已完成经历为准，不把世界包中的可能性写成本局既定事实。`
         : "",
       world.endingGuide ? `结局文风：${compactText(world.endingGuide, 150)}` : ""
     ].filter(Boolean).join("\n"),

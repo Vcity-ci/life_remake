@@ -9,6 +9,8 @@ export type NarrativeContextSection =
   | "talents"
   | "seedHints"
   | "origin"
+  | "world"
+  | "palette"
   | "mainline"
   | "route"
   | "handoff"

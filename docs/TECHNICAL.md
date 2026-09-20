@@ -1,5 +1,15 @@
 # 技术文档（v1.0.1）
 
+## 增量机制：2026-09-20 03:44 +08:00 — v9 世界协议与节拍观察
+
+- `packages/shared/src/index.ts` 新增 `NarrativeWorldCore`、`NarrativeSocialForceDefinition`、`NarrativePalette`、`NarrativeStoryPatternDefinition`、`NarrativeSessionPremise` 与 `NarrativeBeatObservation`。v9 的 `routeArcs`、`narrativeFactions` 和逐路线门槛均非必需；内置包只使用世界级 `progression.gates`。
+- `content.ts` 对 v9 校验世界核心、社会力量、调色板、故事形态和三张世界级结局蓝图。世界卡仍按任务、关键词、拍点和动态对象召回，但不再需要 route scope 才能进入当前内置世界请求。
+- 开局链路在 `render_origin` 成功后调用 `generateNarrativeSessionPremise`，成功结果写入 `NarrativeRunState.sessionPremise` 后才把 opening 标记为 ready。该请求使用隔离的最小任务上下文，不继承或改写主叙事 conversation；结果随匿名存档和分支快照持久化，不显示为新的玩家回合。
+- `plan_narrative_turn` 的场景计划使用 `patternIds` 与 `forceIds`，二者均可为空且各最多两项。引擎只校验引用是否属于当前世界包；它们用于精确召回和 Episode 关联，不是合法剧情白名单。
+- 场景或抉择后果完成正文审校后调用 `observeNarrativeBeat`。观察请求同样使用隔离的最小任务上下文，只读取专用 prompt 中的故事弧、拍点和刚完成正文；结果写入 `lastBeatObservation`，只有 `advance` 才推进当前拍。选择场景在玩家作答前固定为 `hold`，观察器不参与事实、属性、人物或资产提交。
+- 动态场景提交继续沿用原子事务：工具结果、连续性更新、节拍观察和引擎结算任一失败，都不会发布半成品 `TurnRecord`。Memory Curator 仍只处理已经提交的 Episode。
+- v9 结局评估从完整世界的三张蓝图中选择品质；旧 route-scoped 评估仅服务早期数据契约，不参与三个内置世界。
+
 ## 增量机制：2026-09-16 19:05 +08:00 — World Card 生命周期一致性
 
 - `selectNarrativeWorldCardMatches` 先验证结构化作用域，再区分直接、关联和粘滞激活。`stickyUntilSequence` 与 `cooldownUntilSequence` 使用排他的 Episode 边界；提交器忽略 sticky continuation，消除隔轮重复卡自我续期。

@@ -37,6 +37,16 @@ export function publicNarrativeAssetsSnapshot(raw?: NarrativeAssets): PublicNarr
   });
 }
 
+/**
+ * A name-only planning index breaks the "already recalled before it can be
+ * recalled" cycle without placing every ability description in every prompt.
+ */
+export function narrativeAbilityDirectory(raw?: NarrativeAssets): Array<{ id: string; label: string }> {
+  return normalizeNarrativeAssets(raw).abilities
+    .filter((entry) => entry.status === "available")
+    .map((entry) => ({ id: entry.id, label: `${entry.name}（${entry.mastery}）` }));
+}
+
 export function parseNarrativeAssetUpdates(raw: unknown, assets?: NarrativeAssets): NarrativeAssetUpdates | undefined {
   if (raw === undefined) return undefined;
   const result = updates.parse(raw);

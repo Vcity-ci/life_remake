@@ -46,7 +46,16 @@ const stableProvider: NarrativeContextProvider = {
       ...(plan.persona ? fragment({ id: "stable:persona", layer: "stable", section: "persona", sourceType: "persona", priority: 100, content: plan.persona, required: true }) : []),
       ...(plan.talents ?? []).flatMap((talent) => fragment({ id: narrativeContentId("talent", talent), layer: "stable", section: "talents", sourceType: "talent", priority: 90, content: talent })),
       ...(plan.seedHints ?? []).flatMap((hint) => fragment({ id: narrativeContentId("seed-hint", hint), layer: "stable", section: "seedHints", sourceType: "seed-hint", priority: 35, content: hint })),
-      ...(plan.origin ? fragment({ id: "stable:origin", layer: "stable", section: "origin", sourceType: "origin", priority: 85, content: plan.origin }) : [])
+      ...(plan.origin ? fragment({ id: "stable:origin", layer: "stable", section: "origin", sourceType: "origin", priority: 85, content: plan.origin }) : []),
+      ...(plan.worldCoreContext ? fragment({ id: "stable:world-core", layer: "stable", section: "world", sourceType: "world-core", priority: 98, content: plan.worldCoreContext, required: true }) : []),
+      ...(plan.narrativePaletteContext ? fragment({
+        id: `stable:narrative-palette:${plan.task === "background" ? "background" : "scene"}`,
+        layer: "stable",
+        section: "palette",
+        sourceType: "narrative-palette",
+        priority: 76,
+        content: plan.task === "background" ? plan.narrativePaletteContext.background : plan.narrativePaletteContext.scene
+      }) : [])
     ];
   }
 };
@@ -195,7 +204,8 @@ const memoryProvider: NarrativeContextProvider = {
 const endingProvider: NarrativeContextProvider = {
   id: "ending",
   collect: ({ plan, task }) => !plan?.task || task !== "ending" ? [] : [
-    ...(plan.ending ? fragment({ id: "active:ending-brief", layer: "active", section: "ending", sourceType: "ending-brief", priority: 100, content: plan.ending, required: true }) : [])
+    ...(plan.ending ? fragment({ id: "active:ending-brief", layer: "active", section: "ending", sourceType: "ending-brief", priority: 100, content: plan.ending, required: true }) : []),
+    ...(plan.endingGuide ? fragment({ id: "active:ending-guide", layer: "active", section: "ending", sourceType: "ending-guide", priority: 90, content: `结局文风：${plan.endingGuide}` }) : [])
   ]
 };
 

@@ -6,27 +6,33 @@ function momentLabel(moment: NarrativeAssetMoment): string {
     : `${moment.age}岁`;
 }
 
-export function NarrativeAssetsPanel({ assets }: { assets?: PublicNarrativeAssets }) {
+export function NarrativeAssetsArchive({ assets }: { assets?: PublicNarrativeAssets }) {
   const current = assets?.locations.find((entry) => entry.id === assets.currentLocationId);
   return <>
-    <section className="rail-section narrative-assets" aria-label="足迹">
-      <h3>足迹</h3>
-      {current ? <p className="current-place"><small>此刻所在</small><strong>{current.name}</strong><span>{current.description}</span></p> : <small>行迹尚未展开</small>}
-      {Boolean(assets?.locations.length) && <details className="asset-archive"><summary>地点记忆 · {assets!.locations.length}</summary>
-        {assets!.locations.map((entry) => <details className="asset-detail" key={entry.id}>
-          <summary>{entry.name}{entry.id === current?.id ? <small>当前</small> : null}</summary>
-          <p>{entry.description}</p><small>{momentLabel(entry.introduced)}记于此生</small>
-        </details>)}
-      </details>}
-    </section>
-    <section className="rail-section narrative-assets" aria-label="本领">
-      <h3>本领</h3>
-      {assets?.abilities.length ? assets.abilities.map((entry) => <details className={`asset-detail${entry.status === "unavailable" ? " is-unavailable" : ""}`} key={entry.id}>
-        <summary><span>{entry.name}</span><small>{entry.mastery}</small></summary>
-        <p>{entry.description}</p><p className="asset-source">{entry.source}</p>
-        <small>{momentLabel(entry.introduced)}习得{entry.status === "unavailable" ? " · 暂不可用" : ""}</small>
-      </details>) : <small>所学尚待积累</small>}
-    </section>
+    <details className="archive-section narrative-assets">
+      <summary className="archive-section-summary">
+        <span>足迹</span>
+        <small>{assets?.locations.length ? `${assets.locations.length}处${current ? ` · 此刻：${current.name}` : ""}` : "尚未展开"}</small>
+      </summary>
+      <div className="archive-index">
+        {assets?.locations.length ? assets.locations.map((entry) => <details className="archive-entry" key={entry.id}>
+          <summary><span>{entry.name}</span>{entry.id === current?.id ? <small className="archive-current">当前</small> : null}</summary>
+          <div className="archive-entry-content"><p>{entry.description}</p><small>{momentLabel(entry.introduced)}记于此生</small></div>
+        </details>) : <p className="archive-empty">行迹尚未展开。</p>}
+      </div>
+    </details>
+    <details className="archive-section narrative-assets">
+      <summary className="archive-section-summary">
+        <span>本领</span>
+        <small>{assets?.abilities.length ? `${assets.abilities.length}项` : "尚待积累"}</small>
+      </summary>
+      <div className="archive-index">
+        {assets?.abilities.length ? assets.abilities.map((entry) => <details className={`archive-entry${entry.status === "unavailable" ? " is-unavailable" : ""}`} key={entry.id}>
+          <summary><span>{entry.name}</span><small>{entry.mastery}{entry.status === "unavailable" ? " · 暂不可用" : ""}</small></summary>
+          <div className="archive-entry-content"><p>{entry.description}</p><p className="asset-source">来处：{entry.source}</p><small>{momentLabel(entry.introduced)}习得</small></div>
+        </details>) : <p className="archive-empty">所学尚待积累。</p>}
+      </div>
+    </details>
   </>;
 }
 

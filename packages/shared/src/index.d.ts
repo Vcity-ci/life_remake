@@ -291,6 +291,36 @@ export interface NarrativeFactionDefinition {
     stance?: string;
     conflictFactionIds?: string[];
 }
+/** Compact, always-on truths that make one world recognisable without prescribing a plot. */
+export interface NarrativeWorldCore {
+    identity: string;
+    laws: string[];
+    powerStructure: string;
+    everydayLife: string;
+    tone: string;
+}
+/** Concrete forces that can create people and pressure in a run; they are not story routes. */
+export interface NarrativeSocialForceDefinition {
+    id: string;
+    label: string;
+    summary: string;
+    methods: string[];
+    tensions?: string[];
+}
+/** Genre vocabulary offered as possibilities, never as mandatory events. */
+export interface NarrativePalette {
+    sceneModes: string[];
+    conflictSources: string[];
+    actionVocabulary: string[];
+    scalePossibilities: string[];
+}
+/** Optional patterns help a world feel authored while remaining subordinate to the run premise. */
+export interface NarrativeStoryPatternDefinition {
+    id: string;
+    label: string;
+    summary: string;
+    keywords?: string[];
+}
 export interface NarrativeThreadDefinition {
     id: string;
     label: string;
@@ -372,7 +402,8 @@ export interface NarrativeWorldCardActivationState {
 export interface EndingBlueprint {
     id: string;
     worldId: WorldId;
-    directionId: string;
+    /** Optional thematic scope. v9 worlds use one world-level blueprint per polarity. */
+    directionId?: string;
     polarity: EndingPolarity;
     title: string;
     premise: string;
@@ -466,7 +497,9 @@ export interface NarrativeSurvivalRule {
 }
 export interface NarrativeWorldProgression {
     backgroundPacing: NarrativeBackgroundPacing;
-    routes: NarrativeRouteProgression[];
+    /** World-wide capability gates; they pace story beats without selecting a plot route. */
+    gates?: Partial<Record<NarrativeProgressGateStage, NarrativeStatGate>>;
+    routes?: NarrativeRouteProgression[];
     completion: NarrativeCompletionRule;
     growthFocuses?: NarrativeGrowthFocusDefinition[];
     statTiers?: NarrativeStatTierConfig;
@@ -504,10 +537,14 @@ export interface NarrativeRouteDefinition {
     materialEventIds?: string[];
 }
 export interface NarrativeWorldDefinition {
-    version: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
+    version: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
     worldId: WorldId;
     storyBible: string;
     styleRules: string[];
+    worldCore?: NarrativeWorldCore;
+    socialForces?: NarrativeSocialForceDefinition[];
+    narrativePalette?: NarrativePalette;
+    storyPatterns?: NarrativeStoryPatternDefinition[];
     /** World-owned closing texture for the final renderer. */
     endingGuide?: string;
     opening?: NarrativeOpeningDefinition;
@@ -522,7 +559,8 @@ export interface NarrativeWorldDefinition {
     /** General-purpose scenes used when no concrete material is currently fit. */
     sceneArchetypes?: NarrativeSceneArchetype[];
     /** Complete route catalog projected to the model from world data. */
-    routeArcs: NarrativeRouteDefinition[];
+    /** v1-v8 authored lenses. v9 planning derives its focus from the run premise. */
+    routeArcs?: NarrativeRouteDefinition[];
     threads: NarrativeThreadDefinition[];
     characters: NarrativeCharacterDefinition[];
     lore: NarrativeLoreEntry[];
@@ -791,6 +829,29 @@ export interface NarrativeOriginProfile {
     summary: string;
     seedHints: string[];
 }
+export interface NarrativePremiseArc {
+    actId: string;
+    dramaticQuestion: string;
+    pressureSource: string;
+    payoffPossibility: string;
+}
+/** Stable, run-specific story promise generated once from persona, talents, origin and world truths. */
+export interface NarrativeSessionPremise {
+    protagonistAnchor: string;
+    centralTension: string;
+    storyPromise: string;
+    keywords: string[];
+    arcs: NarrativePremiseArc[];
+}
+export interface NarrativeBeatObservation {
+    decision: "hold" | "advance";
+    evidence: string[];
+    keywords: string[];
+    actId: string;
+    beat: Exclude<NarrativeBeat, "ending">;
+    observedEpisodeId?: string;
+    createdAt: number;
+}
 export interface NarrativeOpeningState {
     status: "pending" | "ready";
     profile?: NarrativeOriginProfile;
@@ -809,6 +870,7 @@ export interface NarrativeRunState {
     version: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
     enabled: boolean;
     opening?: NarrativeOpeningState;
+    sessionPremise?: NarrativeSessionPremise;
     arcPhase: NarrativeArcPhase;
     climaxCount: number;
     payoffCount: number;
@@ -825,6 +887,7 @@ export interface NarrativeRunState {
     memoryDigests: NarrativeMemoryDigest[];
     worldCardActivations?: NarrativeWorldCardActivationState[];
     horizonPlan?: NarrativeHorizonPlan;
+    lastBeatObservation?: NarrativeBeatObservation;
     agentAttempts: NarrativeAgentAttemptRecord[];
     components: NarrativeComponentRunState[];
     activeCharacterIds: string[];

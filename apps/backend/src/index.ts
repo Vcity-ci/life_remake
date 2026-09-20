@@ -33,12 +33,13 @@ import type {
 } from "@reroll/shared";
 import { createDefaultGameplayTuning } from "@reroll/shared";
 import { narrativeFactResolutionModes } from "./narrative-continuity.js";
-import { applyNarrativeAssetUpdates, commitNarrativeAssets } from "./narrative-assets.js";
+import { applyNarrativeAssetUpdates, commitNarrativeAssets, narrativeAbilityDirectory } from "./narrative-assets.js";
 import {
   generateEndingNarrative,
   renderInterruptedBackground,
   generateMilestoneOptions,
   generateNarrativeOrigin,
+  generateNarrativeSessionPremise,
   generateYearNarrative,
   isDirectedToolAvailable,
   NarrativeOutcomeError,
@@ -1080,9 +1081,12 @@ async function generateOpeningForRun(options: OpeningGenerationOptions): Promise
     logNarrativeOutcomeFailure(options, error, "render_origin");
     throw error;
   }
+  run.narrative = { ...run.narrative, opening: { status: "pending", profile: opening.profile } };
+  const sessionPremise = await generateNarrativeSessionPremise(run, world, narrativeWorld, opening, narrativeCtx);
   run.narrative = {
     ...run.narrative,
-    opening: { status: "ready", profile: opening.profile }
+    opening: { status: "ready", profile: opening.profile },
+    sessionPremise
   };
   commitNarrativeMemory(run.narrative, { id: "memory:origin", age: 0, factionIds: [], characterIds: [], factIds: [], text: opening.narrative });
   commitNarrativeAssets(run.narrative, applyNarrativeAssetUpdates(run.narrative.assets, opening.assetUpdates, { age: 0 }), opening.assetUpdates, { age: 0 }, {}, "origin");
@@ -1156,7 +1160,7 @@ async function generateDirectedSegmentForRunUnsafe(options: DirectedSegmentOptio
       input: {
         callId,
         allowedIntents: [],
-        routeOptions: narrativeWorld.routeArcs.map((route) => ({ id: route.directionId, label: route.label || route.directionId, summary: route.summary })),
+        routeOptions: [],
         allowClosureRequest: true,
         closureRequired: true,
         allowScenePacing: false
@@ -1176,6 +1180,7 @@ async function generateDirectedSegmentForRunUnsafe(options: DirectedSegmentOptio
   const runtime = run.narrative.actRuntime;
   const act = runtime ? narrativeWorld.mainlineActs?.find((item) => item.id === runtime.actId) : undefined;
   if (!runtime || !act) throw new Error("dynamic_world_act_unavailable");
+  const actPrompt = act.prompt;
   const factId = act.factId ?? act.introduceFactIds?.[0];
   const factLabel = factId ? narrativeWorld.mainlineFacts?.find((fact) => fact.id === factId)?.label : undefined;
   const narrativeSource = {
@@ -1224,26 +1229,29 @@ async function generateDirectedSegmentForRunUnsafe(options: DirectedSegmentOptio
   narrativeCtx.narrativePlan = buildNarrativePromptPlan(run, narrativeWorld, null, allowedTurnKinds.length === 1 && allowedTurnKinds[0] === "background" ? "background" : "planning", {
     backgroundAllowed: allowedTurnKinds.includes("background")
   });
-  const routeOptions = narrativeWorld.routeArcs.map((route) => ({
-    id: route.directionId,
-    label: route.label || route.directionId,
-    summary: route.summary
+  const storyPatterns = (narrativeWorld.storyPatterns ?? []).map((pattern) => ({
+    id: pattern.id,
+    label: pattern.label,
+    summary: pattern.summary
   }));
-  const factionOptions = (narrativeWorld.narrativeFactions ?? []).map((faction) => ({
-    id: faction.id,
-    label: faction.label,
-    summary: faction.summary
+  const socialForces = (narrativeWorld.socialForces ?? []).map((force) => ({
+    id: force.id,
+    label: force.label,
+    summary: force.summary,
+    methods: force.methods,
+    tensions: force.tensions
   }));
   const planningRecall = narrativeCtx.narrativePlan!.recall!;
   const focusReferences: NarrativeTurnEnvelope["focusReferences"] = [
     ...planningRecall.facts.map((fact) => ({ id: fact.id, kind: "fact" as const, label: fact.label })),
     ...planningRecall.characters.filter((entry) => entry.description || entry.relationship).map((entry) => ({ id: entry.id, kind: "character" as const, label: entry.name })),
-    ...(planningRecall.assetSources ?? []).map((entry) => ({
+    ...(planningRecall.assetSources ?? []).filter((entry) => entry.kind === "location").map((entry) => ({
       id: entry.id,
-      kind: entry.kind as "location" | "ability",
+      kind: "location" as const,
       label: (entry.text.split("=")[1] ?? entry.id).split(/[（：]/)[0] || entry.id
-    }))
-  ].filter((entry, index, all) => all.findIndex((candidate) => candidate.id === entry.id) === index).slice(0, 12);
+    })),
+    ...narrativeAbilityDirectory(run.narrative.assets).map((entry) => ({ id: entry.id, kind: "ability" as const, label: entry.label }))
+  ].filter((entry, index, all) => all.findIndex((candidate) => candidate.id === entry.id) === index);
   const growthFocus = runtime.growthFocusOptions?.find((focus) => focus.id === runtime.growthFocusId);
   const envelope: NarrativeTurnEnvelope = {
     callId,
@@ -1252,11 +1260,11 @@ async function generateDirectedSegmentForRunUnsafe(options: DirectedSegmentOptio
     currentAge: run.age,
     sceneAge: turnAges.sceneAge,
     backgroundAgeRange: turnAges.backgroundAgeRange,
-    act: { id: act.id, label: act.label, prompt: act.prompt },
+    act: { id: act.id, label: act.label, prompt: actPrompt },
     beat: runtime.beat,
     capabilities,
-    routes: routeOptions,
-    factions: factionOptions,
+    storyPatterns,
+    socialForces,
     focusReferences,
     statTiers: resolveNarrativeStatTiers(run.stats, run.narrative.statTierConfig),
     growthFocus,
@@ -1270,24 +1278,14 @@ async function generateDirectedSegmentForRunUnsafe(options: DirectedSegmentOptio
     envelope,
     onProgress: options.onProgress,
     buildRenderInput: (turnPlan, promptPlan) => ({
-      storyArc: narrativeWorld.mainlineSkeleton?.premise,
-      act: { id: act.id, label: act.label, prompt: act.prompt, factLabel },
+      act: { id: act.id, label: act.label, prompt: actPrompt, factLabel },
       beat: runtime.beat,
       presentation: turnPlan.presentation,
       allowedTurnKinds: [turnPlan.turnKind],
       sceneAge: turnAges.sceneAge,
       backgroundAgeRange: turnAges.backgroundAgeRange,
-      routes: narrativeWorld.routeArcs.map((route) => ({
-        id: route.directionId,
-        label: route.label || route.directionId,
-        summary: route.summary,
-        perspective: narrativeRouteBeatGuidance(route, runtime.beat)
-      })),
-      factions: (narrativeWorld.narrativeFactions ?? []).map((faction) => ({
-        id: faction.id,
-        label: faction.label,
-        summary: faction.summary
-      })),
+      storyPatterns,
+      socialForces,
       knownCharacters: promptPlan.recall!.characters,
       attributePolicy: runtime.beat === "pressure" || runtime.beat === "climax" ? undefined : dynamicSceneAttributePolicy(),
       backgroundAttributePolicy,
@@ -1382,10 +1380,10 @@ async function generateDirectedSegmentForRunUnsafe(options: DirectedSegmentOptio
       episodeId: episode.id
     };
   }
-  if (!scene.routeId) throw new Error("dynamic_scene_route_missing");
   const advanced = advanceWithDynamicNarrativeScene(run, world, narrativeWorld, {
-    routeId: scene.routeId,
-    factionId: scene.factionId,
+    patternIds: scene.patternIds,
+    forceIds: scene.forceIds,
+    beatDecision: scene.beatDecision ?? "hold",
     beat: runtime.beat,
     narrative: scene.narrative,
     participants: scene.participants,
@@ -1406,7 +1404,7 @@ async function generateDirectedSegmentForRunUnsafe(options: DirectedSegmentOptio
   const sceneMemory = run.narrative.memoryEntries.find((entry) => entry.id === `memory:${run.narrative.scene.lastEventId}`);
   if (sceneMemory) commitNarrativeMemory(run.narrative, { ...sceneMemory, text: committedNarrative });
   const committedSceneAssets = commitNarrativeAssets(run.narrative, applyNarrativeAssetUpdates(run.narrative.assets, scene.assetUpdates, { age: run.age }), scene.assetUpdates, { age: run.age }, {
-    routeIds: [scene.routeId], factionIds: scene.factionId ? [scene.factionId] : [],
+    factionIds: scene.forceIds,
     characterIds: run.narrative.dynamicCharacters.filter((entry) => scene.participants.some((participant) => participant.characterRef === entry.id || (participant.name === entry.name && participant.factionId === entry.factionId))).map((entry) => entry.id),
     factIds: Array.from(new Set([...(factId ? [factId] : []), ...advanced.factIds]))
   }, run.narrative.scene.lastEventId);
@@ -1434,8 +1432,7 @@ async function generateDirectedSegmentForRunUnsafe(options: DirectedSegmentOptio
     age: run.age,
     actId: act.id,
     beat: runtime.beat,
-    routeId: scene.routeId,
-    factionId: scene.factionId,
+    factionId: scene.forceIds[0],
     factIds: advanced.factIds,
     characterIds: scene.participants.map((entry) => entry.characterRef).filter((id): id is string => Boolean(id && id !== "new"))
   });
@@ -1445,7 +1442,7 @@ async function generateDirectedSegmentForRunUnsafe(options: DirectedSegmentOptio
       actId: act.id,
       sourceEventId,
       resolvedAge: run.age,
-      routeId: scene.routeId,
+      routeId: scene.patternIds[0],
       handoff: scene.actHandoff,
       factIds: episode.factIds
     });
@@ -1503,7 +1500,7 @@ async function generateSegmentForRun(
     };
   }
 
-  const usesNarrativeDirector = Boolean(narrativeWorld && run.narrative.enabled && narrativeWorld.routeArcs.length > 0);
+  const usesNarrativeDirector = Boolean(narrativeWorld && run.narrative.enabled && (narrativeWorld.version >= 9 || (narrativeWorld.routeArcs?.length ?? 0) > 0));
   if (usesNarrativeDirector && narrativeWorld) {
     run.narrative = ensureNarrativeActRuntime(run.narrative, narrativeWorld, run.age);
     if (run.narrative.opening?.status === "pending") {
@@ -1993,6 +1990,7 @@ async function runStepFlowUnlocked(
     } | undefined;
     let decisionPendingScene: InternalRunState["pendingDynamicScene"];
     let decisionAgentAttemptId: string | undefined;
+    let decisionBeatDecision: "hold" | "advance" | undefined;
     if (wasDirectedMilestone && usesStoryDirectionDecision) {
       const policy = getPendingDirectedDecisionPolicy(run, resolvedDecision);
       if (!policy) throw new Error("decision_outcome_policy_missing");
@@ -2030,6 +2028,7 @@ async function runStepFlowUnlocked(
         onProgress: reportProgress
       });
       decisionAgentAttemptId = decisionTurn.attemptId;
+      decisionBeatDecision = decisionTurn.observation.decision;
       const outcome = decisionTurn.outcome;
       directedDecisionNarrative = outcome.narrative;
       narrativeOutcome = { effects: outcome.effects };
@@ -2038,8 +2037,7 @@ async function runStepFlowUnlocked(
       relationshipUpdates = outcome.relationshipUpdates;
       decisionNarrativeLinks = pendingDynamicScene
         ? {
-          routeId: pendingDynamicScene.routeId,
-          factionId: pendingDynamicScene.factionId,
+          factionId: pendingDynamicScene.forceIds[0],
           characterIds: pendingDynamicScene.characterIds ?? [],
           factIds: pendingDynamicScene.factIds ?? []
         }
@@ -2060,7 +2058,8 @@ async function runStepFlowUnlocked(
         narrativeFactUpdates,
         narrative: directedDecisionNarrative,
         relationshipUpdates,
-        narrativeWorld
+        narrativeWorld,
+        beatDecision: decisionBeatDecision
       }
     );
     resolveTurnRecordChoice(run, publicChoice, selectedOption);
@@ -2092,8 +2091,8 @@ async function runStepFlowUnlocked(
         age: stepped.updated.age,
         actId: decisionPendingScene?.mainlineActId,
         beat: decisionPendingScene?.beat,
-        routeId: decisionPendingScene?.routeId,
-        factionId: decisionPendingScene?.factionId,
+        routeId: decisionPendingScene?.patternIds[0],
+        factionId: decisionPendingScene?.forceIds[0],
         factIds: stepped.factIds,
         characterIds: decisionPendingScene?.characterIds
       });

@@ -3,7 +3,7 @@
 ## 文档发布核对补充：2026-09-10 00:26 +08:00
 
 - 对外功能以当前 [README](../README.md) 和各 docs 顶部增量记录为准；早期随机事件、古代唯一世界、双向结局描述不应再作为发布摘要。
-- 当前仓库包含古代、奇幻、现代三个 v6 世界包；扩展入口为 [世界包模板与说明](../examples/world-pack/WORLD_PACK_GUIDE.txt)。
+- 当前仓库包含古代、奇幻、现代三个 v9 世界包；扩展入口为 [世界包模板与说明](../examples/world-pack/WORLD_PACK_GUIDE.txt)。
 - 数据库与前端 UX 交互是后续 issue 方向，不应在发布说明中写成已交付功能。
 - 本轮没有执行发布、部署或构建；以下原检查清单保留。
 
@@ -84,7 +84,7 @@ git push -u origin main
 
 ## 5. 当前叙事改动提交检查（2026-08-21 01:29 +08:00，增量）
 
-- 路线局部进度涉及 `packages/shared/src/index.ts`、`apps/backend/src/narrative.ts`、`apps/backend/src/engine.ts` 和 `apps/backend/src/index.ts`；提交时应确保这组契约与实现一起进入版本库。
-- 回归测试位于 `apps/backend/src/engine.test.ts`，覆盖并行路线保留与 payoff 后仅重置获胜路线。
+- v9 世界核心、本局前提、故事形态／社会力量与节拍观察涉及 `packages/shared/src/index.ts`、`apps/backend/src/ai.ts`、`apps/backend/src/narrative.ts`、`apps/backend/src/narrative/runtime.ts`、`apps/backend/src/engine.ts` 和 `apps/backend/src/index.ts`；提交时应确保契约、编排与状态迁移一起进入版本库。
+- 回归测试位于 `apps/backend/src/engine.test.ts`，覆盖世界级门槛、三段五拍、可选故事素材、情景世界卡和世界级三档结局。
 - 文档同步包含架构、技术、使用、配置、蒸馏、变更与开发日志；`docs/DEPLOYMENT.md` 不属于本次叙事变更范围。
 - 发布前至少执行 `npm run test -w @reroll/backend` 与 `npm run build -w @reroll/backend`。若共享包 `dist` 被本地进程占用，不要强制杀进程；先确认源码和后端类型构建结果，再在空闲时重建共享产物。

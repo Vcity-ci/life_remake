@@ -1,115 +1,87 @@
 {
-  "version": 8,
+  "version": 9,
   "worldId": "my_world",
-  "storyBible": "这是一个由人物处境、关系、能力与选择共同塑造的人生世界。故事不预设唯一职业、身份、关系或成功模板。三幕主线应逐步扩大人物需要承担的事：先让一件具体处境进入生活，再让前事的后果带来新的位置与压力，最后让积累的能力、关系和代价面对更大的回响。每一次抉择都必须留下后来能够感受到的影响。",
+  "storyBible": "说明这个世界是什么、哪些力量影响日常，以及人物可以拥有多大的故事尺度。这里只定义世界，不预写玩家必走的剧情。",
   "styleRules": [
-    "使用第二人称，以具体行动、环境细节、人物关系和选择后果推进叙事，让正文始终停留在玩家实际经历的场景之中。",
-    "尊重人物的年龄、身世、天赋与既有经历。普通年份可以平静，但应表现成长、见闻、关系余波或自我认识。",
-    "人物的身份高度与人生答案由本局经历逐步形成；主角可以参与、旁观、帮助、离开或承担与当前处境相称的行动。",
-    "幕间高潮必须改变人物真实的关系、位置、能力或责任；回收必须回应已经发生的承诺、代价或人物联系。"
+    "以第二人称写具体环境、人物行动和选择后果。",
+    "尊重人物人设、年龄、天赋和已经发生的经历。",
+    "普通岁月可以平静；关键场景应改变关系、能力、处境或责任。"
   ],
-  "endingGuide": "以人物最终留下的关系、成果、生活方式或代价回望这段人生；世界包应在此提供适合自身题材的收束余味。",
-  "opening": {
-    "earlyLife": {
-      "maxAge": 3
-    }
+  "worldCore": {
+    "identity": "这个世界不可替代的身份。",
+    "laws": ["世界规律一", "世界规律二", "世界规律三"],
+    "powerStructure": "资源、力量和决定权由谁掌握。",
+    "everydayLife": "普通人怎样学习、工作、生活和往来。",
+    "tone": "叙事质感与允许出现的情绪尺度。"
   },
+  "socialForces": [
+    { "id": "my_world.community", "label": "共同体", "summary": "提供归处，也会提出责任。", "methods": ["支持", "约束", "交换"], "tensions": ["个人与共同体"] },
+    { "id": "my_world.institution", "label": "组织与规则", "summary": "分配机会、资源和评价权。", "methods": ["吸纳", "评定", "排斥"] }
+  ],
+  "narrativePalette": {
+    "sceneModes": ["日常生活", "关系交锋", "远行探索", "公开行动"],
+    "conflictSources": ["责任与自由", "机会与代价", "关系与边界"],
+    "actionVocabulary": ["观察", "学习", "交涉", "行动", "拒绝", "承担"],
+    "scalePossibilities": ["个人生活", "家庭与伙伴", "组织与地域", "世界性变化"]
+  },
+  "storyPatterns": [
+    { "id": "my_world.bonds", "label": "关系与归处", "summary": "从信任、照料、边界和归属展开故事。" },
+    { "id": "my_world.undertaking", "label": "能力与承担", "summary": "从学习、行动、成果和责任展开故事。" },
+    { "id": "my_world.wandering", "label": "远行与新路", "summary": "从迁移、陌生环境和不同生活方式展开故事。" }
+  ],
+  "endingGuide": "以人物实际留下的关系、成果、生活方式和代价评价这一生。",
+  "opening": { "earlyLife": { "maxAge": 3 } },
   "mainlineSkeleton": {
-    "premise": "三幕共同讲述同一段人生。第一幕让人物接触需要认真回应的具体处境；第二幕让此前选择的后果改变其位置和关系；第三幕让积累的能力、关系与代价面对更大的责任或回响。具体人物、地域、组织、危机与人生方向均由本局故事决定。",
-    "opening": "让人物从自身生活、环境或他人处境中看见一件值得回应的事。它可以是机会、误解、责任、竞争、失去或愿望，不预设具体题材和身份。",
-    "pressure": "承接第一幕已经发生的后果，让人物进入新的关系、组织、处境或选择。此幕必须围绕独立矛盾展开，不得原样重复第一幕的问题。",
-    "climax": "让前两幕积累的能力、人物与代价进入更深的实际抉择。人物承担的尺度必须与本局经历相称，不预设英雄身份。",
-    "payoff": "三次高潮中的选择、人物和代价在结局前共同兑现，回答人物如何理解自己留下的关系与成果。",
-    "goodEndingDirection": "人物以判断、行动和承担形成可延续的关系、成果或生活秩序；收获必须承认已付出的代价。",
-    "badEndingDirection": "人物因误判、失去、资源限制或关系破裂失去重要之物；结局仍应尊重其做过的真实选择。"
+    "premise": "本局人设、最终天赋和身世建立长期故事承诺，世界包不替玩家预写唯一命运。",
+    "opening": "让人物最鲜明的处境与世界发生真实接触。",
+    "pressure": "扩大人物选择的影响范围，使代价和关系改变后续可能。",
+    "climax": "让一生积累面对更大尺度的检验。",
+    "payoff": "评价人物实际形成的成就、关系、代价与影响。",
+    "goodEndingDirection": "形成可延续的成果，并承认已付代价。",
+    "badEndingDirection": "失去重要之物，但不否认人物真实走过的道路。"
   },
   "mainlineActs": [
-    {
-      "id": "my_world.first_encounter",
-      "label": "初次卷入",
-      "prompt": "让人物接触一件会改变其看待未来的具体处境。先让世界和他人的问题进入视野，不要求人物立刻解决全部问题。高潮应形成一次真实选择，并留下能带往下一幕的能力、人物关系或代价。",
-      "readinessStage": "opening"
-    },
-    {
-      "id": "my_world.position_and_pressure",
-      "label": "位置与压力",
-      "prompt": "承接第一幕的实际后果，让人物获得或失去新的位置，并面对独立矛盾。机会与底线、安稳与改变、信任与责任、资源与承诺都可以成为压力来源。高潮必须真实改变人物的现实安排或重要关系。",
-      "readinessStage": "pressure"
-    },
-    {
-      "id": "my_world.wider_echo",
-      "label": "更大回响",
-      "prompt": "让前两幕积累的能力、人物与代价进入更深的生活或世界回响。根据人物实际处境决定承担的尺度；高潮必须让此前的承诺、关系与选择得到实质兑现，为结局留下可回收的后果。",
-      "readinessStage": "climax"
-    }
+    { "id": "my_world.arc.one", "label": "故事初潮", "prompt": "由本局故事前提决定第一段核心经历。", "readinessStage": "opening" },
+    { "id": "my_world.arc.two", "label": "命运转流", "prompt": "承接已经发生的事实，扩大人物选择的影响。", "readinessStage": "pressure" },
+    { "id": "my_world.arc.three", "label": "此生大势", "prompt": "让一生积累面对更大尺度的检验。", "readinessStage": "climax" }
   ],
   "worldCards": [
     {
       "id": "my_world.rule.consequences_are_lived",
       "kind": "world_rule",
-      "content": "重要选择通过人物关系、可用资源、生活安排与后来行动产生影响；不要用突兀的身份跃迁代替积累。",
+      "content": "重要选择通过人物关系、可用资源、生活安排与后来行动产生影响。",
       "priority": 95,
       "activation": { "tasks": ["horizon", "planning", "rendering", "dynamic", "decision"] },
       "stickyTurns": 2
     },
     {
-      "id": "my_world.first_act.conflict",
-      "title": "第一幕的可变矛盾",
-      "kind": "conflict",
-      "content": "为第一幕提供可变化的冲突生成原则，描述哪些利益、关系或环境力量会形成问题，不写固定事件和固定人物。",
-      "priority": 90,
+      "id": "my_world.setting.selective_entry",
+      "kind": "setting",
+      "content": "只在相关人物、地点或关键词出现时有帮助的世界知识。",
+      "priority": 82,
       "placement": "scenario",
-      "activation": { "keys": ["这里填写能从最近叙事中触发此卡的词"], "secondaryKeys": ["可选的二级条件"], "selectiveLogic": "and_any", "scanDepth": 3, "actIds": ["my_world.first_encounter"], "beats": ["setup", "escalation", "pressure"], "tasks": ["planning", "rendering", "dynamic", "decision"] },
-      "inclusionGroup": "my_world.act.conflict",
+      "activation": { "keys": ["相关关键词"], "scanDepth": 3, "tasks": ["planning", "rendering", "dynamic"] },
       "cooldownTurns": 2
-    },
-    {
-      "id": "my_world.first_act.payoff",
-      "kind": "consequence",
-      "content": "第一幕收束要让当前矛盾得到实际结果；结果可以带来新处境，但已完成的事情不继续伪装成待解悬念。",
-      "priority": 100,
-      "activation": { "actIds": ["my_world.first_encounter"], "beats": ["climax", "payoff"], "tasks": ["horizon", "planning", "rendering", "dynamic", "decision"] },
-      "inclusionGroup": "my_world.act.consequence",
-      "stickyTurns": 2
-    },
-    {
-      "id": "my_world.route.bonds",
-      "kind": "social_role",
-      "content": "关系视角关注信任、照料、边界与归属怎样通过具体行动变化。",
-      "priority": 80,
-      "activation": { "routeIds": ["my_world.bonds"], "tasks": ["planning", "rendering", "dynamic", "decision"] },
-      "inclusionGroup": "my_world.route.lens"
-    },
-    {
-      "id": "my_world.route.undertaking",
-      "kind": "social_role",
-      "content": "承担视角关注能力、行动、成果与底线怎样在现实压力中相互影响。",
-      "priority": 80,
-      "activation": { "routeIds": ["my_world.undertaking"], "tasks": ["planning", "rendering", "dynamic", "decision"] },
-      "inclusionGroup": "my_world.route.lens"
     },
     {
       "id": "my_world.example.choice",
-      "title": "本世界的抉择表达样例",
       "kind": "style_example",
-      "content": "午后的雨把石阶打得发亮。你刚收好摊布，送信的人便从街角跑来，把一封沾水的短笺压在桌上。对面店主停下算盘，显然也认出了封口的记号；远处钟声已经响过两遍，留给你回应的时间并不多。",
-      "priority": 84,
+      "content": "写一小段只供模仿节奏和感官质地的正文，不放入必须复刻的专名与事实。",
+      "priority": 80,
       "placement": "example",
       "activation": { "beats": ["pressure", "climax"], "tasks": ["rendering", "dynamic"] },
-      "inclusionGroup": "my_world.style.turn",
-      "cooldownTurns": 2
+      "cooldownTurns": 3
     }
   ],
   "progression": {
-    "backgroundPacing": {
-      "minYears": 1,
-      "maxYears": 3,
-      "personalReflectionChance": 0.35
+    "backgroundPacing": { "minYears": 1, "maxYears": 3, "personalReflectionChance": 0.35 },
+    "gates": {
+      "opening": { "weights": { "intelligence": 0.2, "charisma": 0.2, "family": 0.2, "fortune": 0.2, "physique": 0.2 }, "threshold": 7 },
+      "escalation": { "weights": { "intelligence": 0.2, "charisma": 0.2, "family": 0.2, "fortune": 0.2, "physique": 0.2 }, "threshold": 13 },
+      "pressure": { "weights": { "intelligence": 0.2, "charisma": 0.2, "family": 0.2, "fortune": 0.2, "physique": 0.2 }, "threshold": 19 },
+      "climax": { "weights": { "intelligence": 0.2, "charisma": 0.2, "family": 0.2, "fortune": 0.2, "physique": 0.2 }, "threshold": 27 }
     },
-    "statTiers": {
-      "lowMax": 8,
-      "highMin": 22
-    },
+    "statTiers": { "lowMax": 8, "highMin": 22 },
     "statTierPresentation": {
       "intelligence": { "low": "学思未定", "steady": "融会贯通", "high": "见微知著" },
       "charisma": { "low": "拘谨青涩", "steady": "待人得体", "high": "众望所归" },
@@ -118,177 +90,21 @@
       "physique": { "low": "体弱易倦", "steady": "精力充沛", "high": "身心康健" }
     },
     "growthFocuses": [
-      {
-        "id": "my_world.insight",
-        "label": "见闻与技艺",
-        "description": "将日常积累更多放在学习、观察、专业能力与创造之上。",
-        "primaryStats": ["intelligence", "fortune"],
-        "secondaryStats": ["charisma"]
-      },
-      {
-        "id": "my_world.bond",
-        "label": "关系与根基",
-        "description": "将日常积累更多放在人情、家庭与可依靠的关系之上。",
-        "primaryStats": ["charisma", "family"],
-        "secondaryStats": ["fortune"]
-      },
-      {
-        "id": "my_world.resolve",
-        "label": "行动与韧性",
-        "description": "将日常积累更多放在行动、体魄与承受现实的能力之上。",
-        "primaryStats": ["physique", "fortune"],
-        "secondaryStats": ["intelligence"]
-      }
+      { "id": "my_world.insight", "label": "见闻与技艺", "description": "侧重学习、观察与创造。", "primaryStats": ["intelligence", "fortune"], "secondaryStats": ["charisma"] },
+      { "id": "my_world.bond", "label": "关系与根基", "description": "侧重关系、家庭与生活根基。", "primaryStats": ["charisma", "family"], "secondaryStats": ["fortune"] },
+      { "id": "my_world.resolve", "label": "行动与韧性", "description": "侧重行动、体魄与承受现实。", "primaryStats": ["physique", "fortune"], "secondaryStats": ["intelligence"] }
     ],
-    "routes": [
-      {
-        "directionId": "my_world.bonds",
-        "gates": {
-          "opening": { "weights": { "charisma": 0.5, "family": 0.3, "physique": 0.2 }, "threshold": 7 },
-          "escalation": { "weights": { "charisma": 0.5, "family": 0.3, "physique": 0.2 }, "threshold": 13 },
-          "pressure": { "weights": { "charisma": 0.5, "family": 0.3, "physique": 0.2 }, "threshold": 19 },
-          "climax": { "weights": { "charisma": 0.5, "family": 0.3, "physique": 0.2 }, "threshold": 27 }
-        }
-      },
-      {
-        "directionId": "my_world.undertaking",
-        "gates": {
-          "opening": { "weights": { "intelligence": 0.5, "fortune": 0.3, "charisma": 0.2 }, "threshold": 7 },
-          "escalation": { "weights": { "intelligence": 0.5, "fortune": 0.3, "charisma": 0.2 }, "threshold": 13 },
-          "pressure": { "weights": { "intelligence": 0.5, "fortune": 0.3, "charisma": 0.2 }, "threshold": 20 },
-          "climax": { "weights": { "intelligence": 0.5, "fortune": 0.3, "charisma": 0.2 }, "threshold": 28 }
-        }
-      }
-    ],
-    "completion": {
-      "requireCommittedDirection": true,
-      "requireDecisionConsequence": true,
-      "requireClimax": true,
-      "requirePayoff": true,
-      "requireResolvedCoreFacts": true,
-      "requireNoActiveScene": true,
-      "minCompletedSceneInstances": 3,
-      "requireAllMainlineActs": true
-    }
+    "completion": { "requireDecisionConsequence": true, "requireClimax": true, "requirePayoff": true, "requireResolvedCoreFacts": true, "requireNoActiveScene": true, "minCompletedSceneInstances": 3, "requireAllMainlineActs": true }
   },
-  "narrativeFactions": [
-    {
-      "id": "my_world.community",
-      "label": "亲近的人与共同体",
-      "summary": "由亲属、伙伴、邻里或共同生活构成，能提供归处，也会提出责任。",
-      "conflictFactionIds": ["my_world.institution"]
-    },
-    {
-      "id": "my_world.institution",
-      "label": "组织与规则",
-      "summary": "由组织、行业、传统、制度或竞争关系构成，既提供机会，也会制造边界与压力。",
-      "conflictFactionIds": ["my_world.community"]
-    }
-  ],
-  "routeArcs": [
-    {
-      "directionId": "my_world.bonds",
-      "label": "关系与归处",
-      "summary": "从亲密关系、信任、照料、归属与共同体责任观察人生。",
-      "perspective": "让宏大的选择落到相识之人的处境、承诺与归处。",
-      "escalation": "照料、亏欠、陪伴与边界会让善意变成必须回答的选择。",
-      "crisis": "更深的危机来临时，谁得到陪伴、谁被忽略、谁仍能回家应成为真实后果。",
-      "payoffFocus": "回应人物曾经承担或期待的照料、名分与归属。",
-      "coreThreadIds": []
-    },
-    {
-      "directionId": "my_world.undertaking",
-      "label": "能力与承担",
-      "summary": "从学习、技艺、事业、行动与公共责任观察人生。",
-      "perspective": "让每次获得机会都伴随能力、底线和会被追问的代价。",
-      "escalation": "积累、竞争、资源与责任会要求人物证明其行动的意义。",
-      "crisis": "更大选择到来时，人物掌握的能力与失去的东西都应成为实际行动的一部分。",
-      "payoffFocus": "回应人物为何取得、放弃或重新定义自己承担的事。",
-      "coreThreadIds": []
-    }
-  ],
+  "mainlineFacts": [],
+  "sceneArchetypes": [],
   "threads": [],
   "characters": [],
   "lore": [],
   "eventBindings": [],
   "endingBlueprints": [
-    {
-      "id": "my_world.bonds.good",
-      "worldId": "my_world",
-      "directionId": "my_world.bonds",
-      "polarity": "good",
-      "title": "灯火有归",
-      "premise": "你让重要的人拥有了可继续生活的安稳，也没有遗失自己。",
-      "finalConflict": "在最后一次关系与责任的取舍中决定怎样留下。",
-      "payoffFocus": "回应照料、陪伴或归属的承诺。",
-      "epilogueFocus": "以可被彼此看见的关系与生活收束。",
-      "statWeights": { "charisma": 0.3, "family": 0.28, "physique": 0.16, "intelligence": 0.14, "fortune": 0.12 },
-      "requiredThreadIds": []
-    },
-    {
-      "id": "my_world.bonds.normal",
-      "worldId": "my_world",
-      "directionId": "my_world.bonds",
-      "polarity": "normal",
-      "title": "仍有人等你",
-      "premise": "你未能照顾所有人，却守住了最不能放下的关系。",
-      "finalConflict": "在遗憾与责任之间留下可承受的安排。",
-      "payoffFocus": "回应曾经许下的陪伴。",
-      "epilogueFocus": "以有限安稳和持续牵挂收束。",
-      "statWeights": { "charisma": 0.3, "family": 0.28, "physique": 0.16, "intelligence": 0.14, "fortune": 0.12 },
-      "requiredThreadIds": []
-    },
-    {
-      "id": "my_world.bonds.bad",
-      "worldId": "my_world",
-      "directionId": "my_world.bonds",
-      "polarity": "bad",
-      "title": "未竟的归处",
-      "premise": "你失去了重要的陪伴或安稳，但仍留下过真实的守护。",
-      "finalConflict": "在无法两全的关系中承认最后的失去。",
-      "payoffFocus": "回应曾经试图保全的人。",
-      "epilogueFocus": "以离散、牺牲与被记住的善意收束。",
-      "statWeights": { "charisma": 0.3, "family": 0.28, "physique": 0.16, "intelligence": 0.14, "fortune": 0.12 },
-      "requiredThreadIds": []
-    },
-    {
-      "id": "my_world.undertaking.good",
-      "worldId": "my_world",
-      "directionId": "my_world.undertaking",
-      "polarity": "good",
-      "title": "自成其路",
-      "premise": "你取得了成果，也保住了自己认可的尺度。",
-      "finalConflict": "在最后一次机会前说明何种承担值得付出。",
-      "payoffFocus": "回应能力、目标与底线之间的选择。",
-      "epilogueFocus": "以成果、清醒与后续可能收束。",
-      "statWeights": { "intelligence": 0.32, "charisma": 0.22, "fortune": 0.2, "physique": 0.16, "family": 0.1 },
-      "requiredThreadIds": []
-    },
-    {
-      "id": "my_world.undertaking.normal",
-      "worldId": "my_world",
-      "directionId": "my_world.undertaking",
-      "polarity": "normal",
-      "title": "未负来路",
-      "premise": "你未得到所有期待，却留下了能继续前行的能力与位置。",
-      "finalConflict": "在得失之间承认真正想带走的东西。",
-      "payoffFocus": "回应一次关键的上升、坚持或放弃。",
-      "epilogueFocus": "以有限成果与仍可继续的生活收束。",
-      "statWeights": { "intelligence": 0.32, "charisma": 0.22, "fortune": 0.2, "physique": 0.16, "family": 0.1 },
-      "requiredThreadIds": []
-    },
-    {
-      "id": "my_world.undertaking.bad",
-      "worldId": "my_world",
-      "directionId": "my_world.undertaking",
-      "polarity": "bad",
-      "title": "高处有痕",
-      "premise": "你得到或错失的成果最终要求偿还代价，仍必须面对自己走过的路。",
-      "finalConflict": "在保住表面成果和承认真实损失之间作最后选择。",
-      "payoffFocus": "让一次关键行动的代价回到眼前。",
-      "epilogueFocus": "以失衡、转身或迟来的清醒收束。",
-      "statWeights": { "intelligence": 0.32, "charisma": 0.22, "fortune": 0.2, "physique": 0.16, "family": 0.1 },
-      "requiredThreadIds": []
-    }
+    { "id": "my_world.world.good", "worldId": "my_world", "polarity": "good", "title": "自成其路", "premise": "人物把能力与选择变成了可延续的成果。", "finalConflict": "回望最终保住和改变了什么。", "payoffFocus": "依据本局事实、人物、能力和代价。", "epilogueFocus": "交代成果、关系和后续影响。", "statWeights": { "intelligence": 0.2, "charisma": 0.2, "family": 0.2, "fortune": 0.2, "physique": 0.2 }, "requiredThreadIds": [] },
+    { "id": "my_world.world.normal", "worldId": "my_world", "polarity": "normal", "title": "此生有归", "premise": "人物在得失之间留下可信的归处。", "finalConflict": "回望最终保住和改变了什么。", "payoffFocus": "依据本局事实、人物、能力和代价。", "epilogueFocus": "交代有限成果、关系与生活。", "statWeights": { "intelligence": 0.2, "charisma": 0.2, "family": 0.2, "fortune": 0.2, "physique": 0.2 }, "requiredThreadIds": [] },
+    { "id": "my_world.world.bad", "worldId": "my_world", "polarity": "bad", "title": "未竟余响", "premise": "代价改变了人生方向，但人物走过的路并非空白。", "finalConflict": "回望最终失去和留下了什么。", "payoffFocus": "依据本局事实、人物、能力和代价。", "epilogueFocus": "交代失去、未竟之事和残留影响。", "statWeights": { "intelligence": 0.2, "charisma": 0.2, "family": 0.2, "fortune": 0.2, "physique": 0.2 }, "requiredThreadIds": [] }
   ]
 }

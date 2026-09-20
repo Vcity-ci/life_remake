@@ -432,8 +432,22 @@ export function validateNarrativeWorldFactContract(
       throw new Error(`${definition.worldId}_mainline_act_fact_reference_invalid:${act.id}:${unresolved}`);
     }
   }
-  const routeIds = new Set(definition.routeArcs.map((route) => route.directionId));
-  const factionIds = new Set((definition.narrativeFactions ?? []).map((faction) => faction.id));
+  const routeIds = new Set((definition.routeArcs ?? []).map((route) => route.directionId));
+  const factionIds = new Set([
+    ...(definition.socialForces ?? []).map((force) => force.id),
+    ...(definition.narrativeFactions ?? []).map((faction) => faction.id)
+  ]);
+  if (definition.version >= 9) {
+    const core = definition.worldCore;
+    const palette = definition.narrativePalette;
+    if (!core?.identity?.trim() || !core.powerStructure?.trim() || !core.everydayLife?.trim() ||
+        !core.tone?.trim() || !core.laws?.length || !(definition.socialForces?.length) ||
+        !palette?.sceneModes?.length || !palette.conflictSources?.length ||
+        !palette.actionVocabulary?.length || !palette.scalePossibilities?.length ||
+        !(definition.storyPatterns?.length)) {
+      throw new Error(`${definition.worldId}_narrative_world_core_invalid`);
+    }
+  }
   const cardIds = new Set<string>();
   const cardKinds = new Set([
     "world_rule", "setting", "geography", "institution", "culture", "faction", "location", "ability",
@@ -499,7 +513,7 @@ export async function loadNarrativeWorldDefinition(worldId: string): Promise<Nar
     readJsonFile<NarrativeComponentCatalog>(path.resolve(narrativeWorldDir, `${worldId}.components.json`)).catch(() => null)
   ])
     .then(([definition, catalog]) => {
-      const merged = (definition.version === 1 || definition.version === 2 || definition.version === 3 || definition.version === 4 || definition.version === 5 || definition.version === 6 || definition.version === 7 || definition.version === 8) && definition.worldId === worldId
+      const merged = (definition.version === 1 || definition.version === 2 || definition.version === 3 || definition.version === 4 || definition.version === 5 || definition.version === 6 || definition.version === 7 || definition.version === 8 || definition.version === 9) && definition.worldId === worldId
         ? mergeNarrativeComponentCatalog(definition, definition.version >= 8 ? null : catalog, worldId)
         : null;
       const valid = merged ? validateNarrativeWorldFactContract(merged) : null;
@@ -603,7 +617,7 @@ function applyNarrativeEventBinding(
     return definition.sceneArchetypeId;
   })();
   const routeThreadIds = (definition.storyDirectionIds ?? []).flatMap((directionId) => (
-    narrativeWorld?.routeArcs.find((arc) => arc.directionId === directionId)?.coreThreadIds ?? []
+    narrativeWorld?.routeArcs?.find((arc) => arc.directionId === directionId)?.coreThreadIds ?? []
   ));
   if (!binding && !componentBinding && routeThreadIds.length === 0) return definition;
   const threadIds = Array.from(new Set([
@@ -799,7 +813,14 @@ function validateNarrativeEndingBlueprintContract(
   narrativeWorld: NarrativeWorldDefinition
 ): void {
   const requiredEndingPolarities = ["good", "normal", "bad"] as const;
-  for (const route of narrativeWorld.routeArcs) {
+  if (narrativeWorld.version >= 9) {
+    const missingEndings = requiredEndingPolarities.filter((polarity) => !narrativeWorld.endingBlueprints.some((blueprint) => blueprint.polarity === polarity));
+    if (missingEndings.length > 0 || narrativeWorld.endingBlueprints.length !== requiredEndingPolarities.length) {
+      throw new Error(`${worldId}_ending_blueprint_contract_invalid:world:${missingEndings.join(",")}`);
+    }
+    return;
+  }
+  for (const route of narrativeWorld.routeArcs ?? []) {
     const missingEndings = requiredEndingPolarities.filter((polarity) => !narrativeWorld.endingBlueprints.some((blueprint) => (
       blueprint.directionId === route.directionId && blueprint.polarity === polarity
     )));

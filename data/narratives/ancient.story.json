@@ -1,7 +1,7 @@
 {
-  "version": 8,
+  "version": 9,
   "worldId": "ancient",
-  "storyBible": "景朝中后段，宗族、门第、科举、军功、商路与皇权共同塑造命运。地方有生计与公断之争，朝中有任用与施政之争，军民面对局势变动各有求存之道。人物从自身生活进入纷争，因处理事情而改变关系与位置，在新的处境里结交、任事、竞争或退守；更大危机到来时，以已有能力和牵挂参与其中。礼制与权势落实在人的待遇、资源流动和实际行动中。",
+  "storyBible": "景朝并非一条预写好的仕途。宗族、官府、皇权、商路、军镇、乡里与流动人群共同塑造生活；人物可以从任何身份进入权力，也可以始终留在权力边缘。案件、政争、战争、经营、情义和远行都是可能发生的故事形态，真正的主线由本局人物最鲜明的欲望、处境与已经发生的选择形成。",
   "styleRules": [
     "以第二人称写景朝人生，让官署、街市、宗祠、军营、驿路与家宅中的细节自然显出身份、礼数和权力关系。",
     "把案情、民生、声名、人情与局势落到人物当下的处境，用交往、任事和实际得失显出各方的利益与能力。",
@@ -10,34 +10,36 @@
   ],
   "endingGuide": "以人物留下的生路、关系、秩序或未竟代价收束；功业、归处与身后影响都可成为这段人生的余响。",
   "opening": {
-    "earlyLife": { "maxAge": 3 }
+    "earlyLife": {
+      "maxAge": 3
+    }
   },
   "mainlineSkeleton": {
-    "premise": "人生由案件入局、阵营立身走向战乱担当。身边纷争得到处理，人物因实际得失进入新的利益关系，在组织内外的挑战中形成位置，继而面对战争带来的现实抉择。各幕有自身的事情和结果，人物、能力、关系与处境连接这段人生。",
-    "opening": "案件入局：人物介入生活中的案件或纷争，经历调查、交涉与取舍，使眼前事情得到实际处理。由此获得的认识、关系与得失成为进入更广社会的起点。",
-    "pressure": "阵营立身：人物在阵营或组织中承担实际事务，与不同诉求的人合作、竞争和周旋。通过处理本阶段的独立挑战，形成自己的位置、依靠与责任。",
-    "climax": "战乱担当：外部战争打破原有生活，人物以自身身份参与应对。既有力量、关系与代价在组织、交锋、进退和求存中发挥作用，战事经历形成可见的成败与归宿。",
-    "payoff": "回望已处理的纷争、立身经历与战乱中的选择，交代人物留下的关系、成果和生活。此前付出的代价仍是人生的一部分。",
-    "goodEndingDirection": "人物以承担、判断与行动留下可延续的秩序、关系或生路；胜利必须带着已付出的代价。",
-    "badEndingDirection": "人物因失势、误判、代价或所处位置的局限失去重要之物；结局仍应承认其曾经作出的真实选择。"
+    "premise": "世界提供规律和压力，本局人设、天赋与身世建立长期故事承诺；每段经历从已发生事实生长，而非复刻世界包范例。",
+    "opening": "让人物最有辨识度的处境与世界发生真实接触。",
+    "pressure": "扩大人物选择的影响范围，使关系、能力与代价改变后续可能。",
+    "climax": "让一生积累面对更大尺度的检验，并形成不可忽略的结果。",
+    "payoff": "评价这一生实际形成的成就、关系、代价与影响。",
+    "goodEndingDirection": "能力、选择和关系共同形成可延续的成果。",
+    "badEndingDirection": "失败或代价改变人生方向，但仍承认人物真实走过的道路。"
   },
   "mainlineActs": [
     {
-      "id": "ancient.entry_conflict",
-      "label": "案起入局",
-      "prompt": "案件入局。人物从自身年龄、身份与生活中接触一件案件或现实纷争，逐渐认识各方诉求并参与处理。压力来自采取行动时遇到的阻力和取舍。高潮与收束交代这件事实际怎样落定，以及人物由此得到或失去了什么；这些变化带来新的社会关系与人生位置。",
+      "id": "ancient.arc.one",
+      "label": "故事初潮",
+      "prompt": "由本局人物前提决定第一段核心经历，使人物与世界发生真实接触并形成可以继续发展的矛盾。",
       "readinessStage": "opening"
     },
     {
-      "id": "ancient.position_trial",
-      "label": "立身周旋",
-      "prompt": "阵营立身。承接人物已有的声名、能力与关系，在所处组织中展开任事与历练。人物面对同伴、竞争者及组织内外的不同利益，逐渐形成自己的立场和可调动的力量。本幕围绕这段立身经历中的独立挑战推进，收束交代事情的成败、人物取得或失去的位置，以及此后生活的变化。",
+      "id": "ancient.arc.two",
+      "label": "命运转流",
+      "prompt": "承接本局已有事实、人物与能力，扩大人物选择的影响范围，使新的冲突和代价真正改变生活。",
       "readinessStage": "pressure"
     },
     {
-      "id": "ancient.wider_crisis",
-      "label": "大局担当",
-      "prompt": "战乱担当。外部战争进入人物所在的社会，原有秩序、关系与生计受到冲击。按人物实际身份展开应对，让组织与调度、交锋与进退、保护与求存产生具体后果。高潮处理本局战事中的核心挑战，收束呈现人物参与造成的成败及战后的生活处境，作为这一生归宿的依据。",
+      "id": "ancient.arc.three",
+      "label": "此生大势",
+      "prompt": "让人物一生积累的能力、关系与代价面对更大尺度的检验，形成足以评价这段人生的结果。",
       "readinessStage": "climax"
     }
   ],
@@ -47,139 +49,16 @@
       "kind": "world_rule",
       "content": "权力首先表现为谁能见到谁、谁的文书被受理、谁能调动钱粮与人手。人物身份不同，同一件事应呈现不同入口与代价；不默认人物拥有官职、兵权或门第。",
       "priority": 96,
-      "activation": { "tasks": ["horizon", "planning", "rendering", "dynamic", "decision"] },
+      "activation": {
+        "tasks": [
+          "horizon",
+          "planning",
+          "rendering",
+          "dynamic",
+          "decision"
+        ]
+      },
       "stickyTurns": 2
-    },
-    {
-      "id": "ancient.rule.case_has_lives",
-      "kind": "world_rule",
-      "content": "案件与纷争不是谜面清单，而是正在影响生计、名声、亲缘与地方秩序的现实。线索只有在改变人物判断或行动时才进入正文，处理结果必须落到人的去处与利益。",
-      "priority": 94,
-      "activation": { "actIds": ["ancient.entry_conflict"], "tasks": ["horizon", "planning", "rendering", "dynamic", "decision"] },
-      "relatedCardIds": ["ancient.conflict.case_forms"],
-      "stickyTurns": 2
-    },
-    {
-      "id": "ancient.conflict.case_forms",
-      "kind": "conflict",
-      "content": "入局之事可来自命案、侵占、赈济、河工、税役、契约、失踪、冒名或乡里公断；选择符合人物生活的形态，并由本局已出现的人与地点自然长出，不复用固定案名。",
-      "priority": 88,
-      "activation": { "actIds": ["ancient.entry_conflict"], "beats": ["setup", "escalation", "pressure"], "tasks": ["planning", "rendering", "dynamic"] },
-      "inclusionGroup": "ancient.act.conflict",
-      "cooldownTurns": 2
-    },
-    {
-      "id": "ancient.consequence.case_settlement",
-      "kind": "consequence",
-      "content": "本幕收束应让眼前纷争真正落定：有人获救、受罚、失去依靠、改变立场或承担余债。未被解决的更大结构可以留下，但已经解决的案件不再伪装成同一个悬念反复出现。",
-      "priority": 98,
-      "activation": { "actIds": ["ancient.entry_conflict"], "beats": ["climax", "payoff"], "tasks": ["horizon", "planning", "rendering", "dynamic", "decision"] },
-      "inclusionGroup": "ancient.act.consequence",
-      "stickyTurns": 2,
-      "cooldownTurns": 3
-    },
-    {
-      "id": "ancient.practice.faction_life",
-      "kind": "practice",
-      "content": "阵营生活由任事、请托、奖惩、资源分配、同僚协作与上下级关系组成。让人物通过做成或做坏一件独立事务取得位置，而不是继续追查上一幕的案件。",
-      "priority": 95,
-      "activation": { "actIds": ["ancient.position_trial"], "tasks": ["horizon", "planning", "rendering", "dynamic", "decision"] },
-      "relatedCardIds": ["ancient.conflict.competing_duties"],
-      "stickyTurns": 2
-    },
-    {
-      "id": "ancient.conflict.competing_duties",
-      "kind": "conflict",
-      "content": "阵营挑战可来自内部路线之争、地方与中枢的目标冲突、用人失当、资源短缺、盟友索价或公开声望受损。冲突围绕当前职责形成独立中心，并允许合作、竞争、妥协或离开。",
-      "priority": 90,
-      "activation": { "actIds": ["ancient.position_trial"], "beats": ["escalation", "pressure", "climax"], "tasks": ["planning", "rendering", "dynamic", "decision"] },
-      "inclusionGroup": "ancient.act.conflict",
-      "cooldownTurns": 2
-    },
-    {
-      "id": "ancient.consequence.position_won",
-      "kind": "consequence",
-      "content": "阵营幕的结果落到人物实际位置：获得信任、职责、追随者或自主空间，或失去靠山、被边缘化、转投他处。无论成败，都应形成进入更大危机时可用或必须承担的条件。",
-      "priority": 98,
-      "activation": { "actIds": ["ancient.position_trial"], "beats": ["climax", "payoff"], "tasks": ["horizon", "planning", "rendering", "dynamic", "decision"] },
-      "inclusionGroup": "ancient.act.consequence",
-      "stickyTurns": 2,
-      "cooldownTurns": 3
-    },
-    {
-      "id": "ancient.setting.war_reaches_life",
-      "kind": "setting",
-      "content": "战争从方向、地形、粮道、征发、难民、军令与消息迟滞进入生活。入侵方与战场方位由本局生成；不要默认北境，也不要默认人物是统帅，身份可以从主将、幕僚、军吏到商旅、医者、乡民或士卒。",
-      "priority": 98,
-      "activation": { "actIds": ["ancient.wider_crisis"], "tasks": ["horizon", "planning", "rendering", "dynamic", "decision"] },
-      "relatedCardIds": ["ancient.practice.war_action"],
-      "stickyTurns": 3
-    },
-    {
-      "id": "ancient.practice.war_action",
-      "kind": "practice",
-      "content": "战事行动依据身份展开：判断消息、守护家人、筹措物资、组织撤离、侦察交锋、统筹军民或承担命令。让局势通过具体行动与损耗变化，不以朝堂对白替代所有战火。",
-      "priority": 92,
-      "activation": { "actIds": ["ancient.wider_crisis"], "beats": ["escalation", "pressure", "climax"], "tasks": ["planning", "rendering", "dynamic", "decision"] },
-      "inclusionGroup": "ancient.act.conflict",
-      "cooldownTurns": 2
-    },
-    {
-      "id": "ancient.consequence.war_aftermath",
-      "kind": "consequence",
-      "content": "战争收束必须交代本局核心危机的胜负或止息，以及人物保护、失去或改变了什么。宏观天下仍可延续，但当前战役与责任要有明确结果，随后才能进入人生评价。",
-      "priority": 100,
-      "activation": { "actIds": ["ancient.wider_crisis"], "beats": ["climax", "payoff"], "tasks": ["horizon", "planning", "rendering", "dynamic", "decision"] },
-      "inclusionGroup": "ancient.act.consequence",
-      "stickyTurns": 2
-    },
-    {
-      "id": "ancient.role.guardian",
-      "kind": "social_role",
-      "content": "守护视角关注具体的人与秩序怎样免于受损；保护会带来责任、敌意或资源消耗，不等于被动等待。",
-      "priority": 82,
-      "activation": { "routeIds": ["ancient.guardian"], "tasks": ["planning", "rendering", "dynamic", "decision"] },
-      "inclusionGroup": "ancient.route.lens"
-    },
-    {
-      "id": "ancient.role.ambition",
-      "kind": "social_role",
-      "content": "进取视角关注人物怎样争取决定权、位置与更大影响；每次上升都应显出竞争对象、交换条件和可能失去的关系。",
-      "priority": 82,
-      "activation": { "routeIds": ["ancient.ambition"], "tasks": ["planning", "rendering", "dynamic", "decision"] },
-      "inclusionGroup": "ancient.route.lens"
-    },
-    {
-      "id": "ancient.role.broker",
-      "kind": "social_role",
-      "content": "经营视角关注物资、消息、信用与交换怎样连接不同人群；利润与通路必须对应风险、承诺和实际供给。",
-      "priority": 82,
-      "activation": { "routeIds": ["ancient.broker"], "tasks": ["planning", "rendering", "dynamic", "decision"] },
-      "inclusionGroup": "ancient.route.lens"
-    },
-    {
-      "id": "ancient.role.mentor",
-      "kind": "social_role",
-      "content": "教化视角关注知识、技艺与判断如何传给具体的人；学生、同道与受助者会以自己的选择回应人物，而非只作为赞誉来源。",
-      "priority": 82,
-      "activation": { "routeIds": ["ancient.mentor"], "tasks": ["planning", "rendering", "dynamic", "decision"] },
-      "inclusionGroup": "ancient.route.lens"
-    },
-    {
-      "id": "ancient.role.institution",
-      "kind": "social_role",
-      "content": "制度视角关注程序、任用、法度与执行之间的落差；改变规则需要经手的人、可执行的办法与承受反作用的能力。",
-      "priority": 82,
-      "activation": { "routeIds": ["ancient.institution"], "tasks": ["planning", "rendering", "dynamic", "decision"] },
-      "inclusionGroup": "ancient.route.lens"
-    },
-    {
-      "id": "ancient.role.outsider",
-      "kind": "social_role",
-      "content": "游离视角关注边缘身份如何看见规则缝隙并跨越地域与群体；自由伴随缺少保障、难获信任和必须自选归属。",
-      "priority": 82,
-      "activation": { "routeIds": ["ancient.outsider"], "tasks": ["planning", "rendering", "dynamic", "decision"] },
-      "inclusionGroup": "ancient.route.lens"
     },
     {
       "id": "ancient.culture.household_and_clan",
@@ -188,7 +67,26 @@
       "content": "家宅并非封闭小院：婚丧、借贷、田产、学费、照料与名声会把亲族和邻里连在一起。族中长幼各有体面与难处，家门可以提供人情和庇护，也会要求成员替共同声誉承担代价。",
       "priority": 86,
       "placement": "scenario",
-      "activation": { "keys": ["家", "父", "母", "亲", "宗族", "婚", "田产", "邻里"], "scanDepth": 4, "tasks": ["background", "planning", "rendering", "dynamic", "decision"] },
+      "activation": {
+        "keys": [
+          "家",
+          "父",
+          "母",
+          "亲",
+          "宗族",
+          "婚",
+          "田产",
+          "邻里"
+        ],
+        "scanDepth": 4,
+        "tasks": [
+          "background",
+          "planning",
+          "rendering",
+          "dynamic",
+          "decision"
+        ]
+      },
       "stickyTurns": 2,
       "cooldownTurns": 2
     },
@@ -199,8 +97,27 @@
       "content": "县署由堂官、佐贰、书吏、差役和地方中人共同运转。告状先要有人写状、认保和递送，查验又依赖熟悉乡情的人；公文上的一句话落到地方，往往还要经过催办、筹措和人情周转。",
       "priority": 87,
       "placement": "scenario",
-      "activation": { "keys": ["县衙", "官署", "告状", "差役", "书吏", "公文", "审问"], "scanDepth": 4, "tasks": ["planning", "rendering", "dynamic", "decision"] },
-      "relatedCardIds": ["ancient.rule.power_is_access"],
+      "activation": {
+        "keys": [
+          "县衙",
+          "官署",
+          "告状",
+          "差役",
+          "书吏",
+          "公文",
+          "审问"
+        ],
+        "scanDepth": 4,
+        "tasks": [
+          "planning",
+          "rendering",
+          "dynamic",
+          "decision"
+        ]
+      },
+      "relatedCardIds": [
+        "ancient.rule.power_is_access"
+      ],
       "stickyTurns": 2,
       "cooldownTurns": 3
     },
@@ -211,7 +128,26 @@
       "content": "驿路、水道、渡口与山径决定消息和物资怎样抵达。雨季会改变河面与道路，关津查验会拖慢行程，脚夫、船户、客栈和沿途市镇掌握着官文之外的真实动静。",
       "priority": 84,
       "placement": "scenario",
-      "activation": { "keys": ["河", "渡口", "驿路", "行旅", "船", "山路", "客栈", "关津"], "scanDepth": 4, "tasks": ["background", "planning", "rendering", "dynamic", "decision"] },
+      "activation": {
+        "keys": [
+          "河",
+          "渡口",
+          "驿路",
+          "行旅",
+          "船",
+          "山路",
+          "客栈",
+          "关津"
+        ],
+        "scanDepth": 4,
+        "tasks": [
+          "background",
+          "planning",
+          "rendering",
+          "dynamic",
+          "decision"
+        ]
+      },
       "cooldownTurns": 2
     },
     {
@@ -221,7 +157,26 @@
       "content": "街市的秩序由行商、坐贾、工匠、牙人、脚夫和巡街者共同维持。价格背后是货源、时令、赊欠与信用；一门手艺既能换来独立生活，也会让人物卷入行会、主顾和地方权势。",
       "priority": 84,
       "placement": "scenario",
-      "activation": { "keys": ["街市", "商", "铺", "工匠", "买卖", "货", "银钱", "营生"], "scanDepth": 4, "tasks": ["background", "planning", "rendering", "dynamic", "decision"] },
+      "activation": {
+        "keys": [
+          "街市",
+          "商",
+          "铺",
+          "工匠",
+          "买卖",
+          "货",
+          "银钱",
+          "营生"
+        ],
+        "scanDepth": 4,
+        "tasks": [
+          "background",
+          "planning",
+          "rendering",
+          "dynamic",
+          "decision"
+        ]
+      },
       "cooldownTurns": 2
     },
     {
@@ -231,31 +186,26 @@
       "content": "蒙学、私塾、书院和科场连接着师生、同年、地方声望与家中供养。读书不仅是答卷，也包括拜师、讲学、抄书、游学和对现实事务的判断；功名能打开门径，却不会自动带来办事能力。",
       "priority": 85,
       "placement": "scenario",
-      "activation": { "keys": ["读书", "书院", "先生", "科举", "科场", "同窗", "文章", "功名"], "scanDepth": 4, "tasks": ["background", "planning", "rendering", "dynamic", "decision"] },
-      "cooldownTurns": 2
-    },
-    {
-      "id": "ancient.institution.faction_daily_life",
-      "title": "阵营中的日常权力",
-      "kind": "faction",
-      "content": "组织中的位置由能否办事、能调动谁、愿替谁担责以及出了差错谁来收拾共同决定。宴饮和议事只是表面，轮值、荐举、钱粮、差遣、奖惩与消息先后才不断改变人与人的距离。",
-      "priority": 89,
-      "placement": "scenario",
-      "activation": { "actIds": ["ancient.position_trial"], "keys": ["同僚", "上司", "差遣", "阵营", "任事", "荐举", "靠山"], "scanDepth": 5, "tasks": ["planning", "rendering", "dynamic", "decision"] },
-      "relatedCardIds": ["ancient.practice.faction_life"],
-      "stickyTurns": 2,
-      "cooldownTurns": 2
-    },
-    {
-      "id": "ancient.setting.war_supply_and_people",
-      "title": "战事如何抵达人间",
-      "kind": "setting",
-      "content": "战事先改变的是路、粮、价格、征发、迁徙与消息。军队需要营地、向导、医药、马匹和民夫，城镇要决定守、撤或接纳流民；前线一次得失会沿驿路传成截然不同的传闻。",
-      "priority": 92,
-      "placement": "scenario",
-      "activation": { "actIds": ["ancient.wider_crisis"], "keys": ["战", "军", "兵", "敌", "征发", "流民", "粮道", "城防"], "scanDepth": 5, "tasks": ["planning", "rendering", "dynamic", "decision"] },
-      "relatedCardIds": ["ancient.practice.war_action"],
-      "stickyTurns": 3,
+      "activation": {
+        "keys": [
+          "读书",
+          "书院",
+          "先生",
+          "科举",
+          "科场",
+          "同窗",
+          "文章",
+          "功名"
+        ],
+        "scanDepth": 4,
+        "tasks": [
+          "background",
+          "planning",
+          "rendering",
+          "dynamic",
+          "decision"
+        ]
+      },
       "cooldownTurns": 2
     },
     {
@@ -265,7 +215,24 @@
       "content": "同一场雨落在瓦舍、官道、田亩和军营会显出不同生活：有人担心屋漏，有人盘算河运，有人等待开印，有人检查弓弦。衣料、称呼、座次、灯火与出门时辰都能自然显出人物处境。",
       "priority": 76,
       "placement": "scenario",
-      "activation": { "keys": ["春", "夏", "秋", "冬", "雨", "雪", "夜", "节令"], "scanDepth": 3, "tasks": ["background", "rendering", "dynamic"] },
+      "activation": {
+        "keys": [
+          "春",
+          "夏",
+          "秋",
+          "冬",
+          "雨",
+          "雪",
+          "夜",
+          "节令"
+        ],
+        "scanDepth": 3,
+        "tasks": [
+          "background",
+          "rendering",
+          "dynamic"
+        ]
+      },
       "cooldownTurns": 3
     },
     {
@@ -275,7 +242,11 @@
       "content": "几年间，你从替家中记账做到能独自去市集交割。春汛冲坏木桥时，你和邻人绕了三日远路，也第一次听见外乡商客谈起山外的光景。日子没有骤然改头换面，只是你看人、办事都比从前稳了些。",
       "priority": 83,
       "placement": "example",
-      "activation": { "tasks": ["background"] },
+      "activation": {
+        "tasks": [
+          "background"
+        ]
+      },
       "inclusionGroup": "ancient.style.turn",
       "cooldownTurns": 2
     },
@@ -286,7 +257,16 @@
       "content": "差役把封条按上粮仓时，掌柜仍攥着那本湿透的账册。廊下等米的人越聚越多，主簿却催你在天黑前具名。掌柜低声说账册能证明亏空另有来处，只求你给他半个时辰；身后的差役已经伸手来取钥匙。",
       "priority": 86,
       "placement": "example",
-      "activation": { "tasks": ["rendering", "dynamic"], "beats": ["pressure", "climax"] },
+      "activation": {
+        "tasks": [
+          "rendering",
+          "dynamic"
+        ],
+        "beats": [
+          "pressure",
+          "climax"
+        ]
+      },
       "inclusionGroup": "ancient.style.turn",
       "cooldownTurns": 2
     },
@@ -297,184 +277,1277 @@
       "content": "官仓重新开门那日，欠下的粮票按名册补发，掌柜也在堂前认了该认的罪。入冬后，街口多了一间由灾民合办的小铺；有人见你仍会避开，也有人隔着人群点头。那场纷争已经落定，留下的是往后要相处的新秩序。",
       "priority": 88,
       "placement": "example",
-      "activation": { "tasks": ["rendering", "dynamic", "decision"], "beats": ["payoff"] },
+      "activation": {
+        "tasks": [
+          "rendering",
+          "dynamic",
+          "decision"
+        ],
+        "beats": [
+          "payoff"
+        ]
+      },
       "inclusionGroup": "ancient.style.turn",
       "cooldownTurns": 2
     }
   ],
   "sceneArchetypes": [
-    { "id": "ally_request", "label": "旧人求助", "description": "一位已有关系的人带来具体请求；回应会加深承诺，也会暴露新的代价。", "beats": ["setup", "escalation"], "focusTags": ["relationship", "commitment"], "baseWeight": 12 },
-    { "id": "third_party_request", "label": "外来请求", "description": "陌生来客、书信或口信要求人物介入一件与自身处境相连的事。", "beats": ["setup", "escalation"], "focusTags": ["opportunity", "evidence"], "baseWeight": 11 },
-    { "id": "hidden_evidence", "label": "证据浮现", "description": "账页、名册、口供或旧物出现新的矛盾，只提供下一步可追索的线索。", "beats": ["escalation", "pressure"], "focusTags": ["evidence", "truth"], "baseWeight": 12 },
-    { "id": "relationship_fracture", "label": "关系裂痕", "description": "亲友、师门或同僚的立场开始分裂，任何选择都会改变彼此的信任。", "beats": ["pressure"], "focusTags": ["relationship", "cost"], "baseWeight": 12 },
-    { "id": "institutional_obstruction", "label": "规制阻拦", "description": "一道程序、命令或权势阻断了原本的处理方式，人物必须选择绕行、妥协或承担。", "beats": ["pressure"], "focusTags": ["institution", "cost"], "baseWeight": 12 },
-    { "id": "public_commitment", "label": "公开署名", "description": "证据、关系与名声被迫在众目之下交汇，人物需要作出不可逆的承担。", "beats": ["climax"], "focusTags": ["commitment", "reputation"], "baseWeight": 16 },
-    { "id": "witness_return", "label": "旧证归来", "description": "被遗漏的证人、旧物或后果重新出现，要求人物兑现此前承诺并给出归宿。", "beats": ["payoff"], "focusTags": ["payoff", "consequence"], "baseWeight": 16 },
-    { "id": "aftermath_choice", "label": "余波取舍", "description": "冲突已经留下伤痕，人物仍要决定如何安置受影响的人与自己承担的名声。", "beats": ["pressure", "payoff"], "focusTags": ["aftermath", "cost"], "baseWeight": 10 }
+    {
+      "id": "ally_request",
+      "label": "旧人求助",
+      "description": "一位已有关系的人带来具体请求；回应会加深承诺，也会暴露新的代价。",
+      "beats": [
+        "setup",
+        "escalation"
+      ],
+      "focusTags": [
+        "relationship",
+        "commitment"
+      ],
+      "baseWeight": 12
+    },
+    {
+      "id": "third_party_request",
+      "label": "外来请求",
+      "description": "陌生来客、书信或口信要求人物介入一件与自身处境相连的事。",
+      "beats": [
+        "setup",
+        "escalation"
+      ],
+      "focusTags": [
+        "opportunity",
+        "evidence"
+      ],
+      "baseWeight": 11
+    },
+    {
+      "id": "hidden_evidence",
+      "label": "证据浮现",
+      "description": "账页、名册、口供或旧物出现新的矛盾，只提供下一步可追索的线索。",
+      "beats": [
+        "escalation",
+        "pressure"
+      ],
+      "focusTags": [
+        "evidence",
+        "truth"
+      ],
+      "baseWeight": 12
+    },
+    {
+      "id": "relationship_fracture",
+      "label": "关系裂痕",
+      "description": "亲友、师门或同僚的立场开始分裂，任何选择都会改变彼此的信任。",
+      "beats": [
+        "pressure"
+      ],
+      "focusTags": [
+        "relationship",
+        "cost"
+      ],
+      "baseWeight": 12
+    },
+    {
+      "id": "institutional_obstruction",
+      "label": "规制阻拦",
+      "description": "一道程序、命令或权势阻断了原本的处理方式，人物必须选择绕行、妥协或承担。",
+      "beats": [
+        "pressure"
+      ],
+      "focusTags": [
+        "institution",
+        "cost"
+      ],
+      "baseWeight": 12
+    },
+    {
+      "id": "public_commitment",
+      "label": "公开署名",
+      "description": "证据、关系与名声被迫在众目之下交汇，人物需要作出不可逆的承担。",
+      "beats": [
+        "climax"
+      ],
+      "focusTags": [
+        "commitment",
+        "reputation"
+      ],
+      "baseWeight": 16
+    },
+    {
+      "id": "witness_return",
+      "label": "旧证归来",
+      "description": "被遗漏的证人、旧物或后果重新出现，要求人物兑现此前承诺并给出归宿。",
+      "beats": [
+        "payoff"
+      ],
+      "focusTags": [
+        "payoff",
+        "consequence"
+      ],
+      "baseWeight": 16
+    },
+    {
+      "id": "aftermath_choice",
+      "label": "余波取舍",
+      "description": "冲突已经留下伤痕，人物仍要决定如何安置受影响的人与自己承担的名声。",
+      "beats": [
+        "pressure",
+        "payoff"
+      ],
+      "focusTags": [
+        "aftermath",
+        "cost"
+      ],
+      "baseWeight": 10
+    }
   ],
   "progression": {
-    "backgroundPacing": { "minYears": 1, "maxYears": 3 },
-    "statTiers": { "lowMax": 8, "highMin": 22 },
+    "backgroundPacing": {
+      "minYears": 1,
+      "maxYears": 3
+    },
+    "statTiers": {
+      "lowMax": 8,
+      "highMin": 22
+    },
     "statTierPresentation": {
-      "intelligence": { "low": "学思未定", "steady": "明察善断", "high": "洞见如炬" },
-      "charisma": { "low": "未谙人情", "steady": "善解人意", "high": "长袖善舞" },
-      "family": { "low": "根基未稳", "steady": "家道可凭", "high": "门庭煊赫" },
-      "fortune": { "low": "时运未至", "steady": "逢凶化吉", "high": "天眷所归" },
-      "physique": { "low": "体弱未成", "steady": "筋骨康健", "high": "龙精虎健" }
+      "intelligence": {
+        "low": "学思未定",
+        "steady": "明察善断",
+        "high": "洞见如炬"
+      },
+      "charisma": {
+        "low": "未谙人情",
+        "steady": "善解人意",
+        "high": "长袖善舞"
+      },
+      "family": {
+        "low": "根基未稳",
+        "steady": "家道可凭",
+        "high": "门庭煊赫"
+      },
+      "fortune": {
+        "low": "时运未至",
+        "steady": "逢凶化吉",
+        "high": "天眷所归"
+      },
+      "physique": {
+        "low": "体弱未成",
+        "steady": "筋骨康健",
+        "high": "龙精虎健"
+      }
     },
     "survival": {
       "startAge": 4,
       "graceYears": 3,
       "stages": [
-        { "id": "child", "label": "幼年", "ageStageIds": ["child"], "dangerBelowPhysique": 1, "baseCrisisRisk": 0.04, "additionalYearRisk": 0.03, "maxCrisisRisk": 0.14 },
-        { "id": "youth", "label": "青年", "ageStageIds": ["youth"], "dangerBelowPhysique": 2, "baseCrisisRisk": 0.06, "additionalYearRisk": 0.04, "maxCrisisRisk": 0.22 },
-        { "id": "adult", "label": "成年", "ageStageIds": ["prime", "middle"], "dangerBelowPhysique": 3, "baseCrisisRisk": 0.08, "additionalYearRisk": 0.05, "maxCrisisRisk": 0.3 },
-        { "id": "elder", "label": "老年", "ageStageIds": ["elder"], "dangerBelowPhysique": 5, "baseCrisisRisk": 0.12, "additionalYearRisk": 0.06, "maxCrisisRisk": 0.42 }
+        {
+          "id": "child",
+          "label": "幼年",
+          "ageStageIds": [
+            "child"
+          ],
+          "dangerBelowPhysique": 1,
+          "baseCrisisRisk": 0.04,
+          "additionalYearRisk": 0.03,
+          "maxCrisisRisk": 0.14
+        },
+        {
+          "id": "youth",
+          "label": "青年",
+          "ageStageIds": [
+            "youth"
+          ],
+          "dangerBelowPhysique": 2,
+          "baseCrisisRisk": 0.06,
+          "additionalYearRisk": 0.04,
+          "maxCrisisRisk": 0.22
+        },
+        {
+          "id": "adult",
+          "label": "成年",
+          "ageStageIds": [
+            "prime",
+            "middle"
+          ],
+          "dangerBelowPhysique": 3,
+          "baseCrisisRisk": 0.08,
+          "additionalYearRisk": 0.05,
+          "maxCrisisRisk": 0.3
+        },
+        {
+          "id": "elder",
+          "label": "老年",
+          "ageStageIds": [
+            "elder"
+          ],
+          "dangerBelowPhysique": 5,
+          "baseCrisisRisk": 0.12,
+          "additionalYearRisk": 0.06,
+          "maxCrisisRisk": 0.42
+        }
       ],
       "recovery": {
-        "successRateByTier": { "low": 0.25, "steady": 0.55, "high": 1 },
+        "successRateByTier": {
+          "low": 0.25,
+          "steady": 0.55,
+          "high": 1
+        },
         "restoreBuffer": 5
       },
       "familyPhysiqueSupport": {
-        "low": { "outcomes": [{ "delta": -1, "weight": 20 }, { "delta": 0, "weight": 60 }, { "delta": 1, "weight": 20 }] },
-        "steady": { "outcomes": [{ "delta": 0, "weight": 60 }, { "delta": 1, "weight": 40 }] },
-        "high": { "outcomes": [{ "delta": 0, "weight": 45 }, { "delta": 1, "weight": 45 }, { "delta": 2, "weight": 10 }] }
+        "low": {
+          "outcomes": [
+            {
+              "delta": -1,
+              "weight": 20
+            },
+            {
+              "delta": 0,
+              "weight": 60
+            },
+            {
+              "delta": 1,
+              "weight": 20
+            }
+          ]
+        },
+        "steady": {
+          "outcomes": [
+            {
+              "delta": 0,
+              "weight": 60
+            },
+            {
+              "delta": 1,
+              "weight": 40
+            }
+          ]
+        },
+        "high": {
+          "outcomes": [
+            {
+              "delta": 0,
+              "weight": 45
+            },
+            {
+              "delta": 1,
+              "weight": 45
+            },
+            {
+              "delta": 2,
+              "weight": 10
+            }
+          ]
+        }
       }
     },
     "growthFocuses": [
-      { "id": "insight", "label": "见识与谋断", "description": "将日常积累更多放在判断、学习与把握机会之上。", "primaryStats": ["intelligence", "fortune"], "secondaryStats": ["charisma"] },
-      { "id": "bond", "label": "人情与根基", "description": "将日常积累更多放在人情、家门与可依靠的关系之上。", "primaryStats": ["charisma", "family"], "secondaryStats": ["fortune"] },
-      { "id": "resolve", "label": "历练与韧性", "description": "将日常积累更多放在行动、体魄与承受代价的能力之上。", "primaryStats": ["physique", "fortune"], "secondaryStats": ["intelligence"] }
+      {
+        "id": "insight",
+        "label": "见识与谋断",
+        "description": "将日常积累更多放在判断、学习与把握机会之上。",
+        "primaryStats": [
+          "intelligence",
+          "fortune"
+        ],
+        "secondaryStats": [
+          "charisma"
+        ]
+      },
+      {
+        "id": "bond",
+        "label": "人情与根基",
+        "description": "将日常积累更多放在人情、家门与可依靠的关系之上。",
+        "primaryStats": [
+          "charisma",
+          "family"
+        ],
+        "secondaryStats": [
+          "fortune"
+        ]
+      },
+      {
+        "id": "resolve",
+        "label": "历练与韧性",
+        "description": "将日常积累更多放在行动、体魄与承受代价的能力之上。",
+        "primaryStats": [
+          "physique",
+          "fortune"
+        ],
+        "secondaryStats": [
+          "intelligence"
+        ]
+      }
     ],
-    "routes": [
-      { "directionId": "ancient.guardian", "gates": { "opening": { "weights": { "charisma": 0.55, "family": 0.3, "physique": 0.15 }, "threshold": 6 }, "escalation": { "weights": { "charisma": 0.55, "family": 0.3, "physique": 0.15 }, "threshold": 12 }, "pressure": { "weights": { "charisma": 0.55, "family": 0.3, "physique": 0.15 }, "threshold": 18 }, "climax": { "weights": { "charisma": 0.55, "family": 0.3, "physique": 0.15 }, "threshold": 26 } } },
-      { "directionId": "ancient.ambition", "gates": { "opening": { "weights": { "intelligence": 0.55, "charisma": 0.25, "fortune": 0.2 }, "threshold": 6 }, "escalation": { "weights": { "intelligence": 0.55, "charisma": 0.25, "fortune": 0.2 }, "threshold": 13 }, "pressure": { "weights": { "intelligence": 0.55, "charisma": 0.25, "fortune": 0.2 }, "threshold": 20 }, "climax": { "weights": { "intelligence": 0.55, "charisma": 0.25, "fortune": 0.2 }, "threshold": 28 } } },
-      { "directionId": "ancient.broker", "gates": { "opening": { "weights": { "family": 0.45, "charisma": 0.35, "fortune": 0.2 }, "threshold": 6 }, "escalation": { "weights": { "family": 0.45, "charisma": 0.35, "fortune": 0.2 }, "threshold": 12 }, "pressure": { "weights": { "family": 0.45, "charisma": 0.35, "fortune": 0.2 }, "threshold": 19 }, "climax": { "weights": { "family": 0.45, "charisma": 0.35, "fortune": 0.2 }, "threshold": 27 } } },
-      { "directionId": "ancient.mentor", "gates": { "opening": { "weights": { "intelligence": 0.7, "charisma": 0.3 }, "threshold": 6 }, "escalation": { "weights": { "intelligence": 0.7, "charisma": 0.3 }, "threshold": 13 }, "pressure": { "weights": { "intelligence": 0.7, "charisma": 0.3 }, "threshold": 20 }, "climax": { "weights": { "intelligence": 0.7, "charisma": 0.3 }, "threshold": 28 } } },
-      { "directionId": "ancient.institution", "gates": { "opening": { "weights": { "intelligence": 0.55, "charisma": 0.35, "family": 0.1 }, "threshold": 6 }, "escalation": { "weights": { "intelligence": 0.55, "charisma": 0.35, "family": 0.1 }, "threshold": 13 }, "pressure": { "weights": { "intelligence": 0.55, "charisma": 0.35, "family": 0.1 }, "threshold": 20 }, "climax": { "weights": { "intelligence": 0.55, "charisma": 0.35, "family": 0.1 }, "threshold": 28 } } },
-      { "directionId": "ancient.outsider", "gates": { "opening": { "weights": { "fortune": 0.4, "physique": 0.35, "intelligence": 0.25 }, "threshold": 6 }, "escalation": { "weights": { "fortune": 0.4, "physique": 0.35, "intelligence": 0.25 }, "threshold": 12 }, "pressure": { "weights": { "fortune": 0.4, "physique": 0.35, "intelligence": 0.25 }, "threshold": 18 }, "climax": { "weights": { "fortune": 0.4, "physique": 0.35, "intelligence": 0.25 }, "threshold": 26 } } }
-    ],
-    "completion": { "requireCommittedDirection": true, "requireDecisionConsequence": true, "requireClimax": true, "requirePayoff": true, "requireResolvedCoreFacts": true, "requireNoActiveScene": true, "minCompletedSceneInstances": 3, "requireAllMainlineActs": true }
+    "completion": {
+      "requireCommittedDirection": true,
+      "requireDecisionConsequence": true,
+      "requireClimax": true,
+      "requirePayoff": true,
+      "requireResolvedCoreFacts": true,
+      "requireNoActiveScene": true,
+      "minCompletedSceneInstances": 3,
+      "requireAllMainlineActs": true
+    },
+    "gates": {
+      "opening": {
+        "weights": {
+          "intelligence": 0.342,
+          "charisma": 0.3,
+          "family": 0.142,
+          "fortune": 0.133,
+          "physique": 0.083
+        },
+        "threshold": 6
+      },
+      "escalation": {
+        "weights": {
+          "intelligence": 0.342,
+          "charisma": 0.3,
+          "family": 0.142,
+          "fortune": 0.133,
+          "physique": 0.083
+        },
+        "threshold": 13
+      },
+      "pressure": {
+        "weights": {
+          "intelligence": 0.342,
+          "charisma": 0.3,
+          "family": 0.142,
+          "fortune": 0.133,
+          "physique": 0.083
+        },
+        "threshold": 19
+      },
+      "climax": {
+        "weights": {
+          "intelligence": 0.342,
+          "charisma": 0.3,
+          "family": 0.142,
+          "fortune": 0.133,
+          "physique": 0.083
+        },
+        "threshold": 27
+      }
+    }
   },
-  "narrativeFactions": [
-    { "id": "guardian", "label": "宗族与地方", "summary": "有土地、人手与乡里信任，求生计安稳和家门延续；能互助、调停，也会争夺地方资源。", "conflictFactionIds": ["institution", "ambition"] },
-    { "id": "ambition", "label": "朝局与功名", "summary": "有举荐、任用与政治声望，争取施政空间与地位；可提携合作，也因利益与主张发生分合。", "conflictFactionIds": ["institution", "outsider"] },
-    { "id": "broker", "label": "商路与行会", "summary": "有货源、运力与信用网络，求通路和收益；能筹措周转，也会因风险分担与资源定价起争执。", "conflictFactionIds": ["guardian", "outsider"] },
-    { "id": "mentor", "label": "书院与清议", "summary": "有学识、门生与社会声望，求传承和主张落地；能育才任事，也会因方法与立场分歧。", "conflictFactionIds": ["ambition"] },
-    { "id": "institution", "label": "法度与军府", "summary": "有行政、动员与武力，求秩序和执行成效；能组织救援、守备与公断，也有权限和资源之争。", "conflictFactionIds": ["guardian", "ambition"] },
-    { "id": "outsider", "label": "边地与异路", "summary": "有远行经验、地方技艺与跨地域联系，求生存和自主；可结伴、通商、从军，也会碰撞不同秩序。", "conflictFactionIds": ["ambition", "broker"] }
-  ],
-  "routeArcs": [
-    { "directionId": "ancient.guardian", "label": "家门与人情", "summary": "从亲族、地方、照拂与具体人的生计观察大局；人物可以是守护者、被照顾者或夹在家门与公义之间的人。", "perspective": "让每一场制度或权力冲突都落到相识之人的处境、承诺与归处。", "escalation": "家门、人情、地方资源和名声会让善意变成必须兑现的选择。", "crisis": "更大危机来临时，谁得到照拂、谁被牺牲、谁仍能归家都应成为真实后果。", "payoffFocus": "回应人物曾经承担的照料、名分或保全之责。", "coreThreadIds": ["ancient.guardian_relief"], "characterIds": ["ancient.guardian_elder", "ancient.guardian_clerk"], "loreIds": ["ancient.guardian"], "materialEventIds": ["ancient_guardian_04", "ancient_guardian_01", "ancient_guardian_05", "ancient_guardian_09", "ancient_guardian_10"] },
-    { "directionId": "ancient.ambition", "label": "功名与朝局", "summary": "从才能、功名、位置与朝局关系观察大局；人物既可以寻求上升，也可能被权力的门槛推着选择。", "perspective": "让获得位置的机会始终伴随人情、立场与会被追问的代价。", "escalation": "同侪、靠山、功绩与声名会把私人情义变成政治判断。", "crisis": "大局失序时，人物的职位、名望或被拒绝的位置都应决定其能承担什么。", "payoffFocus": "让人物说明自己为何取得或失去位置，并承担由此而来的后果。", "coreThreadIds": ["ancient.ambition_name"], "characterIds": ["ancient.ambition_peer", "ancient.ambition_patron"], "loreIds": ["ancient.ambition"], "materialEventIds": ["ancient_ambition_03", "ancient_ambition_01", "ancient_ambition_05", "ancient_ambition_09", "ancient_ambition_10"] },
-    { "directionId": "ancient.broker", "label": "商路与周转", "summary": "从资源、契约、往来与信誉观察大局；人物可以经营、借贷、运送、调停，或只是在交易的代价中求生。", "perspective": "让资源流向、人情、契约与信誉成为看得见的权力筹码。", "escalation": "多方需求会要求人物用物资、消息、承诺或信用换取立足之处。", "crisis": "大局危机下，资源的断绝与重新分配要落到具体人的生路。", "payoffFocus": "说明人物的周转与信誉最终保住、伤害或改变了谁。", "coreThreadIds": ["ancient.broker_ledger"], "characterIds": ["ancient.broker_merchant", "ancient.broker_envoy"], "loreIds": ["ancient.broker"], "materialEventIds": ["ancient_broker_04", "ancient_broker_01", "ancient_broker_03", "ancient_broker_05", "ancient_broker_09", "ancient_broker_10"] },
-    { "directionId": "ancient.mentor", "label": "师门与学问", "summary": "从师承、学问、门生与清议观察大局；人物可以教人、求学、传递见识，或被知识与名声共同塑造。", "perspective": "让师承、门生和知识如何进入现实始终成为可追问的选择。", "escalation": "清议、查禁、任事与师门关系会要求人物证明所学能否承担现实。", "crisis": "大局危机下，知识、人才与教化可以成为行动资源，也可能成为需要保护的东西。", "payoffFocus": "回应一段师承、教导或由知识引出的责任。", "coreThreadIds": ["ancient.mentor_learning"], "characterIds": ["ancient.mentor_teacher", "ancient.mentor_student"], "loreIds": ["ancient.mentor"], "materialEventIds": ["ancient_mentor_01", "ancient_mentor_02", "ancient_mentor_04", "ancient_mentor_05", "ancient_mentor_09", "ancient_mentor_10"] },
-    { "directionId": "ancient.institution", "label": "法度与署名", "summary": "从文书、命令、制度与署名观察大局；人物可以执行、质疑、修补或承受制度留下的缺口。", "perspective": "让程序既成为权力的遮蔽，也成为追问责任的凭据。", "escalation": "同僚、上司、地方与宗族会要求人物在规则正确和具体代价之间取舍。", "crisis": "大局危机下，每一项命令、调度或署名都应产生救人、伤人或失效的后果。", "payoffFocus": "让一项判断、法度或署名留下可被承担的责任。", "coreThreadIds": ["ancient.institution_reform"], "characterIds": ["ancient.institution_censor", "ancient.institution_magistrate"], "loreIds": ["ancient.institution"], "materialEventIds": ["ancient_institution_01", "ancient_institution_02", "ancient_institution_04", "ancient_institution_05", "ancient_institution_09", "ancient_institution_10"] },
-    { "directionId": "ancient.outsider", "label": "异路与远方", "summary": "从边地、游历、异见与官方叙述之外的生活观察大局；人物可以远行、从军、避乱、求学或在陌生秩序中寻找位置。", "perspective": "让人物的视野持续被陌生消息、不同规则与被忽略的人纠正。", "escalation": "传言、密令、迁徙、异见与陌生关系会使判断和传递本身变得危险。", "crisis": "更大危机到来时，远方的消息与边缘人的处境要成为实际行动的一部分。", "payoffFocus": "回应人物选择相信、带走、公开或守住的那条异路。", "coreThreadIds": ["ancient.outsider_truth"], "characterIds": ["ancient.outsider_scholar", "ancient.outsider_scout"], "loreIds": ["ancient.outsider"], "materialEventIds": ["ancient_outsider_02", "ancient_outsider_01", "ancient_outsider_03", "ancient_outsider_05", "ancient_outsider_09", "ancient_outsider_10"] }
-  ],
   "threads": [
-    { "id": "ancient.guardian_relief", "label": "赈济与名册", "premise": "灾年粮道、流民与阵亡遗属的处置，考验你是否能把责任落到具体的人身上。", "directionIds": ["ancient.guardian"], "payoffHint": "回收时必须回应粮道、遗属或旧案中至少一人的命运。" },
-    { "id": "ancient.ambition_name", "label": "功名污点", "premise": "伪造军功、暗账分利或结党邀约，都会留下可被清算的名字。", "directionIds": ["ancient.ambition"], "payoffHint": "回收时必须让功名与名节的取舍落到真实的朝局后果。" },
-    { "id": "ancient.broker_ledger", "label": "旧账与靠山", "premise": "密信、旧账与河滩利益把你卷入多方交易，信誉与自保无法同时轻易拥有。", "directionIds": ["ancient.broker"], "payoffHint": "回收时必须揭示账本究竟保住谁、害了谁或换来了什么。" },
-    { "id": "ancient.mentor_learning", "label": "师门与新学", "premise": "恩师、书院、门生和边地少年构成一条会反过来追问你所学为何的线索。", "directionIds": ["ancient.mentor"], "payoffHint": "回收时必须让一名门生、恩师或新学的去留回应此前承诺。" },
-    { "id": "ancient.institution_reform", "label": "法度与人情", "premise": "试题、弹章、清丈与税粮改制会迫使你在制度正确和具体人的代价之间选择。", "directionIds": ["ancient.institution"], "payoffHint": "回收时必须说明一项制度改变留下的实际后果与署名责任。" },
-    { "id": "ancient.outsider_truth", "label": "边地真相", "premise": "败报、禁书、流民谈判和密册逐渐拼出与朝廷叙述不同的真相。", "directionIds": ["ancient.outsider"], "payoffHint": "回收时必须让真相被公开、被埋没或以代价换得出口。" }
+    {
+      "id": "ancient.guardian_relief",
+      "label": "赈济与名册",
+      "premise": "灾年粮道、流民与阵亡遗属的处置，考验你是否能把责任落到具体的人身上。",
+      "directionIds": [
+        "ancient.guardian"
+      ],
+      "payoffHint": "回收时必须回应粮道、遗属或旧案中至少一人的命运。"
+    },
+    {
+      "id": "ancient.ambition_name",
+      "label": "功名污点",
+      "premise": "伪造军功、暗账分利或结党邀约，都会留下可被清算的名字。",
+      "directionIds": [
+        "ancient.ambition"
+      ],
+      "payoffHint": "回收时必须让功名与名节的取舍落到真实的朝局后果。"
+    },
+    {
+      "id": "ancient.broker_ledger",
+      "label": "旧账与靠山",
+      "premise": "密信、旧账与河滩利益把你卷入多方交易，信誉与自保无法同时轻易拥有。",
+      "directionIds": [
+        "ancient.broker"
+      ],
+      "payoffHint": "回收时必须揭示账本究竟保住谁、害了谁或换来了什么。"
+    },
+    {
+      "id": "ancient.mentor_learning",
+      "label": "师门与新学",
+      "premise": "恩师、书院、门生和边地少年构成一条会反过来追问你所学为何的线索。",
+      "directionIds": [
+        "ancient.mentor"
+      ],
+      "payoffHint": "回收时必须让一名门生、恩师或新学的去留回应此前承诺。"
+    },
+    {
+      "id": "ancient.institution_reform",
+      "label": "法度与人情",
+      "premise": "试题、弹章、清丈与税粮改制会迫使你在制度正确和具体人的代价之间选择。",
+      "directionIds": [
+        "ancient.institution"
+      ],
+      "payoffHint": "回收时必须说明一项制度改变留下的实际后果与署名责任。"
+    },
+    {
+      "id": "ancient.outsider_truth",
+      "label": "边地真相",
+      "premise": "败报、禁书、流民谈判和密册逐渐拼出与朝廷叙述不同的真相。",
+      "directionIds": [
+        "ancient.outsider"
+      ],
+      "payoffHint": "回收时必须让真相被公开、被埋没或以代价换得出口。"
+    }
   ],
   "characters": [
-    { "id": "ancient.guardian_elder", "label": "族中长辈", "role": "宗族压力与旧规的代表", "description": "重名分，也在危局中依赖你的担当。", "directionIds": ["ancient.guardian"] },
-    { "id": "ancient.guardian_clerk", "label": "赈务书吏", "role": "基层事实的见证者", "description": "熟悉粮册与遗属名单，知道制度落不到何处。", "directionIds": ["ancient.guardian"] },
-    { "id": "ancient.ambition_peer", "label": "同年进士", "role": "功名路上的盟友或对手", "description": "擅长揣度朝局，常以捷径试探你的底线。", "directionIds": ["ancient.ambition"] },
-    { "id": "ancient.ambition_patron", "label": "朝中靠山", "role": "权力入口", "description": "能给出位置，也会要求你偿还人情。", "directionIds": ["ancient.ambition"] },
-    { "id": "ancient.broker_merchant", "label": "商会掌柜", "role": "资源与账目的持有人", "description": "话语圆融，所有好意都写着价码。", "directionIds": ["ancient.broker"] },
-    { "id": "ancient.broker_envoy", "label": "王府使者", "role": "双边拉拢的传话人", "description": "从不说透来意，只留下足以让人难眠的条件。", "directionIds": ["ancient.broker"] },
-    { "id": "ancient.mentor_teacher", "label": "书院山长", "role": "师承与清议的来源", "description": "重学问的承担，也会因立场成为你的风险。", "directionIds": ["ancient.mentor"] },
-    { "id": "ancient.mentor_student", "label": "寒门门生", "role": "传承的具体对象", "description": "才具未成，前途常被出身与现实截断。", "directionIds": ["ancient.mentor"] },
-    { "id": "ancient.institution_censor", "label": "御史同僚", "role": "法度与监察的压力", "description": "相信程序，也会逼你在旧情与证据之间站队。", "directionIds": ["ancient.institution"] },
-    { "id": "ancient.institution_magistrate", "label": "地方父母官", "role": "政令落地的合作者", "description": "知道税粮、田亩与民怨从不只是账面数字。", "directionIds": ["ancient.institution"] },
-    { "id": "ancient.outsider_scholar", "label": "异端学者", "role": "禁书与异路的引路人", "description": "所言常违背正统，却能指出被掩盖的裂缝。", "directionIds": ["ancient.outsider"] },
-    { "id": "ancient.outsider_scout", "label": "边军游士", "role": "边地事实的传递者", "description": "带来塘报之外的消息，也带来无法回避的风险。", "directionIds": ["ancient.outsider"] }
+    {
+      "id": "ancient.guardian_elder",
+      "label": "族中长辈",
+      "role": "宗族压力与旧规的代表",
+      "description": "重名分，也在危局中依赖你的担当。",
+      "directionIds": [
+        "ancient.guardian"
+      ]
+    },
+    {
+      "id": "ancient.guardian_clerk",
+      "label": "赈务书吏",
+      "role": "基层事实的见证者",
+      "description": "熟悉粮册与遗属名单，知道制度落不到何处。",
+      "directionIds": [
+        "ancient.guardian"
+      ]
+    },
+    {
+      "id": "ancient.ambition_peer",
+      "label": "同年进士",
+      "role": "功名路上的盟友或对手",
+      "description": "擅长揣度朝局，常以捷径试探你的底线。",
+      "directionIds": [
+        "ancient.ambition"
+      ]
+    },
+    {
+      "id": "ancient.ambition_patron",
+      "label": "朝中靠山",
+      "role": "权力入口",
+      "description": "能给出位置，也会要求你偿还人情。",
+      "directionIds": [
+        "ancient.ambition"
+      ]
+    },
+    {
+      "id": "ancient.broker_merchant",
+      "label": "商会掌柜",
+      "role": "资源与账目的持有人",
+      "description": "话语圆融，所有好意都写着价码。",
+      "directionIds": [
+        "ancient.broker"
+      ]
+    },
+    {
+      "id": "ancient.broker_envoy",
+      "label": "王府使者",
+      "role": "双边拉拢的传话人",
+      "description": "从不说透来意，只留下足以让人难眠的条件。",
+      "directionIds": [
+        "ancient.broker"
+      ]
+    },
+    {
+      "id": "ancient.mentor_teacher",
+      "label": "书院山长",
+      "role": "师承与清议的来源",
+      "description": "重学问的承担，也会因立场成为你的风险。",
+      "directionIds": [
+        "ancient.mentor"
+      ]
+    },
+    {
+      "id": "ancient.mentor_student",
+      "label": "寒门门生",
+      "role": "传承的具体对象",
+      "description": "才具未成，前途常被出身与现实截断。",
+      "directionIds": [
+        "ancient.mentor"
+      ]
+    },
+    {
+      "id": "ancient.institution_censor",
+      "label": "御史同僚",
+      "role": "法度与监察的压力",
+      "description": "相信程序，也会逼你在旧情与证据之间站队。",
+      "directionIds": [
+        "ancient.institution"
+      ]
+    },
+    {
+      "id": "ancient.institution_magistrate",
+      "label": "地方父母官",
+      "role": "政令落地的合作者",
+      "description": "知道税粮、田亩与民怨从不只是账面数字。",
+      "directionIds": [
+        "ancient.institution"
+      ]
+    },
+    {
+      "id": "ancient.outsider_scholar",
+      "label": "异端学者",
+      "role": "禁书与异路的引路人",
+      "description": "所言常违背正统，却能指出被掩盖的裂缝。",
+      "directionIds": [
+        "ancient.outsider"
+      ]
+    },
+    {
+      "id": "ancient.outsider_scout",
+      "label": "边军游士",
+      "role": "边地事实的传递者",
+      "description": "带来塘报之外的消息，也带来无法回避的风险。",
+      "directionIds": [
+        "ancient.outsider"
+      ]
+    }
   ],
   "lore": [],
   "eventBindings": [
-    { "eventId": "ancient_guardian_01", "beat": "escalation", "characterIds": ["ancient.guardian_elder", "ancient.guardian_clerk"], "sceneHint": "灾年粮道受阻，先写清你所见的缺口，再让责任落到一份名单或一个人身上。" },
-    { "eventId": "ancient_guardian_02", "beat": "escalation", "characterIds": ["ancient.guardian_clerk"], "sceneHint": "流民激增使此前的赈济承诺开始失去余地。" },
-    { "eventId": "ancient_guardian_03", "beat": "climax", "characterIds": ["ancient.guardian_elder"], "sceneHint": "旧案清查把名节、权贵与冤者逼到同一处，必须作出不可逆的站队。" },
-    { "eventId": "ancient_guardian_04", "beat": "setup", "opensThreads": ["ancient.guardian_relief"], "characterIds": ["ancient.guardian_elder"], "sceneHint": "族中田产纠纷让公共责任反过来侵入你的家门。" },
-    { "eventId": "ancient_guardian_05", "beat": "pressure", "characterIds": ["ancient.guardian_clerk"], "sceneHint": "疫病与囤药让救人和保全声誉不能同时轻易做到。" },
-    { "eventId": "ancient_guardian_06", "beat": "payoff", "resolvesThreads": ["ancient.guardian_relief"], "characterIds": ["ancient.guardian_clerk"], "sceneHint": "阵亡名册的去向回应此前赈务承诺，并留下身后名的代价。" },
-    { "eventId": "ancient_ambition_01", "beat": "pressure", "characterIds": ["ancient.ambition_patron"], "sceneHint": "伪造军功的邀约第一次让功名与名节发生明确冲突。" },
-    { "eventId": "ancient_ambition_02", "beat": "pressure", "characterIds": ["ancient.ambition_patron"], "sceneHint": "暗账分利让此前的上升机会出现可追查的证据。" },
-    { "eventId": "ancient_ambition_03", "beat": "setup", "opensThreads": ["ancient.ambition_name"], "characterIds": ["ancient.ambition_peer"], "sceneHint": "联姻把兵权与家族绑在一起，使私人选择公开化。" },
-    { "eventId": "ancient_ambition_04", "beat": "pressure", "characterIds": ["ancient.ambition_peer"], "sceneHint": "结党邀约要求你把同年之谊转换为对清流的攻击。" },
-    { "eventId": "ancient_ambition_05", "beat": "climax", "characterIds": ["ancient.ambition_patron"], "sceneHint": "边功的真伪到了无法同时保住仕途与清名的关口。" },
-    { "eventId": "ancient_ambition_06", "beat": "payoff", "resolvesThreads": ["ancient.ambition_name"], "characterIds": ["ancient.ambition_peer"], "sceneHint": "宫中密信要求兑现旧日选择，让功名污点有了公开后果。" },
-    { "eventId": "ancient_broker_01", "beat": "escalation", "characterIds": ["ancient.broker_envoy"], "sceneHint": "两封密信并置，先让你看清被人情夹住的处境。" },
-    { "eventId": "ancient_broker_02", "beat": "escalation", "characterIds": ["ancient.broker_envoy"], "sceneHint": "朝议分裂让观望本身也成为一种会被记账的选择。" },
-    { "eventId": "ancient_broker_03", "beat": "pressure", "characterIds": ["ancient.broker_merchant"], "sceneHint": "边贸税制让商路、军府和家族信誉同时来索取承诺。" },
-    { "eventId": "ancient_broker_04", "beat": "setup", "opensThreads": ["ancient.broker_ledger"], "characterIds": ["ancient.broker_envoy"], "sceneHint": "婚约与恩师举荐冲突，把两条人情债推到同一张桌上。" },
-    { "eventId": "ancient_broker_05", "beat": "climax", "characterIds": ["ancient.broker_merchant"], "sceneHint": "旧账本成为唯一筹码，也可能让你失去最后的退路。" },
-    { "eventId": "ancient_broker_06", "beat": "payoff", "resolvesThreads": ["ancient.broker_ledger"], "characterIds": ["ancient.broker_merchant"], "sceneHint": "修桥与河滩利益兑现旧账的代价，必须写清保住或失去的信誉。" },
-    { "eventId": "ancient_mentor_01", "beat": "setup", "opensThreads": ["ancient.mentor_learning"], "characterIds": ["ancient.mentor_teacher"], "sceneHint": "书院新学提供一条缓慢却能改变一生的道路。" },
-    { "eventId": "ancient_mentor_02", "beat": "escalation", "characterIds": ["ancient.mentor_student"], "sceneHint": "培养寒门门生让传承从理念变成需要长期承担的人。" },
-    { "eventId": "ancient_mentor_03", "beat": "pressure", "characterIds": ["ancient.mentor_teacher"], "sceneHint": "扩建田学让名声、祖产与教化的成本同时显形。" },
-    { "eventId": "ancient_mentor_04", "beat": "pressure", "characterIds": ["ancient.mentor_teacher"], "sceneHint": "恩师受劾逼你决定师门情义能否承担朝堂风险。" },
-    { "eventId": "ancient_mentor_05", "beat": "climax", "characterIds": ["ancient.mentor_student"], "sceneHint": "门生求幕职时，所学与现实第一次必须作出不可逆交换。" },
-    { "eventId": "ancient_mentor_06", "beat": "payoff", "resolvesThreads": ["ancient.mentor_learning"], "characterIds": ["ancient.mentor_student"], "sceneHint": "边地少年的去留回应你此前对师承与教化的承诺。" },
-    { "eventId": "ancient_institution_01", "beat": "setup", "opensThreads": ["ancient.institution_reform"], "characterIds": ["ancient.institution_censor"], "sceneHint": "试题泄露传闻先让你看到制度裂缝与人情网的交界。" },
-    { "eventId": "ancient_institution_02", "beat": "escalation", "characterIds": ["ancient.institution_censor"], "sceneHint": "弹章指向旧恩人，程序开始要求你给出可被记录的立场。" },
-    { "eventId": "ancient_institution_03", "beat": "pressure", "characterIds": ["ancient.institution_magistrate"], "sceneHint": "清丈田亩使纸上的法度直接进入宗族土地与民户生计。" },
-    { "eventId": "ancient_institution_04", "beat": "pressure", "characterIds": ["ancient.institution_magistrate"], "sceneHint": "税粮改制让政绩、民怨与同僚责任无法再彼此分开。" },
-    { "eventId": "ancient_institution_05", "beat": "climax", "characterIds": ["ancient.institution_censor"], "sceneHint": "军府考功要求明确责任，外戚与败将使你的署名成为不可逆选择。" },
-    { "eventId": "ancient_institution_06", "beat": "payoff", "resolvesThreads": ["ancient.institution_reform"], "characterIds": ["ancient.institution_magistrate"], "sceneHint": "官员考课回收此前所有文书与政令，清名和实绩必须有一个真实结论。" },
-    { "eventId": "ancient_outsider_01", "beat": "escalation", "characterIds": ["ancient.outsider_scout"], "sceneHint": "边军败报与塘报不符，真相先以一处矛盾进入你的生活。" },
-    { "eventId": "ancient_outsider_02", "beat": "setup", "opensThreads": ["ancient.outsider_truth"], "characterIds": ["ancient.outsider_scholar"], "sceneHint": "禁书并不直接给出答案，而是改变你看待旧秩序的方式。" },
-    { "eventId": "ancient_outsider_03", "beat": "pressure", "characterIds": ["ancient.outsider_scout"], "sceneHint": "流民谈判使朝令、军令与具体人的生路正面冲突。" },
-    { "eventId": "ancient_outsider_04", "beat": "pressure", "characterIds": ["ancient.outsider_scholar"], "sceneHint": "旧朝遗孤的线索把边地真相牵回你的家族旧债。" },
-    { "eventId": "ancient_outsider_05", "beat": "climax", "characterIds": ["ancient.outsider_scout"], "sceneHint": "军械走私证据让你必须决定真相交给谁、以谁为代价。" },
-    { "eventId": "ancient_outsider_06", "beat": "payoff", "resolvesThreads": ["ancient.outsider_truth"], "characterIds": ["ancient.outsider_scholar"], "sceneHint": "密册换命回收此前的败报、禁书与旧债，真相必须被公开、埋没或带走。" },
-    { "eventId": "ancient_guardian_07", "beat": "pressure", "characterIds": ["ancient.guardian_clerk"], "sceneHint": "赈粮损耗牵出上司与书吏，追查必须先确认谁会为账目付出代价。" },
-    { "eventId": "ancient_guardian_08", "beat": "escalation", "characterIds": ["ancient.guardian_clerk"], "sceneHint": "失窃的药箱把封锁线外的一家人重新带到你面前，善意有了更具体的去处。" },
-    { "eventId": "ancient_guardian_09", "beat": "climax", "characterIds": ["ancient.guardian_elder", "ancient.guardian_clerk"], "sceneHint": "钦使核灾要求你在地方豪强与死伤实数之间署名，灾年真相不能再被拖延。" },
-    { "eventId": "ancient_guardian_10", "beat": "payoff", "resolvesThreads": ["ancient.guardian_relief"], "characterIds": ["ancient.guardian_clerk"], "sceneHint": "春汛后的证词回收粮案与名册，让此前选择真正决定谁被看见。" },
-    { "eventId": "ancient_ambition_07", "beat": "escalation", "characterIds": ["ancient.ambition_peer"], "sceneHint": "泄露的策论把捷径送到手边，也让功名的来处第一次可以被追问。" },
-    { "eventId": "ancient_ambition_08", "beat": "pressure", "characterIds": ["ancient.ambition_peer"], "sceneHint": "旧部的抚恤请求把军功、亲情与虚报的代价并置。" },
-    { "eventId": "ancient_ambition_09", "beat": "climax", "characterIds": ["ancient.ambition_patron"], "sceneHint": "文书箱里的手迹令朝局清算与个人污点再无回避余地。" },
-    { "eventId": "ancient_ambition_10", "beat": "payoff", "resolvesThreads": ["ancient.ambition_name"], "characterIds": ["ancient.ambition_peer"], "sceneHint": "新君问起旧案，功业的来处终须由你亲口解释。" },
-    { "eventId": "ancient_broker_07", "beat": "escalation", "characterIds": ["ancient.broker_merchant"], "sceneHint": "漕运断绝与盐引条件让资源周转第一次威胁到你自己的信誉。" },
-    { "eventId": "ancient_broker_08", "beat": "pressure", "characterIds": ["ancient.broker_envoy"], "sceneHint": "旧友的清白系在账册上，你必须衡量友谊是否也能被交易。" },
-    { "eventId": "ancient_broker_09", "beat": "climax", "characterIds": ["ancient.broker_envoy", "ancient.broker_merchant"], "sceneHint": "两府同索过桥税，含糊周旋终于会变成明确站队。" },
-    { "eventId": "ancient_broker_10", "beat": "payoff", "resolvesThreads": ["ancient.broker_ledger"], "characterIds": ["ancient.broker_merchant"], "sceneHint": "河工落成时，旧账证人归来；账本到底保住谁必须有结论。" },
-    { "eventId": "ancient_mentor_07", "beat": "escalation", "characterIds": ["ancient.mentor_teacher"], "sceneHint": "查禁藏书让书院必须先决定保住文字还是保住读书的人。" },
-    { "eventId": "ancient_mentor_08", "beat": "pressure", "characterIds": ["ancient.mentor_student"], "sceneHint": "门生在任上的过失迫使你的教导接受百姓与同僚的审视。" },
-    { "eventId": "ancient_mentor_09", "beat": "climax", "characterIds": ["ancient.mentor_teacher", "ancient.mentor_student"], "sceneHint": "被篡改的讲义成为罪证，师门声名与事实都等你作证。" },
-    { "eventId": "ancient_mentor_10", "beat": "payoff", "resolvesThreads": ["ancient.mentor_learning"], "characterIds": ["ancient.mentor_student"], "sceneHint": "多年后的判牍回到书院，曾经的传承终于要在现实里兑现。" },
-    { "eventId": "ancient_institution_07", "beat": "escalation", "characterIds": ["ancient.institution_censor"], "sceneHint": "调走的卷宗只剩小吏口供，程序的空白开始要求你承担判断。" },
-    { "eventId": "ancient_institution_08", "beat": "pressure", "characterIds": ["ancient.institution_magistrate"], "sceneHint": "清丈引发械斗，宗族与法度同时要求你落笔。" },
-    { "eventId": "ancient_institution_09", "beat": "climax", "characterIds": ["ancient.institution_censor"], "sceneHint": "废税法的风声让先前受累的人无处申诉，改制的责任来到正面。" },
-    { "eventId": "ancient_institution_10", "beat": "payoff", "resolvesThreads": ["ancient.institution_reform"], "characterIds": ["ancient.institution_magistrate"], "sceneHint": "考课实录摊在眼前，删去一笔便能改写一段政绩与伤痕。" },
-    { "eventId": "ancient_outsider_07", "beat": "escalation", "characterIds": ["ancient.outsider_scout"], "sceneHint": "失踪村落的名单把边地消息变成与你相识之人的命运。" },
-    { "eventId": "ancient_outsider_08", "beat": "pressure", "characterIds": ["ancient.outsider_scholar"], "sceneHint": "禁书缺页可能藏在军府，求证真相需要先踏入权力的库房。" },
-    { "eventId": "ancient_outsider_09", "beat": "climax", "characterIds": ["ancient.outsider_scout"], "sceneHint": "渡口对峙使密令与真相互相抵触，任何传递方式都将付出代价。" },
-    { "eventId": "ancient_outsider_10", "beat": "payoff", "resolvesThreads": ["ancient.outsider_truth"], "characterIds": ["ancient.outsider_scholar"], "sceneHint": "密册原主索要公开真相的交换，边地旧债终于有了去处。" }
+    {
+      "eventId": "ancient_guardian_01",
+      "beat": "escalation",
+      "characterIds": [
+        "ancient.guardian_elder",
+        "ancient.guardian_clerk"
+      ],
+      "sceneHint": "灾年粮道受阻，先写清你所见的缺口，再让责任落到一份名单或一个人身上。"
+    },
+    {
+      "eventId": "ancient_guardian_02",
+      "beat": "escalation",
+      "characterIds": [
+        "ancient.guardian_clerk"
+      ],
+      "sceneHint": "流民激增使此前的赈济承诺开始失去余地。"
+    },
+    {
+      "eventId": "ancient_guardian_03",
+      "beat": "climax",
+      "characterIds": [
+        "ancient.guardian_elder"
+      ],
+      "sceneHint": "旧案清查把名节、权贵与冤者逼到同一处，必须作出不可逆的站队。"
+    },
+    {
+      "eventId": "ancient_guardian_04",
+      "beat": "setup",
+      "opensThreads": [
+        "ancient.guardian_relief"
+      ],
+      "characterIds": [
+        "ancient.guardian_elder"
+      ],
+      "sceneHint": "族中田产纠纷让公共责任反过来侵入你的家门。"
+    },
+    {
+      "eventId": "ancient_guardian_05",
+      "beat": "pressure",
+      "characterIds": [
+        "ancient.guardian_clerk"
+      ],
+      "sceneHint": "疫病与囤药让救人和保全声誉不能同时轻易做到。"
+    },
+    {
+      "eventId": "ancient_guardian_06",
+      "beat": "payoff",
+      "resolvesThreads": [
+        "ancient.guardian_relief"
+      ],
+      "characterIds": [
+        "ancient.guardian_clerk"
+      ],
+      "sceneHint": "阵亡名册的去向回应此前赈务承诺，并留下身后名的代价。"
+    },
+    {
+      "eventId": "ancient_ambition_01",
+      "beat": "pressure",
+      "characterIds": [
+        "ancient.ambition_patron"
+      ],
+      "sceneHint": "伪造军功的邀约第一次让功名与名节发生明确冲突。"
+    },
+    {
+      "eventId": "ancient_ambition_02",
+      "beat": "pressure",
+      "characterIds": [
+        "ancient.ambition_patron"
+      ],
+      "sceneHint": "暗账分利让此前的上升机会出现可追查的证据。"
+    },
+    {
+      "eventId": "ancient_ambition_03",
+      "beat": "setup",
+      "opensThreads": [
+        "ancient.ambition_name"
+      ],
+      "characterIds": [
+        "ancient.ambition_peer"
+      ],
+      "sceneHint": "联姻把兵权与家族绑在一起，使私人选择公开化。"
+    },
+    {
+      "eventId": "ancient_ambition_04",
+      "beat": "pressure",
+      "characterIds": [
+        "ancient.ambition_peer"
+      ],
+      "sceneHint": "结党邀约要求你把同年之谊转换为对清流的攻击。"
+    },
+    {
+      "eventId": "ancient_ambition_05",
+      "beat": "climax",
+      "characterIds": [
+        "ancient.ambition_patron"
+      ],
+      "sceneHint": "边功的真伪到了无法同时保住仕途与清名的关口。"
+    },
+    {
+      "eventId": "ancient_ambition_06",
+      "beat": "payoff",
+      "resolvesThreads": [
+        "ancient.ambition_name"
+      ],
+      "characterIds": [
+        "ancient.ambition_peer"
+      ],
+      "sceneHint": "宫中密信要求兑现旧日选择，让功名污点有了公开后果。"
+    },
+    {
+      "eventId": "ancient_broker_01",
+      "beat": "escalation",
+      "characterIds": [
+        "ancient.broker_envoy"
+      ],
+      "sceneHint": "两封密信并置，先让你看清被人情夹住的处境。"
+    },
+    {
+      "eventId": "ancient_broker_02",
+      "beat": "escalation",
+      "characterIds": [
+        "ancient.broker_envoy"
+      ],
+      "sceneHint": "朝议分裂让观望本身也成为一种会被记账的选择。"
+    },
+    {
+      "eventId": "ancient_broker_03",
+      "beat": "pressure",
+      "characterIds": [
+        "ancient.broker_merchant"
+      ],
+      "sceneHint": "边贸税制让商路、军府和家族信誉同时来索取承诺。"
+    },
+    {
+      "eventId": "ancient_broker_04",
+      "beat": "setup",
+      "opensThreads": [
+        "ancient.broker_ledger"
+      ],
+      "characterIds": [
+        "ancient.broker_envoy"
+      ],
+      "sceneHint": "婚约与恩师举荐冲突，把两条人情债推到同一张桌上。"
+    },
+    {
+      "eventId": "ancient_broker_05",
+      "beat": "climax",
+      "characterIds": [
+        "ancient.broker_merchant"
+      ],
+      "sceneHint": "旧账本成为唯一筹码，也可能让你失去最后的退路。"
+    },
+    {
+      "eventId": "ancient_broker_06",
+      "beat": "payoff",
+      "resolvesThreads": [
+        "ancient.broker_ledger"
+      ],
+      "characterIds": [
+        "ancient.broker_merchant"
+      ],
+      "sceneHint": "修桥与河滩利益兑现旧账的代价，必须写清保住或失去的信誉。"
+    },
+    {
+      "eventId": "ancient_mentor_01",
+      "beat": "setup",
+      "opensThreads": [
+        "ancient.mentor_learning"
+      ],
+      "characterIds": [
+        "ancient.mentor_teacher"
+      ],
+      "sceneHint": "书院新学提供一条缓慢却能改变一生的道路。"
+    },
+    {
+      "eventId": "ancient_mentor_02",
+      "beat": "escalation",
+      "characterIds": [
+        "ancient.mentor_student"
+      ],
+      "sceneHint": "培养寒门门生让传承从理念变成需要长期承担的人。"
+    },
+    {
+      "eventId": "ancient_mentor_03",
+      "beat": "pressure",
+      "characterIds": [
+        "ancient.mentor_teacher"
+      ],
+      "sceneHint": "扩建田学让名声、祖产与教化的成本同时显形。"
+    },
+    {
+      "eventId": "ancient_mentor_04",
+      "beat": "pressure",
+      "characterIds": [
+        "ancient.mentor_teacher"
+      ],
+      "sceneHint": "恩师受劾逼你决定师门情义能否承担朝堂风险。"
+    },
+    {
+      "eventId": "ancient_mentor_05",
+      "beat": "climax",
+      "characterIds": [
+        "ancient.mentor_student"
+      ],
+      "sceneHint": "门生求幕职时，所学与现实第一次必须作出不可逆交换。"
+    },
+    {
+      "eventId": "ancient_mentor_06",
+      "beat": "payoff",
+      "resolvesThreads": [
+        "ancient.mentor_learning"
+      ],
+      "characterIds": [
+        "ancient.mentor_student"
+      ],
+      "sceneHint": "边地少年的去留回应你此前对师承与教化的承诺。"
+    },
+    {
+      "eventId": "ancient_institution_01",
+      "beat": "setup",
+      "opensThreads": [
+        "ancient.institution_reform"
+      ],
+      "characterIds": [
+        "ancient.institution_censor"
+      ],
+      "sceneHint": "试题泄露传闻先让你看到制度裂缝与人情网的交界。"
+    },
+    {
+      "eventId": "ancient_institution_02",
+      "beat": "escalation",
+      "characterIds": [
+        "ancient.institution_censor"
+      ],
+      "sceneHint": "弹章指向旧恩人，程序开始要求你给出可被记录的立场。"
+    },
+    {
+      "eventId": "ancient_institution_03",
+      "beat": "pressure",
+      "characterIds": [
+        "ancient.institution_magistrate"
+      ],
+      "sceneHint": "清丈田亩使纸上的法度直接进入宗族土地与民户生计。"
+    },
+    {
+      "eventId": "ancient_institution_04",
+      "beat": "pressure",
+      "characterIds": [
+        "ancient.institution_magistrate"
+      ],
+      "sceneHint": "税粮改制让政绩、民怨与同僚责任无法再彼此分开。"
+    },
+    {
+      "eventId": "ancient_institution_05",
+      "beat": "climax",
+      "characterIds": [
+        "ancient.institution_censor"
+      ],
+      "sceneHint": "军府考功要求明确责任，外戚与败将使你的署名成为不可逆选择。"
+    },
+    {
+      "eventId": "ancient_institution_06",
+      "beat": "payoff",
+      "resolvesThreads": [
+        "ancient.institution_reform"
+      ],
+      "characterIds": [
+        "ancient.institution_magistrate"
+      ],
+      "sceneHint": "官员考课回收此前所有文书与政令，清名和实绩必须有一个真实结论。"
+    },
+    {
+      "eventId": "ancient_outsider_01",
+      "beat": "escalation",
+      "characterIds": [
+        "ancient.outsider_scout"
+      ],
+      "sceneHint": "边军败报与塘报不符，真相先以一处矛盾进入你的生活。"
+    },
+    {
+      "eventId": "ancient_outsider_02",
+      "beat": "setup",
+      "opensThreads": [
+        "ancient.outsider_truth"
+      ],
+      "characterIds": [
+        "ancient.outsider_scholar"
+      ],
+      "sceneHint": "禁书并不直接给出答案，而是改变你看待旧秩序的方式。"
+    },
+    {
+      "eventId": "ancient_outsider_03",
+      "beat": "pressure",
+      "characterIds": [
+        "ancient.outsider_scout"
+      ],
+      "sceneHint": "流民谈判使朝令、军令与具体人的生路正面冲突。"
+    },
+    {
+      "eventId": "ancient_outsider_04",
+      "beat": "pressure",
+      "characterIds": [
+        "ancient.outsider_scholar"
+      ],
+      "sceneHint": "旧朝遗孤的线索把边地真相牵回你的家族旧债。"
+    },
+    {
+      "eventId": "ancient_outsider_05",
+      "beat": "climax",
+      "characterIds": [
+        "ancient.outsider_scout"
+      ],
+      "sceneHint": "军械走私证据让你必须决定真相交给谁、以谁为代价。"
+    },
+    {
+      "eventId": "ancient_outsider_06",
+      "beat": "payoff",
+      "resolvesThreads": [
+        "ancient.outsider_truth"
+      ],
+      "characterIds": [
+        "ancient.outsider_scholar"
+      ],
+      "sceneHint": "密册换命回收此前的败报、禁书与旧债，真相必须被公开、埋没或带走。"
+    },
+    {
+      "eventId": "ancient_guardian_07",
+      "beat": "pressure",
+      "characterIds": [
+        "ancient.guardian_clerk"
+      ],
+      "sceneHint": "赈粮损耗牵出上司与书吏，追查必须先确认谁会为账目付出代价。"
+    },
+    {
+      "eventId": "ancient_guardian_08",
+      "beat": "escalation",
+      "characterIds": [
+        "ancient.guardian_clerk"
+      ],
+      "sceneHint": "失窃的药箱把封锁线外的一家人重新带到你面前，善意有了更具体的去处。"
+    },
+    {
+      "eventId": "ancient_guardian_09",
+      "beat": "climax",
+      "characterIds": [
+        "ancient.guardian_elder",
+        "ancient.guardian_clerk"
+      ],
+      "sceneHint": "钦使核灾要求你在地方豪强与死伤实数之间署名，灾年真相不能再被拖延。"
+    },
+    {
+      "eventId": "ancient_guardian_10",
+      "beat": "payoff",
+      "resolvesThreads": [
+        "ancient.guardian_relief"
+      ],
+      "characterIds": [
+        "ancient.guardian_clerk"
+      ],
+      "sceneHint": "春汛后的证词回收粮案与名册，让此前选择真正决定谁被看见。"
+    },
+    {
+      "eventId": "ancient_ambition_07",
+      "beat": "escalation",
+      "characterIds": [
+        "ancient.ambition_peer"
+      ],
+      "sceneHint": "泄露的策论把捷径送到手边，也让功名的来处第一次可以被追问。"
+    },
+    {
+      "eventId": "ancient_ambition_08",
+      "beat": "pressure",
+      "characterIds": [
+        "ancient.ambition_peer"
+      ],
+      "sceneHint": "旧部的抚恤请求把军功、亲情与虚报的代价并置。"
+    },
+    {
+      "eventId": "ancient_ambition_09",
+      "beat": "climax",
+      "characterIds": [
+        "ancient.ambition_patron"
+      ],
+      "sceneHint": "文书箱里的手迹令朝局清算与个人污点再无回避余地。"
+    },
+    {
+      "eventId": "ancient_ambition_10",
+      "beat": "payoff",
+      "resolvesThreads": [
+        "ancient.ambition_name"
+      ],
+      "characterIds": [
+        "ancient.ambition_peer"
+      ],
+      "sceneHint": "新君问起旧案，功业的来处终须由你亲口解释。"
+    },
+    {
+      "eventId": "ancient_broker_07",
+      "beat": "escalation",
+      "characterIds": [
+        "ancient.broker_merchant"
+      ],
+      "sceneHint": "漕运断绝与盐引条件让资源周转第一次威胁到你自己的信誉。"
+    },
+    {
+      "eventId": "ancient_broker_08",
+      "beat": "pressure",
+      "characterIds": [
+        "ancient.broker_envoy"
+      ],
+      "sceneHint": "旧友的清白系在账册上，你必须衡量友谊是否也能被交易。"
+    },
+    {
+      "eventId": "ancient_broker_09",
+      "beat": "climax",
+      "characterIds": [
+        "ancient.broker_envoy",
+        "ancient.broker_merchant"
+      ],
+      "sceneHint": "两府同索过桥税，含糊周旋终于会变成明确站队。"
+    },
+    {
+      "eventId": "ancient_broker_10",
+      "beat": "payoff",
+      "resolvesThreads": [
+        "ancient.broker_ledger"
+      ],
+      "characterIds": [
+        "ancient.broker_merchant"
+      ],
+      "sceneHint": "河工落成时，旧账证人归来；账本到底保住谁必须有结论。"
+    },
+    {
+      "eventId": "ancient_mentor_07",
+      "beat": "escalation",
+      "characterIds": [
+        "ancient.mentor_teacher"
+      ],
+      "sceneHint": "查禁藏书让书院必须先决定保住文字还是保住读书的人。"
+    },
+    {
+      "eventId": "ancient_mentor_08",
+      "beat": "pressure",
+      "characterIds": [
+        "ancient.mentor_student"
+      ],
+      "sceneHint": "门生在任上的过失迫使你的教导接受百姓与同僚的审视。"
+    },
+    {
+      "eventId": "ancient_mentor_09",
+      "beat": "climax",
+      "characterIds": [
+        "ancient.mentor_teacher",
+        "ancient.mentor_student"
+      ],
+      "sceneHint": "被篡改的讲义成为罪证，师门声名与事实都等你作证。"
+    },
+    {
+      "eventId": "ancient_mentor_10",
+      "beat": "payoff",
+      "resolvesThreads": [
+        "ancient.mentor_learning"
+      ],
+      "characterIds": [
+        "ancient.mentor_student"
+      ],
+      "sceneHint": "多年后的判牍回到书院，曾经的传承终于要在现实里兑现。"
+    },
+    {
+      "eventId": "ancient_institution_07",
+      "beat": "escalation",
+      "characterIds": [
+        "ancient.institution_censor"
+      ],
+      "sceneHint": "调走的卷宗只剩小吏口供，程序的空白开始要求你承担判断。"
+    },
+    {
+      "eventId": "ancient_institution_08",
+      "beat": "pressure",
+      "characterIds": [
+        "ancient.institution_magistrate"
+      ],
+      "sceneHint": "清丈引发械斗，宗族与法度同时要求你落笔。"
+    },
+    {
+      "eventId": "ancient_institution_09",
+      "beat": "climax",
+      "characterIds": [
+        "ancient.institution_censor"
+      ],
+      "sceneHint": "废税法的风声让先前受累的人无处申诉，改制的责任来到正面。"
+    },
+    {
+      "eventId": "ancient_institution_10",
+      "beat": "payoff",
+      "resolvesThreads": [
+        "ancient.institution_reform"
+      ],
+      "characterIds": [
+        "ancient.institution_magistrate"
+      ],
+      "sceneHint": "考课实录摊在眼前，删去一笔便能改写一段政绩与伤痕。"
+    },
+    {
+      "eventId": "ancient_outsider_07",
+      "beat": "escalation",
+      "characterIds": [
+        "ancient.outsider_scout"
+      ],
+      "sceneHint": "失踪村落的名单把边地消息变成与你相识之人的命运。"
+    },
+    {
+      "eventId": "ancient_outsider_08",
+      "beat": "pressure",
+      "characterIds": [
+        "ancient.outsider_scholar"
+      ],
+      "sceneHint": "禁书缺页可能藏在军府，求证真相需要先踏入权力的库房。"
+    },
+    {
+      "eventId": "ancient_outsider_09",
+      "beat": "climax",
+      "characterIds": [
+        "ancient.outsider_scout"
+      ],
+      "sceneHint": "渡口对峙使密令与真相互相抵触，任何传递方式都将付出代价。"
+    },
+    {
+      "eventId": "ancient_outsider_10",
+      "beat": "payoff",
+      "resolvesThreads": [
+        "ancient.outsider_truth"
+      ],
+      "characterIds": [
+        "ancient.outsider_scholar"
+      ],
+      "sceneHint": "密册原主索要公开真相的交换，边地旧债终于有了去处。"
+    }
   ],
   "endingBlueprints": [
-    { "id": "ancient.guardian.good", "worldId": "ancient", "directionId": "ancient.guardian", "polarity": "good", "title": "安民留名", "premise": "你把责任落实到人，最终让秩序留下可被继承的温度。", "finalConflict": "在最后一次清册与追责中保全应当被看见的人。", "payoffFocus": "回应赈济、遗属或旧案中的承诺。", "epilogueFocus": "以清名、民生与后人接续收束。", "statWeights": { "charisma": 0.3, "family": 0.28, "physique": 0.16, "intelligence": 0.14, "fortune": 0.12 }, "requiredThreadIds": ["ancient.guardian_relief"], "favorableFlags": ["ancient.relief_duty", "ancient.border_relief"], "adverseFlags": ["ancient.clan_obligation"] },
-    { "id": "ancient.guardian.normal", "worldId": "ancient", "directionId": "ancient.guardian", "polarity": "normal", "title": "灯火未熄", "premise": "你没能让每个人都免于代价，却守住了名册里最重要的几笔。", "finalConflict": "在追责与赈务的余波中决定还能留下什么。", "payoffFocus": "回应曾经答应照看的名字。", "epilogueFocus": "以有限的安稳、被记住的善意与未尽的责任收束。", "statWeights": { "charisma": 0.3, "family": 0.28, "physique": 0.16, "intelligence": 0.14, "fortune": 0.12 }, "requiredThreadIds": ["ancient.guardian_relief"] },
-    { "id": "ancient.guardian.bad", "worldId": "ancient", "directionId": "ancient.guardian", "polarity": "bad", "title": "独担其责", "premise": "你未能同时保住所有人，责任和旧规最终把代价落在自己与家门。", "finalConflict": "在问责中决定替谁承担最后的罪名。", "payoffFocus": "回应未竟的赈务与遗属名册。", "epilogueFocus": "以失守、牺牲与仍被记住的一点善意收束。", "statWeights": { "charisma": 0.3, "family": 0.28, "physique": 0.16, "intelligence": 0.14, "fortune": 0.12 }, "requiredThreadIds": ["ancient.guardian_relief"] },
-    { "id": "ancient.ambition.good", "worldId": "ancient", "directionId": "ancient.ambition", "polarity": "good", "title": "功业自明", "premise": "你取得位置，却没有把功名完全交给污点与派系。", "finalConflict": "在朝局清算前证明功业的来处。", "payoffFocus": "回应伪功、暗账或密信。", "epilogueFocus": "以权柄、克制与被后人争论的名声收束。", "statWeights": { "intelligence": 0.3, "charisma": 0.25, "fortune": 0.2, "physique": 0.15, "family": 0.1 }, "requiredThreadIds": ["ancient.ambition_name"], "favorableFlags": ["ancient.border_merit"], "adverseFlags": ["ancient.false_merit"] },
-    { "id": "ancient.ambition.normal", "worldId": "ancient", "directionId": "ancient.ambition", "polarity": "normal", "title": "功名有痕", "premise": "你保住了位置，也承认有些污点无法洗净。", "finalConflict": "在保全仕途与交代旧账之间留下可承受的答案。", "payoffFocus": "回应功名来处的疑问。", "epilogueFocus": "以有限的权柄、谨慎的沉默与一段可辨的功业收束。", "statWeights": { "intelligence": 0.3, "charisma": 0.25, "fortune": 0.2, "physique": 0.15, "family": 0.1 }, "requiredThreadIds": ["ancient.ambition_name"] },
-    { "id": "ancient.ambition.bad", "worldId": "ancient", "directionId": "ancient.ambition", "polarity": "bad", "title": "功名反噬", "premise": "你攀上的位置最终要求偿还旧账，名节与靠山一同松动。", "finalConflict": "在保住仕途和承认真相之间作最后选择。", "payoffFocus": "让旧日污点成为真实证词。", "epilogueFocus": "以失势、清算或被迫远离朝局收束。", "statWeights": { "intelligence": 0.3, "charisma": 0.25, "fortune": 0.2, "physique": 0.15, "family": 0.1 }, "requiredThreadIds": ["ancient.ambition_name"] },
-    { "id": "ancient.broker.good", "worldId": "ancient", "directionId": "ancient.broker", "polarity": "good", "title": "信誉成业", "premise": "你以人情为桥，却没有让自己成为任何一方的账外筹码。", "finalConflict": "用旧账决定商路与家门应归向何处。", "payoffFocus": "回应密信、账本与河滩利益。", "epilogueFocus": "以商路、信义和可传承的家业收束。", "statWeights": { "family": 0.3, "charisma": 0.25, "fortune": 0.24, "intelligence": 0.14, "physique": 0.07 }, "requiredThreadIds": ["ancient.broker_ledger"], "favorableFlags": ["ancient.trade_alliance"], "adverseFlags": ["ancient.old_ledger"] },
-    { "id": "ancient.broker.normal", "worldId": "ancient", "directionId": "ancient.broker", "polarity": "normal", "title": "守成有余", "premise": "你没有赢下所有交易，却为家门留下了可以继续周转的余地。", "finalConflict": "在旧账清算后决定谁该得到最后的信任。", "payoffFocus": "回应账本与亲族之间的承诺。", "epilogueFocus": "以守住的商路、谨慎的人情与并不完满的家业收束。", "statWeights": { "family": 0.3, "charisma": 0.25, "fortune": 0.24, "intelligence": 0.14, "physique": 0.07 }, "requiredThreadIds": ["ancient.broker_ledger"] },
-    { "id": "ancient.broker.bad", "worldId": "ancient", "directionId": "ancient.broker", "polarity": "bad", "title": "账外之人", "premise": "两边都曾需要你，最终却都让你承担账本之外的代价。", "finalConflict": "在交出账本和保住亲族之间作最后交换。", "payoffFocus": "让旧账兑现其真正主人。", "epilogueFocus": "以信誉崩塌、家业离散或退居一隅收束。", "statWeights": { "family": 0.3, "charisma": 0.25, "fortune": 0.24, "intelligence": 0.14, "physique": 0.07 }, "requiredThreadIds": ["ancient.broker_ledger"] },
-    { "id": "ancient.mentor.good", "worldId": "ancient", "directionId": "ancient.mentor", "polarity": "good", "title": "薪火相传", "premise": "你让学问进入现实，也留下能继续承担的人。", "finalConflict": "在师门危局里决定门生应继承何种道路。", "payoffFocus": "回应恩师、门生或边地少年的去留。", "epilogueFocus": "以书院、门生和后世声名收束。", "statWeights": { "intelligence": 0.35, "charisma": 0.24, "family": 0.16, "physique": 0.14, "fortune": 0.11 }, "requiredThreadIds": ["ancient.mentor_learning"], "favorableFlags": ["ancient.disciples", "ancient.local_school"], "adverseFlags": ["ancient.teacher_censure"] },
-    { "id": "ancient.mentor.normal", "worldId": "ancient", "directionId": "ancient.mentor", "polarity": "normal", "title": "书火犹存", "premise": "师门未能全然如愿，但仍有人带着你教过的字与判断继续前行。", "finalConflict": "在离散之前把最该留下的话交给后来者。", "payoffFocus": "回应一段师承与门生的去向。", "epilogueFocus": "以未熄的书火、有限的传承与个人清议收束。", "statWeights": { "intelligence": 0.35, "charisma": 0.24, "family": 0.16, "physique": 0.14, "fortune": 0.11 }, "requiredThreadIds": ["ancient.mentor_learning"] },
-    { "id": "ancient.mentor.bad", "worldId": "ancient", "directionId": "ancient.mentor", "polarity": "bad", "title": "学脉中断", "premise": "你未能让所学承担现实，师门与门生都被时代各自带走。", "finalConflict": "在保全自身清议与替门生担责之间作最后决定。", "payoffFocus": "回应一段未能兑现的师承。", "epilogueFocus": "以书院沉寂、门生离散或私藏的文字收束。", "statWeights": { "intelligence": 0.35, "charisma": 0.24, "family": 0.16, "physique": 0.14, "fortune": 0.11 }, "requiredThreadIds": ["ancient.mentor_learning"] },
-    { "id": "ancient.institution.good", "worldId": "ancient", "directionId": "ancient.institution", "polarity": "good", "title": "法度留痕", "premise": "你让制度不只停在文书上，也承担了署名之后的后果。", "finalConflict": "在最后一次考课与追责中保住改制的核心。", "payoffFocus": "回应试题、弹章、田亩或税粮改革。", "epilogueFocus": "以政令、清名与具体人的改变收束。", "statWeights": { "intelligence": 0.3, "charisma": 0.25, "family": 0.16, "fortune": 0.15, "physique": 0.14 }, "requiredThreadIds": ["ancient.institution_reform"], "favorableFlags": ["ancient.tax_reform", "ancient.official_record"], "adverseFlags": ["ancient.exam_inquiry"] },
-    { "id": "ancient.institution.normal", "worldId": "ancient", "directionId": "ancient.institution", "polarity": "normal", "title": "法度余温", "premise": "改制没有扭转全部旧规，但你留下的几条记录仍让后来的人有据可循。", "finalConflict": "在考课结案前决定哪些条文值得留下。", "payoffFocus": "回应署名之后应承担的责任。", "epilogueFocus": "以可用而不完美的制度、有限的清名与具体余波收束。", "statWeights": { "intelligence": 0.3, "charisma": 0.25, "family": 0.16, "fortune": 0.15, "physique": 0.14 }, "requiredThreadIds": ["ancient.institution_reform"] },
-    { "id": "ancient.institution.bad", "worldId": "ancient", "directionId": "ancient.institution", "polarity": "bad", "title": "法度伤人", "premise": "程序留下了记录，却没能留下你想保护的人与改制。", "finalConflict": "在承担署名和撕毁旧情之间作最后取舍。", "payoffFocus": "让此前的文书和责任回到你面前。", "epilogueFocus": "以替罪、罢官或被遗忘的政令收束。", "statWeights": { "intelligence": 0.3, "charisma": 0.25, "family": 0.16, "fortune": 0.15, "physique": 0.14 }, "requiredThreadIds": ["ancient.institution_reform"] },
-    { "id": "ancient.outsider.good", "worldId": "ancient", "directionId": "ancient.outsider", "polarity": "good", "title": "边地新路", "premise": "你把被遮蔽的真相转化为一条能让人活下去的新路。", "finalConflict": "决定密册和边地真相应交给谁、如何留下。", "payoffFocus": "回应败报、禁书、流民与军械证据。", "epilogueFocus": "以边地秩序、远行或新盟约收束。", "statWeights": { "fortune": 0.3, "physique": 0.25, "intelligence": 0.2, "charisma": 0.15, "family": 0.1 }, "requiredThreadIds": ["ancient.outsider_truth"], "favorableFlags": ["ancient.border_truth", "ancient.refugee_parley"], "adverseFlags": ["ancient.old_dynasty_debt"] },
-    { "id": "ancient.outsider.normal", "worldId": "ancient", "directionId": "ancient.outsider", "polarity": "normal", "title": "边关远望", "premise": "真相没有立刻改变边地，但你替一部分人争得了离开的路与说话的资格。", "finalConflict": "在密册归处与同伴安危之间留下最后的选择。", "payoffFocus": "回应被遮蔽的名字与证据。", "epilogueFocus": "以远行、尚未安定的边关与持续流传的真相收束。", "statWeights": { "fortune": 0.3, "physique": 0.25, "intelligence": 0.2, "charisma": 0.15, "family": 0.1 }, "requiredThreadIds": ["ancient.outsider_truth"] },
-    { "id": "ancient.outsider.bad", "worldId": "ancient", "directionId": "ancient.outsider", "polarity": "bad", "title": "逐出正途", "premise": "真相没有足够的容身之处，你带着它与旧债一起被推向边缘。", "finalConflict": "在公开密册和保住同伴性命之间作最后选择。", "payoffFocus": "让边地真相以代价兑现。", "epilogueFocus": "以流亡、永戍或无名者的记忆收束。", "statWeights": { "fortune": 0.3, "physique": 0.25, "intelligence": 0.2, "charisma": 0.15, "family": 0.1 }, "requiredThreadIds": ["ancient.outsider_truth"] }
-  ]
+    {
+      "id": "ancient.world.good",
+      "worldId": "ancient",
+      "polarity": "good",
+      "title": "一世有成",
+      "premise": "你把能力与选择变成了真实的生路、秩序或影响，也承担了它的代价。",
+      "finalConflict": "回望本局已经完成的人生经历，确认人物最终保住、改变或失去了什么。",
+      "payoffFocus": "以本局事实、人物关系、能力、选择和代价为依据，不逐项复述账本。",
+      "epilogueFocus": "交代人物一生最重要的成就怎样留下。",
+      "statWeights": {
+        "intelligence": 0.22,
+        "charisma": 0.2,
+        "family": 0.18,
+        "fortune": 0.18,
+        "physique": 0.22
+      },
+      "requiredThreadIds": []
+    },
+    {
+      "id": "ancient.world.normal",
+      "worldId": "ancient",
+      "polarity": "normal",
+      "title": "此生有归",
+      "premise": "你未能尽取天下与人心，却在所得所失之间留下了可信的归处。",
+      "finalConflict": "回望本局已经完成的人生经历，确认人物最终保住、改变或失去了什么。",
+      "payoffFocus": "以本局事实、人物关系、能力、选择和代价为依据，不逐项复述账本。",
+      "epilogueFocus": "交代有限成果、重要关系与仍在延续的生活。",
+      "statWeights": {
+        "intelligence": 0.22,
+        "charisma": 0.2,
+        "family": 0.18,
+        "fortune": 0.18,
+        "physique": 0.22
+      },
+      "requiredThreadIds": []
+    },
+    {
+      "id": "ancient.world.bad",
+      "worldId": "ancient",
+      "polarity": "bad",
+      "title": "山河余痕",
+      "premise": "局势、误判或代价夺走了重要之物，但你走过的路并未因此变成空白。",
+      "finalConflict": "回望本局已经完成的人生经历，确认人物最终保住、改变或失去了什么。",
+      "payoffFocus": "以本局事实、人物关系、能力、选择和代价为依据，不逐项复述账本。",
+      "epilogueFocus": "交代失去、未竟之事与人物留下的痕迹。",
+      "statWeights": {
+        "intelligence": 0.22,
+        "charisma": 0.2,
+        "family": 0.18,
+        "fortune": 0.18,
+        "physique": 0.22
+      },
+      "requiredThreadIds": []
+    }
+  ],
+  "worldCore": {
+    "identity": "礼法、门第、官僚、军功与民间生计并存的古代王朝。身份影响入口，却不预先决定一个人的终点。",
+    "laws": [
+      "文书、名分与见证决定许多权利能否成立",
+      "钱粮、人手、路途与消息决定权力能否落地",
+      "公开体面与私人承诺经常彼此冲突"
+    ],
+    "powerStructure": "皇权与朝廷居于名义中心，地方官署、宗族士绅、军镇、商帮和民间网络各自掌握不同资源。",
+    "everydayLife": "读书、务农、营生、行旅、婚亲、服役、任事与交游构成人生；宏大局势必须通过这些生活入口抵达人物。",
+    "tone": "克制而有张力，既能写日常人情，也能写权力翻覆、战火与改朝换代的震动。"
+  },
+  "socialForces": [
+    {
+      "id": "ancient.court",
+      "label": "朝廷与皇室",
+      "summary": "掌握名分、任命与国家资源，但内部并非单一意志。",
+      "methods": [
+        "诏令",
+        "任免",
+        "结盟",
+        "清算"
+      ]
+    },
+    {
+      "id": "ancient.local",
+      "label": "地方官署",
+      "summary": "直接处理税役、治安、赈济与诉讼，是制度与生活相撞之处。",
+      "methods": [
+        "受理",
+        "稽核",
+        "征发",
+        "调停"
+      ]
+    },
+    {
+      "id": "ancient.clans",
+      "label": "宗族与门第",
+      "summary": "以亲缘、声望、土地与婚盟维持长期影响，也制造难以割舍的责任。",
+      "methods": [
+        "庇护",
+        "举荐",
+        "联姻",
+        "排斥"
+      ]
+    },
+    {
+      "id": "ancient.markets",
+      "label": "商路与民间网络",
+      "summary": "通过钱粮、信用、消息和运输连接不同阶层，能托起人物也能放大危机。",
+      "methods": [
+        "交易",
+        "借贷",
+        "传信",
+        "断供"
+      ]
+    },
+    {
+      "id": "ancient.military",
+      "label": "军镇与边地力量",
+      "summary": "掌握武力、军功与边境经验，既保护秩序也可能重塑秩序。",
+      "methods": [
+        "征募",
+        "守御",
+        "进军",
+        "拥立"
+      ]
+    },
+    {
+      "id": "ancient.outlands",
+      "label": "江湖与边缘人群",
+      "summary": "游侠、流民、方士、戏班与异乡人活在正式秩序的缝隙里。",
+      "methods": [
+        "迁徙",
+        "藏匿",
+        "互助",
+        "越界"
+      ]
+    }
+  ],
+  "narrativePalette": {
+    "sceneModes": [
+      "家宅日常",
+      "乡里公断",
+      "官署任事",
+      "宴集交锋",
+      "市井经营",
+      "旅途见闻",
+      "军事行动",
+      "朝局翻覆"
+    ],
+    "conflictSources": [
+      "名分与真相",
+      "生计与法度",
+      "忠诚与自保",
+      "中央与地方",
+      "亲缘与责任",
+      "野心与代价",
+      "战争与求生"
+    ],
+    "actionVocabulary": [
+      "查访",
+      "交涉",
+      "经营",
+      "结盟",
+      "上书",
+      "设局",
+      "救援",
+      "调度",
+      "守城",
+      "出征",
+      "夺权",
+      "退隐"
+    ],
+    "scalePossibilities": [
+      "一户之内",
+      "一县一州",
+      "组织与门第",
+      "朝堂与天下",
+      "战场与改朝换代"
+    ]
+  },
+  "storyPatterns": [
+    {
+      "id": "ancient.household",
+      "label": "家门兴衰",
+      "summary": "从亲缘、婚姻、产业与名分写一个人的责任和上升。"
+    },
+    {
+      "id": "ancient.governance",
+      "label": "案件与治理",
+      "summary": "让一件现实纷争显出制度、利益与人的去处，不限定新案或旧案。"
+    },
+    {
+      "id": "ancient.power",
+      "label": "权力角逐",
+      "summary": "人物在组织、朝局或地方力量之间争取决定权，也承担胜负后的秩序。"
+    },
+    {
+      "id": "ancient.frontier",
+      "label": "战乱与守护",
+      "summary": "战争可由任意方向和规模进入生活，人物按实际身份参与。"
+    },
+    {
+      "id": "ancient.trade",
+      "label": "商路经营",
+      "summary": "以资源、信用、运输和消息推动人物跨越地域与阶层。"
+    },
+    {
+      "id": "ancient.wandering",
+      "label": "江湖远行",
+      "summary": "由迁徙、技艺、异乡与边缘身份打开正式秩序之外的道路。"
+    }
+  ],
+  "mainlineFacts": []
 }

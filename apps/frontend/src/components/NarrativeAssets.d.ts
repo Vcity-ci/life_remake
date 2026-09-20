@@ -1,5 +1,5 @@
 import type { PublicNarrativeAssets } from "@reroll/shared";
-export declare function NarrativeAssetsPanel({ assets }: {
+export declare function NarrativeAssetsArchive({ assets }: {
     assets?: PublicNarrativeAssets;
 }): import("react/jsx-runtime").JSX.Element;
 export declare function NarrativeAssetChanges({ current, previous }: {

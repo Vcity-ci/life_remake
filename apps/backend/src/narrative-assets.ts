@@ -100,9 +100,10 @@ export function narrativeAssetUpdatesSchema(assets?: NarrativeAssets): Record<st
           description: "已有本领用 ref 引用，只提交变化的字段，名称和获得来历沿用档案；新本领另需 name、description、source、mastery、status。",
           properties: {
             ref: { type: "string", enum: ["new", ...(assets?.abilities ?? []).map((entry) => entry.id)] },
-            name: string, description: { type: "string", description: "能力的具体用途及适用情境。" },
+            name: { type: "string", minLength: 1, maxLength: 24, description: "稳定、简短的本领名称，也是档案标题。" },
+            description: { type: "string", description: "能力的具体用途、适用情境与实际局限；历次运用形成的能力变化写在这里。" },
             source: { type: "string", description: "已经发生的获得来历；更新时保留原来历。" },
-            mastery: { type: "string", description: "这项本领当前的掌握程度、能做的事情与实际局限。" },
+            mastery: { type: "string", minLength: 1, maxLength: 24, description: "当前掌握状态的简短称谓，不写经历、来历或整段能力说明。" },
             status: { type: "string", enum: ["available", "unavailable"] }
           }
         }

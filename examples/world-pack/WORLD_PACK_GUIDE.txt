@@ -1,54 +1,66 @@
-世界包 JSON 模板说明（v9）
-==========================
+基础世界包 JSON 说明（v10）
+============================
 
 本目录包含：
 - world.example.json：前端世界名称、简介、年龄段和基础时间线配置。
-- story.example.json：模型使用的世界规律、社会力量、叙事素材和数值规则。
+- story.example.json：基础世界的规律、力量、文风、数值、生存与结局规则。
+- world-cards.example.json：可拆分维护、按任务与情景召回的世界资料卡目录。
+- story-pack.example.json：玩家可选择的一条 IF 人生路线。
+- STORY_PACK_GUIDE.txt：IF 子世界包的字段与安装说明。
 
-一、使用方法
+一、权责边界
 ------------
-1. 为新世界选择唯一 ID，例如 my_world。
-2. 将 world.example.json 复制到 data/worlds/<世界ID>.json。
-3. 将 story.example.json 复制到 data/narratives/<世界ID>.story.json。
-4. 把两个文件内的 my_world 全部替换为同一个 ID，保持合法 JSON。
-5. 新源码副本或首次初始化会从 data/worlds 载入世界列表；现有内容存储暂未提供热导入界面。
+基础世界包只回答“这是怎样的世界”：
+- worldCore：恒定世界规律、权力结构、日常生活与整体气质。
+- socialForces：可供所有路线使用的阵营、阶层、组织和社会力量。
+- narrativePalette：题材常见的场景、冲突、行动方式与叙事尺度。
+- worldCards：按任务、关键词、节拍和局内对象召回的局部设定。
+- progression / survival：属性成长、节拍准入与生存规则。
+- endingBlueprints：世界级好、普通、坏三档结算方式。
 
-二、世界包的职责
-----------------
-世界包说明“这里是什么世界、哪些力量会行动、能够发生什么类型的故事”，不规定玩家必走的剧情。
+基础世界包不再包含 storyPatterns、mainlineSkeleton 或 mainlineActs。它不列出、绑定或限制子世界包数量，也不承担某一条人生路线的起承转合。
 
-- storyBible：世界总览。不要写成唯一剧情梗概。
-- worldCore：每轮稳定可用的 identity、laws、powerStructure、everydayLife、tone。
-- socialForces：能够产生人物、资源和压力的真实社会力量。它们不是路线，也不要求模型每轮选择。
-- narrativePalette：题材常见的场景形态、冲突来源、行动词汇和故事尺度。
-- storyPatterns：可选的故事形态。模型可选 0—2 项作为当轮素材，不能把它们当作互斥路线。
-- styleRules：正向文风与表现材料，不写“不要做什么”的防御性清单。
-- worldCards：像世界卡一样按任务、节拍、关键词、事实、人物、地点或本领动态召回的局部知识。
+IF 子世界包回答“玩家要在这个世界里完成怎样的一生”：它提供路线承诺、入口视角、三幕目标和路线结局方向。人物、地点、本领、具体事件与抉择仍由每局人设和已发生事实动态生成。
 
-开局身世生成后，引擎会用玩家人设、最终天赋、身世和 worldCore 生成本局 session premise。mainlineActs 的三个条目只是既有五节拍与结局完整性的结构槽位；具体问题、压力和阶段结果由本局 premise 生成，不应在世界包里写死。
-
-三、数值与结局
+二、安装新世界
 --------------
-- progression.gates：世界级 opening / escalation / pressure / climax 能力门槛，不再按故事路线分别配置。
-- growthFocuses、statTiers、statTierPresentation、survival：沿用现有属性成长、展示和生存规则。
-- endingBlueprints：恰好提供 good、normal、bad 三项世界级结局蓝图。属性、名望、抉择轨迹和历史代价决定品质；不再为每条故事形态复制结局。
-- completion：仍可要求三段完整经历、抉择后果、高潮、回收和无活动场景。
+1. 为新世界选择唯一 ID，例如 my_world。
+2. 复制 world.example.json 到 data/worlds/<worldId>.json。
+3. 复制 story.example.json 到 data/narratives/<worldId>.story.json。
+4. 在 data/narratives/world-cards/<worldId>/ 下放置一份或多份世界卡目录 JSON；可从 world-cards.example.json 开始。
+5. 将文件内的 my_world 替换为相同 ID，并保持合法 JSON。
+6. 至少创作一个 IF 子世界包并放入 data/narratives/story-packs/ 下任意子目录；否则该世界会显示为暂不可游玩。
+
+子世界包由目录自动发现，以自身 worldId 归属基础世界。基础世界不会保存子世界包清单，因此新增、修改或删除一条路线时，不需要同步修改基础世界、其他路线或引擎代码。
+
+三、基础世界字段
+----------------
+- version：当前为 10。
+- storyBible：世界总览，不写某一条路线的剧情梗概。
+- styleRules：正向说明该题材怎样表达，不堆叠防御性禁令。
+- worldCore：少量稳定常驻设定。
+- socialForces：必须使用稳定 ID；子世界包可通过 focusForceIds 引用。
+- worldCards：运行时合并后的通用知识卡。创作源放在 data/narratives/world-cards/<worldId>/**/*.json；基础 story 文件保留空数组即可。
+- opening：早年叙事配置。
+- progression：普通年份节奏、能力门槛、属性档位、成长方向和完成条件。
+- survival：不同年龄阶段的体魄风险与濒死规则。
+- endingBlueprints：恰好包含 good、normal、bad 三种世界级蓝图。
 
 四、worldCards
 --------------
+- 每份目录文件使用 { worldId, cards } 结构；同一世界的多个文件会按路径顺序合并，ID 必须全局唯一。
+- 卡片正文属于基础世界，不属于某条 IF 线。子世界包只能通过 worldCardRefs 引用卡片 ID，不能复制卡片正文。
 - activation.tasks：background、planning、horizon、rendering、dynamic、decision。
-- activation 还可使用 keys、secondaryKeys、selectiveLogic、scanDepth、actIds、beats、factionIds、factIds、characterIds、locationIds、abilityIds。
-- v9 不使用 routeIds 激活世界卡。
+- activation 可使用 keys、secondaryKeys、selectiveLogic、scanDepth、actIds、beats、factionIds、factIds、characterIds、locationIds、abilityIds。
 - placement：world、scenario、example、author_note。
-- priority 决定预算内优先级；inclusionGroup 同组择一；stickyTurns、cooldownTurns 和 relatedCardIds 控制生命周期。
-- style_example 直接写可供模仿的短正文，不写创作说明，不放入必须复刻的专名或事实。
+- priority 决定预算内优先级；inclusionGroup 同组择一；stickyTurns、cooldownTurns 与 relatedCardIds 管理生命周期。
+- 基础世界卡不引用某条 IF 路线的 actId。路线可在自身或某一幕的 worldCardRefs 中声明召回偏好；偏好不是剧情准入门槛。
 
 五、检查清单
 ------------
-1. story JSON 的 version 为 9，两个文件 ID 与文件名一致。
-2. worldCore、socialForces、narrativePalette、storyPatterns 均非空。
-3. mainlineActs 保留三个结构槽位，但不预写固定案件、职业或升级路线。
-4. progression 使用 gates，不使用 routes。
-5. endingBlueprints 只有 good、normal、bad 三项。
-6. worldCards 引用的 actIds、factionIds 与 relatedCardIds 均存在，卡片 ID 不含竖线。
-7. 玩家正文不显示工具调用、内部 ID、幕名或状态标签。
+1. story JSON 的 version 为 10，worldId 与基础世界 ID 一致。
+2. worldCore、socialForces、narrativePalette、progression、survival 与三档 endingBlueprints 完整。
+3. 不在基础世界包中重新加入路线目录、三幕主线或具体事件表。
+4. 每个可游玩世界至少存在一份校验通过的 IF 子世界包。
+5. 子世界包引用的 social force 必须存在于基础世界。
+6. 玩家正文不显示工具调用、内部 ID、幕名或状态标签。

@@ -42,6 +42,7 @@ export const gameEnvSchema = z.object({
 export const startRunSchema = z.object({
   clientId: z.string().min(1),
   worldId: z.string().min(1),
+  storyPackId: z.string().min(1).max(160),
   difficultyId: z.string().min(1),
   personaPrompt: z.string().min(4).max(500),
   talentPointTotal: z.number().int().min(1).max(200),

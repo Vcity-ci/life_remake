@@ -48,6 +48,7 @@ const stableProvider: NarrativeContextProvider = {
       ...(plan.seedHints ?? []).flatMap((hint) => fragment({ id: narrativeContentId("seed-hint", hint), layer: "stable", section: "seedHints", sourceType: "seed-hint", priority: 35, content: hint })),
       ...(plan.origin ? fragment({ id: "stable:origin", layer: "stable", section: "origin", sourceType: "origin", priority: 85, content: plan.origin }) : []),
       ...(plan.worldCoreContext ? fragment({ id: "stable:world-core", layer: "stable", section: "world", sourceType: "world-core", priority: 98, content: plan.worldCoreContext, required: true }) : []),
+      ...(plan.storyBible ? fragment({ id: "stable:world-snapshot", layer: "stable", section: "world", sourceType: "world-snapshot", priority: 96, content: plan.storyBible, required: true }) : []),
       ...(plan.narrativePaletteContext ? fragment({
         id: `stable:narrative-palette:${plan.task === "background" ? "background" : "scene"}`,
         layer: "stable",

@@ -1,5 +1,16 @@
 # 配置指南（v1.0.0）
 
+## 当前内容配置：2026-09-21 +08:00
+
+| 内容 | 当前来源与作用 |
+| --- | --- |
+| 基础世界 | `data/worlds/<worldId>.json` 与 `data/narratives/<worldId>.story.json`；v10 只定义共同世界观、社会力量、世界卡、数值、生存和结局。 |
+| IF 子世界包 | `data/narratives/story-packs/**/*.json`；加载器递归发现并依据文件内 `worldId` 归属，不在基础世界登记清单。 |
+| 可玩状态 | 至少存在一个校验通过的子世界包才可开始新局；当前古代、现代、奇幻均已迁移并各有六条路线。 |
+| 存档 | 开局快照完整子世界包；编辑磁盘路线只影响新局，不迁移进行中的存档。 |
+
+模板分别见[基础世界包说明](../examples/world-pack/WORLD_PACK_GUIDE.txt)与[IF 子世界包说明](../examples/world-pack/STORY_PACK_GUIDE.txt)。下方 2026-09-10 表格保留为历史记录，其中版本号、逐路线配置和进程缓存描述不再代表当前 v10 入口。
+
 ## 当前配置入口对齐：2026-09-10 00:26 +08:00
 
 本节补充当前动态叙事配置。后文保留的 `gameplayTuning.milestone/death/ascension` 等字段说明属于已有配置结构，不能据此认定当前主线按随机年龄里程碑或到龄飞升运行。
@@ -167,3 +178,12 @@
 - `fame` 新增：`mainlineActBonus`、`stableChoiceBonus`、`balancedChoiceBonus`、`riskyBreakthroughBonus`、`riskySetbackPenalty`。它们分别影响世界幕完成、三类抉择后果的名望增减；`maxStatValue` 仍是属性名望基数的归一上限。
 - `ending.narrativeNormalScore` 与 `ending.narrativeGoodScore` 控制主线完成后的普通/好结局分界，`narrativeFameWeight` 为名望在结局分数中的有限修正。约束为 `narrativeGoodScore >= narrativeNormalScore`。
 - 每个叙事世界包的每条 `routeArcs.directionId` 必须配置 `good`、`normal`、`bad` 三张结局蓝图，并与原有五步素材完整性校验一起在内容加载期检查。
+## 配置增量：2026-09-22 +08:00 — 独立 World Card 目录
+
+| 内容 | 当前入口 |
+| --- | --- |
+| 基础世界稳定规则与时代切片 | `data/narratives/<worldId>.story.json` |
+| 世界资料卡 | `data/narratives/world-cards/<worldId>/**/*.json`，每份文件为 `{ worldId, cards }` |
+| IF 子世界包 | `data/narratives/story-packs/**/*.json`，通过 `worldCardRefs` 引用所属世界卡 |
+
+世界卡目录会递归发现并合并；卡片 ID 在同一世界内必须唯一。子世界包不能内嵌卡片正文，包级和幕级引用都必须指向已加载卡片。引用只影响召回优先级，不限制其他世界资料参与故事。示例见 `examples/world-pack/world-cards.example.json`。

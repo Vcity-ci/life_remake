@@ -1,0 +1,86 @@
+{
+  "version": 1,
+  "id": "ancient.mystic-order",
+  "revision": "1.0.0",
+  "worldId": "ancient",
+  "name": "方术教门",
+  "tagline": "以医术、经典、仪式与灾异解释影响人心，也承受信仰进入权力后的代价。",
+  "summary": "取材自 Material 的宗教与方术线：从寺观、山村、医家或方术传承建立能力和声望，进入民间与宫廷，最终面对知识、信仰和政治权力的冲突。",
+  "routePromise": "人物将凭借医术、仪式、经典、天文或方术获得社会影响，并决定这份精神与知识权力如何面对朝廷、教门和众生。",
+  "entryLens": "依据人设适配巫祝、僧道、医者、隐士、占卜世家、罪臣之后或偶然得到传承等入口。",
+  "originSeeds": [
+    "人物较早接触经典、医药、仪式、天象或难以解释的经验",
+    "一位师长、病患、灾异或家族秘密构成最初牵引"
+  ],
+  "stakeAxes": [
+    "传承可信度",
+    "民间声望",
+    "教门关系",
+    "权贵信任",
+    "知识与神秘的边界",
+    "个人名节"
+  ],
+  "focusForceIds": [
+    "ancient.faith",
+    "ancient.court",
+    "ancient.palace",
+    "ancient.commoners",
+    "ancient.outlands"
+  ],
+  "acts": [
+    {
+      "id": "ancient.mystic-order.inheritance",
+      "label": "受法",
+      "objective": "取得可以实际帮助他人或解释世界的传承与能力。",
+      "dramaticQuestion": "人物如何证明所学不只是虚名或幻术？",
+      "pressureDirection": "疾病、灾异、师门规矩和民间期待检验最初所学。",
+      "payoffMeaning": "人物建立真实能力、声望与传承身份。",
+      "worldCardRefs": [
+        "ancient.snapshot.popular_faith",
+        "ancient.snapshot.local_society"
+      ]
+    },
+    {
+      "id": "ancient.mystic-order.influence",
+      "label": "入世",
+      "objective": "让医术、仪式、预言或经典进入更广阔的社会与权力关系。",
+      "dramaticQuestion": "人物能否影响权力而不被权力塑造成工具？",
+      "pressureDirection": "宫廷需求、教派竞争、真假灾异和公共责任彼此冲突。",
+      "payoffMeaning": "人物成为能够影响民间或朝局的精神与知识权威。",
+      "worldCardRefs": [
+        "ancient.snapshot.local_society",
+        "ancient.snapshot.central_figures"
+      ]
+    },
+    {
+      "id": "ancient.mystic-order.legacy",
+      "label": "定教",
+      "objective": "决定传承、教门、著述与政治关系的最终去向。",
+      "dramaticQuestion": "人物留下的是可验证的学问、信仰秩序，还是被权力吞没的神话？",
+      "pressureDirection": "君主猜忌、教派分裂、预言成败和继承问题集中出现。",
+      "payoffMeaning": "传承是否延续、人物如何被后世理解得到回答。",
+      "worldCardRefs": [
+        "ancient.snapshot.central_figures",
+        "ancient.snapshot.popular_faith"
+      ]
+    }
+  ],
+  "endingDirections": {
+    "good": [
+      "功成身退或建立可延续的医术、学问与教门传承",
+      "精神影响帮助真实的人而非只服务权力"
+    ],
+    "normal": [
+      "保住部分著述、弟子或民间声望，但退出宫廷与大规模权力竞争"
+    ],
+    "bad": [
+      "因妖言、失验或政治清算而身死教禁",
+      "长生、预言或教门失控，人物晚年被自身传承反噬"
+    ]
+  },
+  "worldCardRefs": [
+    "ancient.snapshot.popular_faith",
+    "ancient.snapshot.local_society",
+    "ancient.snapshot.central_figures"
+  ]
+}

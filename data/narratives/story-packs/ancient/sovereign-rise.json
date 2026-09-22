@@ -1,0 +1,86 @@
+{
+  "version": 1,
+  "id": "ancient.sovereign-rise",
+  "revision": "1.0.0",
+  "worldId": "ancient",
+  "name": "布衣逐鹿",
+  "tagline": "从乱世低处聚集人心与力量，最终回答天下归于何人。",
+  "summary": "取材自 Material 的皇权线：由生存与离散进入群雄并起的时代，逐步取得组织、军政和民心基础，最终面对建立新秩序的责任。",
+  "routePromise": "人物将从自身处境进入天下乱局，逐步获得追随者、资源与决定权，并以实际选择回答自己要建立怎样的秩序。",
+  "entryLens": "依据玩家人设与身世选择进入乱局的身份和契机；贫民、军户、商贩、地方豪强或皇族旁支都可以形成不同入口。",
+  "originSeeds": [
+    "赋税、灾荒、战争或权力更替影响了家庭处境",
+    "人物较早看见秩序如何决定普通人的生存与去留"
+  ],
+  "stakeAxes": [
+    "民心",
+    "军权",
+    "旧部忠诚",
+    "士族支持",
+    "继承安排"
+  ],
+  "focusForceIds": [
+    "ancient.court",
+    "ancient.military",
+    "ancient.local",
+    "ancient.commoners",
+    "ancient.clans"
+  ],
+  "acts": [
+    {
+      "id": "ancient.sovereign-rise.foundation",
+      "label": "立足",
+      "objective": "取得第一批真实支持、资源或组织基础。",
+      "dramaticQuestion": "人物能否从被动求生转为主动影响局势？",
+      "pressureDirection": "旧秩序、地方力量与生存代价迫使人物表明立场。",
+      "payoffMeaning": "人物成为一股能够持续行动的力量。",
+      "worldCardRefs": [
+        "ancient.snapshot.central_figures",
+        "ancient.snapshot.jingyuan_reform"
+      ]
+    },
+    {
+      "id": "ancient.sovereign-rise.contention",
+      "label": "逐鹿",
+      "objective": "进入军政角逐并形成自己的统治道路。",
+      "dramaticQuestion": "人物依靠什么获得并维持更大的支持？",
+      "pressureDirection": "效忠、自立、民心与武力逐渐发生冲突。",
+      "payoffMeaning": "人物已经足以左右一方局势。",
+      "worldCardRefs": [
+        "ancient.snapshot.jingyuan_reform",
+        "ancient.snapshot.frontier_pressure"
+      ]
+    },
+    {
+      "id": "ancient.sovereign-rise.order",
+      "label": "定鼎",
+      "objective": "争夺或重塑最高秩序，并承担胜利后的治理问题。",
+      "dramaticQuestion": "人物建立的秩序是否值得延续？",
+      "pressureDirection": "功臣、士族、外患和继承问题集中出现。",
+      "payoffMeaning": "天下归属与人物留下的制度得到不可逆的回答。",
+      "worldCardRefs": [
+        "ancient.snapshot.frontier_pressure",
+        "ancient.snapshot.local_society"
+      ]
+    }
+  ],
+  "endingDirections": {
+    "good": [
+      "平定局势并建立可延续的新秩序",
+      "使百姓、追随者与继承安排获得相对稳定的归处"
+    ],
+    "normal": [
+      "取得一方基业或改变旧秩序，但成果仍受现实与代价限制"
+    ],
+    "bad": [
+      "死于权力内斗或众叛亲离",
+      "建立的秩序因治理失败或继承失控而迅速崩溃"
+    ]
+  },
+  "worldCardRefs": [
+    "ancient.snapshot.central_figures",
+    "ancient.snapshot.jingyuan_reform",
+    "ancient.snapshot.frontier_pressure",
+    "ancient.snapshot.local_society"
+  ]
+}

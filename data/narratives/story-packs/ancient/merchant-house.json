@@ -1,0 +1,86 @@
+{
+  "version": 1,
+  "id": "ancient.merchant-house",
+  "revision": "1.0.0",
+  "worldId": "ancient",
+  "name": "商贾世家",
+  "tagline": "以货物、信用与远路连接天下，让财富成为家业、地位或风暴。",
+  "summary": "取材自 Material 的商贾线：从店铺、作坊、码头或商队积累第一份信用，进入行会与官商竞争，最终决定财富怎样转化为家族和社会位置。",
+  "routePromise": "人物将通过经营、信用、运输和信息建立商业网络，并面对财富与权力、家族和公共责任之间的转换。",
+  "entryLens": "依据人设适配商户、工匠、船户、盐茶从业者、翻译、没落家庭或偶然获得商机等入口。",
+  "originSeeds": [
+    "人物在店铺、作坊、码头、集市或流动商旅中认识价格与人情",
+    "家庭生计曾因市场、官府或意外变化"
+  ],
+  "stakeAxes": [
+    "资金",
+    "信用",
+    "商路",
+    "官府关系",
+    "行会竞争",
+    "家族转型"
+  ],
+  "focusForceIds": [
+    "ancient.markets",
+    "ancient.local",
+    "ancient.clans",
+    "ancient.neighbors",
+    "ancient.commoners"
+  ],
+  "acts": [
+    {
+      "id": "ancient.merchant-house.credit",
+      "label": "立信",
+      "objective": "取得第一份能够持续经营的本钱、技艺和信用关系。",
+      "dramaticQuestion": "人物凭什么让别人愿意与其做下一次生意？",
+      "pressureDirection": "家道、关卡、货损、竞争和人情债考验初始积累。",
+      "payoffMeaning": "人物拥有可延续的营生和第一条可靠网络。",
+      "worldCardRefs": [
+        "ancient.snapshot.coastal_trade",
+        "ancient.snapshot.nine_regions"
+      ]
+    },
+    {
+      "id": "ancient.merchant-house.network",
+      "label": "通衢",
+      "objective": "把经营扩展为跨地域或跨行业网络，并处理官商与行会关系。",
+      "dramaticQuestion": "商业扩张能否不以失去自主和信用为代价？",
+      "pressureDirection": "垄断、走私、征税、权贵索取和伙伴分利放大风险。",
+      "payoffMeaning": "人物成为能够调动资金、货物与消息的重要商人。",
+      "worldCardRefs": [
+        "ancient.snapshot.nine_regions",
+        "ancient.snapshot.local_society"
+      ]
+    },
+    {
+      "id": "ancient.merchant-house.legacy",
+      "label": "成业",
+      "objective": "决定财富如何转化为家族地位、公共影响或新的生活道路。",
+      "dramaticQuestion": "人物留下的是一笔财富、一个家族还是一种可持续的秩序？",
+      "pressureDirection": "官府清算、政治投资、继承和行业更替集中出现。",
+      "payoffMeaning": "商业成果及其与权力、家族的关系得到最终回答。",
+      "worldCardRefs": [
+        "ancient.snapshot.local_society",
+        "ancient.snapshot.coastal_trade"
+      ]
+    }
+  ],
+  "endingDirections": {
+    "good": [
+      "建立可持续的商业与信用网络，并让家族或伙伴获得更稳定的未来",
+      "财富转化为长期社会位置而非短暂数字"
+    ],
+    "normal": [
+      "守住主要家业或完成有限转型，但必须放弃扩张、权力或部分财富"
+    ],
+    "bad": [
+      "被官府、权贵或政治斗争吞并清算",
+      "信用崩溃、商路覆灭并拖累家族与伙伴"
+    ]
+  },
+  "worldCardRefs": [
+    "ancient.snapshot.coastal_trade",
+    "ancient.snapshot.nine_regions",
+    "ancient.snapshot.local_society"
+  ]
+}

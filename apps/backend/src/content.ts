@@ -10,6 +10,7 @@ import type {
   EventDefinition,
   ItemDefinition,
   NarrativeComponentCatalog,
+  NarrativeWorldCardDefinition,
   NarrativeWorldDefinition,
   StoryDirectionDefinition,
   WorldConfig
@@ -95,6 +96,7 @@ const factionPath = path.resolve(dataRoot, "settings", "factions", "factions.jso
 const factionEventPath = path.resolve(dataRoot, "events", "faction-events.json");
 const eventMetadataPath = path.resolve(dataRoot, "events", "event-metadata.json");
 const narrativeWorldDir = path.resolve(dataRoot, "narratives");
+const narrativeWorldCardDir = path.resolve(narrativeWorldDir, "world-cards");
 const itemPath = path.resolve(dataRoot, "items.json");
 let ensureStorageSeedPromise: Promise<void> | null = null;
 let contentBundleCache: ContentBundle | null = null;
@@ -115,6 +117,39 @@ let itemDefinitionsLoadPromise: Promise<ItemDefinition[]> | null = null;
 async function readJsonFile<T>(targetPath: string): Promise<T> {
   const raw = await fs.readFile(targetPath, "utf8");
   return JSON.parse(raw) as T;
+}
+
+interface NarrativeWorldCardCatalog {
+  worldId: string;
+  cards: NarrativeWorldCardDefinition[];
+}
+
+async function nestedJsonFiles(root: string): Promise<string[]> {
+  try {
+    const entries = await fs.readdir(root, { withFileTypes: true });
+    const files = await Promise.all(entries.map(async (entry) => {
+      const target = path.resolve(root, entry.name);
+      if (entry.isDirectory()) return nestedJsonFiles(target);
+      return entry.isFile() && entry.name.endsWith(".json") ? [target] : [];
+    }));
+    return files.flat().sort();
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return [];
+    throw error;
+  }
+}
+
+async function loadNarrativeWorldCardCatalog(worldId: string): Promise<NarrativeWorldCardDefinition[]> {
+  const files = await nestedJsonFiles(path.resolve(narrativeWorldCardDir, worldId));
+  const cards: NarrativeWorldCardDefinition[] = [];
+  for (const file of files) {
+    const catalog = await readJsonFile<NarrativeWorldCardCatalog>(file);
+    if (catalog.worldId !== worldId || !Array.isArray(catalog.cards)) {
+      throw new Error(`${worldId}_world_card_catalog_invalid:${path.basename(file)}`);
+    }
+    cards.push(...catalog.cards);
+  }
+  return cards;
 }
 
 async function loadSeedWorlds(): Promise<WorldConfig[]> {
@@ -444,13 +479,13 @@ export function validateNarrativeWorldFactContract(
         !core.tone?.trim() || !core.laws?.length || !(definition.socialForces?.length) ||
         !palette?.sceneModes?.length || !palette.conflictSources?.length ||
         !palette.actionVocabulary?.length || !palette.scalePossibilities?.length ||
-        !(definition.storyPatterns?.length)) {
+        (definition.version === 9 && !(definition.storyPatterns?.length))) {
       throw new Error(`${definition.worldId}_narrative_world_core_invalid`);
     }
   }
   const cardIds = new Set<string>();
   const cardKinds = new Set([
-    "world_rule", "setting", "geography", "institution", "culture", "faction", "location", "ability",
+    "world_rule", "setting", "geography", "institution", "culture", "faction", "character", "location", "ability",
     "social_role", "practice", "conflict", "consequence", "motif", "style_example"
   ]);
   const cardTasks = new Set(["background", "planning", "horizon", "rendering", "dynamic", "decision"]);
@@ -510,11 +545,18 @@ export async function loadNarrativeWorldDefinition(worldId: string): Promise<Nar
 
   const load = Promise.all([
     readJsonFile<NarrativeWorldDefinition>(path.resolve(narrativeWorldDir, `${worldId}.story.json`)),
-    readJsonFile<NarrativeComponentCatalog>(path.resolve(narrativeWorldDir, `${worldId}.components.json`)).catch(() => null)
+    readJsonFile<NarrativeComponentCatalog>(path.resolve(narrativeWorldDir, `${worldId}.components.json`)).catch(() => null),
+    loadNarrativeWorldCardCatalog(worldId)
   ])
-    .then(([definition, catalog]) => {
-      const merged = (definition.version === 1 || definition.version === 2 || definition.version === 3 || definition.version === 4 || definition.version === 5 || definition.version === 6 || definition.version === 7 || definition.version === 8 || definition.version === 9) && definition.worldId === worldId
-        ? mergeNarrativeComponentCatalog(definition, definition.version >= 8 ? null : catalog, worldId)
+    .then(([definition, catalog, authoredWorldCards]) => {
+      if (definition.version >= 10 && (definition.worldCards?.length ?? 0) > 0) {
+        throw new Error(`${worldId}_inline_world_cards_not_supported`);
+      }
+      const definitionWithCards = authoredWorldCards.length
+        ? { ...definition, worldCards: [...(definition.worldCards ?? []), ...authoredWorldCards] }
+        : definition;
+      const merged = (definitionWithCards.version === 1 || definitionWithCards.version === 2 || definitionWithCards.version === 3 || definitionWithCards.version === 4 || definitionWithCards.version === 5 || definitionWithCards.version === 6 || definitionWithCards.version === 7 || definitionWithCards.version === 8 || definitionWithCards.version === 9 || definitionWithCards.version === 10) && definitionWithCards.worldId === worldId
+        ? mergeNarrativeComponentCatalog(definitionWithCards, definitionWithCards.version >= 8 ? null : catalog, worldId)
         : null;
       const valid = merged ? validateNarrativeWorldFactContract(merged) : null;
       narrativeWorldCache.set(worldId, valid);

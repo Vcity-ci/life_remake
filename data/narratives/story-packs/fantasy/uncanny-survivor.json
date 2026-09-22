@@ -1,0 +1,86 @@
+{
+  "version": 1,
+  "id": "fantasy.uncanny-survivor",
+  "revision": "1.0.0",
+  "worldId": "fantasy",
+  "name": "禁区行者",
+  "tagline": "辨认诡异的规律，在污染与未知中带回活人的答案。",
+  "summary": "以诡异生态、禁区探索和规律发现为主线；危险不是等待击杀的怪物，人物需要观察、试验、付出代价并决定知识如何使用。",
+  "routePromise": "人物将因一次异象或失踪事件接触禁区规律，逐渐成为能够进入未知并带人归来的行者，最终面对一片足以改变世界秩序的诡异源头。",
+  "entryLens": "依据人设适配灾民、采药人、调查者、宗门弟子、异族向导、受污染者、被古老存在寄生或主动追寻失落之地等入口。",
+  "originSeeds": [
+    "一场异象在人物生活中留下可重复观察的痕迹",
+    "某位亲近之人、聚落或身体变化与未知区域产生关联"
+  ],
+  "stakeAxes": [
+    "禁忌规律",
+    "污染程度",
+    "同伴安全",
+    "探索知识",
+    "资源与利益",
+    "未知存在的意图"
+  ],
+  "focusForceIds": [
+    "fantasy.uncanny",
+    "fantasy.wanderers",
+    "fantasy.sects",
+    "fantasy.species",
+    "fantasy.celestial"
+  ],
+  "acts": [
+    {
+      "id": "fantasy.uncanny-survivor.trace",
+      "label": "识迹",
+      "objective": "从一次具体异象中辨认可验证的规律，并带回第一项真实成果。",
+      "dramaticQuestion": "人物看到的是灾害、生命，还是某种正在回应的存在？",
+      "pressureDirection": "错误判断会直接伤害身体、同伴或故乡，知识必须由行动验证。",
+      "payoffMeaning": "人物拥有了进入未知的本领、伙伴和必须继续追索的问题。",
+      "worldCardRefs": [
+        "fantasy.snapshot.two_layers",
+        "fantasy.snapshot.three_rifts"
+      ]
+    },
+    {
+      "id": "fantasy.uncanny-survivor.expedition",
+      "label": "涉险",
+      "objective": "组织或加入一次深入禁区的行动，揭示污染与外部势力的真实联系。",
+      "dramaticQuestion": "危险知识应该被封锁、分享还是利用？",
+      "pressureDirection": "宗门、商旅、异族与个人愿望争夺探索成果，同伴关系经受消耗。",
+      "payoffMeaning": "人物改变了人们进入禁区的方式，也承担了知识扩散的后果。",
+      "worldCardRefs": [
+        "fantasy.snapshot.three_rifts",
+        "fantasy.snapshot.cultivation_cost"
+      ]
+    },
+    {
+      "id": "fantasy.uncanny-survivor.source",
+      "label": "临渊",
+      "objective": "面对足以扩散到现实世界的诡异源头，并决定它与众生的关系。",
+      "dramaticQuestion": "未知必须被毁灭，还是可以理解并重新划定边界？",
+      "pressureDirection": "污染、牺牲、力量诱惑和不同文明的生存需要集中冲突。",
+      "payoffMeaning": "禁区的未来、人物自身变化与世界对未知的认知得到不可逆答案。",
+      "worldCardRefs": [
+        "fantasy.snapshot.cultivation_cost",
+        "fantasy.snapshot.two_layers"
+      ]
+    }
+  ],
+  "endingDirections": {
+    "good": [
+      "建立可靠的禁区认知与防护方式并保全重要同伴",
+      "理解未知而不被其吞没，让成果能够被后来者验证"
+    ],
+    "normal": [
+      "封住或控制主要危险，但污染、秘密或牺牲仍长期存在"
+    ],
+    "bad": [
+      "因误判规律或争夺成果使诡异扩散",
+      "人物成为禁区的一部分，或以同伴和故乡换取虚假的掌控"
+    ]
+  },
+  "worldCardRefs": [
+    "fantasy.snapshot.two_layers",
+    "fantasy.snapshot.three_rifts",
+    "fantasy.snapshot.cultivation_cost"
+  ]
+}

@@ -1,0 +1,85 @@
+{
+  "version": 1,
+  "id": "ancient.court-minister",
+  "revision": "1.0.0",
+  "worldId": "ancient",
+  "name": "庙堂权臣",
+  "tagline": "从入仕门径走入权力核心，决定辅政、摄政还是取而代之。",
+  "summary": "取材自 Material 的权臣线：依靠教育、官职、人脉和制度能力进入朝局，经营门生故吏与军政资源，最终直面皇权反制和家族去向。",
+  "routePromise": "人物将在官僚与宫廷秩序中积累职位、关系和实际控制力，并决定自己如何使用足以改变朝局的权力。",
+  "entryLens": "依据人设适配家学、科举、军功、幕府、婚盟或宫廷关系等入仕入口，不固定家庭阶层。",
+  "originSeeds": [
+    "家庭曾因缺少政治依靠而承受现实压力",
+    "人物较早接触教育、礼法或权力关系"
+  ],
+  "stakeAxes": [
+    "朝堂派系",
+    "君主信任",
+    "军政资源",
+    "财政",
+    "家族与门生"
+  ],
+  "focusForceIds": [
+    "ancient.court",
+    "ancient.officials",
+    "ancient.palace",
+    "ancient.clans",
+    "ancient.military"
+  ],
+  "acts": [
+    {
+      "id": "ancient.court-minister.entry",
+      "label": "入局",
+      "objective": "取得可以持续参与政务的职位、名望或政治关系。",
+      "dramaticQuestion": "人物凭借什么被权力中心看见？",
+      "pressureDirection": "才干、门第、靠山与原则之间开始产生交换。",
+      "payoffMeaning": "人物获得真实的仕途入口和第一批政治资产。",
+      "worldCardRefs": [
+        "ancient.snapshot.jingyuan_reform",
+        "ancient.snapshot.central_figures"
+      ]
+    },
+    {
+      "id": "ancient.court-minister.network",
+      "label": "执衡",
+      "objective": "经营门生故吏、财政军政或宫廷联盟，成为不可忽略的权力中心。",
+      "dramaticQuestion": "人物能否控制资源而不先被关系反噬？",
+      "pressureDirection": "派系斗争和制度责任迫使人物公开站队。",
+      "payoffMeaning": "人物能够影响重要任命、政策或军政决定。",
+      "worldCardRefs": [
+        "ancient.snapshot.central_figures",
+        "ancient.snapshot.local_society"
+      ]
+    },
+    {
+      "id": "ancient.court-minister.sovereignty",
+      "label": "临极",
+      "objective": "面对皇权反制、摄政、受禅或退让，决定最高权力的归属。",
+      "dramaticQuestion": "人物要成为秩序的辅弼、主人还是牺牲品？",
+      "pressureDirection": "君臣猜忌、家族野心和天下稳定集中冲突。",
+      "payoffMeaning": "人物与皇权的最终关系及其制度后果得到回答。",
+      "worldCardRefs": [
+        "ancient.snapshot.local_society",
+        "ancient.snapshot.jingyuan_reform"
+      ]
+    }
+  ],
+  "endingDirections": {
+    "good": [
+      "长期辅政或完成权力交接，使家族与制度获得稳定延续",
+      "个人能力与政治成果相互印证"
+    ],
+    "normal": [
+      "保住部分权力与政治成果，但必须退让、交权或承担家族代价"
+    ],
+    "bad": [
+      "在皇权、宫廷和军镇联合清算中覆灭",
+      "即使取得最高权力，也因背叛与失序失去成果"
+    ]
+  },
+  "worldCardRefs": [
+    "ancient.snapshot.jingyuan_reform",
+    "ancient.snapshot.central_figures",
+    "ancient.snapshot.local_society"
+  ]
+}

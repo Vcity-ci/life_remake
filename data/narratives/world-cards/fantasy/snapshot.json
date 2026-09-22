@@ -1,0 +1,80 @@
+{
+  "worldId": "fantasy",
+  "cards": [
+    {
+      "id": "fantasy.snapshot.two_layers",
+      "title": "表里两层的苍溟界",
+      "kind": "world_rule",
+      "content": "凡人所见的表世界与诡域构成的里世界重叠。修士、灵药、仪式或污染能让人窥见里层；里世界并非幻觉，它会改变距离、记忆、时间和身份，并在表世界留下可追查的物质后果。",
+      "priority": 78,
+      "placement": "world",
+      "activation": { "keys": ["诡域", "里世界", "污染", "异象", "记忆", "身份"], "scanDepth": 5, "tasks": ["background", "planning", "horizon", "rendering", "dynamic", "decision"] },
+      "stickyTurns": 1,
+      "cooldownTurns": 2
+    },
+    {
+      "id": "fantasy.snapshot.cultivation_cost",
+      "title": "灵气、诡种与境界代价",
+      "kind": "ability",
+      "content": "第一次引气会把灵中阴影一同纳入体内，形成诡种。功法、身体、媒介和环境决定力量怎样显现；境界越高，神通越大，诡种、心魔、因果债和被强者注视的风险也越大。",
+      "priority": 74,
+      "placement": "scenario",
+      "activation": { "keys": ["修行", "引气", "诡种", "境界", "功法", "神通", "突破"], "scanDepth": 5, "tasks": ["background", "planning", "horizon", "rendering", "dynamic", "decision"] },
+      "stickyTurns": 1,
+      "cooldownTurns": 2
+    },
+    {
+      "id": "fantasy.snapshot.old_pact",
+      "title": "松动的天枢之盟",
+      "kind": "institution",
+      "content": "大燮朝廷与三大道统曾约定共同镇诡、彼此不吞并。如今镇诡司主张以诡制诡，正统宗门担心朝廷失控，城邦和修行家族则在夹缝中保存人口与资源；旧盟仍有效，却已无法自动解决新的裂隙。",
+      "priority": 70,
+      "placement": "scenario",
+      "activation": { "keys": ["朝廷", "镇诡司", "宗门", "道统", "天枢", "盟约"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] },
+      "relatedCardIds": ["fantasy.snapshot.central_figures"],
+      "cooldownTurns": 3
+    },
+    {
+      "id": "fantasy.snapshot.central_figures",
+      "title": "承光年间的执局者",
+      "kind": "character",
+      "content": "承光帝李稷以龙气与诡种维持王朝；大司命赵无咎相信危险力量只能由更严密的危险力量约束；三大道统的掌教各守一处裂隙，也各自保护传承。更古老的诡帝残影仍在里世界活动，但并非每段人生都必须与这些人物直接相遇。",
+      "priority": 61,
+      "placement": "scenario",
+      "activation": { "keys": ["人皇", "承光帝", "大司命", "掌教", "诡帝", "赵无咎"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "decision"] },
+      "inclusionGroup": "fantasy.central-figures",
+      "cooldownTurns": 4
+    },
+    {
+      "id": "fantasy.snapshot.three_rifts",
+      "title": "三处扩张中的裂隙",
+      "kind": "geography",
+      "content": "东洲沧溟海眼吞吐异潮，西洲尸岭把矿脉和遗骸变成诡域，北洲冥荒令边地与异族同时迁徙。三处裂隙有不同生态、利益和解决方式；它们可以成为远方压力、旅途目的或人物生活被改变的原因。",
+      "priority": 66,
+      "placement": "scenario",
+      "activation": { "keys": ["海眼", "尸岭", "冥荒", "裂隙", "东洲", "西洲", "北洲"], "scanDepth": 5, "tasks": ["background", "planning", "horizon", "rendering", "dynamic", "decision"] },
+      "cooldownTurns": 3
+    },
+    {
+      "id": "fantasy.snapshot.other_civilizations",
+      "title": "异族也拥有文明",
+      "kind": "faction",
+      "content": "海族、荒民、山中异种和海外仙山并非统一的敌人。它们有语言、贸易、亲族、禁忌与内部冲突，可能袭击、结盟、通婚、雇佣或共同抵抗诡域；敌对必须来自具体利益和历史，而非仅因外形不同。",
+      "priority": 64,
+      "placement": "scenario",
+      "activation": { "keys": ["异族", "海族", "荒民", "海外", "族群", "通婚", "结盟"], "scanDepth": 5, "tasks": ["background", "planning", "horizon", "rendering", "dynamic", "decision"] },
+      "stickyTurns": 1,
+      "cooldownTurns": 3
+    },
+    {
+      "id": "fantasy.snapshot.mortal_life",
+      "title": "修行世界的凡俗日常",
+      "kind": "culture",
+      "content": "灵田、药铺、道馆、商队、巡夜、祭仪和城防让修行进入普通生活。低阶能力首先用来治病、护路、辨污染、修器或争取生计；宏大异变也应通过粮价、失踪、迁徙、师徒和家庭被人感知。",
+      "priority": 60,
+      "placement": "scenario",
+      "activation": { "keys": ["凡人", "药铺", "道馆", "商队", "巡夜", "灵田", "生计"], "scanDepth": 4, "tasks": ["background", "planning", "horizon", "rendering", "dynamic"] },
+      "cooldownTurns": 2
+    }
+  ]
+}

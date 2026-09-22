@@ -1,5 +1,21 @@
 # 技术文档（v1.0.1）
 
+## 增量机制：2026-09-21 +08:00 — 场景协议与三世界内容
+
+- `NARRATIVE_SCENE_PARTICIPANT_LIMIT=6` 同时驱动结算工具 Schema 与本地解析器。参与者只同步需要身份、关系或连续性的具名人物；它不改变 Planner 的三项焦点、五名详细人物召回或十二名活跃档案上限。
+- `generateDynamicNarrativeScene` 在收到 settlement 后先解析人物、属性和 `actHandoff`，通过后才发起 prose render。非法结构不会再消耗第二次请求，也不会发布半成品。
+- 现代与奇幻基础世界升级为 v10；与古代相同，它们只在 `resolveNarrativeExperience` 组合所选 IF 快照后才产生运行时三幕。
+- 本领档案继续复用 `name / mastery / description / source / status`，其中 `name` 是稳定标题、`mastery` 是短状态，未引入重复身份字段。
+
+## 增量机制：2026-09-21 +08:00 — IF 子世界包运行时组合
+
+- 共享协议新增 `NarrativeStoryPackDefinition / Snapshot / PublicStoryPackOption / ResolvedNarrativeExperience`。`StartRunRequest` 接收 `storyPackId`；生产 HTTP schema 将其设为必填。
+- `story-packs.ts` 每次 bootstrap 或开局按目录发现内容，不使用代码枚举。加载器校验三幕数量、命名空间、基础社会力量引用、路线卡 act/faction 引用及卡片 ID 冲突。
+- `narrative-experience.ts` 是唯一组合点：把子包三幕投影为旧五拍状态机所需的三个 act，将路线 promise 投影为 mainline skeleton，并把路线结局方向叠加到基础世界三档蓝图。引擎没有新增第二套节拍实现。
+- `index.ts` 的开局链负责存在性、世界归属与生产入口校验；低层 `createRun` 只接收已解析上下文。步进链从 `storyPackSnapshot` 重组体验，不重新读取同名磁盘路线。
+- Planner 工具不再暴露 `patternIds`。所选 IF 线是整局前提；Planner 仍可按需选择社会力量、关注对象、回合类型与时间请求。Renderer、Observer、Commit 与 Curator 接口保持原职责。
+- bootstrap 同时返回世界的 `storyPackCount / playable` 与公开路线列表。前端按世界筛选路线；没有有效路线的世界不能开始新局。
+
 ## 增量机制：2026-09-20 03:44 +08:00 — v9 世界协议与节拍观察
 
 - `packages/shared/src/index.ts` 新增 `NarrativeWorldCore`、`NarrativeSocialForceDefinition`、`NarrativePalette`、`NarrativeStoryPatternDefinition`、`NarrativeSessionPremise` 与 `NarrativeBeatObservation`。v9 的 `routeArcs`、`narrativeFactions` 和逐路线门槛均非必需；内置包只使用世界级 `progression.gates`。
@@ -263,3 +279,10 @@ docs/
 4. `progression.survival` 是世界包拥有的死亡风险配置：年龄阶段风险线、连续低体魄宽限期、年度风险上限、恢复成功率与家境对体魄的年度支持均由其定义。当前古代包从 4 岁开始检测，连续 3 年低于风险线后才可触发危机。
 5. `resolveSurvivalCrisis` 使用固定种子结算三种选择。成功率按所用属性的低/中/高档取世界包配置，高档直接成功；成功把体魄恢复到风险线加 `restoreBuffer`，失败才把 `outcome` 设为 `dead`，并交由既有结局渲染补足死因文本。
 6. `BackgroundCard.narrative` 以 `bias`、`affinities`、`riskTone` 承载叙事游戏性。`summarizeTalentHooks` 只汇总本局已选的最多三张卡；身世生成、推进和结局均复用这一紧凑上下文，初始属性修正仍由卡片 `modifiers` 在创建运行态时结算。
+## 增量机制：2026-09-22 +08:00 — World Card 目录与焦点召回
+
+- `content.ts` 会读取 `data/narratives/<worldId>.story.json`，同时递归读取 `data/narratives/world-cards/<worldId>/**/*.json`。目录文件格式为 `{ worldId, cards }`；合并后继续由 `validateNarrativeWorldFactContract` 检查卡片 ID、类型、激活条件、作用域、关联与生命周期。
+- `NarrativeStoryPackDefinition` 使用 `worldCardRefs` 和 `acts[].worldCardRefs` 引用世界拥有的卡片。`story-packs.ts` 在加载时验证引用存在，`resolveNarrativeExperience` 不再合并路线私有正文。
+- 世界卡选择器将路线引用作为相关度加分，将 Planner 已选择的卡片作为精确焦点；任务、幕／拍、阵营与运行状态作用域仍然有效。召回上限仍为 6 张、1400 字符，避免因为资料库扩充而回到全量注入。
+- `NarrativeTurnFocusReference.kind` 增加 `world_card`。候选来自规划上下文实际选中的世界卡，不把整份世界卡目录塞入工具 Schema。
+- Context Provider 将 `storyBible` 作为 `stable:world-snapshot`，将 `worldCoreContext` 作为 `stable:world-core`，二者职责不同且均由预算编排器统一去重、排序和追踪。

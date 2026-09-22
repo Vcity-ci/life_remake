@@ -1,4 +1,4 @@
-import type { AdminConfigPayload, ContentBundle, CreateSaveResponse, CurrentGameRunResponse, GameEnvConfigResponse, ModelUsageSummary, PublicBackgroundCard, PublicDifficultyOption, PublicRunState, PublicTimelineEntry, TurnRecord, PublicWorldOption, ProviderConfig, ProviderLimits, SaveSlotSummary, StepAction, StartAllocationConfig, StartRunResponse, StepRunResponse, Stats, SurvivalChoice } from "@reroll/shared";
+import type { AdminConfigPayload, ContentBundle, CreateSaveResponse, CurrentGameRunResponse, GameEnvConfigResponse, ModelUsageSummary, PublicBackgroundCard, PublicDifficultyOption, PublicRunState, PublicStoryPackOption, PublicTimelineEntry, TurnRecord, PublicWorldOption, ProviderConfig, ProviderLimits, SaveSlotSummary, StepAction, StartAllocationConfig, StartRunResponse, StepRunResponse, Stats, SurvivalChoice } from "@reroll/shared";
 export declare class ApiError extends Error {
     status: number;
     code?: string;
@@ -7,6 +7,7 @@ export declare class ApiError extends Error {
 export interface BootstrapPayload {
     deployMode: "local" | "cloud";
     worlds: PublicWorldOption[];
+    storyPacks: PublicStoryPackOption[];
     difficulties: PublicDifficultyOption[];
     cardPool: PublicBackgroundCard[];
     talentPointTotal: number;
@@ -75,6 +76,7 @@ export declare function fetchModelUsage(): Promise<ModelUsageSummary>;
 export declare function startRun(payload: {
     clientId: string;
     worldId: string;
+    storyPackId: string;
     difficultyId: string;
     personaPrompt: string;
     talentPointTotal: number;
@@ -96,6 +98,7 @@ export declare function stepRun(payload: {
 export declare function startRunStream(payload: {
     clientId: string;
     worldId: string;
+    storyPackId: string;
     difficultyId: string;
     personaPrompt: string;
     talentPointTotal: number;

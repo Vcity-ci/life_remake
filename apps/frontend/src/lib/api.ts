@@ -8,6 +8,7 @@ import type {
   PublicBackgroundCard,
   PublicDifficultyOption,
   PublicRunState,
+  PublicStoryPackOption,
   PublicTimelineEntry,
   TurnRecord,
   PublicWorldOption,
@@ -42,6 +43,7 @@ export class ApiError extends Error {
 export interface BootstrapPayload {
   deployMode: "local" | "cloud";
   worlds: PublicWorldOption[];
+  storyPacks: PublicStoryPackOption[];
   difficulties: PublicDifficultyOption[];
   cardPool: PublicBackgroundCard[];
   talentPointTotal: number;
@@ -163,6 +165,7 @@ export async function fetchModelUsage(): Promise<ModelUsageSummary> {
 export async function startRun(payload: {
   clientId: string;
   worldId: string;
+  storyPackId: string;
   difficultyId: string;
   personaPrompt: string;
   talentPointTotal: number;
@@ -251,6 +254,7 @@ export async function startRunStream(
   payload: {
     clientId: string;
     worldId: string;
+    storyPackId: string;
     difficultyId: string;
     personaPrompt: string;
     talentPointTotal: number;

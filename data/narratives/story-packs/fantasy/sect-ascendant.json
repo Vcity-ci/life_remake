@@ -1,0 +1,86 @@
+{
+  "version": 1,
+  "id": "fantasy.sect-ascendant",
+  "revision": "1.0.0",
+  "worldId": "fantasy",
+  "name": "宗门问道",
+  "tagline": "从入门与传承起步，在道统兴衰中走出自己的大道。",
+  "summary": "围绕宗门学习、同辈竞争、师承责任和道统危机展开；境界只是能力变化，真正主线是人物如何继承、改革或离开宗门。",
+  "routePromise": "人物将以独特身份接触一方道统，学习并实际运用本领，在宗门内外的竞争和危机中取得位置，最终决定这份传承应当如何延续。",
+  "entryLens": "依据人设适配正式收徒、杂役旁听、家族举荐、异象觉醒、带艺投门、被夺舍后求庇护或敌对身份潜入等入口。",
+  "originSeeds": [
+    "人物较早接触一项无法仅凭常识解释的力量",
+    "一位师长、同伴或宗门来客改变了原有生活"
+  ],
+  "stakeAxes": [
+    "师承",
+    "功法与本领",
+    "同门关系",
+    "宗门资源",
+    "道统规则",
+    "外敌与内争"
+  ],
+  "focusForceIds": [
+    "fantasy.sects",
+    "fantasy.cities",
+    "fantasy.wanderers",
+    "fantasy.uncanny",
+    "fantasy.celestial"
+  ],
+  "acts": [
+    {
+      "id": "fantasy.sect-ascendant.initiation",
+      "label": "入道",
+      "objective": "取得真实传承并完成第一次能够证明自身道路的修行或任务。",
+      "dramaticQuestion": "人物为何修行，又愿意接受怎样的师门约束？",
+      "pressureDirection": "资质、资源、门规与同辈竞争迫使人物形成自己的方法。",
+      "payoffMeaning": "人物成为能够独立运用本领、承担宗门事务的修行者。",
+      "worldCardRefs": [
+        "fantasy.snapshot.old_pact",
+        "fantasy.snapshot.cultivation_cost"
+      ]
+    },
+    {
+      "id": "fantasy.sect-ascendant.trial",
+      "label": "承脉",
+      "objective": "在宗门内外的重大难题中取得决定权并守住重要关系。",
+      "dramaticQuestion": "道统的延续需要忠诚、改变，还是反叛？",
+      "pressureDirection": "派系、秘境、资源与外部势力使师门承诺彼此冲突。",
+      "payoffMeaning": "人物成为一脉中不可忽略的力量，并改变了宗门走向。",
+      "worldCardRefs": [
+        "fantasy.snapshot.cultivation_cost",
+        "fantasy.snapshot.central_figures"
+      ]
+    },
+    {
+      "id": "fantasy.sect-ascendant.dao",
+      "label": "开道",
+      "objective": "面对足以动摇道统根基的危机，并给出自己的大道答案。",
+      "dramaticQuestion": "人物继承的究竟是力量、制度，还是值得继续的信念？",
+      "pressureDirection": "师门存亡、个人突破、众生代价与天道规则集中碰撞。",
+      "payoffMeaning": "人物使道统得以重生、另开一脉或在自己手中终结。",
+      "worldCardRefs": [
+        "fantasy.snapshot.central_figures",
+        "fantasy.snapshot.old_pact"
+      ]
+    }
+  ],
+  "endingDirections": {
+    "good": [
+      "保全值得延续的传承并开辟更完整的修行道路",
+      "让同门、后来者与所守之地不再只依赖个人强大"
+    ],
+    "normal": [
+      "继承或掌控一方道统，但改革、关系与个人大道只能完成一部分"
+    ],
+    "bad": [
+      "在派系、力量反噬或盲目守旧中葬送传承",
+      "登临高位却失去同门、信念与自身道路"
+    ]
+  },
+  "worldCardRefs": [
+    "fantasy.snapshot.old_pact",
+    "fantasy.snapshot.cultivation_cost",
+    "fantasy.snapshot.central_figures"
+  ]
+}

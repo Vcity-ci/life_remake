@@ -28,6 +28,7 @@ import type {
   NarrativeStatTierConfig,
   NarrativeStatTierPresentation,
   NarrativeStatTier,
+  NarrativeStoryPackSnapshot,
   NarrativeProgressGateStage,
   NarrativeThreadState,
   NarrativeWorldDefinition,
@@ -95,6 +96,7 @@ export interface NarrativePromptPlan {
   activeLoreSources?: Array<{ id: string; text: string }>;
   activeWorldCardSources?: Array<{
     id: string;
+    title?: string;
     text: string;
     placement: NonNullable<NarrativeWorldCardDefinition["placement"]>;
     activationReason: string;
@@ -259,6 +261,10 @@ function selectNarrativeWorldCardMatches(
     abilityIds?: string[];
     text?: string;
     recentTexts?: string[];
+    /** Story-pack references raise relevance without becoming eligibility gates. */
+    preferredCardIds?: string[];
+    /** A planner-selected card may be recalled without relying on another keyword hit. */
+    focusedCardIds?: string[];
   },
   maxCards = 6,
   maxCharacters = 1400,
@@ -272,6 +278,8 @@ function selectNarrativeWorldCardMatches(
   if (!cards.length) return [];
   const sequence = source.narrative.episodes.length;
   const activationById = new Map((source.narrative.worldCardActivations ?? []).map((state) => [state.cardId, state]));
+  const preferredCardIds = new Set(query.preferredCardIds ?? []);
+  const focusedCardIds = new Set(query.focusedCardIds ?? []);
   const currentLocationId = source.narrative.assets?.currentLocationId;
   const cardQuery = {
     task: query.task,
@@ -301,15 +309,17 @@ function selectNarrativeWorldCardMatches(
     }
     // Sticky continuation bypasses only keyword matching. Task, act, beat,
     // route, faction and state scopes remain authoritative.
-    const match = sticky ? scoped : worldCardMatches(card, cardQuery);
+    const focused = focusedCardIds.has(card.id);
+    const preferred = preferredCardIds.has(card.id);
+    const match = sticky || focused || preferred ? scoped : worldCardMatches(card, cardQuery);
     if (!match.matched) {
       diagnostics?.push({ id: card.id, reason: "trigger" });
       return [];
     }
     return [{
       card,
-      score: card.priority + match.specificity * 4 + match.textHits * 8 + (sticky ? 20 : 0),
-      activationReason: sticky ? "sticky" : match.textHits ? `text:${match.textHits}` : match.specificity ? `state:${match.specificity}` : "constant",
+      score: card.priority + match.specificity * 4 + match.textHits * 8 + (sticky ? 20 : 0) + (preferred ? 12 : 0) + (focused ? 40 : 0),
+      activationReason: sticky ? "sticky" : focused ? "focus" : preferred ? "story_pack" : match.textHits ? `text:${match.textHits}` : match.specificity ? `state:${match.specificity}` : "constant",
       activationKind: sticky ? "sticky" as const : "direct" as const,
       lastActivatedSequence: state?.lastActivatedSequence,
       remainingStickyTurns: sticky && state ? state.stickyUntilSequence - sequence : 0,
@@ -1862,6 +1872,13 @@ function buildTaskNarrativePlan(
   const selectedLocationIds = recall.assetSources?.filter((entry) => entry.kind === "location").map((entry) => entry.id) ?? [];
   const selectedAbilityIds = recall.assetSources?.filter((entry) => entry.kind === "ability").map((entry) => entry.id) ?? [];
   const worldCardDiagnostics: Array<{ id: string; reason: string }> = [];
+  const storyPack = (world as NarrativeWorldDefinition & { storyPack?: NarrativeStoryPackSnapshot }).storyPack;
+  const storyPackAct = storyPack?.acts.find((entry) => entry.id === act?.id);
+  const preferredWorldCardIds = Array.from(new Set([
+    ...(storyPack?.worldCardRefs ?? []),
+    ...(storyPackAct?.worldCardRefs ?? [])
+  ]));
+  const focusedWorldCardIds = (options?.focusIds ?? []).filter((id) => (world.worldCards ?? []).some((card) => card.id === id));
   const worldCardSources = selectNarrativeWorldCardMatches(source, world, {
     task,
     actId: act?.id,
@@ -1876,9 +1893,12 @@ function buildTaskNarrativePlan(
     recentTexts: [
       ...source.narrative.memoryEntries.slice(-12).map((entry) => entry.text),
       ...recentNarratives.map((entry) => entry.summary)
-    ]
+    ],
+    preferredCardIds: preferredWorldCardIds,
+    focusedCardIds: focusedWorldCardIds
   }, 6, 1400, worldCardDiagnostics).map(({ card, activationReason, activationKind, lastActivatedSequence, remainingStickyTurns, remainingCooldownTurns }) => ({
     id: card.id,
+    title: card.title,
     text: card.content,
     placement: card.placement ?? (card.kind === "style_example" ? "example" : card.kind === "world_rule" ? "world" : "scenario"),
     activationReason,
@@ -1909,9 +1929,14 @@ function buildTaskNarrativePlan(
           ? `${act?.label}的初始命题：${premiseArc.dramaticQuestion}；压力来源=${premiseArc.pressureSource}；可能结果=${premiseArc.payoffPossibility}`
           : act ? `${act.label}：${act.prompt}` : ""
       ].filter(Boolean).join("\n")
-    : task === "planning"
-      ? premiseAnchor.join("\n")
-      : task === "closure" || task === "ending"
+      : task === "planning"
+        ? premiseAnchor.join("\n")
+        : task === "origin"
+          ? [
+              world.mainlineSkeleton?.premise,
+              world.mainlineActs?.[0] ? `最初故事目标：${world.mainlineActs[0].prompt}` : ""
+            ].filter(Boolean).join("\n")
+        : task === "closure" || task === "ending"
         ? [premiseAnchor[0], world.mainlineSkeleton?.payoff].filter(Boolean).join("\n")
         : undefined;
   return {
@@ -1932,7 +1957,7 @@ function buildTaskNarrativePlan(
     // second global directory here would defeat scene-level retrieval and grow
     // both prompt and tool schemas with the lifetime of the save.
     factDirectory: [],
-    storyBible: world.worldCore?.identity ?? world.storyBible,
+    storyBible: world.storyBible,
     worldCoreContext: world.worldCore ? [
       world.worldCore.identity,
       `世界规律：${world.worldCore.laws.join("；")}`,

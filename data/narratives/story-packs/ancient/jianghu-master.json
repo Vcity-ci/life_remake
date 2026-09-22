@@ -1,0 +1,86 @@
+{
+  "version": 1,
+  "id": "ancient.jianghu-master",
+  "revision": "1.0.0",
+  "worldId": "ancient",
+  "name": "江湖宗师",
+  "tagline": "以技艺、师承和恩仇行走秩序边缘，决定力量最终归于何处。",
+  "summary": "取材自 Material 的江湖线：从街头、山林、武馆、镖局或戏班获得技艺和师承，在恩仇与组织纷争中建立声望，最终面对开宗、招安、辅佐或归隐。",
+  "routePromise": "人物将在正式秩序之外以技艺、承诺和关系建立自己的位置，并回答个人力量如何面对更大的世道。",
+  "entryLens": "依据人设适配镖师、猎户、戏班、武馆、寺观、流民、官宦子弟离家或其他江湖入口。",
+  "originSeeds": [
+    "人物较早接触一门可以安身或伤人的技艺",
+    "师承、恩情、仇怨或无籍身份影响了最初归属"
+  ],
+  "stakeAxes": [
+    "技艺",
+    "名望",
+    "师门",
+    "帮派关系",
+    "官府态度",
+    "恩仇与旧伤"
+  ],
+  "focusForceIds": [
+    "ancient.jianghu",
+    "ancient.outlands",
+    "ancient.local",
+    "ancient.markets",
+    "ancient.faith"
+  ],
+  "acts": [
+    {
+      "id": "ancient.jianghu-master.apprenticeship",
+      "label": "问艺",
+      "objective": "取得真正可以立身的技艺、师承与第一段江湖关系。",
+      "dramaticQuestion": "人物愿意为力量承担怎样的规矩和人情？",
+      "pressureDirection": "生存、门规、护送、比试或恩仇让技艺第一次接受现实检验。",
+      "payoffMeaning": "人物拥有独立行走江湖的能力和名号。",
+      "worldCardRefs": [
+        "ancient.snapshot.nine_regions",
+        "ancient.snapshot.local_society"
+      ]
+    },
+    {
+      "id": "ancient.jianghu-master.reputation",
+      "label": "扬名",
+      "objective": "在帮派、官府、商路和民间势力之间形成自己的声望与立场。",
+      "dramaticQuestion": "人物的名声来自侠义、胜负、恐惧还是可靠？",
+      "pressureDirection": "旧仇、组织责任、通缉和他人求助不断扩大行动后果。",
+      "payoffMeaning": "人物成为能够影响江湖格局的一方人物。",
+      "worldCardRefs": [
+        "ancient.snapshot.local_society",
+        "ancient.snapshot.popular_faith"
+      ]
+    },
+    {
+      "id": "ancient.jianghu-master.legacy",
+      "label": "立宗",
+      "objective": "决定接受招安、开宗立派、辅佐一方、远走或归隐。",
+      "dramaticQuestion": "巅峰之后，人物要把力量传给谁、用在何处？",
+      "pressureDirection": "旧伤、旧部、弟子、官府和时代变局同时索要答案。",
+      "payoffMeaning": "人物的技艺传承、组织归属和江湖评价得到收束。",
+      "worldCardRefs": [
+        "ancient.snapshot.popular_faith",
+        "ancient.snapshot.nine_regions"
+      ]
+    }
+  ],
+  "endingDirections": {
+    "good": [
+      "成为一代宗师并留下可信传承",
+      "以招安、辅佐、守护或自立方式让力量获得归处"
+    ],
+    "normal": [
+      "保住技艺、重要关系或一方名声，但选择远离巅峰与纷争"
+    ],
+    "bad": [
+      "死于仇杀、围剿或组织内斗",
+      "失去武功、门人和旧友，只留下破碎声名"
+    ]
+  },
+  "worldCardRefs": [
+    "ancient.snapshot.nine_regions",
+    "ancient.snapshot.local_society",
+    "ancient.snapshot.popular_faith"
+  ]
+}

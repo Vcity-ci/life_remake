@@ -1,4 +1,4 @@
-import { dynamicNarrativeSceneTools, narrativeTurnPlanTools, narrativeDecisionOutcomeTool, narrativeDecisionRenderTool, narrativeHorizonTool, narrativeProseReviewTool, normalizeMilestoneOptionOverrides, parseDynamicNarrativeParticipants, parseDynamicNarrativeActHandoff, NarrativeOutcomeError, prepareNarrativeOutcomeRequest, interruptedBackgroundTask, recordDirectedDecisionOutcome, recordDirectedStoryTurnOutcome, shouldRefineNarrativeProse, buildNarrativeContinuityWriteSet, extractProviderUsage, type NarrativeContext } from "./ai.js";
+import { dynamicNarrativeSceneTools, narrativeTurnPlanTools, narrativeDecisionOutcomeTool, narrativeDecisionRenderTool, narrativeHorizonTool, narrativeProseReviewTool, normalizeMilestoneOptionOverrides, parseDynamicNarrativeParticipants, parseDynamicNarrativeActHandoff, NarrativeOutcomeError, NARRATIVE_SCENE_PARTICIPANT_LIMIT, prepareNarrativeOutcomeRequest, interruptedBackgroundTask, recordDirectedDecisionOutcome, recordDirectedStoryTurnOutcome, shouldRefineNarrativeProse, buildNarrativeContinuityWriteSet, extractProviderUsage, type NarrativeContext } from "./ai.js";
 import { factUpdateContract, parseFactUpdates, parseRelationshipUpdates, narrativeFactResolutionModes } from "./narrative-continuity.js";
 import { pendingConversationContext, applyConversationSummary, keepRecentConversationRounds, summarizedConversationMemoryIds, type ChatConversationState } from "./conversation.js";
 import { commitNarrativeMemory, narrativeTextOverlap } from "./narrative-memory.js";
@@ -9,7 +9,7 @@ import { dynamicNarrativeScenePrompt, type DynamicNarrativeSceneInput } from "./
 import { retrieveNarrativeMemories } from "./narrative.js";
 import test from "node:test";
 import { createDefaultGameplayTuning } from "@reroll/shared";
-import type { BackgroundCard, DifficultyConfig, EventDefinition, ItemDefinition, NarrativeAttributePolicy, NarrativeWorldDefinition, StoryDirectionDefinition, WorldConfig } from "@reroll/shared";
+import type { BackgroundCard, DifficultyConfig, EventDefinition, ItemDefinition, NarrativeAttributePolicy, NarrativeWorldDefinition, ResolvedNarrativeExperience, StoryDirectionDefinition, WorldConfig } from "@reroll/shared";
 import {
   dynamicBackgroundAttributePolicy,
   dynamicSceneAttributePolicy,
@@ -45,6 +45,22 @@ import { commitNarrativeAgentTurn } from "./narrative/runtime.js";
 import { defaultNarrativeContextProviders } from "./narrative/context/collectors.js";
 import { narrativeTurnCapabilities, type NarrativeTurnEnvelope } from "./narrative/turn.js";
 import { narrativeTaskContract } from "./narrative/task-contracts.js";
+import { loadNarrativeStoryPack, loadNarrativeStoryPacksForWorld, validateNarrativeStoryPack } from "./story-packs.js";
+import { resolveNarrativeExperience } from "./narrative-experience.js";
+
+async function loadNarrativeExperienceForTest(worldId: string): Promise<NarrativeWorldDefinition> {
+  const worldDefinition = await loadNarrativeWorldDefinition(worldId);
+  assert.ok(worldDefinition);
+  if (worldDefinition.version < 10) return worldDefinition;
+  const defaultPackIds: Record<string, string> = {
+    ancient: "ancient.sovereign-rise",
+    modern: "modern.scholar-road",
+    fantasy: "fantasy.sect-ascendant"
+  };
+  const storyPack = await loadNarrativeStoryPack(worldDefinition, defaultPackIds[worldId] ?? "");
+  assert.ok(storyPack);
+  return resolveNarrativeExperience(worldDefinition, storyPack);
+}
 
 const world: WorldConfig = {
   id: "test-world",
@@ -114,6 +130,7 @@ function makeRun() {
     {
       clientId: "test-client",
       worldId: world.id,
+      storyPackId: "test.story-pack",
       difficultyId: difficulty.id,
       personaPrompt: "一个想守住底线的普通人",
       talentPointTotal: 25,
@@ -395,6 +412,7 @@ test("路线开场受世界包属性资格控制，不受年龄硬触发", () =>
     {
       clientId: "narrative-test-client",
       worldId: world.id,
+      storyPackId: "test.story-pack",
       difficultyId: difficulty.id,
       personaPrompt: "想查清旧档的人",
       talentPointTotal: 25,
@@ -427,6 +445,7 @@ test("世界幕入口不会覆盖场景内部的压力与高潮门槛", () => {
     {
       clientId: "paced-scene-client",
       worldId: world.id,
+      storyPackId: "test.story-pack",
       difficultyId: difficulty.id,
       personaPrompt: "愿意承担旧案余波的人",
       talentPointTotal: 25,
@@ -495,6 +514,7 @@ test("叙事世界没有合法候选时不会生成全路线普通事件", () =>
     {
       clientId: "empty-candidate-client",
       worldId: world.id,
+      storyPackId: "test.story-pack",
       difficultyId: difficulty.id,
       personaPrompt: "仍在积累处境的人",
       talentPointTotal: 25,
@@ -515,6 +535,7 @@ test("模型选定路线后由旧高潮状态机在该路线选择当前拍点�
     {
       clientId: "route-material-client",
       worldId: world.id,
+      storyPackId: "test.story-pack",
       difficultyId: difficulty.id,
       personaPrompt: "愿意承担旧案余波的人",
       talentPointTotal: 25,
@@ -665,6 +686,7 @@ test("当前拍点没有具体素材时不注入通用情境原型", () => {
     {
       clientId: "archetype-fallback-client",
       worldId: world.id,
+      storyPackId: "test.story-pack",
       difficultyId: difficulty.id,
       personaPrompt: "想查清旧档的人",
       talentPointTotal: 25,
@@ -706,6 +728,7 @@ test("完成主线后可申请结局，年龄不再是额外门槛", () => {
     {
       clientId: "closure-test-client",
       worldId: world.id,
+      storyPackId: "test.story-pack",
       difficultyId: difficulty.id,
       personaPrompt: "愿意承担旧账的人",
       talentPointTotal: 25,
@@ -749,25 +772,55 @@ test("完成主线后可申请结局，年龄不再是额外门槛", () => {
   assert.equal(run.ended, true);
 });
 
-test("古代世界包以世界常量、社会力量和故事形态驱动动态叙事", async () => {
-  const [definitions, ancientWorld] = await Promise.all([
-    loadEventDefinitions("ancient"),
-    loadNarrativeWorldDefinition("ancient")
-  ]);
+test("基础世界与可独立发现的 IF 路线组合为运行时叙事", async () => {
+  const ancientWorld = await loadNarrativeWorldDefinition("ancient");
+  const modernWorld = await loadNarrativeWorldDefinition("modern");
+  const fantasyWorld = await loadNarrativeWorldDefinition("fantasy");
   assert.ok(ancientWorld);
-  const archetypeIds = new Set(ancientWorld.sceneArchetypes?.map((item) => item.id));
+  assert.ok(modernWorld);
+  assert.ok(fantasyWorld);
+  const storyPacks = await loadNarrativeStoryPacksForWorld(ancientWorld);
   assert.equal(ancientWorld.mainlineFacts?.length ?? 0, 0);
-  assert.equal(ancientWorld.mainlineActs?.length, 3);
-  assert.ok(definitions.length >= 60);
-  assert.equal(ancientWorld.version, 9);
-  assert.equal(ancientWorld.socialForces?.length, 6);
-  assert.equal(ancientWorld.storyPatterns?.length, 6);
+  assert.equal(ancientWorld.mainlineActs, undefined);
+  assert.equal(ancientWorld.storyPatterns, undefined);
+  assert.equal(ancientWorld.version, 10);
+  assert.equal(ancientWorld.socialForces?.length, 12);
+  assert.ok((ancientWorld.worldCards?.length ?? 0) > 10);
+  assert.equal(storyPacks.length, 6);
+  const ancientCardIds = new Set(ancientWorld.worldCards?.map((card) => card.id));
+  for (const pack of storyPacks) {
+    assert.equal(Object.prototype.hasOwnProperty.call(pack, "worldCards"), false);
+    assert.ok(pack.worldCardRefs?.length);
+    assert.ok(pack.worldCardRefs?.every((id) => ancientCardIds.has(id)));
+    assert.ok(pack.acts.every((act) => act.worldCardRefs?.every((id) => ancientCardIds.has(id))));
+  }
+  const selected = storyPacks.find((pack) => pack.id === "ancient.sovereign-rise");
+  assert.ok(selected);
+  const experience = resolveNarrativeExperience(ancientWorld, selected);
+  assert.deepEqual(experience.mainlineActs?.map((act) => act.id), selected.acts.map((act) => act.id));
+  assert.equal(experience.storyPack.id, selected.id);
+  assert.deepEqual(experience.worldCards?.map((card) => card.id), ancientWorld.worldCards?.map((card) => card.id));
+  assert.equal(experience.mainlineSkeleton?.premise, selected.routePromise);
+  assert.match(experience.mainlineActs?.[0]?.prompt ?? "", /朝廷|军镇|地方官署|宗族门第|乡里百姓/);
   assert.equal(ancientWorld.routeArcs, undefined);
-  assert.ok(definitions.every((definition) => (
-    Boolean(definition.narrativeBeat) &&
-    Boolean(definition.sceneArchetypeId) &&
-    archetypeIds.has(definition.sceneArchetypeId!)
-  )));
+  assert.throws(() => validateNarrativeStoryPack({
+    ...selected,
+    worldCardRefs: ["ancient.missing.card"]
+  }, ancientWorld), /world_card_reference_invalid/);
+  assert.throws(() => validateNarrativeStoryPack({
+    ...selected,
+    worldCards: []
+  } as unknown as typeof selected, ancientWorld), /embedded_world_cards_not_supported/);
+  for (const definition of [modernWorld, fantasyWorld]) {
+    const packs = await loadNarrativeStoryPacksForWorld(definition);
+    assert.equal(definition.version, 10);
+    assert.equal(definition.mainlineActs, undefined);
+    assert.equal(definition.storyPatterns, undefined);
+    assert.equal(packs.length, 6);
+    const resolved = resolveNarrativeExperience(definition, packs[0]!);
+    assert.equal(resolved.storyPack.id, packs[0]!.id);
+    assert.deepEqual(resolved.mainlineActs?.map((act) => act.id), packs[0]!.acts.map((act) => act.id));
+  }
 });
 
 test("古代世界的 opening 属性门槛由世界级门槛控制", async () => {
@@ -855,6 +908,7 @@ test("连续场景停表时不会重复推进年龄", () => {
     {
       clientId: "scene-clock-client",
       worldId: world.id,
+      storyPackId: "test.story-pack",
       difficultyId: difficulty.id,
       personaPrompt: "在旧案中周旋的人",
       talentPointTotal: 25,
@@ -948,6 +1002,7 @@ test("叙事结局以主线完成为前提，并稳定区分好、普通、坏�
       {
         clientId: `ending-${intelligence}-${tags.join("-") || "plain"}`,
         worldId: world.id,
+        storyPackId: "test.story-pack",
         difficultyId: difficulty.id,
         personaPrompt: "愿意承担旧档代价的人",
         talentPointTotal: 25,
@@ -1007,6 +1062,7 @@ test("属性档位文案由世界包快照，不写死在引擎或已有存档�
     {
       clientId: "tier-presentation-client",
       worldId: world.id,
+      storyPackId: "test.story-pack",
       difficultyId: difficulty.id,
       personaPrompt: "在世道里慢慢站稳的人",
       talentPointTotal: 25,
@@ -1039,6 +1095,7 @@ test("动态世界幕以单一五拍推进，路线可切换且常驻人物进�
     {
       clientId: "dynamic-world-client",
       worldId: world.id,
+      storyPackId: "test.story-pack",
       difficultyId: difficulty.id,
       personaPrompt: "在旧案中寻找出路的人",
       talentPointTotal: 25,
@@ -1153,6 +1210,7 @@ test("动态三幕只各自结算一次，并在最终 payoff 后进入结局申
     {
       clientId: "three-act-dynamic-world-client",
       worldId: world.id,
+      storyPackId: "test.story-pack",
       difficultyId: difficulty.id,
       personaPrompt: "愿意承担旧案后果的人",
       talentPointTotal: 25,
@@ -1549,8 +1607,7 @@ test("背景任务只读取长期摘要与最后一个真实回合，旧原文�
 
 
 test("实际世界成长侧重不会缩窄工具属性目录，搭配效果与引擎结算一致", async () => {
-  const definition = await loadNarrativeWorldDefinition("ancient");
-  assert.ok(definition);
+  const definition = await loadNarrativeExperienceForTest("ancient");
   const run = makeRun();
   run.narrative.enabled = true;
   run.narrative = ensureNarrativeActRuntime(run.narrative, definition, run.age);
@@ -1696,6 +1753,17 @@ test("人物引用沿用档案身份，短关系说明有效，新人物仍需�
   assert.equal(parseDynamicNarrativeParticipants([{
     characterRef: "new", name: "小周", factionId: "school", role: "同桌", description: "热心的同学", recurring: true
   }], factions, known)?.length, 1);
+  const ensemble = Array.from({ length: NARRATIVE_SCENE_PARTICIPANT_LIMIT }, (_, index) => ({
+    characterRef: "new", name: `人物${index}`, role: `角色${index}`, description: `参与场景${index}`, recurring: false
+  }));
+  assert.equal(parseDynamicNarrativeParticipants(ensemble, factions, known)?.length, NARRATIVE_SCENE_PARTICIPANT_LIMIT);
+  assert.throws(
+    () => parseDynamicNarrativeParticipants([...ensemble, { characterRef: "new", name: "超额人物", role: "旁观者", description: "超过协议上限", recurring: false }], factions, known),
+    (error: unknown) => error instanceof NarrativeOutcomeError &&
+      error.reason === "dynamic_scene_identity_or_participants_invalid" &&
+      error.validation?.rule === "participant_count_exceeded" &&
+      error.validation.received === NARRATIVE_SCENE_PARTICIPANT_LIMIT + 1
+  );
 });
 
 test("地点与本领可按引用只更新变化字段，不重写身份与获得来历", () => {
@@ -1906,8 +1974,8 @@ test("旧幕后果不因另一关注对象的描述递归扩张，承诺仍可�
 
 test("本局前提保持稳定，幕命题只进入 Horizon 而不反复注入正文", async () => {
   for (const worldId of ["ancient", "modern", "fantasy"]) {
-    const definition = await loadNarrativeWorldDefinition(worldId);
-    assert.ok(definition?.mainlineActs?.length);
+    const definition = await loadNarrativeExperienceForTest(worldId);
+    assert.ok(definition.mainlineActs?.length);
     const run = makeRun();
     run.worldId = definition.worldId;
     run.narrative.enabled = true;
@@ -1940,7 +2008,7 @@ test("本局前提保持稳定，幕命题只进入 Horizon 而不反复注入�
 
 test("三世界的幕任务归属场景工具，纯背景和混合请求保持生活任务独立", async () => {
   for (const worldId of ["ancient", "fantasy", "modern"]) {
-    const definition = (await loadNarrativeWorldDefinition(worldId))!;
+    const definition = await loadNarrativeExperienceForTest(worldId);
     const run = makeRun();
     run.worldId = definition.worldId;
     run.narrative.enabled = true;
@@ -2140,7 +2208,7 @@ test("上下文编排按来源去重并让 dynamic 只读取近期回合与按�
 });
 
 test("世界核心与叙事调色板独立投影，不再被 storyBible 长度吞掉", async () => {
-  const definition = (await loadNarrativeWorldDefinition("fantasy"))!;
+  const definition = await loadNarrativeExperienceForTest("fantasy");
   const run = makeRun();
   run.worldId = "fantasy";
   run.narrative.enabled = true;
@@ -2157,7 +2225,7 @@ test("世界核心与叙事调色板独立投影，不再被 storyBible 长度�
 });
 
 test("结局任务单独召回世界包结局文风", async () => {
-  const definition = (await loadNarrativeWorldDefinition("modern"))!;
+  const definition = await loadNarrativeExperienceForTest("modern");
   const run = makeRun();
   run.worldId = "modern";
   run.narrative.enabled = true;
@@ -2185,13 +2253,12 @@ test("上下文预算保留当前任务并优先裁剪低优先召回", () => {
   assert.ok(composition.renderedContext.endsWith("叙述10岁至12岁的生活与成长。"));
 });
 
-test("规划后的渲染工具只使用可选故事形态、社会力量和呈现类型", async () => {
-  const definition = (await loadNarrativeWorldDefinition("ancient"))!;
-  const pattern = definition.storyPatterns![1];
+test("选定 IF 路线后渲染工具只接收当前社会力量和呈现类型", async () => {
+  const definition = await loadNarrativeExperienceForTest("ancient");
   const force = definition.socialForces![1];
   const input: DynamicNarrativeSceneInput = {
     plan: {
-      callId: "call:one", turnKind: "scene", patternIds: [pattern.id], forceIds: [force.id],
+      callId: "call:one", turnKind: "scene", patternIds: [], forceIds: [force.id],
       focusRefs: [], sceneGoal: "让人物面对眼前局势", presentation: "scene", clockRequest: "advance"
     },
     act: definition.mainlineActs![0], beat: "setup", presentation: "scene", allowedTurnKinds: ["scene"],
@@ -2209,26 +2276,26 @@ test("规划后的渲染工具只使用可选故事形态、社会力量和呈�
   assert.match(dynamicNarrativeScenePrompt(input), new RegExp(force.methods[0]!));
 });
 
-test("模型选定故事形态和社会力量后才返读对应细分摘要", async () => {
-  const definition = (await loadNarrativeWorldDefinition("ancient"))!;
+test("选定 IF 路线固定在本局前提中，渲染阶段只返读模型选定的社会力量摘要", async () => {
+  const definition = await loadNarrativeExperienceForTest("ancient");
   const run = makeRun();
   run.worldId = "ancient";
   run.narrative.enabled = true;
   run.narrative = ensureNarrativeActRuntime(run.narrative, definition, run.age);
-  const patternId = definition.storyPatterns![0]!.id;
   const forceId = definition.socialForces![0]!.id;
   run.narrative.memoryDigests = [
-    { id: `route:${patternId}`, scope: "route", scopeId: patternId, revision: 1, throughEpisodeId: "episode:one", coveredEpisodeIds: [], summary: "此前以家门兴衰观察局势。", activeFactIds: [], historicalFactIds: [], characterIds: [], updatedAt: 1 },
+    { id: "route:obsolete", scope: "route", scopeId: "obsolete", revision: 1, throughEpisodeId: "episode:one", coveredEpisodeIds: [], summary: "不属于当前 IF 路线的旧摘要。", activeFactIds: [], historicalFactIds: [], characterIds: [], updatedAt: 1 },
     { id: `faction:${forceId}`, scope: "faction", scopeId: forceId, revision: 1, throughEpisodeId: "episode:one", coveredEpisodeIds: [], summary: "朝廷此前以任免施加压力。", activeFactIds: [], historicalFactIds: [], characterIds: [], updatedAt: 1 }
   ];
   const planning = buildNarrativePromptPlan(run, definition, null, "planning")!;
-  assert.equal(planning.memoryDigests?.some((entry) => entry.id === `route:${patternId}`), false);
-  const rendering = buildNarrativePromptPlan(run, definition, null, "rendering", { patternIds: [patternId], factionIds: [forceId] })!;
-  assert.deepEqual(rendering.memoryDigests?.map((entry) => entry.id).sort(), [`faction:${forceId}`, `route:${patternId}`].sort());
+  assert.equal(planning.memoryDigests?.some((entry) => entry.id === "route:obsolete"), false);
+  assert.match(planning.mainlineSkeleton ?? "", /人物将从自身处境进入天下乱局/);
+  const rendering = buildNarrativePromptPlan(run, definition, null, "rendering", { patternIds: [], factionIds: [forceId] })!;
+  assert.deepEqual(rendering.memoryDigests?.map((entry) => entry.id), [`faction:${forceId}`]);
 });
 
 test("当前 Horizon 参与规划召回，hold 观察词只在当前节拍短暂承接", async () => {
-  const definition = (await loadNarrativeWorldDefinition("fantasy"))!;
+  const definition = await loadNarrativeExperienceForTest("fantasy");
   const run = makeRun();
   run.worldId = "fantasy";
   run.narrative.enabled = true;
@@ -2282,7 +2349,8 @@ test("规划工具目录与能力目录使用同一协议，不再暴露返回�
   assert.deepEqual(tools.map((tool) => tool.name), ["plan_background_turn", "plan_scene_turn"]);
   assert.ok(!tools.some((tool) => tool.name === "plan_choice_turn"));
   const scene = tools.find((tool) => tool.name === "plan_scene_turn")!;
-  assert.ok(scene.parameters.required.includes("patternIds"));
+  assert.equal(scene.parameters.required.includes("patternIds"), false);
+  assert.equal("patternIds" in scene.parameters.properties, false);
   assert.ok(scene.parameters.required.includes("forceIds"));
   assert.equal("presentation" in scene.parameters.properties, false);
 });
@@ -2388,7 +2456,7 @@ test("已进入长期摘要的回合不会在会话窗口滚动时重新归档",
 });
 
 test("世界卡按当前任务、节拍和情景动态召回，不依赖固定路线", async () => {
-  const definition = (await loadNarrativeWorldDefinition("fantasy"))!;
+  const definition = await loadNarrativeExperienceForTest("fantasy");
   const run = makeRun();
   run.worldId = "fantasy";
   run.narrative.enabled = true;
@@ -2406,8 +2474,23 @@ test("世界卡按当前任务、节拍和情景动态召回，不依赖固定�
   assert.equal(selected.some((card) => card.id === "fantasy.example.payoff"), false);
 });
 
+test("IF 路线只引用世界卡并为当前幕提供召回偏好，不复制卡片正文", async () => {
+  const definition = await loadNarrativeExperienceForTest("ancient");
+  const run = makeRun();
+  run.worldId = "ancient";
+  run.narrative.enabled = true;
+  run.narrative = ensureNarrativeActRuntime(run.narrative, definition, run.age);
+  const plan = buildNarrativePromptPlan(run, definition, null, "planning");
+  assert.ok(plan);
+  const activeIds = new Set(plan.activeWorldCardSources?.map((entry) => entry.id));
+  const act = (definition as ResolvedNarrativeExperience).storyPack.acts.find((entry) => entry.id === run.narrative.actRuntime?.actId);
+  assert.ok(act?.worldCardRefs?.some((id) => activeIds.has(id)));
+  assert.equal(plan.storyBible, definition.storyBible);
+  assert.notEqual(plan.storyBible, definition.worldCore?.identity);
+});
+
 test("世界卡会扫描当前场景文本并按选择逻辑激活", async () => {
-  const definition = (await loadNarrativeWorldDefinition("fantasy"))!;
+  const definition = await loadNarrativeExperienceForTest("fantasy");
   const run = makeRun();
   run.worldId = "fantasy";
   run.narrative.enabled = true;
@@ -2444,7 +2527,7 @@ test("已整理 Episode 默认由 Digest 代表，显式关注仍可追溯原文
 
 test("短程计划随全局节拍推进失效，上下文 Provider 保持显式顺序", async () => {
   const run = makeRun();
-  const definition = (await loadNarrativeWorldDefinition("ancient"))!;
+  const definition = await loadNarrativeExperienceForTest("ancient");
   run.worldId = definition.worldId;
   run.narrative.enabled = true;
   run.narrative = ensureNarrativeActRuntime(run.narrative, definition, run.age);
@@ -2511,7 +2594,7 @@ test("正文审校只在过长、泄露、重复或越过未决抉择时触发",
 });
 
 test("世界卡 sticky 只延续指定提交回合且不会自我续期", async () => {
-  const base = (await loadNarrativeWorldDefinition("fantasy"))!;
+  const base = await loadNarrativeExperienceForTest("fantasy");
   const definition: NarrativeWorldDefinition = {
     ...base,
     worldCards: [{
@@ -2557,7 +2640,7 @@ test("世界卡 sticky 只延续指定提交回合且不会自我续期", async 
 });
 
 test("sticky 为零不延续，且 sticky 不跨越世界卡硬作用域", async () => {
-  const base = (await loadNarrativeWorldDefinition("fantasy"))!;
+  const base = await loadNarrativeExperienceForTest("fantasy");
   const firstActId = base.mainlineActs![0].id;
   const otherActId = base.mainlineActs![1].id;
   const definition: NarrativeWorldDefinition = {
@@ -2577,7 +2660,7 @@ test("sticky 为零不延续，且 sticky 不跨越世界卡硬作用域", async
 });
 
 test("关联世界卡服从冷却、互斥组和上下文预算", async () => {
-  const base = (await loadNarrativeWorldDefinition("fantasy"))!;
+  const base = await loadNarrativeExperienceForTest("fantasy");
   const definition: NarrativeWorldDefinition = {
     ...base,
     worldCards: [
@@ -2599,7 +2682,7 @@ test("关联世界卡服从冷却、互斥组和上下文预算", async () => {
 });
 
 test("世界卡任务矩阵与 v8 单一数据源保持一致", async () => {
-  const base = (await loadNarrativeWorldDefinition("modern"))!;
+  const base = await loadNarrativeExperienceForTest("modern");
   const run = makeRun();
   run.worldId = "modern";
   run.narrative.enabled = true;
@@ -2619,7 +2702,7 @@ test("世界卡任务矩阵与 v8 单一数据源保持一致", async () => {
 });
 
 test("抉择上下文精确继承场景地点与本领，风格卡只在声明任务出现", async () => {
-  const definition = (await loadNarrativeWorldDefinition("fantasy"))!;
+  const definition = await loadNarrativeExperienceForTest("fantasy");
   const run = makeRun();
   run.worldId = "fantasy";
   run.narrative.enabled = true;

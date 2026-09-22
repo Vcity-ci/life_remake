@@ -1,0 +1,86 @@
+{
+  "version": 1,
+  "id": "fantasy.heaven-breaker",
+  "revision": "1.0.0",
+  "worldId": "fantasy",
+  "name": "逆命改天",
+  "tagline": "从夺舍、诅咒或天命中夺回自身，最终直面世界规则。",
+  "summary": "承接高概念人设的奇幻路线；人物可以出生便卷入夺舍、古老存在或天地异变，但仍需通过具体行动掌握自身与力量。",
+  "routePromise": "人物将从一项侵入自身命运的异常力量开始，逐步分辨其来源、目的与代价，联合或超越世间势力，最终决定自己与天道规则的关系。",
+  "entryLens": "依据人设适配人皇夺舍、转世记忆、天生诅咒、古神寄生、预言之子、失败容器、异宝认主或其他高概念开局，不把人物压回固定修行起点。",
+  "originSeeds": [
+    "人物的出生、意识或身体从一开始就存在另一个意志留下的痕迹",
+    "天地异变或权力争夺使家庭与故乡无法把异常当作普通秘密"
+  ],
+  "stakeAxes": [
+    "自我边界",
+    "异常力量",
+    "因果与天命",
+    "盟友信任",
+    "古老存在",
+    "改写规则的代价"
+  ],
+  "focusForceIds": [
+    "fantasy.celestial",
+    "fantasy.uncanny",
+    "fantasy.sects",
+    "fantasy.cities",
+    "fantasy.species"
+  ],
+  "acts": [
+    {
+      "id": "fantasy.heaven-breaker.self",
+      "label": "夺身",
+      "objective": "确认异常力量如何影响自身，并夺回第一次真正的自主行动。",
+      "dramaticQuestion": "人物的记忆、欲望和力量中，哪些真正属于自己？",
+      "pressureDirection": "夺舍意志、预言、亲近之人的恐惧与力量诱惑持续侵入选择。",
+      "payoffMeaning": "人物建立了自我边界，并能主动使用或拒绝这份异常力量。",
+      "worldCardRefs": [
+        "fantasy.snapshot.cultivation_cost",
+        "fantasy.snapshot.two_layers"
+      ]
+    },
+    {
+      "id": "fantasy.heaven-breaker.cause",
+      "label": "破局",
+      "objective": "追索异常背后的世间势力与古老因果，打破为人物预设的角色。",
+      "dramaticQuestion": "摆脱操控是否必须摧毁制造这份命运的秩序？",
+      "pressureDirection": "宗门、城邦、异族与古老存在都试图利用人物的特殊性。",
+      "payoffMeaning": "人物不再只是被争夺的容器，而成为能够反向改变局势的力量。",
+      "worldCardRefs": [
+        "fantasy.snapshot.two_layers",
+        "fantasy.snapshot.central_figures"
+      ]
+    },
+    {
+      "id": "fantasy.heaven-breaker.heaven",
+      "label": "改天",
+      "objective": "直面支配自身与众生命运的规则，并承担改变规则后的世界。",
+      "dramaticQuestion": "自由意味着超脱世界、取代旧天，还是让众生拥有选择？",
+      "pressureDirection": "个人完整、亲近之人、众生秩序与终极力量无法全部无损保全。",
+      "payoffMeaning": "人物从命运的承受者成为规则的回答者，世界也留下不可逆变化。",
+      "worldCardRefs": [
+        "fantasy.snapshot.central_figures",
+        "fantasy.snapshot.cultivation_cost"
+      ]
+    }
+  ],
+  "endingDirections": {
+    "good": [
+      "保有完整自我并改变强加于众生的命运规则",
+      "让力量不再依靠吞噬他人的选择延续"
+    ],
+    "normal": [
+      "摆脱主要控制并获得超越凡俗的力量，但部分因果和世界旧序仍然存在"
+    ],
+    "bad": [
+      "被夺舍、诅咒或古老意志彻底取代",
+      "击败旧规则后自己成为更严酷的新天命"
+    ]
+  },
+  "worldCardRefs": [
+    "fantasy.snapshot.cultivation_cost",
+    "fantasy.snapshot.two_layers",
+    "fantasy.snapshot.central_figures"
+  ]
+}

@@ -1,0 +1,86 @@
+{
+  "version": 1,
+  "id": "ancient.frontier-commander",
+  "revision": "1.0.0",
+  "worldId": "ancient",
+  "name": "边镇将帅",
+  "tagline": "在烽火、互市与朝廷猜忌之间，决定一支军队和一方边地的命运。",
+  "summary": "取材自 Material 的边将线：从边地生活或军中入口积累功勋和部曲，处理粮饷、异族与朝局关系，最终面对外敌、军心和中央制衡。",
+  "routePromise": "人物将通过边境经验、军功与关系取得军中决定权，并回答武力究竟用来守护、割据还是重塑秩序。",
+  "entryLens": "依据人设适配军户、边民、罪臣之后、朝廷将门、翻译向导或意外投军等入口。",
+  "originSeeds": [
+    "人物较早接触边境贸易、迁徙、守御或冲突",
+    "家庭与朝廷、军镇或周边族群存在复杂关系"
+  ],
+  "stakeAxes": [
+    "粮饷",
+    "军心",
+    "边民安全",
+    "周边势力关系",
+    "朝中信任",
+    "个人野心"
+  ],
+  "focusForceIds": [
+    "ancient.military",
+    "ancient.neighbors",
+    "ancient.court",
+    "ancient.markets",
+    "ancient.commoners"
+  ],
+  "acts": [
+    {
+      "id": "ancient.frontier-commander.service",
+      "label": "从戎",
+      "objective": "在边地秩序中取得可信的职责、同袍关系和军中位置。",
+      "dramaticQuestion": "人物凭什么在边地活下来并获得信任？",
+      "pressureDirection": "小规模冲突、军纪、互市和地方生计相互牵动。",
+      "payoffMeaning": "人物形成独特的边境能力并拥有可依靠的军中关系。",
+      "worldCardRefs": [
+        "ancient.snapshot.frontier_pressure",
+        "ancient.snapshot.nine_regions"
+      ]
+    },
+    {
+      "id": "ancient.frontier-commander.command",
+      "label": "掌军",
+      "objective": "在大战、粮饷或外交危机中取得更大指挥权。",
+      "dramaticQuestion": "人物如何同时对军队、边民与朝廷负责？",
+      "pressureDirection": "战功、失利、部曲忠诚和朝堂评价不断改变人物位置。",
+      "payoffMeaning": "人物成为足以决定一方攻守的将领。",
+      "worldCardRefs": [
+        "ancient.snapshot.nine_regions",
+        "ancient.snapshot.central_figures"
+      ]
+    },
+    {
+      "id": "ancient.frontier-commander.frontier",
+      "label": "镇疆",
+      "objective": "面对大规模外患与中央猜忌，决定军镇和边地最终去向。",
+      "dramaticQuestion": "重兵在手之后，人物守护的是朝廷、边地还是自己的事业？",
+      "pressureDirection": "入朝、留镇、割据、联盟与决战形成不可回避的选择。",
+      "payoffMeaning": "边境秩序、军队归属和人物政治位置得到最终回答。",
+      "worldCardRefs": [
+        "ancient.snapshot.central_figures",
+        "ancient.snapshot.frontier_pressure"
+      ]
+    }
+  ],
+  "endingDirections": {
+    "good": [
+      "守住边疆并妥善安置军民，以可信方式交代军权",
+      "在战争与互市之间留下长期秩序"
+    ],
+    "normal": [
+      "保住一方安定或军中声望，但未能消除朝廷猜忌和边境隐患"
+    ],
+    "bad": [
+      "因谋反嫌疑、内斗或诱杀失去部曲与性命",
+      "军事冒险失败并导致边镇陷落"
+    ]
+  },
+  "worldCardRefs": [
+    "ancient.snapshot.frontier_pressure",
+    "ancient.snapshot.nine_regions",
+    "ancient.snapshot.central_figures"
+  ]
+}

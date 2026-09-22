@@ -1,0 +1,86 @@
+{
+  "version": 1,
+  "id": "fantasy.wandering-cultivator",
+  "revision": "1.0.0",
+  "worldId": "fantasy",
+  "name": "散修天路",
+  "tagline": "没有宗门替你决定道路，便用每一次交易、结盟与对决走出来。",
+  "summary": "从边地生存和流动网络出发，围绕资源、信用、同伴与自创本领展开，最终形成不依附既有道统的道路。",
+  "routePromise": "人物将以散修或流动身份积累本领、资源与伙伴，在宗门和城邦夹缝中建立信用，最终让自己的道路足以保护、传授或改变一方秩序。",
+  "entryLens": "依据人设适配孤儿、行商护卫、逃宗弟子、异族旅人、落魄家族、被夺舍者或自行摸索力量的普通人。",
+  "originSeeds": [
+    "人物很早便需要依靠实际本领换取生存资源",
+    "一次互助、交易或背叛使人物理解无依无靠的代价"
+  ],
+  "stakeAxes": [
+    "修行资源",
+    "个人信用",
+    "同伴盟约",
+    "自创本领",
+    "商路与据点",
+    "宗门态度"
+  ],
+  "focusForceIds": [
+    "fantasy.wanderers",
+    "fantasy.cities",
+    "fantasy.sects",
+    "fantasy.species",
+    "fantasy.uncanny"
+  ],
+  "acts": [
+    {
+      "id": "fantasy.wandering-cultivator.survival",
+      "label": "谋生",
+      "objective": "凭一项真实本领完成危险委托或交易，建立最初信用与伙伴关系。",
+      "dramaticQuestion": "没有靠山时，人物愿意以什么换取力量？",
+      "pressureDirection": "资源稀缺、骗局、追杀与临时盟约不断检验判断。",
+      "payoffMeaning": "人物获得了能够自由行动的基本实力和可再次合作的人。",
+      "worldCardRefs": [
+        "fantasy.snapshot.mortal_life",
+        "fantasy.snapshot.cultivation_cost"
+      ]
+    },
+    {
+      "id": "fantasy.wandering-cultivator.network",
+      "label": "结路",
+      "objective": "建立连接据点、商路、异族或散修群体的长期网络。",
+      "dramaticQuestion": "个人自由能否与共同承诺同时存在？",
+      "pressureDirection": "宗门垄断、城邦规则、利益分配与同伴危机迫使人物承担组织责任。",
+      "payoffMeaning": "人物成为一张关系网络的核心，而不再只是独行者。",
+      "worldCardRefs": [
+        "fantasy.snapshot.cultivation_cost",
+        "fantasy.snapshot.other_civilizations"
+      ]
+    },
+    {
+      "id": "fantasy.wandering-cultivator.own-dao",
+      "label": "立道",
+      "objective": "用自创本领和既有盟友应对一场足以吞没散修生存空间的危机。",
+      "dramaticQuestion": "人物的道路能否成为他人也能行走的道路？",
+      "pressureDirection": "个人突破、伙伴安全、资源秩序与强大势力的招揽集中碰撞。",
+      "payoffMeaning": "人物建立传承、自由共同体或一条不受旧道统垄断的新路。",
+      "worldCardRefs": [
+        "fantasy.snapshot.other_civilizations",
+        "fantasy.snapshot.mortal_life"
+      ]
+    }
+  ],
+  "endingDirections": {
+    "good": [
+      "以信用、伙伴和自创道路建立可延续的散修秩序",
+      "获得自由而不把风险与代价全部留给弱者"
+    ],
+    "normal": [
+      "成为受人敬重的强大散修，但网络与传承仍依赖个人维系"
+    ],
+    "bad": [
+      "因失信、贪取资源或孤立无援而失去全部积累",
+      "被强大势力收编或成为自己曾经畏惧的掠夺者"
+    ]
+  },
+  "worldCardRefs": [
+    "fantasy.snapshot.mortal_life",
+    "fantasy.snapshot.cultivation_cost",
+    "fantasy.snapshot.other_civilizations"
+  ]
+}

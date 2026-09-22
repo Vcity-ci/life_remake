@@ -1,5 +1,5 @@
 {
-  "version": 9,
+  "version": 10,
   "worldId": "my_world",
   "storyBible": "说明这个世界是什么、哪些力量影响日常，以及人物可以拥有多大的故事尺度。这里只定义世界，不预写玩家必走的剧情。",
   "styleRules": [
@@ -24,55 +24,9 @@
     "actionVocabulary": ["观察", "学习", "交涉", "行动", "拒绝", "承担"],
     "scalePossibilities": ["个人生活", "家庭与伙伴", "组织与地域", "世界性变化"]
   },
-  "storyPatterns": [
-    { "id": "my_world.bonds", "label": "关系与归处", "summary": "从信任、照料、边界和归属展开故事。" },
-    { "id": "my_world.undertaking", "label": "能力与承担", "summary": "从学习、行动、成果和责任展开故事。" },
-    { "id": "my_world.wandering", "label": "远行与新路", "summary": "从迁移、陌生环境和不同生活方式展开故事。" }
-  ],
   "endingGuide": "以人物实际留下的关系、成果、生活方式和代价评价这一生。",
   "opening": { "earlyLife": { "maxAge": 3 } },
-  "mainlineSkeleton": {
-    "premise": "本局人设、最终天赋和身世建立长期故事承诺，世界包不替玩家预写唯一命运。",
-    "opening": "让人物最鲜明的处境与世界发生真实接触。",
-    "pressure": "扩大人物选择的影响范围，使代价和关系改变后续可能。",
-    "climax": "让一生积累面对更大尺度的检验。",
-    "payoff": "评价人物实际形成的成就、关系、代价与影响。",
-    "goodEndingDirection": "形成可延续的成果，并承认已付代价。",
-    "badEndingDirection": "失去重要之物，但不否认人物真实走过的道路。"
-  },
-  "mainlineActs": [
-    { "id": "my_world.arc.one", "label": "故事初潮", "prompt": "由本局故事前提决定第一段核心经历。", "readinessStage": "opening" },
-    { "id": "my_world.arc.two", "label": "命运转流", "prompt": "承接已经发生的事实，扩大人物选择的影响。", "readinessStage": "pressure" },
-    { "id": "my_world.arc.three", "label": "此生大势", "prompt": "让一生积累面对更大尺度的检验。", "readinessStage": "climax" }
-  ],
-  "worldCards": [
-    {
-      "id": "my_world.rule.consequences_are_lived",
-      "kind": "world_rule",
-      "content": "重要选择通过人物关系、可用资源、生活安排与后来行动产生影响。",
-      "priority": 95,
-      "activation": { "tasks": ["horizon", "planning", "rendering", "dynamic", "decision"] },
-      "stickyTurns": 2
-    },
-    {
-      "id": "my_world.setting.selective_entry",
-      "kind": "setting",
-      "content": "只在相关人物、地点或关键词出现时有帮助的世界知识。",
-      "priority": 82,
-      "placement": "scenario",
-      "activation": { "keys": ["相关关键词"], "scanDepth": 3, "tasks": ["planning", "rendering", "dynamic"] },
-      "cooldownTurns": 2
-    },
-    {
-      "id": "my_world.example.choice",
-      "kind": "style_example",
-      "content": "写一小段只供模仿节奏和感官质地的正文，不放入必须复刻的专名与事实。",
-      "priority": 80,
-      "placement": "example",
-      "activation": { "beats": ["pressure", "climax"], "tasks": ["rendering", "dynamic"] },
-      "cooldownTurns": 3
-    }
-  ],
+  "worldCards": [],
   "progression": {
     "backgroundPacing": { "minYears": 1, "maxYears": 3, "personalReflectionChance": 0.35 },
     "gates": {

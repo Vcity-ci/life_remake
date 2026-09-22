@@ -352,6 +352,60 @@ export interface NarrativeStoryPatternDefinition {
   keywords?: string[];
 }
 
+/** One authored act inside a player-selected IF story pack. */
+export interface NarrativeStoryPackActDefinition {
+  id: string;
+  label: string;
+  objective: string;
+  dramaticQuestion: string;
+  pressureDirection: string;
+  payoffMeaning: string;
+  focusForceIds?: string[];
+  /** World-owned cards that are especially useful in this act. References are recall hints, never gates. */
+  worldCardRefs?: string[];
+}
+
+export interface NarrativeStoryPackEndingDirections {
+  good: string[];
+  normal: string[];
+  bad: string[];
+}
+
+/**
+ * A self-contained IF line authored against one world. Worlds never enumerate
+ * packs; the content loader discovers every valid file by its declared worldId.
+ */
+export interface NarrativeStoryPackDefinition {
+  version: 1;
+  id: string;
+  revision: string;
+  worldId: WorldId;
+  name: string;
+  tagline: string;
+  summary: string;
+  routePromise: string;
+  entryLens: string;
+  originSeeds: string[];
+  stakeAxes: string[];
+  focusForceIds?: string[];
+  /** World-owned cards relevant across this IF line. The pack never owns or duplicates their content. */
+  worldCardRefs?: string[];
+  acts: [NarrativeStoryPackActDefinition, NarrativeStoryPackActDefinition, NarrativeStoryPackActDefinition];
+  endingDirections: NarrativeStoryPackEndingDirections;
+}
+
+/** Immutable per-run copy. New authoring revisions affect new lives only. */
+export type NarrativeStoryPackSnapshot = NarrativeStoryPackDefinition;
+
+export interface PublicStoryPackOption {
+  id: string;
+  revision: string;
+  worldId: WorldId;
+  name: string;
+  tagline: string;
+  summary: string;
+}
+
 export interface NarrativeThreadDefinition {
   id: string;
   label: string;
@@ -384,6 +438,7 @@ export type NarrativeWorldCardKind =
   | "institution"
   | "culture"
   | "faction"
+  | "character"
   | "location"
   | "ability"
   | "social_role"
@@ -612,7 +667,7 @@ export interface NarrativeRouteDefinition {
 }
 
 export interface NarrativeWorldDefinition {
-  version: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
+  version: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
   worldId: WorldId;
   storyBible: string;
   styleRules: string[];
@@ -645,6 +700,11 @@ export interface NarrativeWorldDefinition {
   endingBlueprints: EndingBlueprint[];
   components?: NarrativeComponentDefinition[];
   componentEventBindings?: NarrativeComponentEventBinding[];
+}
+
+/** Runtime projection of one base world and exactly one selected story pack. */
+export interface ResolvedNarrativeExperience extends NarrativeWorldDefinition {
+  storyPack: NarrativeStoryPackSnapshot;
 }
 
 /**
@@ -1355,6 +1415,7 @@ export interface DifficultyConfig {
 export interface StartRunRequest {
   clientId: string;
   worldId: WorldId;
+  storyPackId: string;
   difficultyId: string;
   personaPrompt: string;
   stats: Stats;
@@ -1510,6 +1571,7 @@ export interface PublicSurvivalCrisis {
 export interface PublicRunState {
   runId: string;
   worldId: WorldId;
+  storyPack?: Pick<PublicStoryPackOption, "id" | "revision" | "name" | "tagline">;
   difficultyId: string;
   age: number;
   ageStage: PublicAgeStage;
@@ -1546,6 +1608,8 @@ export interface PublicWorldOption {
   id: WorldId;
   name: string;
   intro: string;
+  storyPackCount?: number;
+  playable?: boolean;
 }
 
 export interface PublicDifficultyOption {
@@ -1595,6 +1659,8 @@ export interface SaveSlotSummary {
   id: string;
   title: string;
   worldId: WorldId;
+  storyPackId?: string;
+  storyPackName?: string;
   age: number;
   ended: boolean;
   updatedAt: number;

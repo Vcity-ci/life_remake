@@ -1,0 +1,86 @@
+{
+  "version": 1,
+  "id": "modern.second-start",
+  "revision": "1.0.0",
+  "worldId": "modern",
+  "name": "人生重启",
+  "tagline": "当原来的答案失效，重新决定余生要怎样度过。",
+  "summary": "从一条看似确定的人生道路起步，经由失去、迷茫或主动离开完成转向；重启不是清空过去，而是重新使用已有经历。",
+  "routePromise": "人物将先建立一种被自己或他人认可的生活，随后面对足以动摇它的失去与迷茫，最终利用旧经验开辟新的生活方向。",
+  "entryLens": "依据人设适配学业受挫、职业倦怠、关系变化、健康事件、家庭责任、成功后的空洞或主动追寻另一种生活。",
+  "originSeeds": [
+    "人物较早学会按照某种明确标准评价自己",
+    "一项被搁置的兴趣、关系或愿望始终没有完全消失"
+  ],
+  "stakeAxes": [
+    "自我认同",
+    "既有责任",
+    "经济安全",
+    "旧关系",
+    "新能力",
+    "重新开始的时间"
+  ],
+  "focusForceIds": [
+    "modern.family",
+    "modern.work",
+    "modern.education",
+    "modern.city",
+    "modern.peers"
+  ],
+  "acts": [
+    {
+      "id": "modern.second-start.first-life",
+      "label": "旧路",
+      "objective": "建立一条具体生活道路，并理解它给予和拿走了什么。",
+      "dramaticQuestion": "人物追求的是自己的愿望，还是熟悉的评价标准？",
+      "pressureDirection": "现实回报使人物继续投入，也逐渐暴露被忽略的需要。",
+      "payoffMeaning": "人物拥有了一段真实积累，同时看见了它无法解决的问题。",
+      "worldCardRefs": [
+        "modern.snapshot.transition_2027",
+        "modern.snapshot.family_care"
+      ]
+    },
+    {
+      "id": "modern.second-start.break",
+      "label": "失向",
+      "objective": "面对原有道路的破裂、停滞或主动放弃，并保住重新选择的能力。",
+      "dramaticQuestion": "失去旧身份后，人物还剩下什么？",
+      "pressureDirection": "收入、家庭、年龄、羞耻与不确定性共同阻止转向。",
+      "payoffMeaning": "人物承认旧答案已经失效，并作出真正改变生活结构的行动。",
+      "worldCardRefs": [
+        "modern.snapshot.family_care",
+        "modern.snapshot.housing_and_mobility"
+      ]
+    },
+    {
+      "id": "modern.second-start.new-life",
+      "label": "新生",
+      "objective": "把过往能力和代价转化为一条可持续的新生活道路。",
+      "dramaticQuestion": "第二次选择能否比第一次更接近人物真正想要的人生？",
+      "pressureDirection": "旧责任与新机会发生最终碰撞，重启成果需要现实检验。",
+      "payoffMeaning": "人物以新的关系、工作或生活方式完成对自我的重新定义。",
+      "worldCardRefs": [
+        "modern.snapshot.housing_and_mobility",
+        "modern.snapshot.transition_2027"
+      ]
+    }
+  ],
+  "endingDirections": {
+    "good": [
+      "把旧人生的能力与教训转化为更自主的新生活",
+      "不以重启否定过去，也不再被过去决定未来"
+    ],
+    "normal": [
+      "完成现实可行的转向，并接受新生活同样存在限制"
+    ],
+    "bad": [
+      "在否认过去或逃避责任中重复原有困境",
+      "失去旧道路后始终无法建立新的生活支点"
+    ]
+  },
+  "worldCardRefs": [
+    "modern.snapshot.transition_2027",
+    "modern.snapshot.family_care",
+    "modern.snapshot.housing_and_mobility"
+  ]
+}

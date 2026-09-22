@@ -1,0 +1,35 @@
+{
+  "worldId": "my_world",
+  "cards": [
+    {
+      "id": "my_world.rule.consequences_are_lived",
+      "title": "选择会进入生活",
+      "kind": "world_rule",
+      "content": "重要选择通过人物关系、可用资源、生活安排与后来行动产生影响。",
+      "priority": 95,
+      "placement": "world",
+      "activation": { "tasks": ["horizon", "planning", "rendering", "dynamic", "decision"] },
+      "stickyTurns": 2
+    },
+    {
+      "id": "my_world.setting.selective_entry",
+      "title": "一项按需召回的局部设定",
+      "kind": "setting",
+      "content": "只在相关人物、地点、路线引用或关键词出现时有帮助的世界知识。",
+      "priority": 82,
+      "placement": "scenario",
+      "activation": { "keys": ["相关关键词"], "scanDepth": 3, "tasks": ["planning", "horizon", "rendering", "dynamic"] },
+      "cooldownTurns": 2
+    },
+    {
+      "id": "my_world.example.choice",
+      "title": "抉择场景表达样例",
+      "kind": "style_example",
+      "content": "写一小段只供模仿节奏和感官质地的正文，不放入必须复刻的专名与事实。",
+      "priority": 80,
+      "placement": "example",
+      "activation": { "beats": ["pressure", "climax"], "tasks": ["rendering", "dynamic"] },
+      "cooldownTurns": 3
+    }
+  ]
+}

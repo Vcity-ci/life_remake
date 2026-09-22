@@ -1,0 +1,86 @@
+{
+  "version": 1,
+  "id": "modern.career-maker",
+  "revision": "1.0.0",
+  "worldId": "modern",
+  "name": "事业造物",
+  "tagline": "在工作、创造与交换中，建立真正属于自己的事业。",
+  "summary": "从第一份可被社会需要的能力开始，经历组织、市场与合作者的压力，最终以事业、产品、作品或团队留下成果。",
+  "routePromise": "人物将通过工作与创造取得资源和影响力，在稳定、野心、伦理与个人生活之间作出连续选择，最终建立或失去一份真正属于自己的事业。",
+  "entryLens": "依据人设适配受雇、创业、手艺、自由职业、内容创作、家业接班或偶然机会等入口。",
+  "originSeeds": [
+    "人物较早认识到劳动如何换取资源与尊严",
+    "一项技能、作品或现实需求提供了最初机会"
+  ],
+  "stakeAxes": [
+    "职业能力",
+    "收入与资本",
+    "同事伙伴",
+    "市场认可",
+    "工作伦理",
+    "生活边界"
+  ],
+  "focusForceIds": [
+    "modern.work",
+    "modern.peers",
+    "modern.city",
+    "modern.institutions",
+    "modern.family"
+  ],
+  "acts": [
+    {
+      "id": "modern.career-maker.entry",
+      "label": "入局",
+      "objective": "找到可以立足的工作或创造方向，并完成第一次被现实认可的成果。",
+      "dramaticQuestion": "人物能靠什么在社会交换中站稳脚跟？",
+      "pressureDirection": "经验不足、收入需求与组织规则迫使人物证明价值。",
+      "payoffMeaning": "人物取得了独立行动所需的能力、信用或第一批伙伴。",
+      "worldCardRefs": [
+        "modern.snapshot.transition_2027",
+        "modern.snapshot.ai_and_work"
+      ]
+    },
+    {
+      "id": "modern.career-maker.scale",
+      "label": "成事",
+      "objective": "把个人能力扩展为稳定业务、作品体系或协作团队。",
+      "dramaticQuestion": "人物要以什么代价扩大自己的事业？",
+      "pressureDirection": "竞争、资金、管理、声誉与亲密关系同时牵动决定。",
+      "payoffMeaning": "人物已经能影响一群人的工作与现实选择。",
+      "worldCardRefs": [
+        "modern.snapshot.ai_and_work",
+        "modern.snapshot.housing_and_mobility"
+      ]
+    },
+    {
+      "id": "modern.career-maker.legacy",
+      "label": "立业",
+      "objective": "让事业面对一次决定长期价值的危机、机会或传承选择。",
+      "dramaticQuestion": "成功之后，人物究竟想留下什么？",
+      "pressureDirection": "控制权、伦理、公共影响与个人生活集中发生冲突。",
+      "payoffMeaning": "事业的去向与人物对成功的定义获得不可逆答案。",
+      "worldCardRefs": [
+        "modern.snapshot.housing_and_mobility",
+        "modern.snapshot.transition_2027"
+      ]
+    }
+  ],
+  "endingDirections": {
+    "good": [
+      "建立可持续且不背离初心的事业或作品",
+      "让合作者与后来者分享成果并保有完整生活"
+    ],
+    "normal": [
+      "取得稳定位置和现实成果，但规模、理想或生活只能保全一部分"
+    ],
+    "bad": [
+      "事业在失信、错误扩张或内耗中崩解",
+      "人物得到表面成功却失去关系、健康或创造本身"
+    ]
+  },
+  "worldCardRefs": [
+    "modern.snapshot.transition_2027",
+    "modern.snapshot.ai_and_work",
+    "modern.snapshot.housing_and_mobility"
+  ]
+}

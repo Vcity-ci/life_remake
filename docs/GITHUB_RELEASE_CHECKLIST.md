@@ -1,5 +1,11 @@
 # GitHub 上传前检查清单（v0.8.1）
 
+## 内容包发布核对补充：2026-09-21 +08:00
+
+- 当前古代、现代、奇幻均为 v10 基础世界，各自提供六条 IF 子世界包，共十八条可选路线。
+- 发布前同时校验 `data/narratives/*.story.json` 与 `data/narratives/story-packs/**/*.json`，并确认每条路线的 `worldId`、三幕命名空间和社会力量引用有效。
+- 社区扩展需要同时提供[基础世界模板](../examples/world-pack/WORLD_PACK_GUIDE.txt)与[IF 路线模板](../examples/world-pack/STORY_PACK_GUIDE.txt)。
+
 ## 文档发布核对补充：2026-09-10 00:26 +08:00
 
 - 对外功能以当前 [README](../README.md) 和各 docs 顶部增量记录为准；早期随机事件、古代唯一世界、双向结局描述不应再作为发布摘要。

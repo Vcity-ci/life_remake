@@ -1,0 +1,86 @@
+{
+  "version": 1,
+  "id": "fantasy.city-lord",
+  "revision": "1.0.0",
+  "worldId": "fantasy",
+  "name": "仙城争衡",
+  "tagline": "在家族、城邦与修行资源之间，掌握一座城的命运。",
+  "summary": "以修行城邦、家族网络、资源贸易和防卫秩序为中心，从基层事务进入权力核心，最终面对守城、夺城或改制。",
+  "routePromise": "人物将从城邦或修行家族中的具体位置起步，通过本领、经营与关系获得决定权，并在内外危机中回答力量如何成为可持续的治理。",
+  "entryLens": "依据人设适配家族子弟、坊市学徒、守卫、客卿、流民、异族商旅、被夺舍的继承人或偶然得到资源经营权等入口。",
+  "originSeeds": [
+    "人物较早看见修行资源如何决定普通人的安全与机会",
+    "家庭生计与一座城的家族、坊市或防御体系相连"
+  ],
+  "stakeAxes": [
+    "城防",
+    "修行资源",
+    "家族联盟",
+    "坊市信用",
+    "居民支持",
+    "外部势力"
+  ],
+  "focusForceIds": [
+    "fantasy.cities",
+    "fantasy.sects",
+    "fantasy.wanderers",
+    "fantasy.species",
+    "fantasy.uncanny"
+  ],
+  "acts": [
+    {
+      "id": "fantasy.city-lord.foothold",
+      "label": "立足",
+      "objective": "解决一项影响坊市、家族或城防的现实难题并取得可信位置。",
+      "dramaticQuestion": "人物靠血脉、财富、本领还是众人信任进入权力结构？",
+      "pressureDirection": "资源短缺、家族利益与普通居民的安全要求不同答案。",
+      "payoffMeaning": "人物获得了能够持续影响城邦事务的位置与盟友。",
+      "worldCardRefs": [
+        "fantasy.snapshot.old_pact",
+        "fantasy.snapshot.mortal_life"
+      ]
+    },
+    {
+      "id": "fantasy.city-lord.power",
+      "label": "掌城",
+      "objective": "在派系竞争和外部压力中形成自己的治理联盟。",
+      "dramaticQuestion": "掌握资源的人应当先保护谁？",
+      "pressureDirection": "宗门、家族、商路、异族和城内弱者争夺有限力量。",
+      "payoffMeaning": "人物已经能够调动一城资源，也必须承担由此产生的敌意与责任。",
+      "worldCardRefs": [
+        "fantasy.snapshot.mortal_life",
+        "fantasy.snapshot.three_rifts"
+      ]
+    },
+    {
+      "id": "fantasy.city-lord.siege",
+      "label": "定城",
+      "objective": "让城邦面对战争、禁区扩张或秩序崩溃，并决定其长期制度。",
+      "dramaticQuestion": "一座修行之城应成为少数强者的堡垒，还是众人共同生活的秩序？",
+      "pressureDirection": "守城代价、内部背叛、资源分配与个人突破集中冲突。",
+      "payoffMeaning": "城邦存亡及其制度因人物的选择获得最终方向。",
+      "worldCardRefs": [
+        "fantasy.snapshot.three_rifts",
+        "fantasy.snapshot.old_pact"
+      ]
+    }
+  ],
+  "endingDirections": {
+    "good": [
+      "守住城邦并建立资源、修行与安全能够长期运转的秩序",
+      "让不同出身的居民拥有可预期的生活与上升道路"
+    ],
+    "normal": [
+      "保住城邦或取得统治权，但旧家族、资源不均与外部威胁仍然存在"
+    ],
+    "bad": [
+      "在内斗、压榨或错误防卫中使城邦陷落",
+      "成为只为自身修行抽取一城生机的强者"
+    ]
+  },
+  "worldCardRefs": [
+    "fantasy.snapshot.old_pact",
+    "fantasy.snapshot.mortal_life",
+    "fantasy.snapshot.three_rifts"
+  ]
+}

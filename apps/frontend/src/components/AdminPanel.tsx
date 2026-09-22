@@ -17,7 +17,7 @@ interface Props {
   onClose: () => void;
   bootstrap: {
     deployMode: "local" | "cloud";
-    worlds: Array<{ id: string; name: string; intro: string }>;
+    worlds: Array<{ id: string; name: string; intro: string; storyPackCount?: number; playable?: boolean }>;
     difficulties: Array<{ id: string; name: string; description: string }>;
     limits: ProviderLimits;
   };
@@ -358,7 +358,7 @@ export function AdminPanel(props: Props): React.JSX.Element {
                 世界观
                 <select value={worldId} onChange={(e) => setWorldId(e.target.value)}>
                   {bootstrap.worlds.map((w) => (
-                    <option key={w.id} value={w.id}>{w.name}</option>
+                    <option key={w.id} value={w.id} disabled={w.playable === false}>{w.name}{w.playable === false ? "（暂无路线）" : ""}</option>
                   ))}
                 </select>
               </label>

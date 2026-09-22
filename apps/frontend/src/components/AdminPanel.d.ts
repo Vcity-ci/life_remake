@@ -8,6 +8,8 @@ interface Props {
             id: string;
             name: string;
             intro: string;
+            storyPackCount?: number;
+            playable?: boolean;
         }>;
         difficulties: Array<{
             id: string;

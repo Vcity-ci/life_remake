@@ -1,0 +1,86 @@
+{
+  "version": 1,
+  "id": "modern.public-voice",
+  "revision": "1.0.0",
+  "worldId": "modern",
+  "name": "众声之间",
+  "tagline": "从身边问题走向公共生活，在表达与行动中承担影响。",
+  "summary": "人物可能进入社区、媒体、公益、公共机构、行业组织或基层协作，以实际行动面对制度、舆论和不同群体的利益。",
+  "routePromise": "人物将从一件切身问题开始学习表达、组织与协商，逐步获得公共影响力，并在更大争议中决定自己如何使用声音和位置。",
+  "entryLens": "依据人设适配校园事务、社区困境、职业伦理、网络表达、公益参与、公共服务或偶然卷入的现实事件。",
+  "originSeeds": [
+    "人物较早看见规则对不同人的影响并不相同",
+    "一次被帮助、被忽视或替他人发声的经历留下长期印象"
+  ],
+  "stakeAxes": [
+    "公共信任",
+    "制度程序",
+    "舆论",
+    "组织伙伴",
+    "个人安全",
+    "现实成效"
+  ],
+  "focusForceIds": [
+    "modern.institutions",
+    "modern.peers",
+    "modern.city",
+    "modern.work",
+    "modern.family"
+  ],
+  "acts": [
+    {
+      "id": "modern.public-voice.concern",
+      "label": "发声",
+      "objective": "围绕一个切身问题完成第一次有效表达或集体行动。",
+      "dramaticQuestion": "人物愿意为谁发声，又是否理解问题全貌？",
+      "pressureDirection": "冷漠、误解、程序与私人关系让简单立场变得复杂。",
+      "payoffMeaning": "人物获得了真实回应，也进入了需要持续承担的公共关系。",
+      "worldCardRefs": [
+        "modern.snapshot.platform_reputation",
+        "modern.snapshot.transition_2027"
+      ]
+    },
+    {
+      "id": "modern.public-voice.organize",
+      "label": "共事",
+      "objective": "与不同立场的人建立协作，使诉求转化为可执行的改变。",
+      "dramaticQuestion": "影响现实需要怎样的妥协，又有哪些底线不能交换？",
+      "pressureDirection": "组织分歧、资源、舆论和制度边界同时施压。",
+      "payoffMeaning": "人物不再只是表达者，而成为能推动现实进程的人。",
+      "worldCardRefs": [
+        "modern.snapshot.transition_2027",
+        "modern.snapshot.education_channels"
+      ]
+    },
+    {
+      "id": "modern.public-voice.consequence",
+      "label": "担责",
+      "objective": "让公共影响面对一次重大争议、危机或权力检验。",
+      "dramaticQuestion": "当声音真正有力量时，人物如何为后果负责？",
+      "pressureDirection": "名望、事实、群体利益与个人代价集中冲突。",
+      "payoffMeaning": "人物的公共角色及其实际影响获得长期评价。",
+      "worldCardRefs": [
+        "modern.snapshot.education_channels",
+        "modern.snapshot.platform_reputation"
+      ]
+    }
+  ],
+  "endingDirections": {
+    "good": [
+      "以可靠行动建立公共信任并留下可持续改变",
+      "在拥有影响力后仍尊重事实、程序与具体的人"
+    ],
+    "normal": [
+      "推动了有限改变，也接受公共事务中的妥协和反复"
+    ],
+    "bad": [
+      "因操纵、失实或权力诱惑失去公共信任",
+      "在长期冲突中耗尽自己并伤害原本想保护的人"
+    ]
+  },
+  "worldCardRefs": [
+    "modern.snapshot.platform_reputation",
+    "modern.snapshot.transition_2027",
+    "modern.snapshot.education_channels"
+  ]
+}

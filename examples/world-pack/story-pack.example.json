@@ -1,0 +1,52 @@
+{
+  "version": 1,
+  "id": "my_world.my_route",
+  "revision": "1.0.0",
+  "worldId": "my_world",
+  "name": "我的人生路线",
+  "tagline": "用一句话说明玩家将进入怎样的人生。",
+  "summary": "说明这条 IF 线如何串联基础世界中的力量、处境和人生尺度。",
+  "routePromise": "描述从人物起点到最终结果的长期故事承诺，不规定每一场具体事件。",
+  "entryLens": "说明模型如何依据玩家人设与身世，为同一路线选择不同身份和开场契机。",
+  "originSeeds": [
+    "一项可被不同人设解释的早年处境",
+    "一项能自然连接世界力量的生活经验"
+  ],
+  "stakeAxes": ["重要关系", "个人成果", "现实代价"],
+  "focusForceIds": ["my_world.community", "my_world.institution"],
+  "worldCardRefs": ["my_world.rule.consequences_are_lived", "my_world.setting.selective_entry"],
+  "acts": [
+    {
+      "id": "my_world.my_route.foundation",
+      "label": "立足",
+      "objective": "让人物获得继续走这条路线所需的真实基础。",
+      "dramaticQuestion": "人物能否从被动处境转为主动选择？",
+      "pressureDirection": "世界中的关系与制度开始要求人物付出代价。",
+      "payoffMeaning": "人物已经拥有可持续行动的身份、关系或能力。",
+      "worldCardRefs": ["my_world.setting.selective_entry"]
+    },
+    {
+      "id": "my_world.my_route.commitment",
+      "label": "承担",
+      "objective": "扩大人物选择的影响，使路线目标成为真正的长期责任。",
+      "dramaticQuestion": "人物愿意用什么换取更大的可能？",
+      "pressureDirection": "既有成果、重要关系与现实责任发生冲突。",
+      "payoffMeaning": "人物的选择已经改变自己与周围人的未来。",
+      "worldCardRefs": ["my_world.rule.consequences_are_lived"]
+    },
+    {
+      "id": "my_world.my_route.fulfillment",
+      "label": "兑现",
+      "objective": "让一生积累面对最终检验，并回答路线承诺。",
+      "dramaticQuestion": "人物最终成为什么样的人，又留下了什么？",
+      "pressureDirection": "路线目标、历史代价和未竟关系集中到最后的取舍。",
+      "payoffMeaning": "路线的核心承诺得到不可逆的回答。",
+      "worldCardRefs": ["my_world.rule.consequences_are_lived"]
+    }
+  ],
+  "endingDirections": {
+    "good": ["路线目标得到可延续的实现", "重要关系与历史代价获得可信交代"],
+    "normal": ["人物实现部分目标，并接受现实留下的边界"],
+    "bad": ["人物失去路线中最重要的目标或关系，但其经历仍形成完整结果"]
+  }
+}

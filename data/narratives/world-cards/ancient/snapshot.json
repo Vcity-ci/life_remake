@@ -1,0 +1,80 @@
+{
+  "worldId": "ancient",
+  "cards": [
+    {
+      "id": "ancient.snapshot.jingyuan_reform",
+      "title": "景元新政与清丈",
+      "kind": "conflict",
+      "content": "景元十九年，皇帝萧稷借司礼监曹淳之手清丈田亩、追补隐税。新政能补国库，也直接触动士族、宗族和地方胥吏的利益；一纸田册会在不同人手里变成救急、勒索、翻案或投名状。",
+      "priority": 72,
+      "placement": "scenario",
+      "activation": { "keys": ["清丈", "田亩", "新政", "税", "田册"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] },
+      "relatedCardIds": ["ancient.snapshot.central_figures", "ancient.snapshot.local_society"],
+      "stickyTurns": 1,
+      "cooldownTurns": 3
+    },
+    {
+      "id": "ancient.snapshot.central_figures",
+      "title": "天阙城中的执局者",
+      "kind": "character",
+      "content": "皇帝萧稷急于中兴而多疑；首辅周廷玉代表清流与士族，善用程序和地方关系拖住新政；掌印曹淳控制内廷侦缉与新政执行；兵部尚书陆秉出身寒门、手握边军。四人互相需要，也互相防备，并非每段人生都必须与他们相遇。",
+      "priority": 62,
+      "placement": "scenario",
+      "activation": { "keys": ["皇帝", "首辅", "内阁", "司礼监", "兵部", "天阙"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "decision"] },
+      "inclusionGroup": "ancient.central-figures",
+      "cooldownTurns": 4
+    },
+    {
+      "id": "ancient.snapshot.nine_regions",
+      "title": "九洲地势与道路",
+      "kind": "geography",
+      "content": "中州人口与官署最密；东洲依海运、盐铁和港市而富；西洲多矿山、军户与跨境商路；南洲水网稻乡、宗族和教门深厚；北洲草原荒漠与边镇相接。人物移动时，生计、口音、物价、消息速度和可依赖的秩序都应随地域改变。",
+      "priority": 58,
+      "placement": "scenario",
+      "activation": { "keys": ["中州", "东洲", "西洲", "南洲", "北洲", "远行", "边镇", "港口"], "scanDepth": 4, "tasks": ["background", "planning", "horizon", "rendering", "dynamic"] },
+      "cooldownTurns": 2
+    },
+    {
+      "id": "ancient.snapshot.frontier_pressure",
+      "title": "欠饷边军与北方新汗国",
+      "kind": "conflict",
+      "content": "西、北两镇欠饷已久，军镇靠矿税、互市和私下交易维持。阿史那烈正在统一北方诸部，袭扰、互市、盟约和全面战争都可能发生；边民与普通士卒首先承担朝廷猜忌和外患之间的代价。",
+      "priority": 68,
+      "placement": "scenario",
+      "activation": { "keys": ["边军", "欠饷", "北方", "草原", "汗国", "互市", "军镇"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] },
+      "stickyTurns": 1,
+      "cooldownTurns": 3
+    },
+    {
+      "id": "ancient.snapshot.coastal_trade",
+      "title": "东洲海贸与灰色秩序",
+      "kind": "faction",
+      "content": "东洲许、沈等海商家族掌握船队、仓栈和海外消息，官营盐铁、合法海贸、走私与海盗之间边界模糊。财富可换取地方安定与朝中关系，也可能在禁海、军器和人口买卖上成为罪证。",
+      "priority": 57,
+      "placement": "scenario",
+      "activation": { "keys": ["海商", "船", "港", "盐", "走私", "海盗", "东洲"], "scanDepth": 4, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] },
+      "cooldownTurns": 3
+    },
+    {
+      "id": "ancient.snapshot.local_society",
+      "title": "宗族、胥吏与乡里",
+      "kind": "institution",
+      "content": "王法抵达乡里时要经过县官、胥吏、宗族、乡绅与保甲。宗族能赈济、办学和保护孤弱，也能隐田、私刑和排斥外来者；基层人物面对的权力往往不是抽象朝廷，而是谁保管册页、仓门和证词。",
+      "priority": 66,
+      "placement": "scenario",
+      "activation": { "keys": ["宗族", "乡里", "胥吏", "县衙", "族老", "保甲", "证词"], "scanDepth": 5, "tasks": ["background", "planning", "horizon", "rendering", "dynamic", "decision"] },
+      "stickyTurns": 1,
+      "cooldownTurns": 2
+    },
+    {
+      "id": "ancient.snapshot.popular_faith",
+      "title": "教门、医术与灾年",
+      "kind": "faction",
+      "content": "寺观、天师、医者和民间教门在灾病中提供解释与互助。南洲无生道借流民和饥馑扩张，正统教门与地方官既会救治也会争夺人心；神异传闻应通过仪式、病患、组织和现实后果进入故事。",
+      "priority": 55,
+      "placement": "scenario",
+      "activation": { "keys": ["教门", "寺", "观", "方术", "灾", "病", "无生道"], "scanDepth": 4, "tasks": ["background", "planning", "horizon", "rendering", "dynamic", "decision"] },
+      "cooldownTurns": 3
+    }
+  ]
+}

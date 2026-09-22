@@ -1,0 +1,86 @@
+{
+  "version": 1,
+  "id": "fantasy.otherkin-bond",
+  "revision": "1.0.0",
+  "worldId": "fantasy",
+  "name": "异族盟约",
+  "tagline": "跨越血脉与文明边界，在敌意中重写彼此的关系。",
+  "summary": "围绕异族身份、边境接触、文明误解与共同危机展开；不同族群内部也有分歧，主角可以是任何一方或夹在其间的人。",
+  "routePromise": "人物将因血脉、身世或一次边境相遇进入异族关系，在冲突与合作中取得跨越阵营的信任，最终决定两个或多个文明能否形成新的相处方式。",
+  "entryLens": "依据人设适配混血、俘虏、翻译、边民、使者、异族养子、敌方修士或意外共享力量与记忆等入口。",
+  "originSeeds": [
+    "人物较早发现关于异族的传言与实际生活并不完全一致",
+    "家庭、血脉或故乡与一段旧盟约或旧冲突有关"
+  ],
+  "stakeAxes": [
+    "身份认同",
+    "语言与习俗",
+    "边境安全",
+    "族群信任",
+    "资源与领地",
+    "旧仇与新盟"
+  ],
+  "focusForceIds": [
+    "fantasy.species",
+    "fantasy.cities",
+    "fantasy.sects",
+    "fantasy.wanderers",
+    "fantasy.celestial"
+  ],
+  "acts": [
+    {
+      "id": "fantasy.otherkin-bond.contact",
+      "label": "相见",
+      "objective": "在一次真实冲突或互助中建立跨族群的个人关系与共同事实。",
+      "dramaticQuestion": "人物相信 inherited 的敌意，还是眼前具体的人？",
+      "pressureDirection": "语言、习俗、身份暴露与双方恐惧使理解付出代价。",
+      "payoffMeaning": "人物拥有了另一文明中的名字、关系和必须回应的承诺。",
+      "worldCardRefs": [
+        "fantasy.snapshot.other_civilizations",
+        "fantasy.snapshot.three_rifts"
+      ]
+    },
+    {
+      "id": "fantasy.otherkin-bond.alliance",
+      "label": "结盟",
+      "objective": "围绕共同威胁或利益建立能够经受背叛风险的合作。",
+      "dramaticQuestion": "个人信任怎样成为群体可以接受的盟约？",
+      "pressureDirection": "各自内部的强硬者、旧仇和资源争端持续破坏合作。",
+      "payoffMeaning": "人物成为双方都无法绕开的中介、代表或共同领袖。",
+      "worldCardRefs": [
+        "fantasy.snapshot.three_rifts",
+        "fantasy.snapshot.two_layers"
+      ]
+    },
+    {
+      "id": "fantasy.otherkin-bond.new-order",
+      "label": "共界",
+      "objective": "在战争、迁徙或天地异变中决定多个文明的长期边界。",
+      "dramaticQuestion": "和平需要同化、分隔，还是共同创造新的秩序？",
+      "pressureDirection": "生存空间、牺牲、身份忠诚和古老誓约集中爆发。",
+      "payoffMeaning": "族群关系因人物的选择形成战争、联盟或全新的共同生活方式。",
+      "worldCardRefs": [
+        "fantasy.snapshot.two_layers",
+        "fantasy.snapshot.other_civilizations"
+      ]
+    }
+  ],
+  "endingDirections": {
+    "good": [
+      "建立尊重差异且能够处理冲突的长期盟约",
+      "让跨族群关系从个人奇迹变成可以延续的现实秩序"
+    ],
+    "normal": [
+      "终结主要冲突并留下有限合作，但旧怨与边界仍需后人维护"
+    ],
+    "bad": [
+      "在猜忌与报复中使冲突升级为长期战争",
+      "为证明单一身份而背叛真正信任自己的人"
+    ]
+  },
+  "worldCardRefs": [
+    "fantasy.snapshot.other_civilizations",
+    "fantasy.snapshot.three_rifts",
+    "fantasy.snapshot.two_layers"
+  ]
+}

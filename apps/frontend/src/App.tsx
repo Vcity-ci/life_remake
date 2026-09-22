@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import type { CurrentGameRunResponse, ProviderConfig, ProviderLimits, PublicBackgroundCard, PublicRunState, RunPhase, SaveSlotSummary, StartAllocationConfig, StatKey, Stats, StepAction, SurvivalChoice, TurnRecord } from "@reroll/shared";
+import type { CurrentGameRunResponse, ProviderConfig, ProviderLimits, PublicBackgroundCard, PublicRunState, PublicStoryPackOption, RunPhase, SaveSlotSummary, StartAllocationConfig, StatKey, Stats, StepAction, SurvivalChoice, TurnRecord } from "@reroll/shared";
 import { AdminPanel } from "./components/AdminPanel";
 import { FateArchiveContent, TalentArchive, type DecisionHistoryGroup } from "./components/FateArchive";
 import { NarrativeAssetChanges } from "./components/NarrativeAssets";
+import { StoryPackPickerModal } from "./components/StoryPackPickerModal";
 import {
   ApiError,
   createSaveSlot,
@@ -23,7 +24,8 @@ import { getOrCreateClientId, readLocalProviderConfig, writeLocalProviderConfig 
 
 interface BootstrapState {
   deployMode: "local" | "cloud";
-  worlds: Array<{ id: string; name: string; intro: string }>;
+  worlds: Array<{ id: string; name: string; intro: string; storyPackCount?: number; playable?: boolean }>;
+  storyPacks: PublicStoryPackOption[];
   difficulties: Array<{ id: string; name: string; description: string }>;
   cardPool: PublicBackgroundCard[];
   talentPointTotal: number;
@@ -149,6 +151,7 @@ export default function App(): React.JSX.Element {
   const [bootstrap, setBootstrap] = useState<BootstrapState | null>(null);
   const [runtimeMode, setRuntimeMode] = useState<"cloud" | "local">("local");
   const [worldId, setWorldId] = useState("ancient");
+  const [storyPackId, setStoryPackId] = useState("");
   const [difficultyId, setDifficultyId] = useState("standard");
   const [personaPrompt, setPersonaPrompt] = useState("");
   const [selectedCards, setSelectedCards] = useState<string[]>([]);
@@ -156,6 +159,8 @@ export default function App(): React.JSX.Element {
   const [run, setRun] = useState<PublicRunState | null>(null);
   const [status, setStatus] = useState("初始化中...");
   const [showSettings, setShowSettings] = useState(false);
+  const [showStoryPackPicker, setShowStoryPackPicker] = useState(false);
+  const [storyPackDraftId, setStoryPackDraftId] = useState("");
   const [envReady, setEnvReady] = useState(false);
   const [turns, setTurns] = useState<TurnRecord[]>([]);
   const [showEndingModal, setShowEndingModal] = useState(false);
@@ -184,6 +189,14 @@ export default function App(): React.JSX.Element {
   const isMobileArchive = useMediaQuery("(max-width: 720px)");
 
   const timeline = turns;
+  const availableStoryPacks = useMemo(
+    () => bootstrap?.storyPacks.filter((pack) => pack.worldId === worldId) ?? [],
+    [bootstrap, worldId]
+  );
+  const selectedStoryPack = useMemo(
+    () => availableStoryPacks.find((pack) => pack.id === storyPackId),
+    [availableStoryPacks, storyPackId]
+  );
   const visibleAssets = turns.length ? turns[turns.length - 1].narrativeAssetsSnapshot : run?.narrativeAssets;
   const activeDecision = useMemo<MilestoneChoice | undefined>(() => (
     [...turns].reverse().find((turn) => turn.choice && !turn.choiceOutcome)?.choice
@@ -357,8 +370,27 @@ export default function App(): React.JSX.Element {
     }
   }, [bootstrap]);
 
+  useEffect(() => {
+    if (!bootstrap) return;
+    setStoryPackId((current) => availableStoryPacks.some((pack) => pack.id === current) ? current : "");
+    setStoryPackDraftId((current) => availableStoryPacks.some((pack) => pack.id === current) ? current : "");
+  }, [bootstrap, availableStoryPacks]);
+
+  function openStoryPackPicker(): void {
+    setStoryPackDraftId(availableStoryPacks.some((pack) => pack.id === storyPackId) ? storyPackId : "");
+    setShowStoryPackPicker(true);
+  }
+
+  function confirmStoryPack(): void {
+    if (!availableStoryPacks.some((pack) => pack.id === storyPackDraftId)) return;
+    setStoryPackId(storyPackDraftId);
+    setShowStoryPackPicker(false);
+    setStatus("此生路线已确认，可以继续创建角色。");
+  }
+
   const canStart = useMemo(() => {
     if (!bootstrap || !envReady) return false;
+    if (!availableStoryPacks.some((pack) => pack.id === storyPackId)) return false;
     if (personaPrompt.trim().length < 4) return false;
     const allocated =
       stats.intelligence + stats.charisma + stats.physique + stats.family + stats.fortune;
@@ -369,12 +401,13 @@ export default function App(): React.JSX.Element {
       selectedCards.length > bootstrap.startAllocation.selectedCardMax
     ) return false;
     return true;
-  }, [bootstrap, envReady, personaPrompt, selectedCards, stats]);
+  }, [availableStoryPacks, bootstrap, envReady, personaPrompt, selectedCards, stats, storyPackId]);
   const canRandomStart = useMemo(() => {
     if (!bootstrap || !envReady) return false;
+    if (!availableStoryPacks.some((pack) => pack.id === storyPackId)) return false;
     if (personaPrompt.trim().length < 4) return false;
     return bootstrap.cardPool.length >= bootstrap.startAllocation.selectedCardMin;
-  }, [bootstrap, envReady, personaPrompt]);
+  }, [availableStoryPacks, bootstrap, envReady, personaPrompt, storyPackId]);
 
   const usedTalentPoints = useMemo(
     () => stats.intelligence + stats.charisma + stats.physique + stats.family + stats.fortune,
@@ -411,7 +444,9 @@ export default function App(): React.JSX.Element {
     })));
     setRun(restored);
     runRef.current = restored;
+    setShowStoryPackPicker(false);
     setWorldId(restored.worldId);
+    setStoryPackId(restored.storyPack?.id ?? "");
     setDifficultyId(restored.difficultyId);
     setPersonaPrompt(restored.personaPrompt);
     setStats(restored.stats);
@@ -632,6 +667,10 @@ export default function App(): React.JSX.Element {
       setEnvReady(true);
       setStatus(`本局环境已确认。`);
       setShowSettings(false);
+      if (!run) {
+        setStoryPackDraftId(availableStoryPacks.some((pack) => pack.id === storyPackId) ? storyPackId : "");
+        setShowStoryPackPicker(true);
+      }
     } catch {
       setEnvReady(false);
       setStatus("环境配置失败，请检查模型设置后重试。");
@@ -724,6 +763,7 @@ export default function App(): React.JSX.Element {
       await startRunStream({
         clientId,
         worldId,
+        storyPackId,
         difficultyId,
         personaPrompt,
         talentPointTotal: bootstrap.talentPointTotal,
@@ -1001,6 +1041,7 @@ export default function App(): React.JSX.Element {
       setRun(null);
       runRef.current = null;
       setPersonaPrompt("");
+      setStoryPackId("");
       setSelectedCards([]);
       setFlippedCards({});
       setStats(defaultStats);
@@ -1078,11 +1119,22 @@ export default function App(): React.JSX.Element {
       </header>
 
       <div className="game-content">
-        {!run ? (
-          <section className="panel start-panel">
-          <h2>创建角色</h2>
+	        {!run ? (
+	          <section className="panel start-panel">
+	          <h2>创建角色</h2>
 
-          <label>
+	          <section className={`story-pack-summary${selectedStoryPack ? " selected" : ""}`} aria-label="此生路线">
+	            <div>
+	              <small>{bootstrap.worlds.find((world) => world.id === worldId)?.name ?? worldId}</small>
+	              <strong>{selectedStoryPack?.name ?? "尚未选择此生路线"}</strong>
+	              <span>{selectedStoryPack?.tagline ?? "确认本局环境后，从该世界的 IF 剧情中选择一条人生路线。"}</span>
+	            </div>
+	            <button className="ghost" type="button" disabled={!availableStoryPacks.length} onClick={openStoryPackPicker}>
+	              {selectedStoryPack ? "重新选择" : "选择路线"}
+	            </button>
+	          </section>
+
+	          <label>
             人设提示词
             <textarea
               rows={4}
@@ -1150,7 +1202,7 @@ export default function App(): React.JSX.Element {
         ) : (
           <section className="run-panel reader-layout">
             <aside className="reader-rail character-rail">
-              <div className="rail-title"><small>此生行至</small><strong>{run.age} 岁</strong><span>{run.ageStage.label}</span></div>
+	              <div className="rail-title"><small>{run.storyPack?.name ?? "此生行至"}</small><strong>{run.age} 岁</strong><span>{run.ageStage.label}</span></div>
               <dl className="stat-list">
                 {statKeys.map((key) => {
                   const tier = run.statTiers?.[key] ?? "steady";
@@ -1311,9 +1363,25 @@ export default function App(): React.JSX.Element {
           canConfirmEnv={canConfirmEnv}
           envReady={envReady}
           worldId={worldId}
-          setWorldId={setWorldId}
+          setWorldId={(nextWorldId) => {
+            setWorldId(nextWorldId);
+            setStoryPackId("");
+            setStoryPackDraftId("");
+            setShowStoryPackPicker(false);
+          }}
           difficultyId={difficultyId}
           setDifficultyId={setDifficultyId}
+        />
+      ) : null}
+
+      {!run && showStoryPackPicker ? (
+        <StoryPackPickerModal
+          worldName={bootstrap.worlds.find((world) => world.id === worldId)?.name ?? worldId}
+          storyPacks={availableStoryPacks}
+          selectedId={storyPackDraftId}
+          onSelect={setStoryPackDraftId}
+          onConfirm={confirmStoryPack}
+          onClose={() => setShowStoryPackPicker(false)}
         />
       ) : null}
 
@@ -1397,7 +1465,7 @@ export default function App(): React.JSX.Element {
                     <article className="save-item" key={slot.id}>
                       <div>
                         <strong>{slot.title}</strong>
-                        <small>{slot.age}岁 · {slot.kind === "decision" ? "抉择分岔" : slot.ended ? "已结局" : "进行中"} · {formatSaveTime(slot.updatedAt)}</small>
+	                        <small>{slot.storyPackName ? `${slot.storyPackName} · ` : ""}{slot.age}岁 · {slot.kind === "decision" ? "抉择分岔" : slot.ended ? "已结局" : "进行中"} · {formatSaveTime(slot.updatedAt)}</small>
                       </div>
                       <div className="save-actions">
                         <button className="ghost" disabled={saveWorking} onClick={() => void restoreSavedRun(slot.id)}>{slot.kind === "decision" ? "回到分岔" : "恢复"}</button>

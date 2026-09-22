@@ -27,6 +27,7 @@ import type {
   MilestoneChoice,
   NarrativeRunState,
   NarrativeStatTier,
+  NarrativeStoryPackSnapshot,
   NarrativeSurvivalRule,
   NarrativeThreadState,
   NarrativeWorldDefinition,
@@ -82,6 +83,7 @@ interface EngineContext {
   cards: BackgroundCard[];
   tuning: GameplayTuning;
   narrativeEnabled?: boolean;
+  storyPack?: NarrativeStoryPackSnapshot;
 }
 
 type Rng = () => number;
@@ -185,6 +187,9 @@ export interface InternalRunState extends RunState {
   narrative: NarrativeRunState;
   /** The world package which enabled the narrative runtime for this run. */
   narrativeWorldId?: string;
+  storyPackId?: string;
+  storyPackRevision?: string;
+  storyPackSnapshot?: NarrativeStoryPackSnapshot;
   pendingDirectedDecisionEffects?: Record<DecisionType, DirectedDecisionEffect>;
   pendingDirectedDecisionPolicy?: Record<DecisionType, PendingDirectedDecisionPolicy>;
   pendingDirectedDecisionDirections?: Record<DecisionType, StoryDirectionDefinition>;
@@ -1584,6 +1589,9 @@ export function createRun(ctx: EngineContext, req: StartRunRequest): InternalRun
     story: createStoryDirectorState(ctx.world.id),
     narrative: createNarrativeRunState(Boolean(ctx.narrativeEnabled)),
     narrativeWorldId: ctx.narrativeEnabled ? ctx.world.id : undefined,
+    storyPackId: ctx.storyPack?.id,
+    storyPackRevision: ctx.storyPack?.revision,
+    storyPackSnapshot: ctx.storyPack ? structuredClone(ctx.storyPack) : undefined,
     narrativeReservoir: {
       queued: [],
       revealedCount: 0,
@@ -3988,6 +3996,12 @@ export function toClientRun(run: InternalRunState): PublicRunState {
   return {
     runId: run.runId,
     worldId: run.worldId,
+    storyPack: run.storyPackSnapshot ? {
+      id: run.storyPackSnapshot.id,
+      revision: run.storyPackSnapshot.revision,
+      name: run.storyPackSnapshot.name,
+      tagline: run.storyPackSnapshot.tagline
+    } : undefined,
     difficultyId: run.difficultyId,
     age: visibleAge,
     ageStage: { label: visibleStage.label },

@@ -27,9 +27,9 @@ export function NarrativeAssetsArchive({ assets }: { assets?: PublicNarrativeAss
         <small>{assets?.abilities.length ? `${assets.abilities.length}项` : "尚待积累"}</small>
       </summary>
       <div className="archive-index">
-        {assets?.abilities.length ? assets.abilities.map((entry) => <details className={`archive-entry${entry.status === "unavailable" ? " is-unavailable" : ""}`} key={entry.id}>
-          <summary><span>{entry.name}</span><small>{entry.mastery}{entry.status === "unavailable" ? " · 暂不可用" : ""}</small></summary>
-          <div className="archive-entry-content"><p>{entry.description}</p><p className="asset-source">来处：{entry.source}</p><small>{momentLabel(entry.introduced)}习得</small></div>
+        {assets?.abilities.length ? assets.abilities.map((entry) => <details className={`archive-entry ability-entry${entry.status === "unavailable" ? " is-unavailable" : ""}`} key={entry.id}>
+          <summary><span>{entry.name}</span><small>{entry.status === "unavailable" ? "暂不可用" : "可用"}</small></summary>
+          <div className="archive-entry-content"><p className="asset-mastery"><strong>掌握：</strong>{entry.mastery}</p><p>{entry.description}</p><p className="asset-source">来处：{entry.source}</p><small>{momentLabel(entry.introduced)}习得</small></div>
         </details>) : <p className="archive-empty">所学尚待积累。</p>}
       </div>
     </details>

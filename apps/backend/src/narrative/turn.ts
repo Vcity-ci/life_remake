@@ -3,7 +3,7 @@ import type { NarrativeBeat, NarrativeHorizonPlan, NarrativeStatTier, StatKey } 
 export type NarrativeTurnKind = "background" | "scene";
 export type NarrativeTurnCapability = "background" | "scene" | "choice";
 export type NarrativeTurnSource = "background" | "scene" | "closure";
-export type NarrativeFocusKind = "fact" | "character" | "location" | "ability";
+export type NarrativeFocusKind = "fact" | "character" | "location" | "ability" | "world_card";
 
 export interface NarrativeSocialForceReference {
   id: string;

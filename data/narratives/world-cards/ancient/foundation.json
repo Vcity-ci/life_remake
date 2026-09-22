@@ -1,0 +1,252 @@
+{
+  "worldId": "ancient",
+  "cards": [
+    {
+      "id": "ancient.rule.power_is_access",
+      "title": "权力需要实际入口",
+      "kind": "world_rule",
+      "content": "权力首先表现为谁能见到谁、谁的文书被受理、谁能调动钱粮与人手。人物身份不同，同一件事应呈现不同入口与代价；不默认人物拥有官职、兵权或门第。",
+      "priority": 96,
+      "activation": {
+        "tasks": [
+          "horizon",
+          "planning",
+          "rendering",
+          "dynamic",
+          "decision"
+        ]
+      },
+      "stickyTurns": 2
+    },
+    {
+      "id": "ancient.culture.household_and_clan",
+      "title": "家宅、宗族与邻里",
+      "kind": "culture",
+      "content": "家宅并非封闭小院：婚丧、借贷、田产、学费、照料与名声会把亲族和邻里连在一起。族中长幼各有体面与难处，家门可以提供人情和庇护，也会要求成员替共同声誉承担代价。",
+      "priority": 86,
+      "placement": "scenario",
+      "activation": {
+        "keys": [
+          "家",
+          "父",
+          "母",
+          "亲",
+          "宗族",
+          "婚",
+          "田产",
+          "邻里"
+        ],
+        "scanDepth": 4,
+        "tasks": [
+          "background",
+          "planning",
+          "rendering",
+          "dynamic",
+          "decision"
+        ]
+      },
+      "stickyTurns": 2,
+      "cooldownTurns": 2
+    },
+    {
+      "id": "ancient.institution.local_yamen",
+      "title": "县署的实际门径",
+      "kind": "institution",
+      "content": "县署由堂官、佐贰、书吏、差役和地方中人共同运转。告状先要有人写状、认保和递送，查验又依赖熟悉乡情的人；公文上的一句话落到地方，往往还要经过催办、筹措和人情周转。",
+      "priority": 87,
+      "placement": "scenario",
+      "activation": {
+        "keys": [
+          "县衙",
+          "官署",
+          "告状",
+          "差役",
+          "书吏",
+          "公文",
+          "审问"
+        ],
+        "scanDepth": 4,
+        "tasks": [
+          "planning",
+          "rendering",
+          "dynamic",
+          "decision"
+        ]
+      },
+      "relatedCardIds": [
+        "ancient.rule.power_is_access"
+      ],
+      "stickyTurns": 2,
+      "cooldownTurns": 3
+    },
+    {
+      "id": "ancient.geography.roads_and_waterways",
+      "title": "驿路与水路",
+      "kind": "geography",
+      "content": "驿路、水道、渡口与山径决定消息和物资怎样抵达。雨季会改变河面与道路，关津查验会拖慢行程，脚夫、船户、客栈和沿途市镇掌握着官文之外的真实动静。",
+      "priority": 84,
+      "placement": "scenario",
+      "activation": {
+        "keys": [
+          "河",
+          "渡口",
+          "驿路",
+          "行旅",
+          "船",
+          "山路",
+          "客栈",
+          "关津"
+        ],
+        "scanDepth": 4,
+        "tasks": [
+          "background",
+          "planning",
+          "rendering",
+          "dynamic",
+          "decision"
+        ]
+      },
+      "cooldownTurns": 2
+    },
+    {
+      "id": "ancient.culture.market_and_craft",
+      "title": "街市与营生",
+      "kind": "culture",
+      "content": "街市的秩序由行商、坐贾、工匠、牙人、脚夫和巡街者共同维持。价格背后是货源、时令、赊欠与信用；一门手艺既能换来独立生活，也会让人物卷入行会、主顾和地方权势。",
+      "priority": 84,
+      "placement": "scenario",
+      "activation": {
+        "keys": [
+          "街市",
+          "商",
+          "铺",
+          "工匠",
+          "买卖",
+          "货",
+          "银钱",
+          "营生"
+        ],
+        "scanDepth": 4,
+        "tasks": [
+          "background",
+          "planning",
+          "rendering",
+          "dynamic",
+          "decision"
+        ]
+      },
+      "cooldownTurns": 2
+    },
+    {
+      "id": "ancient.institution.academy_and_examination",
+      "title": "书院与取士",
+      "kind": "institution",
+      "content": "蒙学、私塾、书院和科场连接着师生、同年、地方声望与家中供养。读书不仅是答卷，也包括拜师、讲学、抄书、游学和对现实事务的判断；功名能打开门径，却不会自动带来办事能力。",
+      "priority": 85,
+      "placement": "scenario",
+      "activation": {
+        "keys": [
+          "读书",
+          "书院",
+          "先生",
+          "科举",
+          "科场",
+          "同窗",
+          "文章",
+          "功名"
+        ],
+        "scanDepth": 4,
+        "tasks": [
+          "background",
+          "planning",
+          "rendering",
+          "dynamic",
+          "decision"
+        ]
+      },
+      "cooldownTurns": 2
+    },
+    {
+      "id": "ancient.motif.season_and_status",
+      "title": "时令中的身份",
+      "kind": "motif",
+      "content": "同一场雨落在瓦舍、官道、田亩和军营会显出不同生活：有人担心屋漏，有人盘算河运，有人等待开印，有人检查弓弦。衣料、称呼、座次、灯火与出门时辰都能自然显出人物处境。",
+      "priority": 76,
+      "placement": "scenario",
+      "activation": {
+        "keys": [
+          "春",
+          "夏",
+          "秋",
+          "冬",
+          "雨",
+          "雪",
+          "夜",
+          "节令"
+        ],
+        "scanDepth": 3,
+        "tasks": [
+          "background",
+          "rendering",
+          "dynamic"
+        ]
+      },
+      "cooldownTurns": 3
+    },
+    {
+      "id": "ancient.example.background",
+      "title": "古代普通人生段节奏",
+      "kind": "style_example",
+      "content": "几年间，你从替家中记账做到能独自去市集交割。春汛冲坏木桥时，你和邻人绕了三日远路，也第一次听见外乡商客谈起山外的光景。日子没有骤然改头换面，只是你看人、办事都比从前稳了些。",
+      "priority": 83,
+      "placement": "example",
+      "activation": {
+        "tasks": [
+          "background"
+        ]
+      },
+      "inclusionGroup": "ancient.style.turn",
+      "cooldownTurns": 2
+    },
+    {
+      "id": "ancient.example.choice",
+      "title": "古代抉择场景节奏",
+      "kind": "style_example",
+      "content": "差役把封条按上粮仓时，掌柜仍攥着那本湿透的账册。廊下等米的人越聚越多，主簿却催你在天黑前具名。掌柜低声说账册能证明亏空另有来处，只求你给他半个时辰；身后的差役已经伸手来取钥匙。",
+      "priority": 86,
+      "placement": "example",
+      "activation": {
+        "tasks": [
+          "rendering",
+          "dynamic"
+        ],
+        "beats": [
+          "pressure",
+          "climax"
+        ]
+      },
+      "inclusionGroup": "ancient.style.turn",
+      "cooldownTurns": 2
+    },
+    {
+      "id": "ancient.example.payoff",
+      "title": "古代收束节奏",
+      "kind": "style_example",
+      "content": "官仓重新开门那日，欠下的粮票按名册补发，掌柜也在堂前认了该认的罪。入冬后，街口多了一间由灾民合办的小铺；有人见你仍会避开，也有人隔着人群点头。那场纷争已经落定，留下的是往后要相处的新秩序。",
+      "priority": 88,
+      "placement": "example",
+      "activation": {
+        "tasks": [
+          "rendering",
+          "dynamic",
+          "decision"
+        ],
+        "beats": [
+          "payoff"
+        ]
+      },
+      "inclusionGroup": "ancient.style.turn",
+      "cooldownTurns": 2
+    }
+  ]
+}

@@ -1,0 +1,86 @@
+{
+  "version": 1,
+  "id": "modern.scholar-road",
+  "revision": "1.0.0",
+  "worldId": "modern",
+  "name": "学途成章",
+  "tagline": "从求知与选择出发，让所学真正进入现实生活。",
+  "summary": "围绕学习、升学、专业与知识实践展开的人生路线；成绩只是入口，人物最终要决定自己为何而学、又把能力用于何处。",
+  "routePromise": "人物将从具体的学习环境中形成兴趣与能力，经历升学、专业和现实资源的取舍，最终让所学成为事业、创造或生活方式的一部分。",
+  "entryLens": "依据人设适配普通校园、职业教育、自学、竞赛、家庭传承或成年后重返学习等入口，不预设学历层级。",
+  "originSeeds": [
+    "家庭对教育投入与期待塑造了最初机会",
+    "一次课堂、阅读、实践或师友相遇唤起长期兴趣"
+  ],
+  "stakeAxes": [
+    "学习能力",
+    "教育资源",
+    "师友关系",
+    "专业选择",
+    "家庭期待",
+    "知识的现实用途"
+  ],
+  "focusForceIds": [
+    "modern.education",
+    "modern.family",
+    "modern.peers",
+    "modern.institutions",
+    "modern.work"
+  ],
+  "acts": [
+    {
+      "id": "modern.scholar-road.apprenticeship",
+      "label": "求知",
+      "objective": "形成一项可持续投入的学习方向，并获得真实的训练、作品或认可。",
+      "dramaticQuestion": "人物愿意为什么而学，又能否找到适合自己的方法？",
+      "pressureDirection": "成绩、资源、家庭期待与个人兴趣开始发生冲突。",
+      "payoffMeaning": "人物拥有了可以继续深造或投入现实的能力基础。",
+      "worldCardRefs": [
+        "modern.snapshot.education_channels",
+        "modern.snapshot.ai_and_work"
+      ]
+    },
+    {
+      "id": "modern.scholar-road.choice",
+      "label": "择业",
+      "objective": "在升学、专业、工作与生活条件之间作出会长期影响人生的选择。",
+      "dramaticQuestion": "所学应当服从安全、热爱，还是现实责任？",
+      "pressureDirection": "机会成本、制度门槛和重要关系要求人物承担选择后果。",
+      "payoffMeaning": "人物确立了知识进入现实的道路，也失去了一部分可能。",
+      "worldCardRefs": [
+        "modern.snapshot.ai_and_work",
+        "modern.snapshot.transition_2027"
+      ]
+    },
+    {
+      "id": "modern.scholar-road.practice",
+      "label": "成章",
+      "objective": "以专业能力回应一个足够重要的现实问题，并形成可被他人承接的成果。",
+      "dramaticQuestion": "人物的知识最终改变了什么？",
+      "pressureDirection": "职业伦理、公共影响、个人生活与长期投入集中接受检验。",
+      "payoffMeaning": "人物以研究、教育、技术、作品或专业实践留下了明确结果。",
+      "worldCardRefs": [
+        "modern.snapshot.transition_2027",
+        "modern.snapshot.education_channels"
+      ]
+    }
+  ],
+  "endingDirections": {
+    "good": [
+      "将所学转化为长期成果并保有独立判断",
+      "建立能够继续成长、传授或服务他人的专业道路"
+    ],
+    "normal": [
+      "获得稳定专业位置，但理想、关系与现实之间仍留有妥协"
+    ],
+    "bad": [
+      "在资源耗尽或错误选择中失去继续学习的条件",
+      "能力被名利、制度或自我怀疑长期消磨"
+    ]
+  },
+  "worldCardRefs": [
+    "modern.snapshot.education_channels",
+    "modern.snapshot.ai_and_work",
+    "modern.snapshot.transition_2027"
+  ]
+}

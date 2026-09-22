@@ -65,6 +65,8 @@ import {
   writeContentBundle
 } from "./content.js";
 import { buildNarrativePromptPlan, narrativeRouteBeatGuidance, ensureNarrativeActRuntime, isNarrativeEarlyLife, isNarrativeMainlineActEntryReady, isNarrativeWorldStageReady, selectNarrativeGrowthFocus } from "./narrative.js";
+import { resolveNarrativeExperience } from "./narrative-experience.js";
+import { loadNarrativeStoryPack, loadNarrativeStoryPacksForWorld, toPublicStoryPackOption } from "./story-packs.js";
 import {
   attachTimelineChunk,
   applyDirectedMilestonePresentation,
@@ -483,7 +485,9 @@ function toPublicGameError(error: unknown): PublicGameError {
   if (
     message === "天赋点超出当前配置允许范围" ||
     message === "选卡数量超出当前配置允许范围" ||
-    message === "属性分配总和必须等于本局可用天赋点"
+    message === "属性分配总和必须等于本局可用天赋点" ||
+    message === "story_pack_required" ||
+    message === "story_pack_not_found"
   ) {
     return { status: 400, code: "invalid_start_request", message: "开局参数无效，请重新检查后开始。" };
   }
@@ -1250,7 +1254,12 @@ async function generateDirectedSegmentForRunUnsafe(options: DirectedSegmentOptio
       kind: "location" as const,
       label: (entry.text.split("=")[1] ?? entry.id).split(/[（：]/)[0] || entry.id
     })),
-    ...narrativeAbilityDirectory(run.narrative.assets).map((entry) => ({ id: entry.id, kind: "ability" as const, label: entry.label }))
+    ...narrativeAbilityDirectory(run.narrative.assets).map((entry) => ({ id: entry.id, kind: "ability" as const, label: entry.label })),
+    ...(narrativeCtx.narrativePlan!.activeWorldCardSources ?? []).map((entry) => ({
+      id: entry.id,
+      kind: "world_card" as const,
+      label: entry.title?.trim() || entry.id
+    }))
   ].filter((entry, index, all) => all.findIndex((candidate) => candidate.id === entry.id) === index);
   const growthFocus = runtime.growthFocusOptions?.find((focus) => focus.id === runtime.growthFocusId);
   const envelope: NarrativeTurnEnvelope = {
@@ -1618,12 +1627,16 @@ async function runStartFlowUnlocked(
   }
 
   const resources = await loadGameResources(body.worldId);
-  const { content, runtime, worldline, factions, factionEvents, narrativeWorld } = resources;
+  const { content, runtime, worldline, factions, factionEvents, narrativeWorld: baseNarrativeWorld } = resources;
   const tuning = resolveGameplayTuning(content);
   const allocation = toStartAllocationConfig(tuning);
   const world = resolveWorld(content.worlds, body.worldId);
   const difficulty = resolveDifficulty(content.difficulties, body.difficultyId);
   const milestoneEventPool = flattenMilestoneEventPool(factionEvents);
+  if (!baseNarrativeWorld || !body.storyPackId) throw new Error("story_pack_required");
+  const storyPack = await loadNarrativeStoryPack(baseNarrativeWorld, body.storyPackId);
+  if (!storyPack) throw new Error("story_pack_not_found");
+  const narrativeWorld = resolveNarrativeExperience(baseNarrativeWorld, storyPack);
 
   await clearSessionRuns(sessionId);
   const run = createRun(
@@ -1632,7 +1645,8 @@ async function runStartFlowUnlocked(
       difficulty,
       cards: content.cards,
       tuning,
-      narrativeEnabled: Boolean(narrativeWorld)
+      narrativeEnabled: true,
+      storyPack
     },
     body
   );
@@ -1768,7 +1782,9 @@ async function runStepFlowUnlocked(
     };
   }
   const resources = await loadGameResources(run.worldId);
-  const { content, runtime, worldline, factions, factionEvents, narrativeWorld } = resources;
+  const { content, runtime, worldline, factions, factionEvents, narrativeWorld: baseNarrativeWorld } = resources;
+  if (!baseNarrativeWorld || !run.storyPackSnapshot) throw new Error("story_pack_snapshot_required");
+  const narrativeWorld = resolveNarrativeExperience(baseNarrativeWorld, run.storyPackSnapshot);
   const tuning = resolveGameplayTuning(content);
   const allocation = toStartAllocationConfig(tuning);
   if (run.ended && run.narrativeReservoir.queued.length === 0) {
@@ -2199,6 +2215,12 @@ async function runStepFlowUnlocked(
 app.get("/api/meta/bootstrap", async (_req, res) => {
   const [content, runtime] = await Promise.all([readContentBundle(), readRuntimeConfig()]);
   const { worlds, cards, difficulties } = content;
+  const storyPackCatalog = await Promise.all(worlds.map(async (world) => {
+    const definition = await loadNarrativeWorldDefinition(world.id);
+    const packs = definition ? await loadNarrativeStoryPacksForWorld(definition) : [];
+    return { worldId: world.id, packs };
+  }));
+  const publicStoryPacks = storyPackCatalog.flatMap((entry) => entry.packs.map(toPublicStoryPackOption));
   const tuning = resolveGameplayTuning(content);
   const allocation = toStartAllocationConfig(tuning);
 
@@ -2208,7 +2230,11 @@ app.get("/api/meta/bootstrap", async (_req, res) => {
 
   res.json({
     deployMode,
-    worlds: worlds.map((world) => ({ id: world.id, name: world.name, intro: world.intro })),
+    worlds: worlds.map((world) => {
+      const storyPackCount = storyPackCatalog.find((entry) => entry.worldId === world.id)?.packs.length ?? 0;
+      return { id: world.id, name: world.name, intro: world.intro, storyPackCount, playable: storyPackCount > 0 };
+    }),
+    storyPacks: publicStoryPacks,
     difficulties: difficulties.map((difficulty) => ({
       id: difficulty.id,
       name: difficulty.name,

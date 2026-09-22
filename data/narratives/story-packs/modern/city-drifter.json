@@ -1,0 +1,86 @@
+{
+  "version": 1,
+  "id": "modern.city-drifter",
+  "revision": "1.0.0",
+  "worldId": "modern",
+  "name": "城中远行",
+  "tagline": "离开熟悉的地方，在迁徙与重建中寻找归属。",
+  "summary": "围绕升学、搬迁、转行与城市生活展开；地点不是布景，而会持续改变人物的机会、关系和生活半径。",
+  "routePromise": "人物将离开或重新认识熟悉的生活圈，在城市迁徙、职业转换和新关系中争取立足，最终决定何处以及怎样的生活才算归属。",
+  "entryLens": "依据人设适配求学离乡、务工、家庭搬迁、职业调动、逃离旧关系或主动寻找新生活等入口。",
+  "originSeeds": [
+    "熟悉环境提供安全，也限制了人物想成为的人",
+    "一次迁移机会或现实压力迫使家庭重新安排生活"
+  ],
+  "stakeAxes": [
+    "住处",
+    "收入",
+    "城市身份",
+    "故乡关系",
+    "新社群",
+    "生活节奏"
+  ],
+  "focusForceIds": [
+    "modern.city",
+    "modern.work",
+    "modern.family",
+    "modern.peers",
+    "modern.institutions"
+  ],
+  "acts": [
+    {
+      "id": "modern.city-drifter.departure",
+      "label": "离岸",
+      "objective": "完成一次真正改变生活半径的迁移，并找到最初立足点。",
+      "dramaticQuestion": "人物为什么离开，又准备舍弃什么？",
+      "pressureDirection": "费用、资格、家庭牵挂和陌生环境压缩选择空间。",
+      "payoffMeaning": "人物在新的地方获得了继续生活的实际位置。",
+      "worldCardRefs": [
+        "modern.snapshot.transition_2027",
+        "modern.snapshot.housing_and_mobility"
+      ]
+    },
+    {
+      "id": "modern.city-drifter.belonging",
+      "label": "扎根",
+      "objective": "建立工作、住处与关系网络，使新城市不再只是暂住地。",
+      "dramaticQuestion": "适应一座城市是否意味着改变自己？",
+      "pressureDirection": "阶层差异、通勤、孤独与故乡责任同时拉扯人物。",
+      "payoffMeaning": "人物建立了新的生活秩序，也明确了自己无法同时拥有的一切。",
+      "worldCardRefs": [
+        "modern.snapshot.housing_and_mobility",
+        "modern.snapshot.platform_reputation"
+      ]
+    },
+    {
+      "id": "modern.city-drifter.home",
+      "label": "归处",
+      "objective": "在一次迁移、家庭事件或城市变化中决定长期归属。",
+      "dramaticQuestion": "家是地点、关系，还是人物选择的生活？",
+      "pressureDirection": "留下、返回或再次远行都要求付出不可逆的代价。",
+      "payoffMeaning": "人物对归属和生活方式作出可以回望一生的决定。",
+      "worldCardRefs": [
+        "modern.snapshot.platform_reputation",
+        "modern.snapshot.transition_2027"
+      ]
+    }
+  ],
+  "endingDirections": {
+    "good": [
+      "在选择的地方建立稳定关系与自主生活",
+      "能够往返故乡与新生活而不再被任何一处完全困住"
+    ],
+    "normal": [
+      "获得现实立足点，但归属、家庭或职业仍存在长期拉扯"
+    ],
+    "bad": [
+      "在反复迁徙中耗尽资源并失去支持网络",
+      "为了留下或返回而牺牲全部自我选择"
+    ]
+  },
+  "worldCardRefs": [
+    "modern.snapshot.transition_2027",
+    "modern.snapshot.housing_and_mobility",
+    "modern.snapshot.platform_reputation"
+  ]
+}

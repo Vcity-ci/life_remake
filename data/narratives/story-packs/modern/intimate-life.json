@@ -1,0 +1,86 @@
+{
+  "version": 1,
+  "id": "modern.intimate-life",
+  "revision": "1.0.0",
+  "worldId": "modern",
+  "name": "相伴此生",
+  "tagline": "在相遇、共同生活与漫长照料中，回答爱如何成为选择。",
+  "summary": "以亲情、友情、爱情与家庭边界为中心的人生路线，不把婚姻视作唯一终点，而关注关系如何经受现实年月。",
+  "routePromise": "人物将从原生家庭和早年关系中理解亲密，在相遇与共同生活中学习承诺、边界和照料，最终形成自己愿意承担的家庭与关系方式。",
+  "entryLens": "依据人设适配青梅旧友、校园相识、工作伙伴、网络相遇、重组家庭、独身互助或其他长期关系入口。",
+  "originSeeds": [
+    "早年家庭中的亲近与缺失影响了人物表达感情的方式",
+    "一段友谊或被照料的经验成为理解关系的起点"
+  ],
+  "stakeAxes": [
+    "信任",
+    "共同生活",
+    "家庭责任",
+    "个人边界",
+    "经济安排",
+    "离别与照料"
+  ],
+  "focusForceIds": [
+    "modern.family",
+    "modern.peers",
+    "modern.city",
+    "modern.work",
+    "modern.institutions"
+  ],
+  "acts": [
+    {
+      "id": "modern.intimate-life.encounter",
+      "label": "相知",
+      "objective": "建立一段足以改变人物生活安排的重要关系。",
+      "dramaticQuestion": "人物能否真实地看见他人，也让自己被看见？",
+      "pressureDirection": "家庭经验、性格防御与现实距离考验最初信任。",
+      "payoffMeaning": "双方形成了愿意继续投入的关系与共同记忆。",
+      "worldCardRefs": [
+        "modern.snapshot.family_care",
+        "modern.snapshot.housing_and_mobility"
+      ]
+    },
+    {
+      "id": "modern.intimate-life.commitment",
+      "label": "相守",
+      "objective": "在住处、工作、金钱、家庭和未来计划中实践承诺。",
+      "dramaticQuestion": "感情如何进入并承受具体生活？",
+      "pressureDirection": "个人成长与共同责任不再天然一致，冲突需要真实协商。",
+      "payoffMeaning": "关系形成了可持续结构，或诚实地改变了原有形式。",
+      "worldCardRefs": [
+        "modern.snapshot.housing_and_mobility",
+        "modern.snapshot.transition_2027"
+      ]
+    },
+    {
+      "id": "modern.intimate-life.seasons",
+      "label": "相伴",
+      "objective": "让关系面对疾病、照料、代际变化、远行或重大人生转折。",
+      "dramaticQuestion": "岁月改变一切之后，人物仍愿意怎样相待？",
+      "pressureDirection": "失去、责任与个人未竟愿望集中考验关系的本质。",
+      "payoffMeaning": "人物最终形成了关于爱、家庭与陪伴的完整答案。",
+      "worldCardRefs": [
+        "modern.snapshot.transition_2027",
+        "modern.snapshot.family_care"
+      ]
+    }
+  ],
+  "endingDirections": {
+    "good": [
+      "建立有边界、有照料也允许彼此成长的长期关系",
+      "即使关系形式改变，仍保有诚实、尊重与共同承担"
+    ],
+    "normal": [
+      "在现实妥协中维持重要关系，并接受部分遗憾无法消除"
+    ],
+    "bad": [
+      "因控制、逃避或长期失信使重要关系破裂",
+      "把责任完全交给他人，最终失去亲近与自我"
+    ]
+  },
+  "worldCardRefs": [
+    "modern.snapshot.family_care",
+    "modern.snapshot.housing_and_mobility",
+    "modern.snapshot.transition_2027"
+  ]
+}

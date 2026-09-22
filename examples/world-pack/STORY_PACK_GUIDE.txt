@@ -1,0 +1,39 @@
+IF 子世界包 JSON 说明（v1）
+===========================
+
+一、使用方法
+------------
+1. 复制 story-pack.example.json。
+2. 设置唯一 id，例如 my_world.scholar_path；设置 worldId 为已有基础世界 ID。
+3. 放入 data/narratives/story-packs/ 下任意目录，文件名不限，但建议按世界分目录。
+4. 重启后端。加载器会递归发现 JSON，并在开局世界选择后展示对应路线。
+
+基础世界不登记子世界包数量。新增、删除或修改该文件，不需要修改基础世界、其他子世界包、前端列表或 TypeScript 代码。
+
+二、字段职责
+------------
+- version：当前为 1。
+- id / revision：稳定路线 ID 与内容版本。修改内容时提升 revision。
+- worldId：所属基础世界。
+- name / tagline / summary：供玩家选择路线时阅读。
+- routePromise：贯穿一生的核心承诺；比题材提示具体，比固定剧情大纲开放。
+- entryLens：同一路线如何容纳不同人设、出身和身份。
+- originSeeds：身世生成可借用的宽松起点，不表示这些事必然发生。
+- stakeAxes：路线中最值得长期追踪的关系、成果和代价。
+- focusForceIds：优先相关的基础世界力量 ID；不是唯一可出现的阵营。
+- worldCardRefs：优先相关的基础世界卡 ID；它只提高按需召回相关度，不把未列出的卡或剧情排除在外。
+- acts：恰好三幕。每幕提供 objective、dramaticQuestion、pressureDirection 与 payoffMeaning；具体事件由模型依据本局状态生成。
+- acts[].worldCardRefs：当前幕更值得考虑的基础世界卡，可省略。
+- endingDirections：good、normal、bad 各自的路线结算方向，与基础世界结局蓝图组合。
+
+三、独立创作边界
+----------------
+- 路线可以自由增删改，不得要求其他路线同步变化。
+- act id 必须以本子世界包 id 开头，并在三幕内唯一。
+- worldCardRefs 必须引用所属基础世界中已经存在的卡片；子世界包不保存世界卡正文。
+- 子世界包不写年龄门槛、属性数值、生存公式、公共阵营详情或通用文风，它们属于基础世界和引擎。
+- 不穷举每个节拍的事件。现有 setup → escalation → pressure → climax → payoff 状态机负责叙事完整性，模型负责结合人物与已发生事实生成具体经历。
+
+四、存档语义
+------------
+开局后，选中的子世界包会完整快照进运行态和存档。之后修改磁盘上的同名子世界包只影响新游戏，不会让旧存档中途换线。保存列表和运行界面会显示所选路线名称。

@@ -1,0 +1,67 @@
+{
+  "worldId": "modern",
+  "cards": [
+    {
+      "id": "modern.snapshot.transition_2027",
+      "title": "2027年的机会重组",
+      "kind": "setting",
+      "content": "2027年的东洲仍有庞大城市网络与完整产业，却处于增长放缓、行业更替和安全感下降同时发生的阶段。稳定岗位更受追逐，新产业不断制造入口；同一选择对不同家庭可能意味着跃迁、缓冲或不可承受的风险。",
+      "priority": 72,
+      "placement": "scenario",
+      "activation": { "keys": ["就业", "行业", "机会", "稳定", "转型", "2027"], "scanDepth": 5, "tasks": ["background", "planning", "horizon", "rendering", "dynamic", "decision"] },
+      "stickyTurns": 1,
+      "cooldownTurns": 3
+    },
+    {
+      "id": "modern.snapshot.education_channels",
+      "title": "教育、资格与作品",
+      "kind": "institution",
+      "content": "升学、职业教育、资格考试、导师项目和可验证作品构成不同入口。学历仍有筛选作用，但专业能力、实习经历、家庭支持和所在城市共同决定一张证书能兑现多少机会。",
+      "priority": 64,
+      "placement": "scenario",
+      "activation": { "keys": ["学校", "升学", "考试", "导师", "专业", "学历", "作品"], "scanDepth": 5, "tasks": ["background", "planning", "horizon", "rendering", "dynamic", "decision"] },
+      "cooldownTurns": 2
+    },
+    {
+      "id": "modern.snapshot.ai_and_work",
+      "title": "AI进入日常工作",
+      "kind": "practice",
+      "content": "生成式 AI 已进入编程、内容、客服、医疗辅助和管理流程。它既压缩重复岗位，也让小团队和个人获得过去昂贵的能力；真正的冲突通常落在岗位重组、责任归属、作品可信度和学习速度上。",
+      "priority": 62,
+      "placement": "scenario",
+      "activation": { "keys": ["AI", "人工智能", "自动化", "程序", "内容", "岗位"], "scanDepth": 4, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] },
+      "cooldownTurns": 3
+    },
+    {
+      "id": "modern.snapshot.housing_and_mobility",
+      "title": "居住与城市迁移",
+      "kind": "geography",
+      "content": "核心城市机会密集但住房与通勤昂贵，区域中心更易建立生活网络，小城成本较低却选择较少。租住、买房、返乡、异地关系和照料责任会把职业决定变成具体的时间与空间安排。",
+      "priority": 60,
+      "placement": "scenario",
+      "activation": { "keys": ["租房", "买房", "通勤", "城市", "返乡", "迁移", "异地"], "scanDepth": 5, "tasks": ["background", "planning", "horizon", "rendering", "dynamic", "decision"] },
+      "cooldownTurns": 2
+    },
+    {
+      "id": "modern.snapshot.family_care",
+      "title": "家庭、亲密关系与照料",
+      "kind": "culture",
+      "content": "低生育和老龄化使照料成为许多家庭的长期议题。父母支持、伴侣分工、育儿、疾病与职业中断并非配角，它们会真实改变一个人能承担的风险，也可能形成新的亲密与共同事业。",
+      "priority": 65,
+      "placement": "scenario",
+      "activation": { "keys": ["父母", "伴侣", "婚姻", "孩子", "照料", "养老", "家庭"], "scanDepth": 5, "tasks": ["background", "planning", "horizon", "rendering", "dynamic", "decision"] },
+      "stickyTurns": 1,
+      "cooldownTurns": 2
+    },
+    {
+      "id": "modern.snapshot.platform_reputation",
+      "title": "平台身份与公众目光",
+      "kind": "institution",
+      "content": "社交平台、招聘系统、信用记录和公开作品让线上身份与现实机会相互影响。传播能迅速带来同伴、客户和公共影响，也会放大误读、网暴、隐私泄露与一次失误。",
+      "priority": 56,
+      "placement": "scenario",
+      "activation": { "keys": ["平台", "账号", "舆论", "公众", "直播", "社交媒体", "声誉"], "scanDepth": 4, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] },
+      "cooldownTurns": 3
+    }
+  ]
+}

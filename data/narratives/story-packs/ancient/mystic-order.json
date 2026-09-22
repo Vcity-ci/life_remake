@@ -37,7 +37,10 @@
       "payoffMeaning": "人物建立真实能力、声望与传承身份。",
       "worldCardRefs": [
         "ancient.snapshot.popular_faith",
-        "ancient.snapshot.local_society"
+        "ancient.snapshot.local_society",
+        "ancient.domain.faith.disaster_healing",
+        "ancient.domain.faith.rite_miracle",
+        "ancient.domain.faith.seal_taboo"
       ]
     },
     {
@@ -49,7 +52,10 @@
       "payoffMeaning": "人物成为能够影响民间或朝局的精神与知识权威。",
       "worldCardRefs": [
         "ancient.snapshot.local_society",
-        "ancient.snapshot.central_figures"
+        "ancient.snapshot.central_figures",
+        "ancient.domain.faith.rite_miracle",
+        "ancient.domain.faith.court_debate",
+        "ancient.domain.faith.popular_movement"
       ]
     },
     {
@@ -61,7 +67,10 @@
       "payoffMeaning": "传承是否延续、人物如何被后世理解得到回答。",
       "worldCardRefs": [
         "ancient.snapshot.central_figures",
-        "ancient.snapshot.popular_faith"
+        "ancient.snapshot.popular_faith",
+        "ancient.domain.faith.court_debate",
+        "ancient.domain.faith.seal_taboo",
+        "ancient.domain.faith.popular_movement"
       ]
     }
   ],

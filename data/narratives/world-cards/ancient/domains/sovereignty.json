@@ -1,0 +1,50 @@
+{
+  "worldId": "ancient",
+  "cards": [
+    {
+      "id": "ancient.domain.sovereignty.mobilization",
+      "title": "聚众、起事与地方动员",
+      "kind": "practice",
+      "content": "乱局中的力量从粮食、安全、乡里信用和共同怨望中聚集。人物可以组织自保、响应起事或接管失序地区，但每一次征发与承诺都决定追随者为何而来。",
+      "priority": 75,
+      "placement": "scenario",
+      "activation": { "keys": ["聚众", "起义", "起事", "乡勇", "动员", "征发"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] }
+    },
+    {
+      "id": "ancient.domain.sovereignty.stronghold_campaign",
+      "title": "据点、攻城与地盘",
+      "kind": "conflict",
+      "content": "争夺县城、关隘、粮仓、渡口和交通线，意味着从流动作战转向治理人口与土地。攻取容易守住难，军事胜利会立刻带来税粮、治安和俘降问题。",
+      "priority": 76,
+      "placement": "scenario",
+      "activation": { "keys": ["据点", "县城", "关隘", "攻城", "地盘", "渡口"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] }
+    },
+    {
+      "id": "ancient.domain.sovereignty.absorb_forces",
+      "title": "收编、联盟与旧部",
+      "kind": "faction",
+      "content": "扩张需要收编降军、地方豪强、流民首领与旧朝官吏。封赏、婚盟、质子、共同敌人和制度位置都能维持联盟，也会让新旧部曲争夺功劳与信任。",
+      "priority": 74,
+      "placement": "scenario",
+      "activation": { "keys": ["收编", "降军", "豪强", "旧部", "封赏", "联盟"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] }
+    },
+    {
+      "id": "ancient.domain.sovereignty.legitimacy_enthronement",
+      "title": "名分、登基与分封",
+      "kind": "institution",
+      "content": "最高权力需要军事实力之外的名分、礼仪、官署承认与地方响应。称王、登基、拥立或奉旧主都要安排功臣、宗室、士族和盟友，并承担分封与中央权力的张力。",
+      "priority": 78,
+      "placement": "scenario",
+      "activation": { "keys": ["登基", "称王", "拥立", "名分", "分封", "宗室"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] }
+    },
+    {
+      "id": "ancient.domain.sovereignty.postwar_order",
+      "title": "战后治理与继承",
+      "kind": "consequence",
+      "content": "定鼎之后仍需裁撤或安置军队、恢复生产、处理旧敌、兑现功臣、建立税制并安排继承。胜利者如何约束自己，比夺取天下更能决定新秩序能否延续。",
+      "priority": 77,
+      "placement": "scenario",
+      "activation": { "keys": ["战后", "治理", "功臣", "税制", "继承", "裁军"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] }
+    }
+  ]
+}

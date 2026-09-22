@@ -37,7 +37,10 @@
       "payoffMeaning": "人物拥有了进入未知的本领、伙伴和必须继续追索的问题。",
       "worldCardRefs": [
         "fantasy.snapshot.two_layers",
-        "fantasy.snapshot.three_rifts"
+        "fantasy.snapshot.three_rifts",
+        "fantasy.domain.uncanny.trace",
+        "fantasy.domain.uncanny.expedition",
+        "fantasy.domain.uncanny.knowledge_cost"
       ]
     },
     {
@@ -49,7 +52,10 @@
       "payoffMeaning": "人物改变了人们进入禁区的方式，也承担了知识扩散的后果。",
       "worldCardRefs": [
         "fantasy.snapshot.three_rifts",
-        "fantasy.snapshot.cultivation_cost"
+        "fantasy.snapshot.cultivation_cost",
+        "fantasy.domain.uncanny.expedition",
+        "fantasy.domain.uncanny.seal_purify",
+        "fantasy.domain.cultivation.spell_combat"
       ]
     },
     {
@@ -61,7 +67,10 @@
       "payoffMeaning": "禁区的未来、人物自身变化与世界对未知的认知得到不可逆答案。",
       "worldCardRefs": [
         "fantasy.snapshot.cultivation_cost",
-        "fantasy.snapshot.two_layers"
+        "fantasy.snapshot.two_layers",
+        "fantasy.domain.uncanny.seal_purify",
+        "fantasy.domain.uncanny.knowledge_cost",
+        "fantasy.domain.destiny.world_change"
       ]
     }
   ],

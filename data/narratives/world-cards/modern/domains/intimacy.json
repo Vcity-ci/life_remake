@@ -1,0 +1,41 @@
+{
+  "worldId": "modern",
+  "cards": [
+    {
+      "id": "modern.domain.intimacy.encounter_trust",
+      "title": "相识、靠近与信任",
+      "kind": "practice",
+      "content": "重要关系从共同经历、倾听、边界与彼此兑现的小事中形成。吸引并不自动带来理解，人物如何表达需要和回应差异，决定关系能否继续。",
+      "priority": 72,
+      "placement": "scenario",
+      "activation": { "keys": ["相识", "约会", "信任", "倾听", "边界", "靠近"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] }
+    },
+    {
+      "id": "modern.domain.intimacy.shared_life",
+      "title": "共同生活与现实协商",
+      "kind": "conflict",
+      "content": "住处、金钱、家务、职业、双方家庭和未来计划让承诺变成实际安排。冲突需要协商而非自动和解，长期亲密也允许保留个人空间。",
+      "priority": 75,
+      "placement": "scenario",
+      "activation": { "keys": ["共同生活", "家务", "金钱", "婚姻", "承诺", "协商"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] }
+    },
+    {
+      "id": "modern.domain.intimacy.care_change",
+      "title": "照料、疾病与人生转折",
+      "kind": "practice",
+      "content": "疾病、育儿、衰老、失业和远行会改变关系中的能力与分工。照料既包含付出，也需要接受帮助、设置界限并承认双方仍有各自的人生。",
+      "priority": 74,
+      "placement": "scenario",
+      "activation": { "keys": ["照料", "疾病", "育儿", "衰老", "失业", "远行"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] }
+    },
+    {
+      "id": "modern.domain.intimacy.form_legacy",
+      "title": "关系形式与共同答案",
+      "kind": "consequence",
+      "content": "关系可以走向婚姻、长期伴侣、共同养育、分开或重新定义。成熟收束不要求某一种形式，而要说明双方怎样面对承诺、失去和共同留下的生活。",
+      "priority": 74,
+      "placement": "scenario",
+      "activation": { "keys": ["伴侣", "分开", "共同养育", "重新定义", "陪伴", "关系形式"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] }
+    }
+  ]
+}

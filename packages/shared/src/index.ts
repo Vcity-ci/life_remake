@@ -884,7 +884,7 @@ export interface NarrativeActCanon {
   factIds: string[];
 }
 
-export type NarrativeMemoryDigestScope = "run" | "act" | "route" | "character" | "faction";
+export type NarrativeMemoryDigestScope = "run" | "act" | "route" | "character" | "faction" | "location" | "ability";
 
 /** Model-curated view over committed Episodes. It may summarize, never create game facts. */
 export interface NarrativeMemoryDigest {
@@ -932,6 +932,7 @@ export interface NarrativeAgentAttemptRecord {
   factionId?: string;
   horizonRevision?: number;
   digestRevision?: number;
+  continuityStatus?: "skipped" | "requested_empty" | "requested_changed";
   episodeId?: string;
   contextFragmentIds: string[];
   createdAt: number;

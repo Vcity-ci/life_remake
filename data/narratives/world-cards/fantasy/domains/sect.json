@@ -1,0 +1,41 @@
+{
+  "worldId": "fantasy",
+  "cards": [
+    {
+      "id": "fantasy.domain.sect.initiation",
+      "title": "入门、师承与同辈",
+      "kind": "institution",
+      "content": "入门意味着接受师承、资源分配、门规和同辈评价。外门、内门、亲传或客卿只是位置，真正归属来自共同任务、互相担保与危局中的选择。",
+      "priority": 73,
+      "placement": "scenario",
+      "activation": { "keys": ["入门", "师承", "外门", "内门", "同门", "门规"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] }
+    },
+    {
+      "id": "fantasy.domain.sect.trial_resource",
+      "title": "试炼、秘境与资源分配",
+      "kind": "conflict",
+      "content": "宗门试炼会把修为、判断、合作与门内竞争放进真实风险。秘境名额、丹药、洞府和传承有限，获得资源的方式会决定同辈关系与派系评价。",
+      "priority": 75,
+      "placement": "scenario",
+      "activation": { "keys": ["试炼", "秘境", "名额", "丹药", "洞府", "资源"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] }
+    },
+    {
+      "id": "fantasy.domain.sect.faction_crisis",
+      "title": "派系、道统与宗门危机",
+      "kind": "faction",
+      "content": "宗门内部可能因修行理念、资源、掌教继承和对外立场分裂。外敌、污染或盟约危机使争论必须落到护山、撤离、结盟或更换领导的实际行动。",
+      "priority": 76,
+      "placement": "scenario",
+      "activation": { "keys": ["派系", "掌教", "道统", "护山", "继承", "宗门危机"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] }
+    },
+    {
+      "id": "fantasy.domain.sect.reform_legacy",
+      "title": "整顿、另立与传承去向",
+      "kind": "consequence",
+      "content": "取得宗门影响力后，可以整顿门规、重分资源、另开一脉或解散失去意义的组织。改革是否留下新秩序，取决于弟子、盟友与普通成员能否继续实践。",
+      "priority": 75,
+      "placement": "scenario",
+      "activation": { "keys": ["整顿", "另立", "开宗", "一脉", "改革", "弟子"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] }
+    }
+  ]
+}

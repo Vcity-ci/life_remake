@@ -1,0 +1,41 @@
+{
+  "worldId": "modern",
+  "cards": [
+    {
+      "id": "modern.domain.enterprise.problem_prototype",
+      "title": "问题、原型与早期用户",
+      "kind": "practice",
+      "content": "创业或独立创造从一个具体问题、可运行原型和真实反馈开始。早期用户的使用方式往往不同于设想，人物需要决定坚持愿景、调整方向还是停止投入。",
+      "priority": 73,
+      "placement": "scenario",
+      "activation": { "keys": ["创业", "原型", "用户", "需求", "反馈", "产品"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] }
+    },
+    {
+      "id": "modern.domain.enterprise.funding_market",
+      "title": "资金、市场与生存期",
+      "kind": "conflict",
+      "content": "现金流、定价、获客、融资和竞争共同决定一项事业能否活下去。接受资金会换来时间与资源，也会带来增长承诺、股权变化和新的评价尺度。",
+      "priority": 76,
+      "placement": "scenario",
+      "activation": { "keys": ["资金", "市场", "现金流", "融资", "定价", "竞争"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] }
+    },
+    {
+      "id": "modern.domain.enterprise.partner_governance",
+      "title": "合伙、用人和公司治理",
+      "kind": "institution",
+      "content": "合伙人、核心员工与投资方通过职责、股权、薪酬和决策程序共同承担风险。关系越亲近，越需要明确分歧如何解决以及离开时怎样交代。",
+      "priority": 75,
+      "placement": "scenario",
+      "activation": { "keys": ["合伙人", "股权", "员工", "投资方", "治理", "薪酬"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] }
+    },
+    {
+      "id": "modern.domain.enterprise.crisis_transform",
+      "title": "危机、转型与责任",
+      "kind": "consequence",
+      "content": "产品事故、现金断裂、声誉危机或行业变化会迫使事业转型。人物要决定保护用户、员工、投资与个人生活的先后顺序，并让选择留下可追溯的结果。",
+      "priority": 77,
+      "placement": "scenario",
+      "activation": { "keys": ["危机", "转型", "事故", "裁员", "声誉", "责任"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] }
+    }
+  ]
+}

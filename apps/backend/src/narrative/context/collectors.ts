@@ -50,8 +50,8 @@ const stableProvider: NarrativeContextProvider = {
       ...(plan.worldCoreContext ? fragment({ id: "stable:world-core", layer: "stable", section: "world", sourceType: "world-core", priority: 98, content: plan.worldCoreContext, required: true }) : []),
       ...(plan.storyBible ? fragment({ id: "stable:world-snapshot", layer: "stable", section: "world", sourceType: "world-snapshot", priority: 96, content: plan.storyBible, required: true }) : []),
       ...(plan.narrativePaletteContext ? fragment({
-        id: `stable:narrative-palette:${plan.task === "background" ? "background" : "scene"}`,
-        layer: "stable",
+        id: `active:narrative-palette:${plan.task === "background" ? "background" : "scene"}`,
+        layer: "active",
         section: "palette",
         sourceType: "narrative-palette",
         priority: 76,
@@ -105,7 +105,9 @@ const loreProvider: NarrativeContextProvider = {
 const worldCardProvider: NarrativeContextProvider = {
   id: "world-cards",
   collect: ({ plan }) => !plan?.task ? [] : (plan.activeWorldCardSources ?? []).flatMap((card) => {
-    const target = card.placement === "world"
+    const cacheStableWorldCard = card.placement === "world" && card.activationReason === "constant" &&
+      card.stickyTurns === 0 && card.cooldownTurns === 0;
+    const target = cacheStableWorldCard
       ? { layer: "stable" as const, section: "lore" as const, priority: 86 }
       : card.placement === "example"
         ? { layer: "recall" as const, section: "styleExamples" as const, priority: 78 }

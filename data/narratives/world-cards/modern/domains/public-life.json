@@ -1,0 +1,41 @@
+{
+  "worldId": "modern",
+  "cards": [
+    {
+      "id": "modern.domain.public.concern_evidence",
+      "title": "切身问题与事实整理",
+      "kind": "practice",
+      "content": "公共行动从受影响者的具体经历、可核实事实和明确诉求开始。表达之前要区分传闻与证据，也要理解不同人为何对同一问题承担不同代价。",
+      "priority": 73,
+      "placement": "scenario",
+      "activation": { "keys": ["公共问题", "证据", "诉求", "受影响者", "发声", "调查"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] }
+    },
+    {
+      "id": "modern.domain.public.organize_negotiate",
+      "title": "组织、协作与制度沟通",
+      "kind": "institution",
+      "content": "推动改变需要分工、会议、代表、法律程序、媒体沟通与谈判。共同目标之下仍会有策略分歧，组织是否透明决定参与者能否长期信任。",
+      "priority": 75,
+      "placement": "scenario",
+      "activation": { "keys": ["组织", "协作", "谈判", "程序", "代表", "会议"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] }
+    },
+    {
+      "id": "modern.domain.public.reputation_backlash",
+      "title": "舆论、误读与反作用",
+      "kind": "conflict",
+      "content": "公开传播能迅速扩大支持，也会压缩复杂事实并放大个人风险。误读、网暴、对立动员和组织内部争议，要求人物在速度、准确与保护参与者之间取舍。",
+      "priority": 76,
+      "placement": "scenario",
+      "activation": { "keys": ["舆论", "网暴", "传播", "误读", "争议", "声誉"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] }
+    },
+    {
+      "id": "modern.domain.public.accountability",
+      "title": "改变、妥协与长期担责",
+      "kind": "consequence",
+      "content": "公共成果可能是政策改变、服务改善、社群延续或仅让问题被看见。人物需要交代妥协影响了谁、承诺由谁继续，以及个人影响力如何受到监督。",
+      "priority": 75,
+      "placement": "scenario",
+      "activation": { "keys": ["政策", "改善", "妥协", "监督", "承诺", "长期责任"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] }
+    }
+  ]
+}

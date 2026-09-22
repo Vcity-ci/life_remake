@@ -74,7 +74,7 @@ export function parseNarrativeAssetUpdates(raw: unknown, assets?: NarrativeAsset
   };
 }
 
-export function narrativeAssetUpdatesSchema(assets?: NarrativeAssets): Record<string, unknown> {
+export function narrativeAssetUpdatesSchema(_assets?: NarrativeAssets): Record<string, unknown> {
   const string = { type: "string", minLength: 1 };
   return {
     type: "object",
@@ -87,7 +87,7 @@ export function narrativeAssetUpdatesSchema(assets?: NarrativeAssets): Record<st
           required: ["ref"],
           description: "已有地点用 ref 引用，只提交变化的描述与当前位置；新地点另需 name 和 description。",
           properties: {
-            ref: { type: "string", enum: ["new", ...(assets?.locations ?? []).map((entry) => entry.id)] },
+            ref: { type: "string", description: "使用本轮上下文中的已有地点 ID，或使用 new 新建地点。" },
             name: string, description: string,
             current: { type: "boolean", description: "本段结束时主角实际所在的地点为 true；仅提及或曾经路过为 false。" }
           }
@@ -99,7 +99,7 @@ export function narrativeAssetUpdatesSchema(assets?: NarrativeAssets): Record<st
           required: ["ref"],
           description: "已有本领用 ref 引用，只提交变化的字段，名称和获得来历沿用档案；新本领另需 name、description、source、mastery、status。",
           properties: {
-            ref: { type: "string", enum: ["new", ...(assets?.abilities ?? []).map((entry) => entry.id)] },
+            ref: { type: "string", description: "使用本轮上下文中的已有本领 ID，或使用 new 新建本领。" },
             name: { type: "string", minLength: 1, maxLength: 24, description: "稳定、简短的本领名称，也是档案标题。" },
             description: { type: "string", description: "能力的具体用途、适用情境与实际局限；历次运用形成的能力变化写在这里。" },
             source: { type: "string", description: "已经发生的获得来历；更新时保留原来历。" },

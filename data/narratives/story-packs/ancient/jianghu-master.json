@@ -37,7 +37,10 @@
       "payoffMeaning": "人物拥有独立行走江湖的能力和名号。",
       "worldCardRefs": [
         "ancient.snapshot.nine_regions",
-        "ancient.snapshot.local_society"
+        "ancient.snapshot.local_society",
+        "ancient.domain.jianghu.mastery_rules",
+        "ancient.domain.jianghu.challenge_duel",
+        "ancient.domain.jianghu.escort_rescue"
       ]
     },
     {
@@ -49,7 +52,10 @@
       "payoffMeaning": "人物成为能够影响江湖格局的一方人物。",
       "worldCardRefs": [
         "ancient.snapshot.local_society",
-        "ancient.snapshot.popular_faith"
+        "ancient.snapshot.popular_faith",
+        "ancient.domain.jianghu.challenge_duel",
+        "ancient.domain.jianghu.escort_rescue",
+        "ancient.domain.jianghu.revenge_treasure"
       ]
     },
     {
@@ -61,7 +67,10 @@
       "payoffMeaning": "人物的技艺传承、组织归属和江湖评价得到收束。",
       "worldCardRefs": [
         "ancient.snapshot.popular_faith",
-        "ancient.snapshot.nine_regions"
+        "ancient.snapshot.nine_regions",
+        "ancient.domain.jianghu.revenge_treasure",
+        "ancient.domain.jianghu.sect_legacy",
+        "ancient.domain.jianghu.mastery_rules"
       ]
     }
   ],

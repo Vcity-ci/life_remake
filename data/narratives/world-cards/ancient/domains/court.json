@@ -1,0 +1,50 @@
+{
+  "worldId": "ancient",
+  "cards": [
+    {
+      "id": "ancient.domain.court.audience_appointment",
+      "title": "奏对、任免与入局",
+      "kind": "institution",
+      "content": "官员通过奏对、考课、举荐、科举、军功与临时差遣进入权力网络。一次任命既是机会，也是君主、上官、同僚和家族衡量人物立场的开始。",
+      "priority": 73,
+      "placement": "scenario",
+      "activation": { "keys": ["奏对", "任命", "举荐", "考课", "入仕", "差遣"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] }
+    },
+    {
+      "id": "ancient.domain.court.faction_coalition",
+      "title": "派系、门生与合纵连横",
+      "kind": "faction",
+      "content": "朝堂派系由政见、门生、婚姻、乡党、财政和军政利益交织而成。结盟可以推动任免与政策，也会制造人情债、公开站队和联盟破裂后的清算。",
+      "priority": 75,
+      "placement": "scenario",
+      "activation": { "keys": ["派系", "门生", "乡党", "联姻", "结盟", "站队"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] }
+    },
+    {
+      "id": "ancient.domain.court.palace_plot",
+      "title": "宫廷密议与内廷门禁",
+      "kind": "conflict",
+      "content": "宫门、印玺、宿卫、诏书与近侍决定消息和命令怎样抵达朝堂。密议不必总是阴谋，却会围绕继承、宠信、病情与诏令真伪形成高风险博弈。",
+      "priority": 76,
+      "placement": "scenario",
+      "activation": { "keys": ["宫廷", "密议", "宿卫", "印玺", "诏书", "近侍"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] }
+    },
+    {
+      "id": "ancient.domain.court.ruler_bargain",
+      "title": "君主、辅弼与相互试探",
+      "kind": "conflict",
+      "content": "君臣关系同时包含授权、依赖、猜忌与责任。君主可借轮换、密令和不同派系制衡重臣，重臣也能以政绩、舆论、门生和军政资源争取空间。",
+      "priority": 77,
+      "placement": "scenario",
+      "activation": { "keys": ["君主", "辅政", "猜忌", "制衡", "重臣", "密令"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] }
+    },
+    {
+      "id": "ancient.domain.court.coup_transfer",
+      "title": "政变、清洗与权力交接",
+      "kind": "consequence",
+      "content": "当常规程序失效，逼宫、政变、摄政、禅让、清洗或主动交权都可能出现。成败取决于名分、宿卫、官署执行、军队态度与地方响应，结果还必须回答新秩序如何运转。",
+      "priority": 78,
+      "placement": "scenario",
+      "activation": { "keys": ["政变", "逼宫", "摄政", "禅让", "清洗", "交权"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] }
+    }
+  ]
+}

@@ -37,7 +37,10 @@
       "payoffMeaning": "人物拥有了可以继续深造或投入现实的能力基础。",
       "worldCardRefs": [
         "modern.snapshot.education_channels",
-        "modern.snapshot.ai_and_work"
+        "modern.snapshot.ai_and_work",
+        "modern.domain.education.learning_direction",
+        "modern.domain.education.exam_project",
+        "modern.domain.education.path_choice"
       ]
     },
     {
@@ -49,7 +52,10 @@
       "payoffMeaning": "人物确立了知识进入现实的道路，也失去了一部分可能。",
       "worldCardRefs": [
         "modern.snapshot.ai_and_work",
-        "modern.snapshot.transition_2027"
+        "modern.snapshot.transition_2027",
+        "modern.domain.education.path_choice",
+        "modern.domain.career.entry_work",
+        "modern.domain.city.departure_foothold"
       ]
     },
     {
@@ -61,7 +67,10 @@
       "payoffMeaning": "人物以研究、教育、技术、作品或专业实践留下了明确结果。",
       "worldCardRefs": [
         "modern.snapshot.transition_2027",
-        "modern.snapshot.education_channels"
+        "modern.snapshot.education_channels",
+        "modern.domain.education.public_practice",
+        "modern.domain.career.project_team",
+        "modern.domain.public.concern_evidence"
       ]
     }
   ],

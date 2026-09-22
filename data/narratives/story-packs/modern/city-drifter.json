@@ -37,7 +37,10 @@
       "payoffMeaning": "人物在新的地方获得了继续生活的实际位置。",
       "worldCardRefs": [
         "modern.snapshot.transition_2027",
-        "modern.snapshot.housing_and_mobility"
+        "modern.snapshot.housing_and_mobility",
+        "modern.domain.city.departure_foothold",
+        "modern.domain.city.home_tension",
+        "modern.domain.education.path_choice"
       ]
     },
     {
@@ -49,7 +52,10 @@
       "payoffMeaning": "人物建立了新的生活秩序，也明确了自己无法同时拥有的一切。",
       "worldCardRefs": [
         "modern.snapshot.housing_and_mobility",
-        "modern.snapshot.platform_reputation"
+        "modern.snapshot.platform_reputation",
+        "modern.domain.city.network_belonging",
+        "modern.domain.city.home_tension",
+        "modern.domain.career.entry_work"
       ]
     },
     {
@@ -61,7 +67,10 @@
       "payoffMeaning": "人物对归属和生活方式作出可以回望一生的决定。",
       "worldCardRefs": [
         "modern.snapshot.platform_reputation",
-        "modern.snapshot.transition_2027"
+        "modern.snapshot.transition_2027",
+        "modern.domain.city.home_tension",
+        "modern.domain.city.long_home",
+        "modern.domain.intimacy.care_change"
       ]
     }
   ],

@@ -1,0 +1,50 @@
+{
+  "worldId": "ancient",
+  "cards": [
+    {
+      "id": "ancient.domain.jianghu.mastery_rules",
+      "title": "师承、技艺与门规",
+      "kind": "practice",
+      "content": "武艺、医术、轻身、暗器与江湖手段都通过反复练习和师承规矩获得。真正掌握本领意味着知道何时使用、如何留手，以及违背门规要承担什么。",
+      "priority": 74,
+      "placement": "scenario",
+      "activation": { "keys": ["师承", "武艺", "门规", "练功", "暗器", "轻功"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] }
+    },
+    {
+      "id": "ancient.domain.jianghu.challenge_duel",
+      "title": "挑战、比武与胜负名声",
+      "kind": "conflict",
+      "content": "比武可能为切磋、争名、护人、夺位或解决旧怨。场地、见证、兵器、伤势和是否守约决定胜负之外的声名，也会引来新的对手与责任。",
+      "priority": 76,
+      "placement": "scenario",
+      "activation": { "keys": ["挑战", "比武", "决斗", "擂台", "兵器", "切磋"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] }
+    },
+    {
+      "id": "ancient.domain.jianghu.escort_rescue",
+      "title": "护送、追踪与救援",
+      "kind": "practice",
+      "content": "镖路、寻人、护送与救援把技艺放进道路、时限和同行者的安全中。敌友可能在途中转换，完成委托也未必等于守住受托之人的真正利益。",
+      "priority": 72,
+      "placement": "scenario",
+      "activation": { "keys": ["护送", "镖局", "追踪", "寻人", "救援", "委托"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] }
+    },
+    {
+      "id": "ancient.domain.jianghu.revenge_treasure",
+      "title": "寻仇、夺宝与旧债",
+      "kind": "conflict",
+      "content": "旧仇、失传本领、藏宝与门派遗物会把私人欲望变成多人争夺。线索可能真实也可能被利用，人物必须判断复仇是否仍指向原来的责任，以及宝物会改变谁的力量。",
+      "priority": 75,
+      "placement": "scenario",
+      "activation": { "keys": ["寻仇", "复仇", "夺宝", "秘笈", "遗物", "藏宝"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] }
+    },
+    {
+      "id": "ancient.domain.jianghu.sect_legacy",
+      "title": "清理门户与开宗立派",
+      "kind": "consequence",
+      "content": "当个人声望变成组织责任，便会出现收徒、定规矩、清理门户、处理叛徒、接受招安或另立门派的问题。传承能否延续，取决于制度与弟子，而不只取决于宗师强弱。",
+      "priority": 77,
+      "placement": "scenario",
+      "activation": { "keys": ["清理门户", "收徒", "弟子", "开宗立派", "招安", "门派"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] }
+    }
+  ]
+}

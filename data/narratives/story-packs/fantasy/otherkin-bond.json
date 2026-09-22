@@ -37,7 +37,10 @@
       "payoffMeaning": "人物拥有了另一文明中的名字、关系和必须回应的承诺。",
       "worldCardRefs": [
         "fantasy.snapshot.other_civilizations",
-        "fantasy.snapshot.three_rifts"
+        "fantasy.snapshot.three_rifts",
+        "fantasy.domain.civilization.first_contact",
+        "fantasy.domain.civilization.trade_oath",
+        "fantasy.domain.civilization.war_migration"
       ]
     },
     {
@@ -49,7 +52,10 @@
       "payoffMeaning": "人物成为双方都无法绕开的中介、代表或共同领袖。",
       "worldCardRefs": [
         "fantasy.snapshot.three_rifts",
-        "fantasy.snapshot.two_layers"
+        "fantasy.snapshot.two_layers",
+        "fantasy.domain.civilization.trade_oath",
+        "fantasy.domain.civilization.war_migration",
+        "fantasy.domain.civilization.shared_order"
       ]
     },
     {
@@ -61,7 +67,10 @@
       "payoffMeaning": "族群关系因人物的选择形成战争、联盟或全新的共同生活方式。",
       "worldCardRefs": [
         "fantasy.snapshot.two_layers",
-        "fantasy.snapshot.other_civilizations"
+        "fantasy.snapshot.other_civilizations",
+        "fantasy.domain.civilization.war_migration",
+        "fantasy.domain.civilization.shared_order",
+        "fantasy.domain.civilization.trade_oath"
       ]
     }
   ],

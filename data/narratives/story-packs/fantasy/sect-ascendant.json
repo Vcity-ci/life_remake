@@ -37,7 +37,10 @@
       "payoffMeaning": "人物成为能够独立运用本领、承担宗门事务的修行者。",
       "worldCardRefs": [
         "fantasy.snapshot.old_pact",
-        "fantasy.snapshot.cultivation_cost"
+        "fantasy.snapshot.cultivation_cost",
+        "fantasy.domain.sect.initiation",
+        "fantasy.domain.cultivation.foundation",
+        "fantasy.domain.sect.trial_resource"
       ]
     },
     {
@@ -49,7 +52,10 @@
       "payoffMeaning": "人物成为一脉中不可忽略的力量，并改变了宗门走向。",
       "worldCardRefs": [
         "fantasy.snapshot.cultivation_cost",
-        "fantasy.snapshot.central_figures"
+        "fantasy.snapshot.central_figures",
+        "fantasy.domain.sect.trial_resource",
+        "fantasy.domain.sect.faction_crisis",
+        "fantasy.domain.cultivation.spell_combat"
       ]
     },
     {
@@ -61,7 +67,10 @@
       "payoffMeaning": "人物使道统得以重生、另开一脉或在自己手中终结。",
       "worldCardRefs": [
         "fantasy.snapshot.central_figures",
-        "fantasy.snapshot.old_pact"
+        "fantasy.snapshot.old_pact",
+        "fantasy.domain.sect.faction_crisis",
+        "fantasy.domain.sect.reform_legacy",
+        "fantasy.domain.cultivation.own_path"
       ]
     }
   ],

@@ -37,7 +37,10 @@
       "payoffMeaning": "人物获得了能够自由行动的基本实力和可再次合作的人。",
       "worldCardRefs": [
         "fantasy.snapshot.mortal_life",
-        "fantasy.snapshot.cultivation_cost"
+        "fantasy.snapshot.cultivation_cost",
+        "fantasy.domain.cultivation.foundation",
+        "fantasy.domain.cultivation.spell_combat",
+        "fantasy.domain.city.foothold_service"
       ]
     },
     {
@@ -49,7 +52,10 @@
       "payoffMeaning": "人物成为一张关系网络的核心，而不再只是独行者。",
       "worldCardRefs": [
         "fantasy.snapshot.cultivation_cost",
-        "fantasy.snapshot.other_civilizations"
+        "fantasy.snapshot.other_civilizations",
+        "fantasy.domain.civilization.trade_oath",
+        "fantasy.domain.city.resource_governance",
+        "fantasy.domain.cultivation.own_path"
       ]
     },
     {
@@ -61,7 +67,10 @@
       "payoffMeaning": "人物建立传承、自由共同体或一条不受旧道统垄断的新路。",
       "worldCardRefs": [
         "fantasy.snapshot.other_civilizations",
-        "fantasy.snapshot.mortal_life"
+        "fantasy.snapshot.mortal_life",
+        "fantasy.domain.cultivation.own_path",
+        "fantasy.domain.civilization.shared_order",
+        "fantasy.domain.city.long_order"
       ]
     }
   ],

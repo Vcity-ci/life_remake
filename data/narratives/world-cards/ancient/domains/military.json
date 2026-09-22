@@ -1,0 +1,50 @@
+{
+  "worldId": "ancient",
+  "cards": [
+    {
+      "id": "ancient.domain.military.reconnaissance",
+      "title": "斥候、地形与敌情",
+      "kind": "practice",
+      "content": "军情来自哨探、向导、俘口、烽燧与地形判断。侦察可以发现道路、营垒、伏兵或补给弱点，也可能因误报、泄密和地方向导的立场改变整支军队的选择。",
+      "priority": 74,
+      "placement": "scenario",
+      "activation": { "keys": ["斥候", "侦察", "敌情", "地形", "烽燧", "向导"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] }
+    },
+    {
+      "id": "ancient.domain.military.training_command",
+      "title": "操练、军纪与临阵号令",
+      "kind": "practice",
+      "content": "军队的战力来自操练、编制、军纪、旗鼓号令和将校之间的信任。练兵能把乌合之众变成可用之军，也会暴露逃亡、冒功、私兵与新旧将领争权。",
+      "priority": 73,
+      "placement": "scenario",
+      "activation": { "keys": ["练兵", "操练", "军纪", "号令", "将校", "部曲"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] }
+    },
+    {
+      "id": "ancient.domain.military.logistics_morale",
+      "title": "粮道、军饷与军心",
+      "kind": "conflict",
+      "content": "粮秣、军饷、马匹、伤兵与运输决定军队能走多远。短缺会引出征发、走私、克扣、逃亡乃至哗变；调度得当则能稳定军心、赢得边民支持并创造战机。",
+      "priority": 75,
+      "placement": "scenario",
+      "activation": { "keys": ["军粮", "粮道", "军饷", "马匹", "伤兵", "哗变"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] }
+    },
+    {
+      "id": "ancient.domain.military.raid_siege",
+      "title": "夜袭、攻守与围城",
+      "kind": "conflict",
+      "content": "交战可表现为试探、伏击、夜袭、野战、攻城或长期围困。每种打法都受兵力、城防、天气、平民与退路牵制，胜负之外还会留下伤亡、俘虏和城中秩序。",
+      "priority": 76,
+      "placement": "scenario",
+      "activation": { "keys": ["夜袭", "伏击", "围城", "攻城", "守城", "野战"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] }
+    },
+    {
+      "id": "ancient.domain.military.prisoners_retreat",
+      "title": "追击、撤退与战后处置",
+      "kind": "consequence",
+      "content": "胜败之后仍要决定追击或收兵、交换俘虏、安置降卒、抚恤死伤与恢复边地。一次克制的撤退可能保存实力，一次过度追击也可能让战功变成灾难。",
+      "priority": 72,
+      "placement": "scenario",
+      "activation": { "keys": ["追击", "撤退", "俘虏", "降卒", "抚恤", "战后"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] }
+    }
+  ]
+}

@@ -643,7 +643,7 @@ export function ensureNarrativeRunState(
       factIds: uniqueRecent(entry.factIds ?? [], 12)
     }))
     : [];
-  const digestScopes = ["run", "act", "route", "character", "faction"] as const;
+  const digestScopes = ["run", "act", "route", "character", "faction", "location", "ability"] as const;
   const memoryDigests: NarrativeMemoryDigest[] = Array.isArray(state.memoryDigests)
     ? state.memoryDigests.filter((entry): entry is NarrativeMemoryDigest => Boolean(
       entry?.id && digestScopes.includes(entry.scope) && entry?.throughEpisodeId && entry?.summary
@@ -692,6 +692,9 @@ export function ensureNarrativeRunState(
       actId: entry.actId ? compactText(entry.actId, 120) : undefined,
       routeId: entry.routeId ? compactText(entry.routeId, 100) : undefined,
       factionId: entry.factionId ? compactText(entry.factionId, 100) : undefined,
+      continuityStatus: entry.continuityStatus === "requested_empty" || entry.continuityStatus === "requested_changed"
+        ? entry.continuityStatus
+        : entry.continuityStatus === "skipped" ? "skipped" : undefined,
       contextFragmentIds: uniqueRecent(entry.contextFragmentIds ?? [], 64),
       createdAt: Math.max(0, Math.trunc(Number(entry.createdAt) || 0))
     }))

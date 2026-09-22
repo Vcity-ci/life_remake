@@ -1,0 +1,50 @@
+{
+  "worldId": "ancient",
+  "cards": [
+    {
+      "id": "ancient.domain.commerce.capital_credit",
+      "title": "本钱、信用与首次成交",
+      "kind": "practice",
+      "content": "经营从本钱、货源、手艺、担保和第一批稳定客人开始。赊欠与借贷能放大机会，也把个人声誉、家产和伙伴关系变成必须兑现的承诺。",
+      "priority": 73,
+      "placement": "scenario",
+      "activation": { "keys": ["本钱", "信用", "赊欠", "借贷", "成交", "担保"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] }
+    },
+    {
+      "id": "ancient.domain.commerce.transport_warehouse",
+      "title": "商路、仓储与货损",
+      "kind": "practice",
+      "content": "水陆运输受季节、关卡、盗匪、仓储、脚力和消息速度影响。调货、押运、保险式分担与临时改道能化解风险，也可能让一次延误波及整条商路。",
+      "priority": 74,
+      "placement": "scenario",
+      "activation": { "keys": ["商路", "仓储", "押运", "货损", "关卡", "调货"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] }
+    },
+    {
+      "id": "ancient.domain.commerce.guild_competition",
+      "title": "行会、价格与同业竞争",
+      "kind": "conflict",
+      "content": "行会通过货源、工价、铺面、标准与共同担保维持秩序，也会排斥新人和操纵价格。竞争可以表现为降价、挖角、联盟、技术改良或争夺官府许可。",
+      "priority": 75,
+      "placement": "scenario",
+      "activation": { "keys": ["行会", "同业", "价格", "铺面", "挖角", "工价"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] }
+    },
+    {
+      "id": "ancient.domain.commerce.state_gray_trade",
+      "title": "官商、税关与灰色贸易",
+      "kind": "institution",
+      "content": "专卖、税关、牌照、军需和权贵采购让商业与政治相连。走私与灰色交易可能维持边地生计，也会带来勒索、查封和被迫替某方输送资源的风险。",
+      "priority": 76,
+      "placement": "scenario",
+      "activation": { "keys": ["官商", "税关", "专卖", "走私", "查封", "军需"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] }
+    },
+    {
+      "id": "ancient.domain.commerce.succession_public",
+      "title": "合伙、继承与财富去向",
+      "kind": "consequence",
+      "content": "事业扩大后必须处理分红、背叛、学徒、继承与家族转型。财富也可投入赈济、道路、工坊或政治关系；它最终留下的是垄断、信用还是公共基础，由长期选择决定。",
+      "priority": 74,
+      "placement": "scenario",
+      "activation": { "keys": ["合伙", "分红", "继承", "家业", "赈济", "工坊"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] }
+    }
+  ]
+}

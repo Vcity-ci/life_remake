@@ -1,0 +1,41 @@
+{
+  "worldId": "fantasy",
+  "cards": [
+    {
+      "id": "fantasy.domain.city.foothold_service",
+      "title": "坊市、差事与立足",
+      "kind": "social_role",
+      "content": "仙城由坊市、巡守、工坊、家族、散修与凡人共同维持。解决治安、供水、灵脉、交易或污染问题，能让人物获得职位、信用和最初盟友。",
+      "priority": 72,
+      "placement": "scenario",
+      "activation": { "keys": ["坊市", "巡守", "工坊", "仙城", "差事", "立足"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] }
+    },
+    {
+      "id": "fantasy.domain.city.resource_governance",
+      "title": "灵脉、资源与城中治理",
+      "kind": "institution",
+      "content": "护城阵、灵脉、药材、粮食和居住区是城邦权力的基础。治理要在修士突破、产业运转、凡人安全与家族利益之间分配有限资源。",
+      "priority": 74,
+      "placement": "scenario",
+      "activation": { "keys": ["灵脉", "护城阵", "资源", "治理", "家族", "居民"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] }
+    },
+    {
+      "id": "fantasy.domain.city.siege_defense",
+      "title": "围城、阵防与内部裂痕",
+      "kind": "conflict",
+      "content": "城邦危机可以来自敌军、兽潮、诡域或内部夺权。守城不仅是正面交锋，还包括修补阵眼、分配避难区、识别内应、组织反击与决定是否突围。",
+      "priority": 77,
+      "placement": "scenario",
+      "activation": { "keys": ["围城", "守城", "阵眼", "内应", "突围", "兽潮"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] }
+    },
+    {
+      "id": "fantasy.domain.city.long_order",
+      "title": "城主权力与长期制度",
+      "kind": "consequence",
+      "content": "危机后的城邦需要决定议事、守备、税费、族群位置与力量监督方式。个人威望可以救一时，长期秩序则需要能在人物不在场时继续运作。",
+      "priority": 75,
+      "placement": "scenario",
+      "activation": { "keys": ["城主", "议事", "守备", "税费", "制度", "监督"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] }
+    }
+  ]
+}

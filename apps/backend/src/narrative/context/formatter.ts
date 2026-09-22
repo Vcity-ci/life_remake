@@ -44,6 +44,6 @@ export function formatNarrativeContextFragments(
   const userFragments = fragments.filter((entry) => entry.placement === "user_context" && (!layers || layers.has(entry.layer)));
   return SECTION_ORDER.map((section) => renderSection(
     section,
-    userFragments.filter((entry) => entry.section === section).sort((a, b) => a.order - b.order).map((entry) => entry.content)
+    userFragments.filter((entry) => entry.section === section).sort((a, b) => a.order - b.order || a.id.localeCompare(b.id)).map((entry) => entry.content)
   )).filter(Boolean).join("\n");
 }

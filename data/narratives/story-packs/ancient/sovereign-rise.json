@@ -36,7 +36,10 @@
       "payoffMeaning": "人物成为一股能够持续行动的力量。",
       "worldCardRefs": [
         "ancient.snapshot.central_figures",
-        "ancient.snapshot.jingyuan_reform"
+        "ancient.snapshot.jingyuan_reform",
+        "ancient.domain.sovereignty.mobilization",
+        "ancient.domain.sovereignty.stronghold_campaign",
+        "ancient.domain.sovereignty.absorb_forces"
       ]
     },
     {
@@ -48,7 +51,10 @@
       "payoffMeaning": "人物已经足以左右一方局势。",
       "worldCardRefs": [
         "ancient.snapshot.jingyuan_reform",
-        "ancient.snapshot.frontier_pressure"
+        "ancient.snapshot.frontier_pressure",
+        "ancient.domain.sovereignty.stronghold_campaign",
+        "ancient.domain.sovereignty.absorb_forces",
+        "ancient.domain.sovereignty.legitimacy_enthronement"
       ]
     },
     {
@@ -60,7 +66,10 @@
       "payoffMeaning": "天下归属与人物留下的制度得到不可逆的回答。",
       "worldCardRefs": [
         "ancient.snapshot.frontier_pressure",
-        "ancient.snapshot.local_society"
+        "ancient.snapshot.local_society",
+        "ancient.domain.sovereignty.legitimacy_enthronement",
+        "ancient.domain.sovereignty.postwar_order",
+        "ancient.domain.sovereignty.absorb_forces"
       ]
     }
   ],

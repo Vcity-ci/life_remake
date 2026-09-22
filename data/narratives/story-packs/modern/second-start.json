@@ -37,7 +37,10 @@
       "payoffMeaning": "人物拥有了一段真实积累，同时看见了它无法解决的问题。",
       "worldCardRefs": [
         "modern.snapshot.transition_2027",
-        "modern.snapshot.family_care"
+        "modern.snapshot.family_care",
+        "modern.domain.career.entry_work",
+        "modern.domain.intimacy.shared_life",
+        "modern.domain.education.path_choice"
       ]
     },
     {
@@ -49,7 +52,10 @@
       "payoffMeaning": "人物承认旧答案已经失效，并作出真正改变生活结构的行动。",
       "worldCardRefs": [
         "modern.snapshot.family_care",
-        "modern.snapshot.housing_and_mobility"
+        "modern.snapshot.housing_and_mobility",
+        "modern.domain.career.value_legacy",
+        "modern.domain.city.home_tension",
+        "modern.domain.intimacy.care_change"
       ]
     },
     {
@@ -61,7 +67,10 @@
       "payoffMeaning": "人物以新的关系、工作或生活方式完成对自我的重新定义。",
       "worldCardRefs": [
         "modern.snapshot.housing_and_mobility",
-        "modern.snapshot.transition_2027"
+        "modern.snapshot.transition_2027",
+        "modern.domain.career.entry_work",
+        "modern.domain.city.long_home",
+        "modern.domain.education.public_practice"
       ]
     }
   ],

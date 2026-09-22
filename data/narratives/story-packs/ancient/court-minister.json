@@ -36,7 +36,10 @@
       "payoffMeaning": "人物获得真实的仕途入口和第一批政治资产。",
       "worldCardRefs": [
         "ancient.snapshot.jingyuan_reform",
-        "ancient.snapshot.central_figures"
+        "ancient.snapshot.central_figures",
+        "ancient.domain.court.audience_appointment",
+        "ancient.domain.court.faction_coalition",
+        "ancient.domain.court.ruler_bargain"
       ]
     },
     {
@@ -48,7 +51,10 @@
       "payoffMeaning": "人物能够影响重要任命、政策或军政决定。",
       "worldCardRefs": [
         "ancient.snapshot.central_figures",
-        "ancient.snapshot.local_society"
+        "ancient.snapshot.local_society",
+        "ancient.domain.court.faction_coalition",
+        "ancient.domain.court.palace_plot",
+        "ancient.domain.court.ruler_bargain"
       ]
     },
     {
@@ -60,7 +66,10 @@
       "payoffMeaning": "人物与皇权的最终关系及其制度后果得到回答。",
       "worldCardRefs": [
         "ancient.snapshot.local_society",
-        "ancient.snapshot.jingyuan_reform"
+        "ancient.snapshot.jingyuan_reform",
+        "ancient.domain.court.palace_plot",
+        "ancient.domain.court.ruler_bargain",
+        "ancient.domain.court.coup_transfer"
       ]
     }
   ],

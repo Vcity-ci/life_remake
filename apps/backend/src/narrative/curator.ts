@@ -28,6 +28,8 @@ export interface NarrativeMemoryCurationEpisode {
   factionId?: string;
   factIds: string[];
   characterIds: string[];
+  locationIds: string[];
+  abilityIds: string[];
   text: string;
 }
 
@@ -67,7 +69,9 @@ function episodesForScope(episodes: NarrativeEpisodeRecord[], scope: NarrativeMe
   if (scope === "act") return episodes.filter((episode) => episode.actId === value);
   if (scope === "route") return episodes.filter((episode) => episode.routeId === value);
   if (scope === "faction") return episodes.filter((episode) => episode.factionId === value);
-  return episodes.filter((episode) => episode.characterIds.includes(value ?? ""));
+  if (scope === "character") return episodes.filter((episode) => episode.characterIds.includes(value ?? ""));
+  if (scope === "location") return episodes.filter((episode) => episode.locationIds.includes(value ?? ""));
+  return episodes.filter((episode) => episode.abilityIds.includes(value ?? ""));
 }
 
 function curationScopes(run: InternalRunState, episodes: NarrativeEpisodeRecord[]): NarrativeMemoryCurationScope[] {
@@ -76,7 +80,9 @@ function curationScopes(run: InternalRunState, episodes: NarrativeEpisodeRecord[
     ...unique(episodes.map((episode) => episode.actId)).map((value) => ({ scope: "act" as const, value })),
     ...unique(episodes.map((episode) => episode.routeId)).map((value) => ({ scope: "route" as const, value })),
     ...unique(episodes.map((episode) => episode.factionId)).map((value) => ({ scope: "faction" as const, value })),
-    ...unique(episodes.flatMap((episode) => episode.characterIds)).map((value) => ({ scope: "character" as const, value }))
+    ...unique(episodes.flatMap((episode) => episode.characterIds)).map((value) => ({ scope: "character" as const, value })),
+    ...unique(episodes.flatMap((episode) => episode.locationIds)).map((value) => ({ scope: "location" as const, value })),
+    ...unique(episodes.flatMap((episode) => episode.abilityIds)).map((value) => ({ scope: "ability" as const, value }))
   ];
   return candidates.map(({ scope, value }) => {
     const id = scopeId(scope, value);
@@ -117,6 +123,8 @@ export function prepareNarrativeMemoryCuration(run: InternalRunState): Narrative
       factionId: episode.factionId,
       factIds: episode.factIds.filter((id) => factIds.has(id)),
       characterIds: episode.characterIds.filter((id) => characterIds.has(id)),
+      locationIds: episode.locationIds,
+      abilityIds: episode.abilityIds,
       text: episode.memoryIds.map((id) => memoryById.get(id)?.text ?? "").filter(Boolean).join("\n")
     })),
     scopes: curationScopes(run, selected),

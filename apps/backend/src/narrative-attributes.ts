@@ -62,16 +62,16 @@ export function describeNarrativeAttributePolicy(policy: NarrativeAttributePolic
   ].filter(Boolean).join(" ");
 }
 
-export function narrativeEffectsSchema(policy: NarrativeAttributePolicy): Record<string, unknown> {
+export function narrativeEffectsSchema(_policy: NarrativeAttributePolicy): Record<string, unknown> {
   return {
-    type: "array", minItems: policy.minEffects, maxItems: policy.maxEffects,
-    description: describeNarrativeAttributePolicy(policy),
+    type: "array", minItems: 0, maxItems: statKeys.length,
+    description: "提交本轮实际形成的属性变化标签；本轮允许的数量、属性、方向与幅度由当前任务给出，并由引擎审批。",
     items: {
       type: "object", additionalProperties: false, required: ["stat", "direction", "band"],
       properties: {
-        stat: { type: "string", enum: policy.allowedStats },
-        direction: { type: "string", enum: policy.allowedDirections },
-        band: { type: "string", enum: policy.allowedBands }
+        stat: { type: "string", enum: statKeys },
+        direction: { type: "string", enum: directions },
+        band: { type: "string", enum: bands }
       }
     }
   };

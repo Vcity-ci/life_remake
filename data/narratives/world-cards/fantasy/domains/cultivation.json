@@ -1,0 +1,41 @@
+{
+  "worldId": "fantasy",
+  "cards": [
+    {
+      "id": "fantasy.domain.cultivation.foundation",
+      "title": "感应、吐纳与筑基",
+      "kind": "practice",
+      "content": "修行从辨认灵息、调整身体与理解功法开始。吐纳、淬体、观想和仪轨各有路径，进境会改变感官与行动能力，也会显露体质、资源和方法上的代价。",
+      "priority": 73,
+      "placement": "scenario",
+      "activation": { "keys": ["吐纳", "筑基", "观想", "淬体", "灵息", "功法"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] }
+    },
+    {
+      "id": "fantasy.domain.cultivation.breakthrough",
+      "title": "瓶颈、破境与失控",
+      "kind": "conflict",
+      "content": "破境需要积累、契机与对自身道路的理解，不只是力量骤增。外力催动可越过瓶颈，却可能留下污染、心神裂隙、寿元损耗或被他人控制的痕迹。",
+      "priority": 75,
+      "placement": "scenario",
+      "activation": { "keys": ["瓶颈", "破境", "突破", "走火", "寿元", "污染"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] }
+    },
+    {
+      "id": "fantasy.domain.cultivation.spell_combat",
+      "title": "术法、身位与交锋",
+      "kind": "practice",
+      "content": "术法交锋由感知、距离、地形、施术准备、克制关系与消耗共同决定。攻防可以表现为结印、御器、近身、破阵或借环境反制，余波会影响同伴、场所与后续行动。",
+      "priority": 77,
+      "placement": "scenario",
+      "activation": { "keys": ["斗法", "术法", "御器", "结印", "交锋", "身法"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] }
+    },
+    {
+      "id": "fantasy.domain.cultivation.own_path",
+      "title": "自创法门与道路传承",
+      "kind": "consequence",
+      "content": "修行者可改良旧法、融合异族知识或从自身经历中创出新术。新道路需要反复验证、传授方式与适用边界，否则个人奇迹无法成为可延续的传承。",
+      "priority": 74,
+      "placement": "scenario",
+      "activation": { "keys": ["自创", "法门", "传承", "改良", "开道", "授法"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] }
+    }
+  ]
+}

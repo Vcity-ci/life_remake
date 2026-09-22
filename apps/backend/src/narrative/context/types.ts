@@ -94,6 +94,7 @@ export interface NarrativeContextManifest {
 export interface NarrativeContextComposition {
   renderedContext: string;
   stableContext: string;
+  runtimeContext: string;
   activeContext: string;
   taskContext: string;
   historyMessages: ConversationPromptMessage[];

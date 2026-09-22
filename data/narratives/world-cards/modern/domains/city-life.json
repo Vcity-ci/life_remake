@@ -1,0 +1,41 @@
+{
+  "worldId": "modern",
+  "cards": [
+    {
+      "id": "modern.domain.city.departure_foothold",
+      "title": "迁移、落脚与生活半径",
+      "kind": "geography",
+      "content": "迁入新城市需要处理交通、证件、住处、收入和最初社会联系。真正落脚不是抵达车站，而是能够稳定吃住、工作并知道遇到问题向谁求助。",
+      "priority": 73,
+      "placement": "scenario",
+      "activation": { "keys": ["迁移", "落脚", "租房", "通勤", "新城市", "住处"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] }
+    },
+    {
+      "id": "modern.domain.city.network_belonging",
+      "title": "邻里、同伴与城市归属",
+      "kind": "culture",
+      "content": "归属感来自同事、邻里、朋友、熟悉店铺和反复走过的道路。关系网络能提供工作信息、照料和情感支持，也可能把人物固定在不再适合的位置。",
+      "priority": 72,
+      "placement": "scenario",
+      "activation": { "keys": ["邻里", "同伴", "归属", "朋友", "街区", "关系网络"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] }
+    },
+    {
+      "id": "modern.domain.city.home_tension",
+      "title": "故乡责任与两地拉扯",
+      "kind": "conflict",
+      "content": "返乡、异地关系、父母照料和城市机会会把距离变成现实选择。留下或离开都不是背叛，关键是人物怎样承担无法同时在场的代价。",
+      "priority": 75,
+      "placement": "scenario",
+      "activation": { "keys": ["故乡", "返乡", "异地", "父母", "两地", "离开"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] }
+    },
+    {
+      "id": "modern.domain.city.long_home",
+      "title": "留下、返回与再次远行",
+      "kind": "consequence",
+      "content": "长期归处可以是扎根一城、回到故乡、在多地生活或不断迁移。收束应说明人物保住了哪些关系与生活方式，也承认选择排除了哪些可能。",
+      "priority": 74,
+      "placement": "scenario",
+      "activation": { "keys": ["扎根", "归处", "留下", "返回", "远行", "生活方式"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] }
+    }
+  ]
+}

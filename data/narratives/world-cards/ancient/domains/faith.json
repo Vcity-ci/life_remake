@@ -1,0 +1,50 @@
+{
+  "worldId": "ancient",
+  "cards": [
+    {
+      "id": "ancient.domain.faith.disaster_healing",
+      "title": "灾异、疫病与救治",
+      "kind": "practice",
+      "content": "灾年与疫病会同时考验医药、组织和解释世界的能力。诊治、隔离、施药、安葬和安抚民心都可能建立声望，也可能因误判、资源不足或权力干预引发指责。",
+      "priority": 75,
+      "placement": "scenario",
+      "activation": { "keys": ["灾异", "疫病", "治病", "施药", "隔离", "救治"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] }
+    },
+    {
+      "id": "ancient.domain.faith.rite_miracle",
+      "title": "仪式、神迹与公众信任",
+      "kind": "culture",
+      "content": "祈禳、占候、祭仪与被称作神迹的现象，会被不同人理解为信仰、技术、巧合或政治信号。其影响取决于是否回应真实困境，以及谁借此获得解释权。",
+      "priority": 73,
+      "placement": "scenario",
+      "activation": { "keys": ["仪式", "神迹", "祈禳", "占候", "祭仪", "天象"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] }
+    },
+    {
+      "id": "ancient.domain.faith.court_debate",
+      "title": "朝堂辩经与正统之争",
+      "kind": "conflict",
+      "content": "经典解释、医术成效、历法与灾异归因都可能进入朝堂辩论。辩经不仅争论真假，也牵动教门资格、国家礼制、君主权威和民间声望。",
+      "priority": 76,
+      "placement": "scenario",
+      "activation": { "keys": ["辩经", "正统", "经典", "历法", "朝堂", "教门"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] }
+    },
+    {
+      "id": "ancient.domain.faith.seal_taboo",
+      "title": "封禁、禁忌与危险传承",
+      "kind": "conflict",
+      "content": "危险之物、禁地、秘术或有害习俗需要被封存、改造或公开。封禁需要可信的见证、守护者和代价，也可能因继承断裂、权贵觊觎或民众恐惧再次失控。",
+      "priority": 75,
+      "placement": "scenario",
+      "activation": { "keys": ["封印", "封禁", "禁忌", "秘术", "禁地", "传承"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] }
+    },
+    {
+      "id": "ancient.domain.faith.popular_movement",
+      "title": "教门互助与民间起事",
+      "kind": "faction",
+      "content": "教门可以凭施药、赈济、讲经和互助网络聚集民众，也可能在饥荒、压迫或领袖野心下转为抗税、起事或地方自治。信众并非一体，温和救济与激进行动会争夺方向。",
+      "priority": 77,
+      "placement": "scenario",
+      "activation": { "keys": ["信众", "赈济", "互助", "起事", "抗税", "教门"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] }
+    }
+  ]
+}

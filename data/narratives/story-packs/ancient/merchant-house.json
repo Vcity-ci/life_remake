@@ -37,7 +37,10 @@
       "payoffMeaning": "人物拥有可延续的营生和第一条可靠网络。",
       "worldCardRefs": [
         "ancient.snapshot.coastal_trade",
-        "ancient.snapshot.nine_regions"
+        "ancient.snapshot.nine_regions",
+        "ancient.domain.commerce.capital_credit",
+        "ancient.domain.commerce.transport_warehouse",
+        "ancient.domain.commerce.guild_competition"
       ]
     },
     {
@@ -49,7 +52,10 @@
       "payoffMeaning": "人物成为能够调动资金、货物与消息的重要商人。",
       "worldCardRefs": [
         "ancient.snapshot.nine_regions",
-        "ancient.snapshot.local_society"
+        "ancient.snapshot.local_society",
+        "ancient.domain.commerce.transport_warehouse",
+        "ancient.domain.commerce.guild_competition",
+        "ancient.domain.commerce.state_gray_trade"
       ]
     },
     {
@@ -61,7 +67,10 @@
       "payoffMeaning": "商业成果及其与权力、家族的关系得到最终回答。",
       "worldCardRefs": [
         "ancient.snapshot.local_society",
-        "ancient.snapshot.coastal_trade"
+        "ancient.snapshot.coastal_trade",
+        "ancient.domain.commerce.state_gray_trade",
+        "ancient.domain.commerce.succession_public",
+        "ancient.domain.commerce.capital_credit"
       ]
     }
   ],

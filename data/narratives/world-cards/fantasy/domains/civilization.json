@@ -1,0 +1,41 @@
+{
+  "worldId": "fantasy",
+  "cards": [
+    {
+      "id": "fantasy.domain.civilization.first_contact",
+      "title": "语言、习俗与初次接触",
+      "kind": "culture",
+      "content": "不同族群通过称谓、礼物、禁忌、翻译和共同劳动确认彼此意图。误解并不自动等于敌意，真正的关系需要可验证的互助或冲突事实。",
+      "priority": 73,
+      "placement": "scenario",
+      "activation": { "keys": ["异族", "语言", "习俗", "翻译", "禁忌", "接触"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] }
+    },
+    {
+      "id": "fantasy.domain.civilization.trade_oath",
+      "title": "贸易、盟誓与共同利益",
+      "kind": "faction",
+      "content": "跨族贸易、共享水源、通行权和共同敌人能形成联盟基础。盟誓需要交换担保、争端程序和双方内部的支持，否则个人友谊难以承受群体压力。",
+      "priority": 74,
+      "placement": "scenario",
+      "activation": { "keys": ["贸易", "盟誓", "通行", "共同利益", "担保", "结盟"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] }
+    },
+    {
+      "id": "fantasy.domain.civilization.war_migration",
+      "title": "族群战争与迁徙",
+      "kind": "conflict",
+      "content": "资源枯竭、裂隙扩张、旧仇与强硬领袖都可能把边境摩擦变成战争。战斗之外，迁徙路线、俘虏、混居者和撤离后的土地归属同样决定冲突走向。",
+      "priority": 76,
+      "placement": "scenario",
+      "activation": { "keys": ["族群战争", "迁徙", "边境", "俘虏", "撤离", "旧仇"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] }
+    },
+    {
+      "id": "fantasy.domain.civilization.shared_order",
+      "title": "共同边界与新秩序",
+      "kind": "consequence",
+      "content": "长期共处需要划定领地、混居规则、司法、祭仪和资源共享方式。新秩序可以是联盟、自治、联邦或保持距离的和平，但必须让双方普通人看见如何生活。",
+      "priority": 75,
+      "placement": "scenario",
+      "activation": { "keys": ["共处", "自治", "边界", "混居", "联盟", "新秩序"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] }
+    }
+  ]
+}

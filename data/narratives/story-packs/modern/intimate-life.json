@@ -37,7 +37,10 @@
       "payoffMeaning": "双方形成了愿意继续投入的关系与共同记忆。",
       "worldCardRefs": [
         "modern.snapshot.family_care",
-        "modern.snapshot.housing_and_mobility"
+        "modern.snapshot.housing_and_mobility",
+        "modern.domain.intimacy.encounter_trust",
+        "modern.domain.intimacy.shared_life",
+        "modern.domain.city.network_belonging"
       ]
     },
     {
@@ -49,7 +52,10 @@
       "payoffMeaning": "关系形成了可持续结构，或诚实地改变了原有形式。",
       "worldCardRefs": [
         "modern.snapshot.housing_and_mobility",
-        "modern.snapshot.transition_2027"
+        "modern.snapshot.transition_2027",
+        "modern.domain.intimacy.shared_life",
+        "modern.domain.intimacy.care_change",
+        "modern.domain.career.project_team"
       ]
     },
     {
@@ -61,7 +67,10 @@
       "payoffMeaning": "人物最终形成了关于爱、家庭与陪伴的完整答案。",
       "worldCardRefs": [
         "modern.snapshot.transition_2027",
-        "modern.snapshot.family_care"
+        "modern.snapshot.family_care",
+        "modern.domain.intimacy.care_change",
+        "modern.domain.intimacy.form_legacy",
+        "modern.domain.city.long_home"
       ]
     }
   ],

@@ -37,7 +37,10 @@
       "payoffMeaning": "人物取得了独立行动所需的能力、信用或第一批伙伴。",
       "worldCardRefs": [
         "modern.snapshot.transition_2027",
-        "modern.snapshot.ai_and_work"
+        "modern.snapshot.ai_and_work",
+        "modern.domain.career.entry_work",
+        "modern.domain.career.project_team",
+        "modern.domain.enterprise.problem_prototype"
       ]
     },
     {
@@ -49,7 +52,10 @@
       "payoffMeaning": "人物已经能影响一群人的工作与现实选择。",
       "worldCardRefs": [
         "modern.snapshot.ai_and_work",
-        "modern.snapshot.housing_and_mobility"
+        "modern.snapshot.housing_and_mobility",
+        "modern.domain.career.project_team",
+        "modern.domain.career.scale_control",
+        "modern.domain.enterprise.funding_market"
       ]
     },
     {
@@ -61,7 +67,10 @@
       "payoffMeaning": "事业的去向与人物对成功的定义获得不可逆答案。",
       "worldCardRefs": [
         "modern.snapshot.housing_and_mobility",
-        "modern.snapshot.transition_2027"
+        "modern.snapshot.transition_2027",
+        "modern.domain.career.scale_control",
+        "modern.domain.career.value_legacy",
+        "modern.domain.enterprise.crisis_transform"
       ]
     }
   ],

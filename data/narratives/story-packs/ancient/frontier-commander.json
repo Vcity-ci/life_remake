@@ -37,7 +37,10 @@
       "payoffMeaning": "人物形成独特的边境能力并拥有可依靠的军中关系。",
       "worldCardRefs": [
         "ancient.snapshot.frontier_pressure",
-        "ancient.snapshot.nine_regions"
+        "ancient.snapshot.nine_regions",
+        "ancient.domain.military.reconnaissance",
+        "ancient.domain.military.training_command",
+        "ancient.domain.military.logistics_morale"
       ]
     },
     {
@@ -49,7 +52,10 @@
       "payoffMeaning": "人物成为足以决定一方攻守的将领。",
       "worldCardRefs": [
         "ancient.snapshot.nine_regions",
-        "ancient.snapshot.central_figures"
+        "ancient.snapshot.central_figures",
+        "ancient.domain.military.logistics_morale",
+        "ancient.domain.military.raid_siege",
+        "ancient.domain.military.reconnaissance"
       ]
     },
     {
@@ -61,7 +67,10 @@
       "payoffMeaning": "边境秩序、军队归属和人物政治位置得到最终回答。",
       "worldCardRefs": [
         "ancient.snapshot.central_figures",
-        "ancient.snapshot.frontier_pressure"
+        "ancient.snapshot.frontier_pressure",
+        "ancient.domain.military.raid_siege",
+        "ancient.domain.military.prisoners_retreat",
+        "ancient.domain.military.logistics_morale"
       ]
     }
   ],

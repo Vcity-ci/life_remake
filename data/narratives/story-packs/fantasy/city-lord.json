@@ -37,7 +37,10 @@
       "payoffMeaning": "人物获得了能够持续影响城邦事务的位置与盟友。",
       "worldCardRefs": [
         "fantasy.snapshot.old_pact",
-        "fantasy.snapshot.mortal_life"
+        "fantasy.snapshot.mortal_life",
+        "fantasy.domain.city.foothold_service",
+        "fantasy.domain.city.resource_governance",
+        "fantasy.domain.cultivation.foundation"
       ]
     },
     {
@@ -49,7 +52,10 @@
       "payoffMeaning": "人物已经能够调动一城资源，也必须承担由此产生的敌意与责任。",
       "worldCardRefs": [
         "fantasy.snapshot.mortal_life",
-        "fantasy.snapshot.three_rifts"
+        "fantasy.snapshot.three_rifts",
+        "fantasy.domain.city.resource_governance",
+        "fantasy.domain.city.long_order",
+        "fantasy.domain.sect.faction_crisis"
       ]
     },
     {
@@ -61,7 +67,10 @@
       "payoffMeaning": "城邦存亡及其制度因人物的选择获得最终方向。",
       "worldCardRefs": [
         "fantasy.snapshot.three_rifts",
-        "fantasy.snapshot.old_pact"
+        "fantasy.snapshot.old_pact",
+        "fantasy.domain.city.siege_defense",
+        "fantasy.domain.city.resource_governance",
+        "fantasy.domain.city.long_order"
       ]
     }
   ],

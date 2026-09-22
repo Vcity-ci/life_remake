@@ -1,0 +1,41 @@
+{
+  "worldId": "modern",
+  "cards": [
+    {
+      "id": "modern.domain.career.entry_work",
+      "title": "求职、试用与第一份成果",
+      "kind": "practice",
+      "content": "求职由信息、简历、面试、作品、推荐与岗位真实需求共同决定。进入组织后，试用期和第一项可验证成果会建立信用，也暴露职责与承诺是否一致。",
+      "priority": 73,
+      "placement": "scenario",
+      "activation": { "keys": ["求职", "面试", "简历", "试用", "岗位", "第一份工作"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] }
+    },
+    {
+      "id": "modern.domain.career.project_team",
+      "title": "项目、协作与组织关系",
+      "kind": "conflict",
+      "content": "项目推进需要拆解目标、协作、汇报、谈判与处理失败。资源和功劳如何分配，会改变同事、客户、管理者与团队之间的信任，也决定个人能力能否变成共同成果。",
+      "priority": 75,
+      "placement": "scenario",
+      "activation": { "keys": ["项目", "协作", "汇报", "团队", "客户", "功劳"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] }
+    },
+    {
+      "id": "modern.domain.career.scale_control",
+      "title": "扩张、管理与控制权",
+      "kind": "institution",
+      "content": "业务扩张会带来招聘、流程、资金、质量和管理责任。创始人、骨干、投资者或组织高层对速度与方向可能意见不同，控制权必须以现实决策呈现。",
+      "priority": 76,
+      "placement": "scenario",
+      "activation": { "keys": ["扩张", "管理", "招聘", "融资", "控制权", "流程"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] }
+    },
+    {
+      "id": "modern.domain.career.value_legacy",
+      "title": "事业价值与长期去向",
+      "kind": "consequence",
+      "content": "事业成熟后会面对伦理、公共影响、继任、出售、退出或继续承担的问题。最终成果不仅是规模与收入，也包括它怎样改变参与者的生活以及人物自己的时间。",
+      "priority": 75,
+      "placement": "scenario",
+      "activation": { "keys": ["事业", "继任", "出售", "退出", "公共影响", "长期价值"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] }
+    }
+  ]
+}

@@ -1,0 +1,41 @@
+{
+  "worldId": "fantasy",
+  "cards": [
+    {
+      "id": "fantasy.domain.destiny.possession_identity",
+      "title": "夺舍、预言与自我边界",
+      "kind": "conflict",
+      "content": "夺舍、血脉记忆、预言或天命会争夺人物对自身的解释权。抵抗不只依赖意志，还可借名字、关系、身体习惯、契约漏洞与他人见证确认何者属于自己。",
+      "priority": 77,
+      "placement": "scenario",
+      "activation": { "keys": ["夺舍", "预言", "天命", "血脉", "自我", "记忆"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] }
+    },
+    {
+      "id": "fantasy.domain.destiny.hunters_patronage",
+      "title": "争夺、庇护与利用",
+      "kind": "faction",
+      "content": "特殊力量会引来研究、招揽、囚禁、崇拜与保护。每个势力都可能提供真实帮助，也会试图定义人物用途；接受庇护意味着谈判边界与退出方式。",
+      "priority": 74,
+      "placement": "scenario",
+      "activation": { "keys": ["争夺", "庇护", "招揽", "囚禁", "特殊力量", "利用"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] }
+    },
+    {
+      "id": "fantasy.domain.destiny.rule_breach",
+      "title": "规则漏洞与逆命行动",
+      "kind": "practice",
+      "content": "改变既定命运需要先找出规则何时生效、靠什么媒介维持、谁从中受益。人物可以转移代价、破坏媒介、重写契约或让被规则排除的人共同参与。",
+      "priority": 76,
+      "placement": "scenario",
+      "activation": { "keys": ["规则", "漏洞", "逆命", "契约", "媒介", "代价"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] }
+    },
+    {
+      "id": "fantasy.domain.destiny.world_change",
+      "title": "改天后的世界",
+      "kind": "consequence",
+      "content": "打破天命或旧规则会重新分配力量、风险与自由。真正的收束不仅说明人物是否超脱，还要呈现普通人、盟友、敌人和后来者如何生活在新规则之下。",
+      "priority": 78,
+      "placement": "scenario",
+      "activation": { "keys": ["改天", "新规则", "超脱", "后来者", "天道", "世界改变"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] }
+    }
+  ]
+}

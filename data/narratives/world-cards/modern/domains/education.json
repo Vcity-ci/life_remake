@@ -1,0 +1,41 @@
+{
+  "worldId": "modern",
+  "cards": [
+    {
+      "id": "modern.domain.education.learning_direction",
+      "title": "兴趣、训练与学习方向",
+      "kind": "practice",
+      "content": "学习方向从课程体验、长期兴趣、现实反馈和可获得的训练条件中形成。选择专业或技艺意味着分配时间，也会让人物逐渐进入新的同伴、导师与评价体系。",
+      "priority": 72,
+      "placement": "scenario",
+      "activation": { "keys": ["学习", "兴趣", "课程", "专业", "训练", "导师"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] }
+    },
+    {
+      "id": "modern.domain.education.exam_project",
+      "title": "考试、竞赛与项目成果",
+      "kind": "practice",
+      "content": "考试、竞赛、研究和作品项目以不同方式检验能力。准备过程会涉及合作、失败、资源差异与伦理选择，结果既可能打开入口，也可能促使人物换一种道路。",
+      "priority": 74,
+      "placement": "scenario",
+      "activation": { "keys": ["考试", "竞赛", "研究", "项目", "作品", "成绩"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] }
+    },
+    {
+      "id": "modern.domain.education.path_choice",
+      "title": "升学、就业与机会成本",
+      "kind": "conflict",
+      "content": "升学、就业、职业教育、间隔期和转专业各有时间与经济成本。选择并非只看名次，还会改变城市、关系、家庭负担和未来能够接触的问题。",
+      "priority": 75,
+      "placement": "scenario",
+      "activation": { "keys": ["升学", "就业", "转专业", "职业教育", "选择", "机会成本"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] }
+    },
+    {
+      "id": "modern.domain.education.public_practice",
+      "title": "知识进入现实",
+      "kind": "consequence",
+      "content": "专业能力只有进入教学、研究、产品、服务或公共问题才显出长期价值。人物需要在准确、效率、伦理、传播和个人生活之间决定成果如何被使用与承接。",
+      "priority": 74,
+      "placement": "scenario",
+      "activation": { "keys": ["教学", "研究成果", "产品", "专业", "伦理", "实践"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] }
+    }
+  ]
+}

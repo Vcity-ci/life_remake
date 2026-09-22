@@ -37,7 +37,10 @@
       "payoffMeaning": "人物建立了自我边界，并能主动使用或拒绝这份异常力量。",
       "worldCardRefs": [
         "fantasy.snapshot.cultivation_cost",
-        "fantasy.snapshot.two_layers"
+        "fantasy.snapshot.two_layers",
+        "fantasy.domain.destiny.possession_identity",
+        "fantasy.domain.destiny.hunters_patronage",
+        "fantasy.domain.cultivation.foundation"
       ]
     },
     {
@@ -49,7 +52,10 @@
       "payoffMeaning": "人物不再只是被争夺的容器，而成为能够反向改变局势的力量。",
       "worldCardRefs": [
         "fantasy.snapshot.two_layers",
-        "fantasy.snapshot.central_figures"
+        "fantasy.snapshot.central_figures",
+        "fantasy.domain.destiny.hunters_patronage",
+        "fantasy.domain.destiny.rule_breach",
+        "fantasy.domain.uncanny.knowledge_cost"
       ]
     },
     {
@@ -61,7 +67,10 @@
       "payoffMeaning": "人物从命运的承受者成为规则的回答者，世界也留下不可逆变化。",
       "worldCardRefs": [
         "fantasy.snapshot.central_figures",
-        "fantasy.snapshot.cultivation_cost"
+        "fantasy.snapshot.cultivation_cost",
+        "fantasy.domain.destiny.rule_breach",
+        "fantasy.domain.destiny.world_change",
+        "fantasy.domain.cultivation.own_path"
       ]
     }
   ],

@@ -37,7 +37,10 @@
       "payoffMeaning": "人物获得了真实回应，也进入了需要持续承担的公共关系。",
       "worldCardRefs": [
         "modern.snapshot.platform_reputation",
-        "modern.snapshot.transition_2027"
+        "modern.snapshot.transition_2027",
+        "modern.domain.public.concern_evidence",
+        "modern.domain.public.organize_negotiate",
+        "modern.domain.public.reputation_backlash"
       ]
     },
     {
@@ -49,7 +52,10 @@
       "payoffMeaning": "人物不再只是表达者，而成为能推动现实进程的人。",
       "worldCardRefs": [
         "modern.snapshot.transition_2027",
-        "modern.snapshot.education_channels"
+        "modern.snapshot.education_channels",
+        "modern.domain.public.organize_negotiate",
+        "modern.domain.public.reputation_backlash",
+        "modern.domain.public.accountability"
       ]
     },
     {
@@ -61,7 +67,10 @@
       "payoffMeaning": "人物的公共角色及其实际影响获得长期评价。",
       "worldCardRefs": [
         "modern.snapshot.education_channels",
-        "modern.snapshot.platform_reputation"
+        "modern.snapshot.platform_reputation",
+        "modern.domain.public.reputation_backlash",
+        "modern.domain.public.accountability",
+        "modern.domain.enterprise.crisis_transform"
       ]
     }
   ],

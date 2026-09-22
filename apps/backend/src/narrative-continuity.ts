@@ -20,7 +20,7 @@ export function factUpdateContract(factIds: string[]) {
   const changes = { type: "array", items: {
     type: "object", additionalProperties: false, required: ["factId", "status", "summary"],
     properties: {
-      factId: { type: "string", ...(mutableIds.length ? { enum: mutableIds } : {}) },
+      factId: { type: "string", description: "使用本轮可更新事项中给出的事实 ID。" },
       status: { type: "string", enum: ["open", "resolved"], description: "仍有待处理内容为 open；事情已有结果、义务已履行或不再需要处理为 resolved。" },
       summary: { type: "string", description: "这件事情现在的进展或实际结果。" }
     }
@@ -35,7 +35,7 @@ export function factUpdateContract(factIds: string[]) {
           type: "object", additionalProperties: false, required: ["kind", "label", "status"],
           properties: { kind: { type: "string", enum: factKinds }, label: { type: "string" }, status: { type: "string", enum: ["open", "resolved"] }, priority: { type: "integer", minimum: 1, maximum: 4 } }
         }},
-        ...(mutableIds.length ? { updates: changes } : {})
+        updates: changes
       }
     }
   };
@@ -90,11 +90,11 @@ export function parseFactUpdates(raw: unknown, contract: ReturnType<typeof factU
   };
 }
 
-export function relationshipUpdatesSchema(characterIds: string[]) {
-  return { type: "array", ...(characterIds.length ? {} : { maxItems: 0 }), items: {
+export function relationshipUpdatesSchema(_characterIds: string[]) {
+  return { type: "array", items: {
     type: "object", additionalProperties: false, required: ["characterRef", "stance", "summary"],
     properties: {
-      characterRef: { type: "string", ...(characterIds.length ? { enum: characterIds } : {}) },
+      characterRef: { type: "string", description: "使用本轮可更新人物中给出的角色 ID。" },
       stance: { type: "string", enum: relationshipStances }, summary: { type: "string" },
       status: { type: "string", enum: ["active", "resolved", "gone"], description: "人物仍在场、这段交往已告一段落、或已经离场（包括死亡）；具体处境写入 description。" },
       description: { type: "string", description: "人物当前身份与处境，替换已过时的档案描述。" }

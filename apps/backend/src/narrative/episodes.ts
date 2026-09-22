@@ -23,9 +23,11 @@ export function selectNarrativeEpisodeRecall(
     (digest.scope === "act" && digest.scopeId === input.actId) ||
     (digest.scope === "route" && digest.scopeId === input.routeId) ||
     (digest.scope === "character" && digest.scopeId && focusIds.has(digest.scopeId)) ||
-    (digest.scope === "faction" && digest.scopeId && focusIds.has(digest.scopeId))
+    (digest.scope === "faction" && digest.scopeId && focusIds.has(digest.scopeId)) ||
+    (digest.scope === "location" && digest.scopeId && focusIds.has(digest.scopeId)) ||
+    (digest.scope === "ability" && digest.scopeId && focusIds.has(digest.scopeId))
   ).sort((a, b) => {
-    const scopePriority = (scope: typeof a.scope) => scope === "act" ? 4 : scope === "route" ? 3 : scope === "character" || scope === "faction" ? 2 : 1;
+    const scopePriority = (scope: typeof a.scope) => scope === "act" ? 4 : scope === "route" ? 3 : scope === "character" || scope === "faction" || scope === "location" || scope === "ability" ? 2 : 1;
     return scopePriority(b.scope) - scopePriority(a.scope) || b.updatedAt - a.updatedAt;
   }).slice(0, 4);
   const coveredEpisodeIds = new Set(state.memoryDigests.find((digest) => digest.id === "run")?.coveredEpisodeIds ?? []);

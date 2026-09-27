@@ -43,7 +43,7 @@ export function validateNarrativeStoryPack(
     throw new Error("story_pack_identity_invalid");
   }
   if (!nonEmpty(value.name) || !nonEmpty(value.tagline) || !nonEmpty(value.summary) ||
-      !nonEmpty(value.routePromise) || !nonEmpty(value.entryLens) ||
+      !nonEmpty(value.routePromise) || !nonEmpty(value.centralConflict) || !nonEmpty(value.entryLens) ||
       !stringList(value.originSeeds, 1) || !stringList(value.stakeAxes, 1) ||
       !Array.isArray(value.acts) || value.acts.length !== 3) {
     throw new Error(`${value.id}_story_pack_content_invalid`);

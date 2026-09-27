@@ -124,6 +124,8 @@ export interface StoryFactDefinition {
     kind: StoryFactKind;
     label: string;
     priority?: number;
+    /** The world act that introduced this run-local fact. */
+    actId?: string;
     threadId?: string;
     routeIds?: string[];
     factionIds?: string[];
@@ -259,6 +261,8 @@ export interface NarrativeActHandoff {
     resolvedTension: string;
     lastingConsequence: string;
     continuation: string;
+    /** A small explicit set of unresolved facts that remain active in the next act. */
+    carryFactIds?: string[];
 }
 /**
  * A reusable dramatic situation. It gives the director usable material even
@@ -351,6 +355,8 @@ export interface NarrativeStoryPackDefinition {
     tagline: string;
     summary: string;
     routePromise: string;
+    /** Persistent dramatic conflict instantiated once per run; acts express its escalation. */
+    centralConflict: string;
     entryLens: string;
     originSeeds: string[];
     stakeAxes: string[];
@@ -789,6 +795,8 @@ export interface NarrativeEpisodeRecord {
     characterIds: string[];
     locationIds: string[];
     abilityIds: string[];
+    /** Plot-only delta for semantic observation and batched run summarization. */
+    storyDelta?: string;
     createdAt: number;
 }
 /** Durable outcome of a completed world act, derived from the payoff handoff. */
@@ -817,6 +825,11 @@ export interface NarrativeMemoryDigest {
     characterIds: string[];
     updatedAt: number;
 }
+export interface NarrativeHorizonIntent {
+    id: string;
+    goal: string;
+    status: "active" | "consumed";
+}
 /** Advisory, act-scoped horizon. Route selection remains a per-turn model decision. */
 export interface NarrativeHorizonPlan {
     id: string;
@@ -825,7 +838,7 @@ export interface NarrativeHorizonPlan {
     throughEpisodeId?: string;
     dramaticQuestion: string;
     developingTension: string;
-    nearTermIntents: string[];
+    intents: NarrativeHorizonIntent[];
     focusRefs: string[];
     payoffShape: string;
     status: "active" | "stale";
@@ -847,6 +860,10 @@ export interface NarrativeAgentAttemptRecord {
     horizonRevision?: number;
     digestRevision?: number;
     continuityStatus?: "skipped" | "requested_empty" | "requested_changed";
+    /** The immutable route, fact and world-card selection shared by settlement and rendering. */
+    briefId?: string;
+    focusIds?: string[];
+    worldCardIds?: string[];
     episodeId?: string;
     contextFragmentIds: string[];
     createdAt: number;
@@ -899,8 +916,9 @@ export interface NarrativeSessionPremise {
 }
 export interface NarrativeBeatObservation {
     decision: "hold" | "advance";
-    evidence: string[];
-    keywords: string[];
+    horizonDecision: "hold" | "consume" | "replan";
+    resolvedFactIds: string[];
+    carryFactIds: string[];
     actId: string;
     beat: Exclude<NarrativeBeat, "ending">;
     observedEpisodeId?: string;
@@ -1406,7 +1424,7 @@ export interface CreateSaveResponse {
     save: SaveSlotSummary;
     recoveryCode: string;
 }
-export type ModelUsageOperation = "narrative" | "summary" | "continuation" | "director" | "planning" | "settlement" | "continuity" | "curation" | "horizon" | "review" | "render" | "origin" | "background" | "scene" | "choice" | "decision" | "ending";
+export type ModelUsageOperation = "narrative" | "summary" | "continuation" | "director" | "planning" | "observation" | "settlement" | "continuity" | "curation" | "horizon" | "review" | "render" | "origin" | "background" | "scene" | "choice" | "decision" | "ending";
 export type ModelUsageTransport = "chat" | "responses";
 export interface ModelUsageTotals {
     requestCount: number;

@@ -43,7 +43,6 @@ const stableProvider: NarrativeContextProvider = {
   collect: ({ plan }) => {
     if (!plan?.task) return [];
     return [
-      ...(plan.persona ? fragment({ id: "stable:persona", layer: "stable", section: "persona", sourceType: "persona", priority: 100, content: plan.persona, required: true }) : []),
       ...(plan.talents ?? []).flatMap((talent) => fragment({ id: narrativeContentId("talent", talent), layer: "stable", section: "talents", sourceType: "talent", priority: 90, content: talent })),
       ...(plan.seedHints ?? []).flatMap((hint) => fragment({ id: narrativeContentId("seed-hint", hint), layer: "stable", section: "seedHints", sourceType: "seed-hint", priority: 35, content: hint })),
       ...(plan.origin ? fragment({ id: "stable:origin", layer: "stable", section: "origin", sourceType: "origin", priority: 85, content: plan.origin }) : []),

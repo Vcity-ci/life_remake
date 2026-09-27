@@ -12,6 +12,9 @@ export function narrativeContextTrace(manifest: NarrativeContextManifest) {
     totalEstimatedTokens: manifest.totalEstimatedTokens,
     layerEstimatedTokens: manifest.layerEstimatedTokens,
     selectedSourceIds: manifest.fragments.flatMap((entry) => entry.sourceIds),
+    storyContractFragments: manifest.fragments
+      .filter((entry) => entry.id === "runtime:mainline" || entry.id === "active:route" || entry.id.startsWith("active:act-handoff:"))
+      .map((entry) => entry.id),
     selectedWorldCards: manifest.fragments.filter((entry) => entry.sourceType === "world-card").map((entry) => ({
       id: entry.sourceIds.find((id) => id.startsWith("world-card:"))?.slice("world-card:".length) ?? entry.id,
       reason: entry.activationReason,

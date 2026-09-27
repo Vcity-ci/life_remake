@@ -68,6 +68,7 @@ const usageOperationLabels: Record<ModelUsageOperation, string> = {
   continuation: "文本续写",
   director: "方向选择",
   planning: "剧情规划",
+  observation: "节拍观察",
   settlement: "状态结算",
   continuity: "连续性同步",
   horizon: "幕间规划",

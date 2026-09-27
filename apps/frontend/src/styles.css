@@ -785,11 +785,18 @@ details[open] > .archive-section-summary::before { transform: rotate(90deg); }
 .opening-pending p { margin: 9px 0 0; line-height: 1.8; }
 .opening-pending button { margin-top: 14px; }
 
-.decision-dock { flex: 0 0 auto; margin-top: 0; padding: 18px 0 0; border-top: 1px solid #665a40; }
+.decision-dock { flex: 0 0 auto; min-height: 0; margin-top: 0; padding: 18px 0 0; border-top: 1px solid #665a40; }
+.decision-dock-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+.decision-dock-heading small { color: #bd9f60; font-size: 11px; }
+.decision-dock-heading span { color: #9eaa9f; font-size: 11px; }
 .decision-dock p { margin: 0 0 12px; color: #e0d6c1; line-height: 1.7; }
 .decision-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .decision-options button { display: grid; gap: 5px; min-height: 78px; padding: 12px 14px; text-align: left; }
 .decision-options button small { color: #2b271d; line-height: 1.4; }
+.decision-commit { display: grid; gap: 4px; margin-top: 13px; padding: 10px 12px; border-left: 2px solid #a98c50; background: #191d1d; }
+.decision-commit > small { color: #9f8754; font-size: 10px; }
+.decision-commit > strong { color: #dfc681; font-size: 13px; font-weight: 600; }
+.narrative .decision-commit > p { margin: 0; color: #bfb6a5; font-size: 12px; line-height: 1.6; }
 .survival-dock { flex: 0 0 auto; margin-top: 0; padding: 18px 0 0; border-top: 1px solid #73504a; }
 .survival-dock > p { margin: 0 0 10px; color: #e2d2c6; line-height: 1.7; }
 .survival-dock .survival-kicker { color: #c98770; font-size: 12px; letter-spacing: 0; }
@@ -888,6 +895,7 @@ details[open] > .archive-section-summary::before { transform: rotate(90deg); }
   .story-reader { height: clamp(420px, 72dvh, 680px); min-height: 0; padding: 21px 18px; }
   .fate-rail { display: none; }
   .rail-section { padding-bottom: 15px; margin-bottom: 15px; border-bottom: 1px solid #423f36; }
+  .decision-dock { max-height: min(48dvh, 390px); overflow-y: auto; overscroll-behavior: contain; padding-right: 3px; }
   .decision-options { grid-template-columns: 1fr; }
   .survival-options { grid-template-columns: 1fr; }
   .narrative-origin { padding: 16px 16px 18px; }

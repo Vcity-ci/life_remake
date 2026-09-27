@@ -1,4 +1,4 @@
-import type { NarrativeBeat, NarrativeHorizonPlan, NarrativeStatTier, StatKey } from "@reroll/shared";
+import type { NarrativeBeat, NarrativeEpisodeRecord, NarrativeHorizonPlan, NarrativeStatTier, StatKey } from "@reroll/shared";
 
 export type NarrativeTurnKind = "background" | "scene";
 export type NarrativeTurnCapability = "background" | "scene" | "choice";
@@ -34,9 +34,10 @@ export interface NarrativeTurnEnvelope {
   socialForces: NarrativeSocialForceReference[];
   focusReferences: NarrativeTurnFocusReference[];
   statTiers: Record<StatKey, NarrativeStatTier>;
+  recentChanges?: string[];
   growthFocus?: { id: string; label: string; description: string };
   clock: { mode: "advance" | "hold"; sameAgeTurnCount: number; maxSameAgeTurns: number };
-  horizon?: Pick<NarrativeHorizonPlan, "revision" | "dramaticQuestion" | "developingTension" | "nearTermIntents" | "focusRefs" | "payoffShape">;
+  horizon?: Pick<NarrativeHorizonPlan, "revision" | "dramaticQuestion" | "developingTension" | "intents" | "focusRefs" | "payoffShape">;
 }
 
 export interface NarrativeHorizonInput {
@@ -49,6 +50,7 @@ export interface NarrativeHorizonInput {
   focusReferences: NarrativeTurnFocusReference[];
   previousCanon: Array<{ actId: string; text: string }>;
   memoryDigests: Array<{ id: string; text: string }>;
+  recentChanges?: string[];
   throughEpisodeId?: string;
   nextRevision: number;
 }
@@ -63,6 +65,12 @@ export interface NarrativeTurnPlan {
   sceneGoal: string;
   presentation: "summary" | "scene" | "choice";
   clockRequest: "advance" | "hold";
+  horizonIntentId?: string;
+}
+
+export function recentCommittedNarrativeChanges(episodes: NarrativeEpisodeRecord[], limit = 3): string[] {
+  return episodes.filter((episode) => episode.storyDelta?.trim()).slice(-limit)
+    .map((episode) => `${episode.age}岁：${episode.storyDelta!.trim()}`);
 }
 
 export function narrativeTurnCapabilities(

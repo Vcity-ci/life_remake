@@ -2,11 +2,11 @@ import { validateNarrativeEffects, narrativeEffectsSchema, describeNarrativeAttr
 import { buildConversationPromptMessages, keepRecentConversationRounds, projectConversationUserPrompt } from "./conversation.js";
 import OpenAI from "openai";
 import { ZodError } from "zod";
-import { factUpdateContract, parseFactUpdates, relationshipStances, relationshipUpdatesSchema, parseRelationshipUpdates, normalizeNarrativeHandoffFact } from "./narrative-continuity.js";
+import { factUpdateContract, parseFactUpdates, relationshipStances, relationshipUpdatesSchema, parseRelationshipUpdates, normalizeNarrativeHandoffFact, isNarrativeFactModelMutable } from "./narrative-continuity.js";
 import type { NarrativeRelationshipUpdate } from "@reroll/shared";
-import { resolvePromptPack, narrativeTaskRule, narrativeToolRule, normalizeNarrativeText, isNarrativePlainText, type PromptPackResolved, type NarrativeTask } from "./narrative-prompts.js";
+import { resolvePromptPack, narrativeTaskRule, narrativeToolRule, narrativeProseProfile, narrativeProseProfileInstruction, normalizeNarrativeText, isNarrativePlainText, type PromptPackResolved, type NarrativeTask } from "./narrative-prompts.js";
 import { createHash, randomUUID } from "node:crypto";
-import type { InternalRunState } from "./engine.js";
+import { resolveNarrativeStatTiers, type InternalRunState } from "./engine.js";
 import type { ConversationPromptMessage, ChatConversationState, ChatHistoryMessage, ToolCallRecord } from "./conversation.js";
 import type { AiMilestoneOptions, DecisionType, EventStoryPosition, ModelUsageOperation, NarrativeActHandoff, NarrativeAttributeEffect, NarrativeAttributePolicy, NarrativeBeat, NarrativeBeatObservation, NarrativeCharacterRelationship, NarrativeEndingBrief, NarrativeFactUpdates, NarrativeFactResolution, NarrativeHorizonPlan, NarrativeIntent, NarrativeSessionPremise, NarrativeStatTier, NarrativeWorldDefinition, ProviderConfig, StatKey, Stats, WorldConfig, YearEvent } from "@reroll/shared";
 import { formatNarrativePromptPlan, type NarrativePromptPlan } from "./narrative.js";
@@ -16,7 +16,7 @@ import { narrativeContextTrace } from "./narrative/context/trace.js";
 import { recordModelUsage, commitRunMemoryCuration, commitRunScopedMemoryCuration, getRun } from "./store.js";
 import type { NarrativeAssets, NarrativeAssetUpdates } from "@reroll/shared";
 import { narrativeAssetUpdatesSchema, parseNarrativeAssetUpdates } from "./narrative-assets.js";
-import type { NarrativeHorizonInput, NarrativeSocialForceReference, NarrativeTurnEnvelope, NarrativeTurnPlan } from "./narrative/turn.js";
+import { recentCommittedNarrativeChanges, type NarrativeHorizonInput, type NarrativeSocialForceReference, type NarrativeTurnEnvelope, type NarrativeTurnPlan } from "./narrative/turn.js";
 import {
   prepareNarrativeMemoryCuration,
   type NarrativeMemoryCurationResult,
@@ -359,9 +359,33 @@ export function narrativeContinuityReadSet(plan: NarrativePromptPlan | undefined
   };
 }
 
+/**
+ * The narrator may read historical canon, but continuity can only mutate open
+ * run-local facts belonging to the current act (or unscoped legacy facts).
+ */
+export function narrativeContinuityWritableSet(
+  run: InternalRunState,
+  plan: NarrativePromptPlan | undefined
+): NarrativeContinuityRefs {
+  const readSet = narrativeContinuityReadSet(plan);
+  const currentActId = run.narrative.actRuntime?.actId;
+  const writableFactIds = new Set((run.story.factLedger?.facts ?? [])
+    .map(normalizeNarrativeHandoffFact)
+    .filter((fact) => fact.status === "open" && isNarrativeFactModelMutable(fact.id))
+    .filter((fact) => !fact.actId || fact.actId === currentActId)
+    .map((fact) => fact.id));
+  return {
+    factIds: readSet.factIds.filter((id) => writableFactIds.has(id)),
+    characterIds: readSet.characterIds.filter((id) =>
+      run.narrative.dynamicCharacters.some((entry) => entry.id === id && entry.status !== "gone")),
+    locationIds: readSet.locationIds,
+    abilityIds: readSet.abilityIds
+  };
+}
+
 export function buildNarrativeContinuityWriteSet(
   run: InternalRunState,
-  readSet: NarrativeContinuityRefs,
+  writableSet: NarrativeContinuityRefs,
   declaredRefs: NarrativeContinuityRefs,
   participantIds: string[] = []
 ): NarrativeContinuityWriteSet {
@@ -369,10 +393,10 @@ export function buildNarrativeContinuityWriteSet(
     const allow = new Set(allowed);
     return new Set(declared.filter((id) => allow.has(id)));
   };
-  const factIds = intersect(readSet.factIds, declaredRefs.factIds);
-  const characterIds = intersect(readSet.characterIds, declaredRefs.characterIds);
-  const locationIds = intersect(readSet.locationIds, declaredRefs.locationIds);
-  const abilityIds = intersect(readSet.abilityIds, declaredRefs.abilityIds);
+  const factIds = intersect(writableSet.factIds, declaredRefs.factIds);
+  const characterIds = intersect(writableSet.characterIds, declaredRefs.characterIds);
+  const locationIds = intersect(writableSet.locationIds, declaredRefs.locationIds);
+  const abilityIds = intersect(writableSet.abilityIds, declaredRefs.abilityIds);
   const participantSet = new Set(participantIds);
   return {
     factIds: (run.story.factLedger?.facts ?? [])
@@ -397,6 +421,9 @@ export function hasNarrativeContinuityWork(writeSet: NarrativeContinuityWriteSet
 
 export interface DirectedDecisionNarrativeOutcome extends DirectedDecisionSettlement, NarrativeContinuityChanges {
   narrative: string;
+  storyDelta: string;
+  /** Engine-facing fact decisions made by the isolated beat observer. */
+  observerResolvedFactIds?: string[];
 }
 
 export interface NarrativeOriginOutcome {
@@ -412,12 +439,12 @@ export interface NarrativeOriginOutcome {
  * Semantic helper calls must not inherit the renderer's recall set or mutate its
  * conversation window. Their complete input lives in the dedicated task prompt.
  */
-function isolatedNarrativeTaskContext(ctx: NarrativeContext): NarrativeContext {
+function isolatedNarrativeTaskContext(ctx: NarrativeContext, task: NarrativeTask = "planning"): NarrativeContext {
   return {
     ...ctx,
     conversation: undefined,
     narrativePlan: {
-      task: "planning",
+      task,
       storyBible: "",
       styleRules: [],
       activeLore: [],
@@ -482,15 +509,16 @@ export async function generateNarrativeSessionPremise(
   const core = narrativeWorld.worldCore;
   const storyPack = run.storyPackSnapshot;
   const prompt = [
-    `玩家人设：${run.personaPrompt || "未额外指定"}。`,
     `最终天赋：${run.cards.map((card) => `${card.name}（${card.narrative?.bias ?? card.description ?? ""}）`).join("；") || "无"}。`,
     `已生成身世：${origin.profile.summary}。`,
     core ? `世界常量：${core.identity}；规律=${core.laws.join("、")}；力量结构=${core.powerStructure}；日常=${core.everydayLife}；基调=${core.tone}。` : `世界背景：${narrativeWorld.storyBible}`,
     storyPack ? `玩家选择的 IF 路线：${storyPack.name}。${storyPack.routePromise}` : "",
+    storyPack ? `路线核心矛盾：${storyPack.centralConflict}` : "",
+    storyPack?.originSeeds.length ? `可供后续经历发展的入口线索：${storyPack.originSeeds.join("；")}。它们不是身世中已经发生的事实。` : "",
     storyPack ? `路线关注：${storyPack.stakeAxes.join("、")}。` : "",
     `可用社会力量：${(narrativeWorld.socialForces ?? []).map((force) => `${force.id}=${force.label}：${force.summary}`).join(" | ") || "由本局自然生成"}。`,
     `结构槽位：${acts.map((act) => `${act.id}=${act.label}`).join(" | ")}。`,
-    "把既定 IF 路线适配成这个人物独有的版本：人设与身世决定进入方式，三个结构槽位的目标和顺序保持不变，具体人物、地点与事件从本局事实生长。",
+    "人物设定说明人物是谁与想成为什么，身世说明人物从哪里来，IF 路线规定其将面对的长期问题。结合世界切片把路线核心矛盾实例化为本局稳定的 centralTension，再让三幕分别承接它的升级；具体人物、地点与事件从本局事实生长。",
     "必须调用 establish_session_premise。"
   ].join("\n");
   const result = await requestNarrativeOutcomeTool(run, world, isolatedNarrativeTaskContext(ctx), tool, prompt, {
@@ -535,10 +563,12 @@ export interface DynamicNarrativeSceneInput {
   storyPatterns: Array<{ id: string; label: string; summary: string }>;
   socialForces: NarrativeSocialForceReference[];
   knownCharacters: Array<{ id: string; name: string; factionId?: string; role: string; description: string; relationship?: string }>;
+  knownFactIds?: string[];
   attributePolicy?: NarrativeAttributePolicy;
   backgroundAttributePolicy: NarrativeAttributePolicy;
   growthFocus?: { label: string; description: string };
   statTiers: Record<StatKey, NarrativeStatTier>;
+  recentChanges?: string[];
   lifeStage?: {
     label: string;
     maxAge: number;
@@ -553,7 +583,10 @@ export interface DynamicNarrativeSceneResult {
   patternIds: string[];
   forceIds: string[];
   beatDecision?: "hold" | "advance";
+  /** Engine-facing fact decisions made by the isolated beat observer. */
+  observerResolvedFactIds?: string[];
   narrative: string;
+  storyDelta: string;
   scenePacing?: "continuous" | "spanning";
   participants: Array<{ characterRef: string; name: string; factionId?: string; role: string; description: string; recurring: boolean; relationship?: Pick<NarrativeCharacterRelationship, "stance" | "summary"> }>;
   milestoneCopy?: DirectedNarrativeResult["milestoneCopy"];
@@ -602,8 +635,9 @@ function narrativeHorizonPrompt(input: NarrativeHorizonInput): string {
     input.socialForces.length ? `社会力量：${input.socialForces.map((force) => `${force.id}=${force.label}：${compactText(force.summary, 60)}${force.methods?.length ? `；常见作用方式=${force.methods.join("、")}` : ""}`).join(" | ")}` : "",
     input.previousCanon.length ? `此前幕间结果：${input.previousCanon.map((canon) => `${canon.actId}=${canon.text}`).join("；")}` : "",
     input.memoryDigests.length ? `长期经历：${input.memoryDigests.map((digest) => `${digest.id}=${digest.text}`).join("；")}` : "",
+    input.recentChanges?.length ? `最近已发生的变化：${input.recentChanges.join("；")}。以这些结果修正较早的摘要与意图。` : "",
     input.focusReferences.length ? `可关注引用：${input.focusReferences.map((entry) => `${entry.id}=${entry.label}`).join(" | ")}` : "",
-    "规划当前故事弧未来数个回合值得发展的张力、问题和可能形成的阶段结果。故事形态只是可选素材；不要替下一回合决定具体事件、人物身份或结局。",
+    "规划当前故事弧未来数个回合值得发展的张力、问题和可能形成的阶段结果。nearTermIntents 是可分轮兑现的意图储备，每项只表达一个行动、发现或关系变化，不要把完整事件链塞进一项。故事形态只是可选素材；不要替下一回合决定具体事件、人物身份或结局。",
     "必须调用 plan_narrative_horizon，不写玩家可见正文。"
   ].filter(Boolean).join("\n");
 }
@@ -633,14 +667,15 @@ export async function generateNarrativeHorizonPlan(
   if (!dramaticQuestion || !developingTension || !payoffShape || nearTermIntents.length < 2) {
     throw invalidNarrativeOutcome("narrative_horizon_invalid");
   }
+  const id = `horizon:${input.act.id}:${input.nextRevision}`;
   return {
-    id: `horizon:${input.act.id}:${input.nextRevision}`,
+    id,
     actId: input.act.id,
     revision: input.nextRevision,
     throughEpisodeId: input.throughEpisodeId,
     dramaticQuestion,
     developingTension,
-    nearTermIntents,
+    intents: nearTermIntents.map((goal, index) => ({ id: `${id}:intent:${index + 1}`, goal, status: "active" as const })),
     focusRefs,
     payoffShape,
     status: "active",
@@ -656,8 +691,12 @@ export async function observeNarrativeBeat(
     actId: string;
     beat: Exclude<NarrativeBeat, "ending">;
     arcQuestion: string;
-    narrative: string;
-    decisionOutcome?: string;
+    actObjective?: string;
+    payoffMeaning?: string;
+    storyProgress: string;
+    currentDelta: string;
+    activeFacts: Array<{ id: string; state: string; actId?: string }>;
+    horizonIntent?: { id: string; goal: string };
   },
   ctx: NarrativeContext
 ): Promise<NarrativeBeatObservation> {
@@ -665,15 +704,16 @@ export async function observeNarrativeBeat(
     type: "function",
     function: {
       name: "observe_story_beat",
-      description: "只判断刚完成的内容是否已经兑现当前节拍；不规划后续、不写正文、不修改事实。",
+      description: "只判断已经发生的故事是否兑现当前意图与节拍，并裁定既有事实的生命周期。",
       parameters: {
         type: "object",
         additionalProperties: false,
-        required: ["decision", "evidence", "keywords"],
+        required: ["beatDecision", "horizonDecision", "resolvedFactIds", "carryFactIds"],
         properties: {
-          decision: { type: "string", enum: ["hold", "advance"] },
-          evidence: { type: "array", minItems: 1, maxItems: 3, items: { type: "string", minLength: 1, maxLength: 100 } },
-          keywords: { type: "array", maxItems: 4, items: { type: "string", minLength: 1, maxLength: 24 } }
+          beatDecision: { type: "string", enum: ["hold", "advance"] },
+          horizonDecision: { type: "string", enum: ["hold", "consume", "replan"] },
+          resolvedFactIds: { type: "array", maxItems: 6, items: { type: "string" } },
+          carryFactIds: { type: "array", maxItems: 3, items: { type: "string" } }
         }
       }
     }
@@ -685,43 +725,71 @@ export async function observeNarrativeBeat(
     climax: "核心矛盾已经发生决定性行动或选择",
     payoff: "当前事情已有明确结果，并形成后续生活的新处境"
   };
-  const prompt = [
-    `当前故事弧问题：${input.arcQuestion}。`,
-    `当前节拍=${input.beat}；达成含义=${beatMeaning[input.beat]}。`,
-    `刚完成的正文：${input.narrative}`,
-    input.decisionOutcome ? `玩家选择及结果：${input.decisionOutcome}` : "",
-    "只依据已发生内容判断。已经满足含义则 advance；仍只是在铺陈、重复或尚未发生关键变化则 hold。",
-    "必须调用 observe_story_beat。"
-  ].filter(Boolean).join("\n");
-  const result = await requestNarrativeOutcomeTool(run, world, isolatedNarrativeTaskContext(ctx), tool, prompt, {
-    task: "planning",
+  const prompt = narrativeBeatObservationPrompt(input, beatMeaning[input.beat]);
+  const result = await requestNarrativeOutcomeTool(run, world, isolatedNarrativeTaskContext(ctx, "observation"), tool, prompt, {
+    task: "observation",
     callId: `${input.callId}:beat-observer`,
-    source: input.decisionOutcome ? "decision" : "scene"
+    source: "scene"
   });
-  const decision = result.raw.decision === "hold" || result.raw.decision === "advance" ? result.raw.decision : undefined;
-  const evidence = Array.isArray(result.raw.evidence)
-    ? result.raw.evidence.filter((value): value is string => typeof value === "string").map((value) => compactText(value, 100)).filter(Boolean).slice(0, 3)
+  const decision = result.raw.beatDecision === "hold" || result.raw.beatDecision === "advance" ? result.raw.beatDecision : undefined;
+  const horizonDecision = result.raw.horizonDecision === "hold" || result.raw.horizonDecision === "consume" || result.raw.horizonDecision === "replan"
+    ? result.raw.horizonDecision : undefined;
+  const knownFactIds = new Set(input.activeFacts.map((fact) => fact.id));
+  const ids = (value: unknown, max: number): string[] => Array.isArray(value)
+    ? Array.from(new Set(value.filter((id): id is string => typeof id === "string" && knownFactIds.has(id)))).slice(0, max)
     : [];
-  const keywords = Array.isArray(result.raw.keywords)
-    ? result.raw.keywords.filter((value): value is string => typeof value === "string").map((value) => compactText(value, 24)).filter(Boolean).slice(0, 4)
+  const resolvedFactIds = ids(result.raw.resolvedFactIds, 6);
+  const carryFactIds = input.beat === "payoff" && decision === "advance"
+    ? ids(result.raw.carryFactIds, 3).filter((id) => !resolvedFactIds.includes(id))
     : [];
-  if (!decision || evidence.length === 0) throw invalidNarrativeOutcome("narrative_beat_observation_invalid");
-  return { decision, evidence, keywords, actId: input.actId, beat: input.beat, createdAt: Date.now() };
+  if (!decision || !horizonDecision) throw invalidNarrativeOutcome("narrative_beat_observation_invalid");
+  return { decision, horizonDecision, resolvedFactIds, carryFactIds, actId: input.actId, beat: input.beat, createdAt: Date.now() };
+}
+
+export function narrativeBeatObservationPrompt(
+  input: {
+    beat: Exclude<NarrativeBeat, "ending">;
+    arcQuestion: string;
+    actObjective?: string;
+    payoffMeaning?: string;
+    storyProgress: string;
+    currentDelta: string;
+    activeFacts: Array<{ id: string; state: string; actId?: string }>;
+    horizonIntent?: { id: string; goal: string };
+  },
+  beatMeaning: string
+): string {
+  return [
+    `当前故事弧问题：${input.arcQuestion}。`,
+    input.actObjective ? `本幕人物变化目标：${input.actObjective}。` : "",
+    input.payoffMeaning ? `本幕应形成的阶段结果：${input.payoffMeaning}。` : "",
+    `当前节拍=${input.beat}；达成含义=${beatMeaning}。`,
+    `截至上一回合的故事脉络：${input.storyProgress || "尚无摘要"}`,
+    `本轮已经发生的变化：${input.currentDelta}`,
+    input.horizonIntent ? `当前短程意图：${input.horizonIntent.id}=${input.horizonIntent.goal}` : "当前没有短程意图。",
+    `活跃事实目录：${input.activeFacts.map((fact) => `${fact.id}=${fact.state}${fact.actId ? `（幕=${fact.actId}）` : ""}`).join(" | ") || "无"}`,
+    input.beat === "payoff"
+      ? "只依据已发生内容判断。只有正文已实际形成上述阶段结果才能 advance；完成一项局部事务、手续或信息整理但人物位置与处境尚未兑现时应 hold。"
+      : "只依据已发生内容判断。已经满足含义则 advance；仍只是在铺陈、重复或尚未发生关键变化则 hold。",
+    "resolvedFactIds 只列出已经由故事实际回答或结束的既有事实。carryFactIds 只在 payoff 确认 advance 时列出仍需跨幕承接的既有事实；其他情况返回空数组。horizonDecision=consume 表示当前短程意图已兑现，replan 只用于玩家选择已经实质改变原计划方向。必须调用 observe_story_beat。"
+  ].filter(Boolean).join("\n");
 }
 
 export interface NarrativeProseReviewInput {
   callId: string;
-  task: "scene" | "choice" | "decision" | "ending";
+  task: "background" | "scene" | "choice" | "decision" | "ending";
   ageLabel: string;
   sceneGoal: string;
   narrative: string;
   background?: string;
+  targetMinLength?: number;
+  targetMaxLength?: number;
+  reviewAtLength?: number;
   maxLength?: number;
+  backgroundTargetMaxLength?: number;
+  backgroundMaxLength?: number;
   interactionState?: NarrativeInteractionState;
-  immutableOptions?: Array<{ id: DecisionType; label: string; description: string }>;
 }
-
-const NARRATIVE_REVIEW_SOFT_LIMIT = 720;
 
 function repeatedNarrativeParagraph(text: string): boolean {
   const paragraphs = text.split(/\n{2,}/).map((entry) => entry.replace(/\s+/g, "").trim()).filter((entry) => entry.length >= 24);
@@ -739,7 +807,9 @@ function narrativeResolvesPendingChoice(text: string): boolean {
 export function shouldRefineNarrativeProse(input: NarrativeProseReviewInput): boolean {
   const combined = [input.narrative, input.background].filter((entry): entry is string => Boolean(entry)).join("\n");
   if (input.maxLength && input.narrative.length > input.maxLength) return true;
-  if (combined.length > NARRATIVE_REVIEW_SOFT_LIMIT) return true;
+  if (input.backgroundMaxLength && (input.background?.length ?? 0) > input.backgroundMaxLength) return true;
+  if (input.targetMaxLength && input.narrative.length > (input.reviewAtLength ?? input.targetMaxLength)) return true;
+  if (input.backgroundTargetMaxLength && (input.background?.length ?? 0) > input.backgroundTargetMaxLength) return true;
   if (repeatedNarrativeParagraph(combined) || narrativeHasInternalArtifacts(combined)) return true;
   return input.interactionState === "choice_pending" && narrativeResolvesPendingChoice(combined);
 }
@@ -755,12 +825,24 @@ export function narrativeProseReviewTool(_input: NarrativeProseReviewInput): Rec
         additionalProperties: false,
         required: ["narrative"],
         properties: {
-          narrative: { type: "string", minLength: 10 },
-          background: { type: "string", minLength: 10 }
+          narrative: { type: "string", minLength: 10, maxLength: 800 },
+          background: { type: "string", minLength: 10, maxLength: 300 }
         }
       }
     }
   };
+}
+
+export function narrativeProseReviewPrompt(input: NarrativeProseReviewInput): string {
+  return [
+    `正文对应${input.ageLabel}；已批准目标=${input.sceneGoal}。`,
+    input.targetMinLength && input.targetMaxLength ? `建议成稿保持在${input.targetMinLength}-${input.targetMaxLength}字，只保留完成本轮目标所需的内容。` : "",
+    input.backgroundTargetMaxLength ? `抉择背景控制在${input.backgroundTargetMaxLength}字以内。` : "",
+    input.maxLength ? `成稿不得超过${input.maxLength}字。` : "",
+    `正文：${input.narrative}`,
+    input.background === undefined ? "" : `抉择背景：${input.background}`,
+    "必须调用 refine_narrative_prose。"
+  ].filter(Boolean).join("\n");
 }
 
 export async function refineNarrativeProse(
@@ -769,47 +851,45 @@ export async function refineNarrativeProse(
   input: NarrativeProseReviewInput,
   ctx: NarrativeContext
 ): Promise<{ narrative: string; background?: string }> {
-  const prompt = [
-    `正文对应${input.ageLabel}；任务=${input.task}；已批准目标=${input.sceneGoal}。`,
-    `交互状态=${input.interactionState ?? "none"}。`,
-    input.interactionState === "choice_pending"
-      ? `玩家尚未选择。以下行动均为不可变的待选项，不得把任何一项写成已经发生：${(input.immutableOptions ?? []).map((option) => `${option.id}=${option.label}：${option.description}`).join(" | ")}`
-      : "",
-    "整理正文，使人物身份、行动、地点和时间与已发生经历一致；移除工具结构、内部标签和面向模型的说明；避免用重复悬念句强行承上启下。",
-    "保留已经生成的事件结果、人物关系、事实含义、选项语义和结局定性，不新增结构化变化。",
-    input.maxLength ? `成稿不得超过${input.maxLength}字。` : "",
-    `正文：${input.narrative}`,
-    input.background === undefined ? "" : `抉择背景：${input.background}`,
-    "必须调用 refine_narrative_prose。"
-  ].filter(Boolean).join("\n");
+  const prompt = narrativeProseReviewPrompt(input);
   const result = await requestNarrativeOutcomeTool(run, world, ctx, narrativeProseReviewTool(input), prompt, {
     task: "reviewing",
     callId: `${input.callId}:review`,
-    source: input.task === "ending" ? "ending" : input.task === "decision" || input.task === "choice" ? "decision" : "scene"
+    source: input.task === "ending"
+      ? "ending"
+      : input.task === "background"
+        ? "background"
+        : input.task === "decision" || input.task === "choice"
+          ? "decision"
+          : "scene"
   });
   const narrative = normalizeNarrativeText(result.raw.narrative);
   const background = input.background === undefined ? undefined : normalizeNarrativeText(result.raw.background);
   const interactionViolation = input.interactionState === "choice_pending" && narrativeResolvesPendingChoice([narrative, background].filter(Boolean).join("\n"));
-  if (!isSafePlayerNarrative(narrative) || (input.maxLength && narrative.length > input.maxLength) || (input.background !== undefined && !isSafePlayerNarrative(background ?? "")) || interactionViolation) {
+  if (!isSafePlayerNarrative(narrative) || (input.maxLength && narrative.length > input.maxLength) || (input.background !== undefined && !isSafePlayerNarrative(background ?? "")) || (input.backgroundMaxLength && (background?.length ?? 0) > input.backgroundMaxLength) || interactionViolation) {
     throw invalidNarrativeOutcome("narrative_review_invalid");
   }
   return { narrative, background };
 }
 
 export function narrativeTurnPlanTools(input: NarrativeTurnEnvelope): Record<string, unknown>[] {
+  const activeHorizonIntentIds = input.horizon?.intents.filter((intent) => intent.status === "active").map((intent) => intent.id) ?? [];
   const commonProperties: Record<string, unknown> = {
     focusRefs: {
       type: "array",
       maxItems: 3,
       items: { type: "string", description: "使用当前任务列出的可承接对象 ID；无合适对象时返回空数组。" }
     },
-    sceneGoal: { type: "string", minLength: 1, maxLength: 180 },
+    sceneGoal: { type: "string", minLength: 1, maxLength: 180, description: "本回合唯一需要完成的一项可观察行动、变化或过渡；不要写完整事件链。" },
     clockRequest: { type: "string", enum: ["advance", "hold"] }
   };
   const tool = (name: string, description: string, scene: boolean): Record<string, unknown> => {
     const properties = scene
       ? {
           ...commonProperties,
+          ...(activeHorizonIntentIds.length ? {
+            horizonIntentId: { type: "string", description: "本回合准备兑现的一个短程意图 ID。" }
+          } : {}),
           forceIds: {
             type: "array", maxItems: 2,
             items: { type: "string", description: "使用当前任务列出的社会力量 ID；没有合适对象时返回空数组。" }
@@ -824,7 +904,7 @@ export function narrativeTurnPlanTools(input: NarrativeTurnEnvelope): Record<str
         parameters: {
           type: "object",
           additionalProperties: false,
-          required: ["focusRefs", "sceneGoal", "clockRequest", ...(scene ? ["forceIds"] : [])],
+          required: ["focusRefs", "sceneGoal", "clockRequest", ...(scene ? ["forceIds", ...(activeHorizonIntentIds.length ? ["horizonIntentId"] : [])] : [])],
           properties
         }
       }
@@ -837,7 +917,8 @@ export function narrativeTurnPlanTools(input: NarrativeTurnEnvelope): Record<str
       : tool("plan_scene_turn", "规划一个无需玩家选择、直接展开并形成结果的场景。只提出目标，不写正文或改变游戏状态。", true));
 }
 
-function narrativeTurnPlanningPrompt(input: NarrativeTurnEnvelope): string {
+export function narrativeTurnPlanningPrompt(input: NarrativeTurnEnvelope): string {
+  const activeHorizonIntents = input.horizon?.intents.filter((intent) => intent.status === "active") ?? [];
   return [
     `回合=${input.callId}；当前年龄=${input.currentAge}岁；场景年龄=${input.sceneAge}岁；背景年龄=${input.backgroundAgeRange.fromAge}-${input.backgroundAgeRange.toAge}岁。`,
     `当前世界幕：${input.act.label}。${input.act.prompt}`,
@@ -845,10 +926,11 @@ function narrativeTurnPlanningPrompt(input: NarrativeTurnEnvelope): string {
     input.socialForces.length ? `当前世界的社会力量：${input.socialForces.map((entry) => `${entry.id}=${entry.label}：${compactText(entry.summary, 60)}${entry.methods?.length ? `；可采用=${entry.methods.join("、")}` : ""}`).join(" | ")}` : "",
     input.focusReferences.length ? `可承接对象：${input.focusReferences.map((entry) => `${entry.id}=${entry.kind}:${entry.label}`).join(" | ")}` : "",
     input.growthFocus ? `人物当前成长侧重：${input.growthFocus.label}。${input.growthFocus.description}` : "",
-    input.horizon ? `当前幕短程意图（建议而非路线门槛）：核心问题=${input.horizon.dramaticQuestion}；正在发展的张力=${input.horizon.developingTension}；近期意图=${input.horizon.nearTermIntents.join("、")}；建议关注=${input.horizon.focusRefs.join("、") || "无"}；可能形成的阶段结果=${input.horizon.payoffShape}` : "",
+    input.horizon ? `当前幕短程意图储备（跨多个回合使用）：核心问题=${input.horizon.dramaticQuestion}；正在发展的张力=${input.horizon.developingTension}；可用意图=${activeHorizonIntents.map((intent) => `${intent.id}=${intent.goal}`).join(" | ") || "无"}；建议关注=${input.horizon.focusRefs.join("、") || "无"}；可能形成的阶段结果=${input.horizon.payoffShape}` : "",
+    input.recentChanges?.length ? `最近已发生的变化：${input.recentChanges.join("；")}。已发生结果优先于此前提出的短程意图。` : "",
     `人物能力档位：${Object.entries(input.statTiers).map(([key, value]) => `${key}=${value}`).join("；")}`,
-    "根据选定的 IF 路线、本局故事前提、已发生经历与当前节拍，从本轮提供的规划工具中选择一种。forceIds 只在确实有助于本段时选择，可以为空；它是世界力量索引，不是剧情轨道。focusRefs 只引用本轮确实需要承接的对象，可以为空。",
-    "clockRequest 只表达该场景是否适合同年连续发展，最终由引擎执行。必须调用一个规划工具；不要写玩家可见正文。"
+    "根据选定的 IF 路线、本局故事前提、已发生经历与当前节拍，从本轮提供的规划工具中选择一种。主线场景用 horizonIntentId 选择本轮准备兑现的一个短程意图，并将其落实为 sceneGoal；其余意图留给后续回合。普通年份不消费短程意图。forceIds 只在确实有助于本段时选择，可以为空；它是世界力量索引，不是剧情轨道。focusRefs 只引用本轮确实需要承接的对象，可以为空。",
+    "clockRequest 只表达该场景是否适合同年连续发展：需要在同一年继续处理当前事情时用 hold，本轮结束后可进入下一年龄时用 advance。无需为了推进年龄而仓促写完整件事。最终由引擎执行。必须调用一个规划工具；不要写玩家可见正文。"
   ].filter(Boolean).join("\n");
 }
 
@@ -885,13 +967,16 @@ export async function generateNarrativeTurnPlan(
   if (turnKind === "background") {
     return { callId: input.callId, turnKind, patternIds: [], forceIds: [], focusRefs, sceneGoal, presentation, clockRequest: "advance" };
   }
+  const activeIntentIds = new Set(input.horizon?.intents.filter((intent) => intent.status === "active").map((intent) => intent.id) ?? []);
+  const horizonIntentId = typeof raw.horizonIntentId === "string" && activeIntentIds.has(raw.horizonIntentId) ? raw.horizonIntentId : undefined;
+  if (activeIntentIds.size > 0 && !horizonIntentId) throw invalidNarrativeOutcome("narrative_turn_plan_horizon_intent_invalid");
   const patternIds = Array.isArray(raw.patternIds)
     ? Array.from(new Set(raw.patternIds.filter((id): id is string => typeof id === "string" && input.storyPatterns.some((entry) => entry.id === id)))).slice(0, 2)
     : [];
   const forceIds = Array.isArray(raw.forceIds)
     ? Array.from(new Set(raw.forceIds.filter((id): id is string => typeof id === "string" && input.socialForces.some((entry) => entry.id === id)))).slice(0, 2)
     : [];
-  return { callId: input.callId, turnKind, patternIds, forceIds, focusRefs, sceneGoal, presentation, clockRequest };
+  return { callId: input.callId, turnKind, patternIds, forceIds, focusRefs, sceneGoal, presentation, clockRequest, horizonIntentId };
 }
 
 export class DirectedStoryTurnError extends Error {
@@ -1323,19 +1408,17 @@ export function memoryCurationTool(
   };
 }
 
-function memoryCurationPrompt(work: NarrativeMemoryCurationWork, scopes: NarrativeMemoryCurationWork["scopes"]): string {
+export function memoryCurationPrompt(work: NarrativeMemoryCurationWork, scopes: NarrativeMemoryCurationWork["scopes"]): string {
   return [
-    scopes.some((scope) => scope.id === "run")
-      ? "整理以下已经提交的经历，只返回 run 长期摘要。"
-      : "为确实被本批经历改变的对象更新长期视图；没有变化的对象可以不返回。",
-    "run 摘要写成当前局势：保留人物身份、当下处境、主要关系、能力、不可逆变化与尚未兑现的承诺，不按年份复述流水账。对象摘要只保留该对象目前有效的状态。未完成事实放入 activeFactIds；已解决事实放入 historicalFactIds并只保留其结果。只能引用目录中的 ID。",
-    `作用域：${scopes.map((scope) => `${scope.id}；此前摘要=${scope.previousSummary || "无"}；本批=${scope.episodeIds.join("、")}`).join("\n")}`,
+    "用上一版摘要与本批新变化更新 run 长期摘要；只有本批确实改变的对象才另提交对象摘要。",
+    "run 摘要只整理故事脉络：关键转折、玩家选择、当前主要矛盾、尚未解决的压力与最新处境；人物、地点、本领的档案说明不重复写入。对象摘要只保留该对象目前有效的状态。只有仍未解决且在本批经历中发生实质变化的事实放入 activeFactIds；重复提及但状态未变不提高其重要性。已解决事实退出待解决内容，放入 historicalFactIds并只保留结果。只能引用目录中的 ID。",
+    `作用域：${scopes.map((scope) => `${scope.id}；此前摘要=${scope.previousSummary || "无"}；当前状态=${scope.currentState || "无"}；本批=${scope.episodeIds.join("、")}`).join("\n")}`,
     `事实目录：${work.validFactIds.join("、") || "无"}；其中已解决：${work.resolvedFactIds.join("、") || "无"}。`,
     `人物目录：${work.validCharacterIds.join("、") || "无"}。`,
     ...work.episodes.map((episode) => [
       `${episode.id}｜${episode.ageFrom === undefined || episode.ageFrom === episode.age ? `${episode.age}岁` : `${episode.ageFrom}-${episode.age}岁`}｜${episode.turnKind}｜幕=${episode.actId ?? "无"}｜拍=${episode.beat ?? "无"}｜路线=${episode.routeId ?? "无"}｜阵营=${episode.factionId ?? "无"}`,
       `事实=${episode.factIds.join("、") || "无"}；人物=${episode.characterIds.join("、") || "无"}；地点=${episode.locationIds.join("、") || "无"}；本领=${episode.abilityIds.join("、") || "无"}`,
-      episode.text
+      episode.storyDelta || episode.text
     ].join("\n"))
   ].join("\n");
 }
@@ -1345,8 +1428,7 @@ async function generateNarrativeMemoryCuration(
   run: InternalRunState,
   world: WorldConfig,
   work: NarrativeMemoryCurationWork,
-  scopes: NarrativeMemoryCurationWork["scopes"],
-  requireEveryScope: boolean
+  scopes: NarrativeMemoryCurationWork["scopes"]
 ): Promise<NarrativeMemoryCurationResult> {
   const result = await requestNarrativeOutcomeTool(run, world, ctx, memoryCurationTool(work, scopes), memoryCurationPrompt(work, scopes), {
     task: "curation",
@@ -1369,7 +1451,7 @@ async function generateNarrativeMemoryCuration(
       characterIds: ids(entry.characterIds)
     };
   }).filter((entry) => validScopeIds.has(entry.id) && entry.summary.length <= 600 && isNarrativePlainText(entry.summary, 1));
-  if (!digests.length || (requireEveryScope && !scopes.every((scope) => digests.some((entry) => entry.id === scope.id)))) {
+  if (!digests.some((entry) => entry.id === "run")) {
     throw invalidNarrativeOutcome("narrative_curation_scope_missing");
   }
   return { digests };
@@ -1382,17 +1464,16 @@ export function scheduleCommittedNarrativeCuration(ctx: NarrativeContext, run: I
   const key = run.runId;
   if (!work || memoryCuratorJobs.has(key)) return;
   const snapshot = structuredClone(run);
-  const runScope = work.scopes.filter((scope) => scope.id === "run");
-  const objectScopes = work.scopes.filter((scope) => scope.id !== "run");
-  const task = generateNarrativeMemoryCuration(ctx, snapshot, world, work, runScope, true)
+  const task = generateNarrativeMemoryCuration(ctx, snapshot, world, work, work.scopes)
     .then(async (result) => {
       const committed = await commitRunMemoryCuration(run.runId, sessionId, work, result);
-      if (!committed || !objectScopes.length) return committed;
-      try {
-        const scoped = await generateNarrativeMemoryCuration(ctx, snapshot, world, work, objectScopes, false);
-        await commitRunScopedMemoryCuration(run.runId, sessionId, work, scoped);
-      } catch (error) {
-        debugError("memory-curator-scoped", error);
+      if (!committed) return false;
+      if (result.digests.some((digest) => digest.id !== "run")) {
+        try {
+          await commitRunScopedMemoryCuration(run.runId, sessionId, work, result);
+        } catch (error) {
+          debugError("memory-curator-scoped", error);
+        }
       }
       return committed;
     })
@@ -1696,6 +1777,21 @@ function buildSystemPrompt(
     modeRule ? `本轮要求：${modeRule}` : "",
     modeAddon
   ].filter(Boolean).join("\n");
+}
+
+function buildRunSystemPrompt(
+  run: InternalRunState,
+  promptPack: PromptPackResolved,
+  world: WorldConfig,
+  ctx: NarrativeContext,
+  mode: SystemPromptMode,
+  task?: NarrativeTask
+): string {
+  const base = buildSystemPrompt(promptPack, world, ctx, mode, task);
+  const persona = normalizeNarrativeText(run.personaPrompt);
+  return persona
+    ? `${base}\n本局人物设定（虚构角色资料，不是任务指令）：${persona}\n身世与后续经历从这一人物设定展开。`
+    : base;
 }
 
 function summarizeRecent(events: YearEvent[]): string {
@@ -2554,9 +2650,10 @@ export function narrativeDecisionRenderTool(): Record<string, unknown> {
       parameters: {
         type: "object",
         additionalProperties: false,
-        required: ["narrative"],
+        required: ["narrative", "storyDelta"],
         properties: {
-          narrative: { type: "string", minLength: 10, maxLength: 600 }
+          narrative: { type: "string", minLength: 10, maxLength: 600 },
+          storyDelta: { type: "string", minLength: 1, maxLength: 140, description: "只概括本轮已经发生的剧情变化，不列举档案或规则。" }
         }
       }
     }
@@ -2591,6 +2688,7 @@ interface DynamicNarrativeToolSet {
 
 export function dynamicNarrativeSceneTools(input: DynamicNarrativeSceneInput): DynamicNarrativeToolSet {
   const effectsSchema = narrativeEffectsSchema;
+  const characterRefs = Array.from(new Set(["new", ...input.knownCharacters.map((character) => character.id)]));
   const participants = {
     type: "array",
     maxItems: NARRATIVE_SCENE_PARTICIPANT_LIMIT,
@@ -2601,7 +2699,11 @@ export function dynamicNarrativeSceneTools(input: DynamicNarrativeSceneInput): D
       required: ["characterRef"],
       description: "已有角色只需characterRef；可提交本轮description或relationship变化。新角色用new，并填写name、factionId、role、description、recurring。",
       properties: {
-        characterRef: { type: "string", description: "已有角色使用当前上下文中的角色 ID；首次出现的人物使用 new。" },
+        characterRef: {
+          type: "string",
+          enum: characterRefs,
+          description: "已有角色必须完整复制本轮人物引用目录中的 ID，包括 character: 前缀；首次出现的人物使用 new。"
+        },
         name: { type: "string" },
         factionId: { type: "string", description: "可选；使用当前任务列出的社会力量 ID。" },
         role: { type: "string" },
@@ -2711,7 +2813,7 @@ function dynamicNarrativeRenderTool(input: DynamicNarrativeSceneInput): { tool: 
       type: "object", additionalProperties: false, required: ["id", "label", "description"],
       properties: {
         id: { type: "string", enum: ["safe", "balanced", "risky"] },
-        label: { type: "string" }, description: { type: "string" }
+        label: { type: "string", maxLength: 36 }, description: { type: "string", maxLength: 90 }
       }
     }
   };
@@ -2730,10 +2832,11 @@ function dynamicNarrativeRenderTool(input: DynamicNarrativeSceneInput): { tool: 
         description: choice ? "依据已审批场景写玩家可见的抉择背景与三个选项。" : "依据已审批结果写玩家可见正文。",
         parameters: {
           type: "object", additionalProperties: false,
-          required: ["narrative", ...(choice ? ["background", "optionOverrides"] : [])],
+          required: ["narrative", "storyDelta", ...(choice ? ["background", "optionOverrides"] : [])],
           properties: {
-            narrative: { type: "string", minLength: 10 },
-            ...(choice ? { background: { type: "string", minLength: 10 }, optionOverrides } : {})
+            narrative: { type: "string", minLength: 10, maxLength: 800 },
+            storyDelta: { type: "string", minLength: 1, maxLength: 140, description: "只概括本轮已经发生的剧情变化，不列举档案或规则。" },
+            ...(choice ? { background: { type: "string", minLength: 10, maxLength: 300 }, optionOverrides } : {})
           }
         }
       }
@@ -3019,7 +3122,7 @@ export async function generateDirectedFocusSelection(
   if (toolSupportCache.get(supportKey) === false) return null;
 
   const promptPack = normalizePromptPackForModel(ctx.promptPack);
-  const systemPrompt = buildSystemPrompt(promptPack, world, ctx, "year");
+  const systemPrompt = buildRunSystemPrompt(run, promptPack, world, ctx, "year");
   const conversation = ensureConversationState(ctx.conversation, hashSystemPrompt(systemPrompt), systemPrompt);
   ctx.conversation = conversation;
   const recent = summarizeRecent(run.history.slice(-2));
@@ -3087,7 +3190,7 @@ export async function generateDirectedNarrative(
 ): Promise<DirectedNarrativeResult | null> {
   if (!ctx.apiKey.trim()) return null;
   const promptPack = normalizePromptPackForModel(ctx.promptPack);
-  const systemPrompt = buildSystemPrompt(promptPack, world, ctx, "year");
+  const systemPrompt = buildRunSystemPrompt(run, promptPack, world, ctx, "year");
   const conversation = ensureConversationState(ctx.conversation, hashSystemPrompt(systemPrompt), systemPrompt);
   ctx.conversation = conversation;
   const userPrompt = buildDirectedNarrativePrompt(run, input, kind);
@@ -3216,7 +3319,7 @@ export async function generateDirectedStoryTurn(
       : undefined
   };
   const contextTask: NarrativeTask = input.closureRequired ? "closure" : "planning";
-  const systemPrompt = buildSystemPrompt(promptPack, world, planningContext, "year", contextTask);
+  const systemPrompt = buildRunSystemPrompt(run, promptPack, world, planningContext, "year", contextTask);
   const conversation = ensureConversationState(ctx.conversation, hashSystemPrompt(systemPrompt), systemPrompt);
   ctx.conversation = conversation;
 
@@ -3519,6 +3622,7 @@ function narrativeToolUsageOperation(toolNames: string[]): ModelUsageOperation {
 
 function narrativeTaskUsageOperation(task: NarrativeTask | undefined, toolNames: string[]): ModelUsageOperation {
   if (task === "planning") return "planning";
+  if (task === "observation") return "observation";
   if (task === "settlement" || task === "closure") return "settlement";
   if (task === "continuity") return "continuity";
   if (task === "curation") return "curation";
@@ -3629,7 +3733,7 @@ export function prepareNarrativeOutcomeRequest(
   options?: NarrativeOutcomeRequestOptions
 ) {
   const task = options?.task ?? ctx.narrativePlan?.task ?? "dynamic";
-  const systemPrompt = buildSystemPrompt(normalizePromptPackForModel(ctx.promptPack), world, ctx, "year", task);
+  const systemPrompt = buildRunSystemPrompt(run, normalizePromptPackForModel(ctx.promptPack), world, ctx, "year", task);
   const conversation = ensureConversationState(ctx.conversation, hashSystemPrompt(systemPrompt), systemPrompt);
   ctx.conversation = conversation;
   const tools = Array.isArray(toolInput) ? toolInput : [toolInput];
@@ -3652,7 +3756,7 @@ export function prepareNarrativeOutcomeRequest(
     : Array.from(recalledCharacterIds);
   const recalledLocationIds = new Set((ctx.narrativePlan?.recall?.assetSources ?? []).filter((entry) => entry.kind === "location").map((entry) => entry.id));
   const recalledAbilityIds = new Set((ctx.narrativePlan?.recall?.assetSources ?? []).filter((entry) => entry.kind === "ability").map((entry) => entry.id));
-  const allowedContinuityRefs = narrativeContinuityReadSet(ctx.narrativePlan);
+  const allowedContinuityRefs = options?.writeSet ?? narrativeContinuityWritableSet(run, ctx.narrativePlan);
   const continuityReferenceCatalog = buildNarrativeContinuityReferenceCatalog(run, allowedContinuityRefs);
   const locationIds = new Set(writeSet ? writeSet.locationIds.filter((id) => recalledLocationIds.has(id)) : recalledLocationIds);
   const abilityIds = new Set(writeSet ? writeSet.abilityIds.filter((id) => recalledAbilityIds.has(id)) : recalledAbilityIds);
@@ -3922,22 +4026,34 @@ export async function renderInterruptedBackground(
   fromAge: number, events: YearEvent[]
 ): Promise<Pick<DynamicNarrativeSceneResult, "narrative" | "assetUpdates" | "factUpdates" | "relationshipUpdates">> {
   const { tool, prompt } = interruptedBackgroundTask(run, fromAge, events);
-  const readSet = narrativeContinuityReadSet(ctx.narrativePlan);
+  const writableSet = narrativeContinuityWritableSet(run, ctx.narrativePlan);
   const result = await requestNarrativeOutcomeTool(run, world, ctx, tool, prompt, { task: "background", contracts: { references: true } });
   const narrative = normalizeNarrativeText(result.raw.narrative);
   if (!isSafePlayerNarrative(narrative)) throw invalidNarrativeOutcome("background_result_narrative_invalid");
   const continuityRefs = result.continuityRefs ?? { factIds: [], characterIds: [], locationIds: [], abilityIds: [] };
-  const writeSet = buildNarrativeContinuityWriteSet(run, readSet, continuityRefs);
+  const writeSet = buildNarrativeContinuityWriteSet(run, writableSet, continuityRefs);
   const continuity = hasNarrativeContinuityWork(writeSet, result.continuityRequired) ? await synchronizeNarrativeContinuity(run, world, {
     callId: ctx.callId ?? `background:${run.runId}:${run.age}`,
     source: "background",
     subject: `人物从${fromAge}岁至${run.age}岁的经历止于濒死处境`,
-    approvedResult: { yearlyChanges: events.map((event) => ({ age: event.age, statChanges: event.statChanges })) },
     narrative,
     focusIds: [...continuityRefs.factIds, ...continuityRefs.characterIds, ...continuityRefs.locationIds, ...continuityRefs.abilityIds],
-    writeSet
+    writeSet,
+    continuityRequired: result.continuityRequired === true
   }, ctx) : {};
   return { narrative, ...continuity };
+}
+
+export function narrativeOriginPrompt(run: InternalRunState): string {
+  const statSummary = Object.entries(run.stats).map(([stat, value]) => `${stat}=${value}`).join("；");
+  return [
+    "为一名尚未开始人生经历的人物写身世，停在其出生时。",
+    run.storyPackSnapshot ? `本局 IF 路线的家庭与环境入口：${run.storyPackSnapshot.name}。${run.storyPackSnapshot.entryLens}` : "",
+    `初始属性：${statSummary}。用于把握人物来处与生活条件。`,
+    "交代出生前的家族历史、出生时的生活环境与人物来处，让天赋自然体现在身世中；不叙述主角出生后的行动、成就或年龄。",
+    "summary 提炼身世中的确定信息；有值得保留的潜在线索时可填写 seedHints。",
+    "不得写规则、数值、内部标签、工具或结局。必须调用 render_origin。"
+  ].filter(Boolean).join("\n");
 }
 
 export async function generateNarrativeOrigin(
@@ -3945,18 +4061,7 @@ export async function generateNarrativeOrigin(
   world: WorldConfig,
   ctx: NarrativeContext
 ): Promise<NarrativeOriginOutcome> {
-  const statSummary = Object.entries(run.stats).map(([stat, value]) => `${stat}=${value}`).join("；");
-  const prompt = [
-    "为一名出生前的人物写身世。",
-    run.storyPackSnapshot ? `本局 IF 路线：${run.storyPackSnapshot.name}。${run.storyPackSnapshot.routePromise}` : "",
-    run.storyPackSnapshot ? `接入方向：${run.storyPackSnapshot.entryLens}` : "",
-    run.storyPackSnapshot?.originSeeds.length ? `可用来处素材：${run.storyPackSnapshot.originSeeds.join("；")}。这些是适配方向，不是必须逐条复刻的事件。` : "",
-    `初始属性：${statSummary}。用于把握人物来处与生活条件。`,
-    "交代家庭、生活环境与人物的来处，让天赋自然体现在身世中。",
-    "summary 提炼身世中的确定信息；有值得保留的潜在线索时可填写 seedHints。",
-    "不得写规则、数值、内部标签、工具或结局。必须调用 render_origin。"
-  ].filter(Boolean).join("\n");
-  const result = await requestNarrativeOutcomeTool(run, world, ctx, narrativeOriginOutcomeTool(), prompt, {
+  const result = await requestNarrativeOutcomeTool(run, world, ctx, narrativeOriginOutcomeTool(), narrativeOriginPrompt(run), {
     task: "origin",
     contracts: { assets: true }
   });
@@ -4015,13 +4120,17 @@ export async function renderDirectedDecisionNarrative(
   input: { decision: DecisionType; label: string; description: string },
   settlement: DirectedDecisionSettlement,
   ctx: NarrativeContext
-): Promise<{ narrative: string; continuityRefs: NarrativeContinuityRefs; continuityRequired: boolean }> {
+): Promise<{ narrative: string; storyDelta: string; continuityRefs: NarrativeContinuityRefs; continuityRequired: boolean }> {
+  const proseProfile = narrativeProseProfile("decision");
   const prompt = [
     `人物在${run.age}岁选择了“${compactText(input.label, 36)}”：${compactText(input.description, 90)}。`,
     `已审批结算：${decisionSettlementForPrompt(settlement)}`,
-    "依据抉择前处境和已审批结算，写清行动经过、直接结果与人物当下处境。结构化结算是事实边界，不要照抄字段、标签或内部标识。",
+    `人物当前能力：${Object.entries(resolveNarrativeStatTiers(run.stats, run.narrative.statTierConfig)).map(([stat, tier]) => `${labelStat(stat as StatKey)}=${tier}`).join("；")}。人设决定身份、外貌与志向，能力决定当下行动及他人回应；不在正文列出档位。`,
+    recentCommittedNarrativeChanges(run.narrative.episodes).length ? `最近已发生的变化：${recentCommittedNarrativeChanges(run.narrative.episodes).join("；")}。` : "",
+    "依据抉择前处境和已审批结算，写清行动经过、直接结果与人物当下处境，并留下一个已经形成、可被下一段承接的具体变化。结构化结算是事实边界，不要照抄字段、标签或内部标识。",
+    narrativeProseProfileInstruction(proseProfile),
     "continuityRefs 只填写本次选择后持久状态确有变化的既有对象；若产生了值得后续承接的新事实、地点或本领，则 continuityRequired=true。",
-    "必须调用 render_decision_outcome。"
+    "同时用 storyDelta 概括本轮已经发生的剧情变化，供内部进展判断使用；它不是玩家正文。必须调用 render_decision_outcome。"
   ].join("\n");
   const result = await requestNarrativeOutcomeTool(run, world, ctx, narrativeDecisionRenderTool(), prompt, {
     task: "decision",
@@ -4030,11 +4139,13 @@ export async function renderDirectedDecisionNarrative(
     contracts: { references: true }
   });
   const narrative = normalizeNarrativeText(result.raw.narrative);
-  if (!isSafePlayerNarrative(narrative)) {
-    throw invalidNarrativeOutcome("decision_narrative_invalid", { rule: "narrative_text_invalid", path: "narrative" });
+  const storyDelta = compactText(normalizeNarrativeText(result.raw.storyDelta), 140);
+  if (!isSafePlayerNarrative(narrative) || !storyDelta) {
+    throw invalidNarrativeOutcome("decision_narrative_invalid", { rule: "narrative_text_invalid", path: !storyDelta ? "storyDelta" : "narrative" });
   }
   return {
     narrative,
+    storyDelta,
     continuityRefs: result.continuityRefs ?? { factIds: [], characterIds: [], locationIds: [], abilityIds: [] },
     continuityRequired: result.continuityRequired === true
   };
@@ -4047,10 +4158,10 @@ export async function synchronizeNarrativeContinuity(
     callId: string;
     source: NarrativeContextComposeInput["source"];
     subject: string;
-    approvedResult: object;
     narrative: string;
     focusIds?: string[];
     writeSet: NarrativeContinuityWriteSet;
+    continuityRequired: boolean;
   },
   ctx: NarrativeContext
 ): Promise<NarrativeContinuityChanges> {
@@ -4094,11 +4205,10 @@ export async function synchronizeNarrativeContinuity(
   }
   const prompt = [
     `本轮事项：${compactText(input.subject, 180)}。`,
-    `已批准结果：${JSON.stringify(input.approvedResult)}。`,
     `最终正文：${input.narrative}。`,
     `本轮可更新引用：事实=${input.writeSet.factIds.join("、") || "无"}；人物=${input.writeSet.characterIds.join("、") || "无"}；地点=${input.writeSet.locationIds.join("、") || "无"}；本领=${input.writeSet.abilityIds.join("、") || "无"}。`,
-    "把正文中已经实际发生、并会影响后续续写的变化作为差量同步到对应字段。既有对象只有状态实际变化时才提交；未变化对象省略。正文中新形成且值得后续承接的对象才登记为新对象。",
-    "本轮引用的既有事实若仍有待处理内容则更新为 open；若正文已给出结果、义务已经履行或不再需要继续处理则更新为 resolved。相同事项复用既有引用，不另建同义事实。",
+    "把正文中已经实际发生、并会影响后续续写的变化作为差量同步到对应字段。既有对象只有状态实际变化时才提交；未变化对象省略。正文中新形成且值得后续承接的对象才登记为新对象。只写变化后的短状态，不复述正文，不重写人物、地点或本领的完整经历。",
+    "既有事实只同步本轮新增进展；是否已经收束及是否跨幕承接由独立观察器裁定。相同事项复用既有引用，不另建同义事实。",
     "必须调用 sync_narrative_continuity。"
   ].join("\n");
   const result = await requestNarrativeOutcomeTool(run, world, ctx, narrativeContinuityTool(), prompt, {
@@ -4107,18 +4217,26 @@ export async function synchronizeNarrativeContinuity(
     source: input.source,
     focusIds: input.focusIds,
     writeSet: input.writeSet,
-    contracts: { assets: true, facts: true, relationships: true, layout: "continuity" }
+    contracts: {
+      assets: input.continuityRequired || input.writeSet.locationIds.length > 0 || input.writeSet.abilityIds.length > 0,
+      facts: input.continuityRequired || input.writeSet.factIds.length > 0,
+      relationships: input.writeSet.characterIds.length > 0,
+      layout: "continuity"
+    }
   });
   const assetUpdates = result.assetUpdates && (result.assetUpdates.locations.length || result.assetUpdates.abilities.length)
     ? result.assetUpdates
     : undefined;
-  const factUpdates = result.factUpdates && (
-    result.factUpdates.introduce.length ||
-    result.factUpdates.touchFactIds.length ||
-    result.factUpdates.resolveFactIds.length ||
-    result.factUpdates.progress?.length ||
-    result.factUpdates.resolutions?.length
-  ) ? result.factUpdates : undefined;
+  const extractedFactUpdates = result.factUpdates ? {
+    ...result.factUpdates,
+    resolveFactIds: [],
+    resolutions: []
+  } : undefined;
+  const factUpdates = extractedFactUpdates && (
+    extractedFactUpdates.introduce.length ||
+    extractedFactUpdates.touchFactIds.length ||
+    extractedFactUpdates.progress?.length
+  ) ? extractedFactUpdates : undefined;
   return {
     assetUpdates,
     factUpdates,
@@ -4177,18 +4295,21 @@ export function parseDynamicNarrativeParticipants(
   return participants;
 }
 
-export function parseDynamicNarrativeActHandoff(raw: unknown): NarrativeActHandoff | null {
+export function parseDynamicNarrativeActHandoff(raw: unknown, knownFactIds: string[] = []): NarrativeActHandoff | null {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
   const source = raw as Record<string, unknown>;
   const resolvedTension = typeof source.resolvedTension === "string" ? compactText(source.resolvedTension, 180) : "";
   const lastingConsequence = typeof source.lastingConsequence === "string" ? compactText(source.lastingConsequence, 180) : "";
   const continuation = typeof source.continuation === "string" ? compactText(source.continuation, 180) : "";
+  const carryFactIds = Array.isArray(source.carryFactIds)
+    ? Array.from(new Set(source.carryFactIds.filter((id): id is string => typeof id === "string" && knownFactIds.includes(id)))).slice(0, 3)
+    : [];
   if (
     !isSafePlayerText(resolvedTension, 1) ||
     !isSafePlayerText(lastingConsequence, 1) ||
     !isSafePlayerText(continuation, 1)
   ) return null;
-  return { resolvedTension, lastingConsequence, continuation };
+  return { resolvedTension, lastingConsequence, continuation, ...(carryFactIds.length ? { carryFactIds } : {}) };
 }
 
 export function dynamicNarrativeScenePrompt(
@@ -4215,9 +4336,9 @@ export function dynamicNarrativeScenePrompt(
       force.methods?.length ? `可采用的作用方式=${force.methods.join("、")}` : "",
       force.tensions?.length ? `内部张力=${force.tensions.join("、")}` : ""
     ].filter(Boolean).join("；")).join(" | ")}` : "",
-    sceneAllowed ? `本轮已有人物引用：${input.knownCharacters.length
+    sceneAllowed ? `本轮人物引用目录：${input.knownCharacters.length
       ? input.knownCharacters.map((character) => `${character.id}=${character.name}（${character.role}）`).join(" | ")
-      : "无"}。已有角色的 characterRef 必须使用这里列出的 ID；首次出现的人物使用 new。` : "",
+      : "无"}。participants[].characterRef 必须完整复制左侧 ID，包括 character: 前缀；不得返回人物名、前缀后的片段或自行改写的 ID。首次出现的人物使用 new。` : "",
     resolvesBackground && input.growthFocus ? `这段人生的成长侧重：${input.growthFocus.label}。${input.growthFocus.description}` : "",
     resolvesBackground
       ? `本次结算覆盖${input.backgroundAgeRange.fromAge}岁至${input.backgroundAgeRange.toAge}岁。提交一组轻度或中度成长标签，引擎会将其应用于其中每个实际年龄。${describeNarrativeAttributePolicy(input.backgroundAttributePolicy)}`
@@ -4228,24 +4349,25 @@ export function dynamicNarrativeScenePrompt(
     resolvesChoice
       ? "本次确定抉择出现前的场景结构与参与人物；尚未选择的行动不产生属性后果。"
       : "",
-    "故事形态和社会力量只是可调用素材，不是剧情轨道。已有角色再次出场时用 characterRef 引用档案；只有首次出现的人物使用 characterRef=new，并提交创建信息。新人物可以暂不归属任何社会力量；只有 recurring=true 的新人物才会进入命运人物档案。participant.relationship 只表达该参与人物在本场景结束时已经形成的直接态度。",
+    "故事形态和社会力量只是可调用素材，不是剧情轨道。已有角色再次出场时只提交 characterRef 及本轮确有变化的内容；首次出现的人物提交创建信息。新人物可以暂不归属任何社会力量；只有 recurring=true 的新人物才会进入命运人物档案。participant.relationship 只表达该参与人物在本场景结束时已经形成的直接态度。",
     `本轮通过${toolSet.names.join("、")}提交结构化结果，不写玩家正文。`
   ].filter(Boolean).join("\n");
   return prompt;
 }
 
-function dynamicNarrativeRenderPrompt(input: DynamicNarrativeSceneInput, settlement: Record<string, unknown>): string {
+export function dynamicNarrativeRenderPrompt(input: DynamicNarrativeSceneInput, settlement: Record<string, unknown>): string {
   const age = input.presentation === "summary"
     ? `${input.backgroundAgeRange.fromAge}-${input.backgroundAgeRange.toAge}岁`
     : `${input.sceneAge}岁`;
+  const proseProfile = narrativeProseProfile(input.presentation, input.beat);
   return [
     `已批准回合计划：目标=${input.plan?.sceneGoal ?? "延续人物经历"}；呈现=${input.presentation}；年龄=${age}。`,
     `已审批结构化结果：${JSON.stringify(settlement)}。`,
-    input.presentation === "choice"
-      ? "写清取舍前已经发生的处境，并给出safe、balanced、risky三个自然语言行动选项；不要写风险标签或尚未选择的结果。"
-      : "依据已审批结果写人物经历与当下结果；不要照抄字段、标签或内部标识。",
-    "continuityRefs 只填写正文中持久状态确有变化的既有对象；若产生了值得后续承接的新事实、地点或本领，则 continuityRequired=true；普通出现与重复提及为 false。",
-    `必须调用${dynamicNarrativeRenderTool(input).name}。`
+    `人物当前能力：${Object.entries(input.statTiers).map(([stat, tier]) => `${labelStat(stat as StatKey)}=${tier}`).join("；")}。人设决定身份、外貌与志向，能力决定当下行动及他人回应；不在正文列出档位。`,
+    input.recentChanges?.length ? `最近已发生的变化：${input.recentChanges.join("；")}。承接已完成的选择和人物处境，不重演。` : "",
+    `本轮叙事重点是完成上述目标。${narrativeProseProfileInstruction(proseProfile)}`,
+    "已审批结算与召回资料用于保持一致，不是必须逐项复述的清单。只写本轮直接用到的内容；未在本轮发生的短程意图、人物、地点、本领与事实留给后续回合。",
+    `同时用 storyDelta 概括本轮已经发生的剧情变化，供内部进展判断使用；它不是玩家正文。必须调用${dynamicNarrativeRenderTool(input).name}提交本轮玩家可见内容。`
   ].join("\n");
 }
 
@@ -4287,7 +4409,7 @@ export async function generateDynamicNarrativeScene(
       rule: "scene_pacing_mismatch", path: "scenePacing", expected: expectedPacing, received: settlement.raw.scenePacing
     });
     actHandoff = input.beat === "payoff"
-      ? parseDynamicNarrativeActHandoff(settlement.raw.actHandoff) ?? undefined
+      ? parseDynamicNarrativeActHandoff(settlement.raw.actHandoff, input.knownFactIds ?? []) ?? undefined
       : undefined;
     if (settlement.toolName === "resolve_scene_outcome") {
       attributeEffects = input.attributePolicy
@@ -4313,18 +4435,19 @@ export async function generateDynamicNarrativeScene(
       contracts: { references: true }
     });
   const narrative = normalizeNarrativeText(rendered.raw.narrative);
-  if (!isSafePlayerNarrative(narrative)) throw invalidNarrativeOutcome("dynamic_scene_narrative_unsafe", { rule: "narrative_text_invalid", path: "narrative" });
+  const storyDelta = compactText(normalizeNarrativeText(rendered.raw.storyDelta), 140);
+  if (!isSafePlayerNarrative(narrative) || !storyDelta) throw invalidNarrativeOutcome("dynamic_scene_narrative_unsafe", { rule: "narrative_text_invalid", path: !storyDelta ? "storyDelta" : "narrative" });
   const continuityRefs = rendered.continuityRefs ?? { factIds: [], characterIds: [], locationIds: [], abilityIds: [] };
   const continuityRequired = rendered.continuityRequired === true;
 
   if (settlement.toolName === "resolve_background_outcome") {
-    return { turnKind: "background", patternIds: [], forceIds: [], narrative, participants: [], backgroundAttributeEffects, continuityRefs, continuityRequired };
+    return { turnKind: "background", patternIds: [], forceIds: [], narrative, storyDelta, participants: [], backgroundAttributeEffects, continuityRefs, continuityRequired };
   }
 
   const patternIds = input.plan?.patternIds ?? [];
   const forceIds = input.plan?.forceIds ?? [];
   if (settlement.toolName === "resolve_scene_outcome") {
-    return { turnKind: "scene", patternIds, forceIds, narrative, scenePacing, participants, createsDecision: false, attributeEffects, actHandoff, continuityRefs, continuityRequired };
+    return { turnKind: "scene", patternIds, forceIds, narrative, storyDelta, scenePacing, participants, createsDecision: false, attributeEffects, actHandoff, continuityRefs, continuityRequired };
   }
 
   if (settlement.toolName === "resolve_choice_scene") {
@@ -4338,6 +4461,7 @@ export async function generateDynamicNarrativeScene(
       patternIds,
       forceIds,
       narrative,
+      storyDelta,
       scenePacing,
       participants,
       createsDecision: true,
@@ -4427,7 +4551,7 @@ export async function generateYearNarrative(
 ): Promise<string> {
   if (!ctx.apiKey.trim()) return "";
   const promptPack = normalizePromptPackForModel(ctx.promptPack);
-  const systemPrompt = buildSystemPrompt(promptPack, world, ctx, "year");
+  const systemPrompt = buildRunSystemPrompt(run, promptPack, world, ctx, "year");
   const systemHash = hashSystemPrompt(systemPrompt);
   const conversation = ensureConversationState(ctx.conversation, systemHash, systemPrompt);
   ctx.conversation = conversation;
@@ -4763,7 +4887,7 @@ export async function generateMilestoneOptions(
   const fallback = baseChoice ? fallbackFromChoice(baseChoice) : defaultOptions();
 
   const promptPack = normalizePromptPackForModel(ctx.promptPack);
-  const systemPrompt = buildSystemPrompt(promptPack, world, ctx, "milestone");
+  const systemPrompt = buildRunSystemPrompt(run, promptPack, world, ctx, "milestone");
   const systemHash = hashSystemPrompt(systemPrompt);
   const conversation = ensureConversationState(ctx.conversation, systemHash, systemPrompt);
   ctx.conversation = conversation;
@@ -4854,7 +4978,7 @@ export async function generateEndingNarrative(
   if (ctx.narrativePlan) ctx.narrativePlan.ending = endingBriefText(brief);
 
   const promptPack = normalizePromptPackForModel(ctx.promptPack);
-  const systemPrompt = buildSystemPrompt(promptPack, world, ctx, "ending");
+  const systemPrompt = buildRunSystemPrompt(run, promptPack, world, ctx, "ending");
   const systemHash = hashSystemPrompt(systemPrompt);
   const conversation = ensureConversationState(ctx.conversation, systemHash, systemPrompt);
   ctx.conversation = conversation;

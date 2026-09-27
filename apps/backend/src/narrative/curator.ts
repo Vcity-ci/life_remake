@@ -7,13 +7,14 @@ import type { ChatConversationState } from "../conversation.js";
 import type { InternalRunState } from "../engine.js";
 
 const CURATION_BATCH_SIZE = 6;
-const CURATION_MIN_EPISODES = 4;
+const CURATION_MIN_EPISODES = 3;
 
 export interface NarrativeMemoryCurationScope {
   id: string;
   scope: NarrativeMemoryDigestScope;
   scopeId?: string;
   previousSummary: string;
+  currentState?: string;
   episodeIds: string[];
 }
 
@@ -31,6 +32,7 @@ export interface NarrativeMemoryCurationEpisode {
   locationIds: string[];
   abilityIds: string[];
   text: string;
+  storyDelta: string;
 }
 
 export interface NarrativeMemoryCurationWork {
@@ -74,6 +76,22 @@ function episodesForScope(episodes: NarrativeEpisodeRecord[], scope: NarrativeMe
   return episodes.filter((episode) => episode.abilityIds.includes(value ?? ""));
 }
 
+function currentScopeState(run: InternalRunState, scope: NarrativeMemoryDigestScope, value?: string): string | undefined {
+  if (scope === "character") {
+    const character = run.narrative.dynamicCharacters.find((entry) => entry.id === value);
+    return character ? [character.name, character.role, character.status, character.relationship?.summary, character.description].filter(Boolean).join("；") : undefined;
+  }
+  if (scope === "location") {
+    const location = run.narrative.assets?.locations.find((entry) => entry.id === value);
+    return location ? `${location.name}；${location.description}` : undefined;
+  }
+  if (scope === "ability") {
+    const ability = run.narrative.assets?.abilities.find((entry) => entry.id === value);
+    return ability ? [ability.name, ability.mastery, ability.status, ability.description].filter(Boolean).join("；") : undefined;
+  }
+  return undefined;
+}
+
 function curationScopes(run: InternalRunState, episodes: NarrativeEpisodeRecord[]): NarrativeMemoryCurationScope[] {
   const candidates: Array<{ scope: NarrativeMemoryDigestScope; value?: string }> = [
     { scope: "run" },
@@ -84,6 +102,7 @@ function curationScopes(run: InternalRunState, episodes: NarrativeEpisodeRecord[
     ...unique(episodes.flatMap((episode) => episode.locationIds)).map((value) => ({ scope: "location" as const, value })),
     ...unique(episodes.flatMap((episode) => episode.abilityIds)).map((value) => ({ scope: "ability" as const, value }))
   ];
+  const payoffPending = episodes.some((episode) => episode.beat === "payoff" || episode.turnKind === "ending");
   return candidates.map(({ scope, value }) => {
     const id = scopeId(scope, value);
     const previous = run.narrative.memoryDigests.find((digest) => digest.id === id);
@@ -92,9 +111,15 @@ function curationScopes(run: InternalRunState, episodes: NarrativeEpisodeRecord[
       scope,
       scopeId: value,
       previousSummary: previous?.summary ?? "",
+      currentState: currentScopeState(run, scope, value),
       episodeIds: episodesForScope(episodes, scope, value).map((episode) => episode.id)
     };
-  }).filter((scope) => scope.episodeIds.length > 0);
+  }).filter((scope) => {
+    if (!scope.episodeIds.length) return false;
+    if (scope.scope === "run") return true;
+    const alreadySummarized = run.narrative.memoryDigests.some((digest) => digest.id === scope.id);
+    return !alreadySummarized || scope.episodeIds.length >= CURATION_MIN_EPISODES || payoffPending;
+  });
 }
 
 export function prepareNarrativeMemoryCuration(run: InternalRunState): NarrativeMemoryCurationWork | undefined {
@@ -106,8 +131,17 @@ export function prepareNarrativeMemoryCuration(run: InternalRunState): Narrative
   const memoryById = new Map(run.narrative.memoryEntries.map((memory) => [memory.id, memory]));
   const facts = run.story.factLedger?.facts ?? [];
   const factIds = new Set(facts.map((fact) => fact.id));
-  const resolvedFactIds = facts.filter((fact) => fact.status === "resolved").map((fact) => fact.id);
   const characterIds = new Set(run.narrative.dynamicCharacters.map((character) => character.id));
+  const scopes = curationScopes(run, selected);
+  const priorDigests = run.narrative.memoryDigests.filter((digest) => scopes.some((scope) => scope.id === digest.id));
+  const relevantFactIds = new Set([
+    ...selected.flatMap((episode) => episode.factIds),
+    ...priorDigests.flatMap((digest) => [...digest.activeFactIds, ...digest.historicalFactIds])
+  ]);
+  const relevantCharacterIds = new Set([
+    ...selected.flatMap((episode) => episode.characterIds),
+    ...priorDigests.flatMap((digest) => digest.characterIds)
+  ]);
   return {
     revision: run.narrative.memoryRevision,
     throughEpisodeId: selected.at(-1)!.id,
@@ -125,12 +159,13 @@ export function prepareNarrativeMemoryCuration(run: InternalRunState): Narrative
       characterIds: episode.characterIds.filter((id) => characterIds.has(id)),
       locationIds: episode.locationIds,
       abilityIds: episode.abilityIds,
-      text: episode.memoryIds.map((id) => memoryById.get(id)?.text ?? "").filter(Boolean).join("\n")
+      text: episode.memoryIds.map((id) => memoryById.get(id)?.text ?? "").filter(Boolean).join("\n"),
+      storyDelta: episode.storyDelta ?? ""
     })),
-    scopes: curationScopes(run, selected),
-    validFactIds: Array.from(factIds),
-    resolvedFactIds,
-    validCharacterIds: Array.from(characterIds)
+    scopes,
+    validFactIds: Array.from(factIds).filter((id) => relevantFactIds.has(id)),
+    resolvedFactIds: facts.filter((fact) => fact.status === "resolved" && relevantFactIds.has(fact.id)).map((fact) => fact.id),
+    validCharacterIds: Array.from(characterIds).filter((id) => relevantCharacterIds.has(id))
   };
 }
 
@@ -147,7 +182,7 @@ export function applyNarrativeMemoryCuration(
   if (work.episodeIds.some((id) => !run.narrative.episodes.some((episode) => episode.id === id))) return false;
   const scopeById = new Map(work.scopes.map((scope) => [scope.id, scope]));
   const proposals = result.digests.filter((proposal, index, all) =>
-    scopeById.has(proposal.id) && proposal.summary.trim().length > 0 && proposal.summary.trim().length <= 600 &&
+    proposal.id === "run" && scopeById.has(proposal.id) && proposal.summary.trim().length > 0 && proposal.summary.trim().length <= 600 &&
     all.findIndex((entry) => entry.id === proposal.id) === index
   );
   if (!proposals.some((proposal) => proposal.id === "run")) return false;

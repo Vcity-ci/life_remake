@@ -13,6 +13,7 @@ export interface NarrativeCommitDraft {
   factionId?: string;
   factIds?: string[];
   characterIds?: string[];
+  storyDelta?: string;
 }
 
 function unique(values: Array<string | undefined>): string[] {
@@ -39,6 +40,7 @@ export function commitNarrativeEpisode(run: InternalRunState, draft: NarrativeCo
     characterIds: unique([...(draft.characterIds ?? []), ...(memory?.characterIds ?? [])]),
     locationIds: unique(memory?.locationIds ?? []),
     abilityIds: unique(memory?.abilityIds ?? []),
+    storyDelta: draft.storyDelta?.trim() || undefined,
     createdAt: Date.now()
   };
   run.narrative.episodes = [...run.narrative.episodes.filter((entry) => entry.id !== record.id), record].slice(-120);
@@ -73,4 +75,3 @@ export async function runNarrativeTurnTransaction<T>(
   Object.assign(run, working);
   return { result, committed: run };
 }
-

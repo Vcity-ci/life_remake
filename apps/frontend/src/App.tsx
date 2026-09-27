@@ -199,24 +199,36 @@ export default function App(): React.JSX.Element {
   );
   const visibleAssets = turns.length ? turns[turns.length - 1].narrativeAssetsSnapshot : run?.narrativeAssets;
   const activeDecision = useMemo<MilestoneChoice | undefined>(() => (
-    [...turns].reverse().find((turn) => turn.choice && !turn.choiceOutcome)?.choice
-  ), [turns]);
+    [...turns].reverse().find((turn) => turn.choice && !turn.choiceOutcome)?.choice ?? run?.nextMilestoneChoice
+  ), [turns, run?.nextMilestoneChoice]);
+  const showActiveDecision = Boolean(activeDecision && (phaseOf(run) === "waiting_decision" || isGenerating));
   const activeSurvivalCrisis: SurvivalCrisis | undefined = run?.survivalCrisis;
   const decisionHistory = useMemo<DecisionHistoryGroup[]>(() => {
-    const seen = new Set<string>();
-    const entries = [...turns].reverse().flatMap((turn) => {
-      if (turn.kind !== "choice_outcome" || !turn.choice || !turn.choiceOutcome || seen.has(turn.choice.sceneId)) return [];
-      seen.add(turn.choice.sceneId);
-      return [{
-        id: turn.choice.sceneId,
+    const entriesByChoice = new Map<string, {
+      id: string;
+      sequence: number;
+      age: number;
+      ageStageLabel: string;
+      background: string;
+      choiceLabel: string;
+      choiceDescription: string;
+      rollLabels: string[];
+    }>();
+    for (const turn of [...turns].sort((left, right) => left.sequence - right.sequence)) {
+      if (!turn.choice || !turn.choiceOutcome) continue;
+      const choiceKey = milestoneChoiceKey(turn.choice);
+      entriesByChoice.set(choiceKey, {
+        id: choiceKey,
+        sequence: turn.sequence,
         age: turn.age,
         ageStageLabel: turn.ageStage.label,
         background: turn.choice.background ?? "",
         choiceLabel: turn.choiceOutcome.label,
         choiceDescription: turn.choiceOutcome.description,
         rollLabels: extractDeltaLabels(turn)
-      }];
-    }).reverse();
+      });
+    }
+    const entries = [...entriesByChoice.values()].sort((left, right) => left.sequence - right.sequence);
     const groups: DecisionHistoryGroup[] = [];
     for (const entry of entries) {
       const group = groups.find((candidate) => candidate.age === entry.age && candidate.ageStageLabel === entry.ageStageLabel);
@@ -461,8 +473,9 @@ export default function App(): React.JSX.Element {
 
   function appendTurn(record: TurnRecord): void {
     setTurns((previous) => {
-      const settled = record.choice?.sceneId && record.choiceOutcome
-        ? previous.map((item) => item.choice?.sceneId === record.choice?.sceneId && !item.choiceOutcome
+      const incomingChoiceKey = record.choice ? milestoneChoiceKey(record.choice) : undefined;
+      const settled = incomingChoiceKey && record.choiceOutcome
+        ? previous.map((item) => item.choice && milestoneChoiceKey(item.choice) === incomingChoiceKey && !item.choiceOutcome
           ? { ...item, choiceOutcome: record.choiceOutcome }
           : item)
         : previous;
@@ -1265,6 +1278,13 @@ export default function App(): React.JSX.Element {
                         </div>
                       ) : null}
                       {!isOrigin ? <div className="delta-row">{extractDeltaLabels(item).map((label, idx) => <small key={`${timelineKey(item)}-${idx}`}>{label}</small>)}</div> : null}
+                      {item.choiceOutcome ? (
+                        <section className="decision-commit" aria-label="已完成的抉择">
+                          <small>命运抉择</small>
+                          <strong>{item.choiceOutcome.label}</strong>
+                          <p>{item.choiceOutcome.description}</p>
+                        </section>
+                      ) : null}
                       {(!isOrigin || originExpanded) ? <NarrativeAssetChanges current={item.narrativeAssetsSnapshot} previous={timeline[index - 1]?.narrativeAssetsSnapshot} /> : null}
                     </article>
                   );
@@ -1278,8 +1298,12 @@ export default function App(): React.JSX.Element {
                 ) : null}
               </div>
 
-              {activeDecision && phaseOf(run) === "waiting_decision" ? (
-                <section className="decision-dock">
+              {activeDecision && showActiveDecision ? (
+                <section className="decision-dock" aria-live="polite" aria-busy={isGenerating}>
+                  <div className="decision-dock-heading">
+                    <small>{activeDecision.age}岁 · 命运抉择</small>
+                    {isGenerating ? <span>正在结算...</span> : null}
+                  </div>
                   <p>{activeDecision.background ?? "你来到抉择时刻："}</p>
                   <div className="decision-options">
                     {activeDecision.options.map((opt) => (
@@ -1309,7 +1333,7 @@ export default function App(): React.JSX.Element {
                 </section>
               ) : null}
 
-              {!run.ended && !(activeDecision && phaseOf(run) === "waiting_decision") && !(activeSurvivalCrisis && phaseOf(run) === "waiting_decision") ? (
+              {!run.ended && !showActiveDecision && !(activeSurvivalCrisis && phaseOf(run) === "waiting_decision") ? (
                 <div className="advance-bar">
                   <button
                     disabled={isStreaming || isGenerating || (needsGrowthFocus(run) ? false : !canAdvance(run))}
@@ -1511,4 +1535,7 @@ export default function App(): React.JSX.Element {
       </footer>
     </main>
   );
+}
+function milestoneChoiceKey(choice: MilestoneChoice): string {
+  return `${choice.sceneId}:${choice.revision}`;
 }

@@ -5,7 +5,7 @@
       "id": "fantasy.domain.uncanny.trace",
       "title": "异象、痕迹与规律",
       "kind": "practice",
-      "content": "诡异通过气味、温度、声音、梦境、失踪和环境变化留下可观察痕迹。调查需要对照时间、地点与受影响者，先建立规律，再判断它是否有意识、领地或交换条件。",
+      "content": "诡异通过气味、温度、声音、梦境、失踪和环境变化留下可观察痕迹。人物可在接触、试探、追踪或对抗中逐渐辨明规律，再判断它是否有意识、领地或交换条件。",
       "priority": 75,
       "placement": "scenario",
       "activation": { "keys": ["异象", "痕迹", "失踪", "梦境", "诡异", "规律"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] }
@@ -14,7 +14,7 @@
       "id": "fantasy.domain.uncanny.expedition",
       "title": "禁区探索与队伍生存",
       "kind": "conflict",
-      "content": "进入禁区需要路线、补给、退路、职责分工与污染记录。探索所得可能是知识、资源或幸存者，也可能迫使队伍在继续深入和带回已有成果之间选择。",
+      "content": "进入禁区需要路线、补给、退路与同伴配合。探索所得可能是知识、资源或幸存者，也可能在追逐、失散、遭遇和环境异变中迫使队伍决定继续深入还是带回已有成果。",
       "priority": 76,
       "placement": "scenario",
       "activation": { "keys": ["禁区", "探索", "补给", "退路", "污染", "队伍"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] }
@@ -32,10 +32,10 @@
       "id": "fantasy.domain.uncanny.knowledge_cost",
       "title": "危险知识与传播代价",
       "kind": "consequence",
-      "content": "关于诡异的知识能救人，也能成为模仿、召唤和权力垄断的工具。公开多少、交给谁、如何验证与保存，会决定一次发现是公共防线还是新的灾源。",
+      "content": "关于诡异的知识能救人，也能成为模仿、召唤和权力垄断的工具。人物如何运用、传授或隐瞒亲身确认的规律，会决定一次遭遇成为公共防线还是新的灾源。",
       "priority": 74,
       "placement": "scenario",
-      "activation": { "keys": ["知识", "记录", "传播", "召唤", "发现", "灾源"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] }
+      "activation": { "keys": ["危险知识", "诡异知识", "传播禁忌", "模仿仪式", "召唤", "灾源"], "scanDepth": 3, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] }
     }
   ]
 }

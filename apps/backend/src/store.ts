@@ -129,6 +129,7 @@ const modelUsageOperations: ModelUsageOperation[] = [
   "continuation",
   "director",
   "planning",
+  "observation",
   "settlement",
   "continuity",
   "curation",

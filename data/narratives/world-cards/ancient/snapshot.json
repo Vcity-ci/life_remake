@@ -59,10 +59,10 @@
       "id": "ancient.snapshot.local_society",
       "title": "宗族、胥吏与乡里",
       "kind": "institution",
-      "content": "王法抵达乡里时要经过县官、胥吏、宗族、乡绅与保甲。宗族能赈济、办学和保护孤弱，也能隐田、私刑和排斥外来者；基层人物面对的权力往往不是抽象朝廷，而是谁保管册页、仓门和证词。",
+      "content": "王法抵达乡里时要经过县官、胥吏、宗族、乡绅与保甲。宗族能赈济、办学和保护孤弱，也能隐田、私刑和排斥外来者；基层人物面对的权力往往不是抽象朝廷，而是谁能提供庇护、调动人情、解释乡约并迫使旁人服从。",
       "priority": 66,
       "placement": "scenario",
-      "activation": { "keys": ["宗族", "乡里", "胥吏", "县衙", "族老", "保甲", "证词"], "scanDepth": 5, "tasks": ["background", "planning", "horizon", "rendering", "dynamic", "decision"] },
+      "activation": { "keys": ["宗族", "乡里", "胥吏", "县衙", "族老", "保甲", "乡约"], "scanDepth": 5, "tasks": ["background", "planning", "horizon", "rendering", "dynamic", "decision"] },
       "stickyTurns": 1,
       "cooldownTurns": 2
     },

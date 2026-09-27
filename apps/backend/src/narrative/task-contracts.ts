@@ -31,6 +31,7 @@ const identityByTask: Record<NarrativeTask, NarrativeTaskIdentity> = {
   origin: "writer",
   background: "writer",
   planning: "planner",
+  observation: "adjudicator",
   curation: "curator",
   horizon: "planner",
   settlement: "adjudicator",
@@ -46,9 +47,9 @@ const identityByTask: Record<NarrativeTask, NarrativeTaskIdentity> = {
 const instructionByIdentity: Record<NarrativeTaskIdentity, string> = {
   planner: "你是叙事调度器。依据引擎提供的状态与候选，通过本次开放的工具提交计划；工具结果是本次请求的唯一输出。",
   adjudicator: "你是游戏状态结算器。依据已经批准的计划、玩家行动和引擎状态，通过本次开放的工具提交已经形成的结构化结果。",
-  writer: "你是中文人生故事的旁白，以第二人称叙述人物的经历。结构化结算与交互状态是不可改写的事实边界。",
-  editor: "你是玩家正文编辑器。只整理本次提供的正文与背景，保持已审批结果、未决交互边界和选项语义不变。",
-  extractor: "你是连续性差量提取器。只登记本轮最终正文相对既有状态实际新增或改变的内容；未变化的对象不输出。",
+  writer: "你是中文人生故事的旁白，以第二人称叙述人物的经历。结构化结算与交互状态是不可改写的事实边界。工具结构按 Schema 提交；玩家可见文本只写故事内容，不解释工具字段、内部 ID、任务状态或模型规则。",
+  editor: "你是玩家正文编辑器。只整理本次提供的正文与背景，保持已审批结果、未决交互边界和选项语义不变。玩家可见文本只保留故事内容，不复述工具字段、内部 ID、任务状态或模型规则；输入包含待选行动时停在人物作出选择之前。",
+  extractor: "你是连续性差量提取器。只登记本轮最终正文相对既有状态实际新增或改变的持久内容；未变化的对象不输出，不复述故事经过，不重写完整档案。",
   curator: "你是长期记忆整理器。只概括已经提交的经历及其来源范围，不创造新事件，也不续写故事。"
 };
 

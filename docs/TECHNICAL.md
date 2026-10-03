@@ -1,5 +1,23 @@
 # 技术文档（v1.0.1）
 
+## 增量机制：2026-10-03 +08:00 — 身份目录、归并与体魄档位
+
+- `narrative-identities.ts` 提供局内身份目录；详细内容仍由任务召回选择。渲染 `continuityRefs` 中人物引用包括本局既有身份，连续性同步可核对完整人物、地点和本领目录，事实写入仍限于本轮允许更新的开放事项。
+- `sync_narrative_continuity.identityMerges` 为可选数组，条目使用 `kind / sourceRef / targetRef`。同一人物再出场、同一本领熟练度提高优先复用原 ID；已经重复的档案由模型明确声明归并，引用必须属于同一对局。
+- `index.ts` 在资产变更与公开回合提交前应用归并，`identityAliases` 保存旧 ID 到保留 ID 的映射；相关链接、Episode、待选场景、对象摘要和召回索引随之更新。异步对象摘要按保留身份提交，已公开历史快照与正文保留原样。
+- `progression.statTiers.overrides` 为单个属性配置 `lowMax / highMin`。三世界体魄采用 4 / 22，其他属性采用默认 8 / 22；同一解析器用于前端标签、模型能力和求生判定。
+- 本轮验证通过 132 项后端回归与共享、后端、前端构建；真实 31 岁存档副本验证已离场人物引用可接受，三份辨蹄声本领可明确归并为一个稳定身份。验证不写入本地存档，也不调用模型 API。
+
+## 增量机制：2026-10-03 +08:00 — 观察输入与抉择交接
+
+- `synchronizeNarrativeContinuity` 保留 `factUpdates` 的进展与完成提案。`narrativeFactProgressForCommit` 将既有事项的完成说明保留为最新进展，实际关闭交由 `applyObserverFactResolutions`；完成说明写入 `resolutionSummary`，高潮结算保留该具体说明。
+- `narrativeObservationFacts` 合并本轮引用及变化，保持当前幕或无幕归属的开放事实范围。实际涉及事项不受补充目录预算截断；`carry:*` 使用与动态事实相同的状态更新合同。
+- `narrativeActProgress` 读取当前幕最新 Digest 的覆盖集合，只补充未覆盖 Episode 的 `storyDelta`。Planner 与 Observer 共用此进展投影；原文归档窗口淘汰已覆盖 Episode 时，Digest 继续代表其历史。
+- 直接场景和抉择结果使用 Observer 判断当前拍职责。普通人生段、待选场景仅在有既有事实完成提案时调用事实观察，返回 `hold`；普通人生段若被生存事件截短，以最终重渲染正文的变化为提交依据。
+- `NarrativeTurnPlan.decisionBrief` 只属于 `plan_choice_turn`。Schema 声明并要求 `question / stakes`，解析器、`DynamicNarrativeScenePayload`、`pendingDynamicScene` 和抉择结果正文共享该数据。前端继续读取现有抉择及历史回合投影。
+- 非待选场景的 `dynamicSceneAttributePolicy` 按规划呈现形式传入，压力和高潮也能调用 `resolve_scene_outcome`；待选场景调用 `resolve_choice_scene`，玩家作答后沿既有抉择属性策略结算。`narrativeProseProfile("decision")` 与结果请求采用一致的自然结束要求。
+- 本轮回归覆盖完成提案到退场、实际引用保留、跨幕引用复用、摘要覆盖与较早选择、待选状态保存及结果提交、三世界同年直接场景；既有原子提交、异步摘要、生存和公开快照回归继续保留。
+
 ## 增量机制：2026-09-21 +08:00 — 场景协议与三世界内容
 
 - `NARRATIVE_SCENE_PARTICIPANT_LIMIT=6` 同时驱动结算工具 Schema 与本地解析器。参与者只同步需要身份、关系或连续性的具名人物；它不改变 Planner 的三项焦点、五名详细人物召回或十二名活跃档案上限。
@@ -97,16 +115,18 @@
 
 `engine.ts` 的 `applyAnnualFamilyPhysiqueSupport` 与 `updateAnnualSurvivalRisk` 在实际跨年时执行；同年场景不重复取得年度家境支持或累积年度风险。三套世界包当前共用以下数值配置，年龄段边界仍读取各自基础世界的 `ageThresholds`：
 
-| 生存阶段 | 体魄低于 | 初始危机概率 | 每多一年增加 | 概率上限 |
-| --- | --- | --- | --- | --- |
-| 幼年 | 1 | 4% | 3 个百分点 | 14% |
-| 青年 | 2 | 6% | 4 个百分点 | 22% |
-| 成年（prime / middle） | 3 | 8% | 5 个百分点 | 30% |
-| 老年 | 5 | 12% | 6 个百分点 | 42% |
+体魄风险使用 `statTiers` 的最低档上限，当前三世界均为 0–4。年龄阶段仅决定以下概率：
 
-- 配置为 `startAge=4`、`graceYears=3`，第三个连续低体魄检查年份开始概率判断；风险会经过既有减风险机制并限制在阶段上限内。恢复至风险线、切换生存阶段会重置累计。
+| 生存阶段 | 初始危机概率 | 每多一年增加 | 概率上限 |
+| --- | --- | --- | --- |
+| 幼年 | 4% | 3 个百分点 | 14% |
+| 青年 | 6% | 4 个百分点 | 22% |
+| 成年（prime / middle） | 8% | 5 个百分点 | 30% |
+| 老年 | 12% | 6 个百分点 | 42% |
+
+- 配置为 `startAge=4`、`graceYears=3`，第三个连续处于最低体魄档的检查年份开始概率判断；风险会经过既有减风险机制并限制在阶段上限内。跨年龄阶段保留累计；体魄恢复到最低档以上时立即清除累计，同年不增加累计。
 - 自愈／求援／听天由命使用智力／魅力／气运档位。配置成功率为低档 25%、中档 55%、高档 100%，引擎亦直接认定高档成功。
-- 成功将体魄至少恢复到当前风险线 +5 并清除累计；失败写入 `outcome=dead` 与 `deathCause`，由结算渲染承接故事。风险触发本身不宣判死亡。
+- 成功将体魄至少恢复到最低档上限 +5（当前为 9）并清除累计；失败写入 `outcome=dead` 与 `deathCause`，由结算渲染承接故事。风险触发本身不宣判死亡。
 - 年度家境体魄支持：低档 -1/0/+1 权重为 20/60/20；中档 0/+1 为 60/40；高档 0/+1/+2 为 45/45/10。该变化与当年属性后果合并，不增加模型请求。
 - 主线结局使用 `completed` 及 good / normal / bad 蓝图，与上述死亡路径区分；属性决定结局品质，不单独充当主线结束条件。
 

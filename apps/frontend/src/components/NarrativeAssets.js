@@ -13,11 +13,12 @@ export function NarrativeAssetChanges({ current, previous }) {
         return null;
     const place = current.locations.find((entry) => entry.id === current.currentLocationId);
     const moved = place && current.currentLocationId !== previous?.currentLocationId;
+    const revisited = moved && previous?.locations.some((entry) => entry.id === place.id);
     const changed = current.abilities.filter((entry) => {
         const old = previous?.abilities.find((item) => item.id === entry.id);
         return !old || old.mastery !== entry.mastery || old.status !== entry.status || old.description !== entry.description || old.name !== entry.name;
     });
     if (!moved && !changed.length)
         return null;
-    return _jsxs("div", { className: "narrative-asset-changes", children: [moved ? _jsxs("span", { children: ["\u884C\u81F3 \u00B7 ", place.name] }) : null, changed.map((entry) => _jsxs("span", { children: [entry.name, " \u00B7 ", entry.status === "unavailable" ? "暂不可用" : entry.mastery] }, entry.id))] });
+    return _jsxs("div", { className: "narrative-asset-changes", children: [moved ? _jsxs("span", { children: [revisited ? "重返" : "行至", " \u00B7 ", place.name] }) : null, changed.map((entry) => _jsxs("span", { children: [entry.name, " \u00B7 ", entry.status === "unavailable" ? "暂不可用" : entry.mastery] }, entry.id))] });
 }

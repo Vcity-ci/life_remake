@@ -7,6 +7,10 @@
   "tagline": "从乱世低处聚集人心与力量，最终回答天下归于何人。",
   "summary": "取材自 Material 的皇权线：由生存与离散进入群雄并起的时代，逐步取得组织、军政和民心基础，最终面对建立新秩序的责任。",
   "routePromise": "人物将从自身处境进入天下乱局，逐步获得追随者、资源与决定权，并以实际选择回答自己要建立怎样的秩序。",
+  "protagonistTrajectory": "从乱世中求生的普通人，成长为能够组织众人、征战四方并建立新秩序的领袖。",
+  "coreOpposition": "崩坏的旧秩序、相互争夺天下的势力与人物自身统治理想之间的冲突。",
+  "stakesProgression": "从一家一地的活路，扩大到军民与盟友的命运，最终决定天下权力和新制度的形状。",
+  "endingQuestion": "人物夺取天下之后，能否建立比自己推翻的秩序更值得活下去的世界？",
   "centralConflict": "旧政权正在失去维持地方安全与生计的能力，起事者、豪强与军镇争夺城池和人心，人物必须从求生走向组织力量并面对建立新秩序的战争。",
   "entryLens": "依据玩家人设与身世选择进入乱局的身份和契机；贫民、军户、商贩、地方豪强或皇族旁支都可以形成不同入口。",
   "originSeeds": [
@@ -35,6 +39,13 @@
       "dramaticQuestion": "人物能否从被动求生转为主动影响局势？",
       "pressureDirection": "旧秩序、地方力量与生存代价迫使人物表明立场。",
       "payoffMeaning": "人物成为一股能够持续行动的力量。",
+      "beatOutline": {
+        "setup": "让乱世危机直接威胁人物所在群体，并显露组织众人的机会。",
+        "escalation": "通过救援、起事、收编或夺取据点形成第一批追随者。",
+        "pressure": "让官军、豪强、资源匮乏与内部意见同时考验新生组织。",
+        "climax": "让人物亲自领导一次决定据点与追随者存亡的行动。",
+        "payoff": "确认组织、地盘与共同目标，使人物从求生者成为一方首领。"
+      },
       "worldCardRefs": [
         "ancient.snapshot.central_figures",
         "ancient.snapshot.jingyuan_reform",
@@ -50,6 +61,13 @@
       "dramaticQuestion": "人物依靠什么获得并维持更大的支持？",
       "pressureDirection": "效忠、自立、民心与武力逐渐发生冲突。",
       "payoffMeaning": "人物已经足以左右一方局势。",
+      "beatOutline": {
+        "setup": "让第一处据点卷入更大的军政竞争与联盟格局。",
+        "escalation": "通过征战、攻城、收编或分封扩大军政版图。",
+        "pressure": "让盟友野心、百姓负担、军纪与争霸时机产生冲突。",
+        "climax": "让人物领导一场改变势力版图的大战或政治整合。",
+        "payoff": "确立疆域、班底、制度雏形和必须最终击败的竞争者。"
+      },
       "worldCardRefs": [
         "ancient.snapshot.jingyuan_reform",
         "ancient.snapshot.frontier_pressure",
@@ -65,6 +83,13 @@
       "dramaticQuestion": "人物建立的秩序是否值得延续？",
       "pressureDirection": "功臣、士族、外患和继承问题集中出现。",
       "payoffMeaning": "天下归属与人物留下的制度得到不可逆的回答。",
+      "beatOutline": {
+        "setup": "让天下归属与新秩序合法性成为最后必须回答的问题。",
+        "escalation": "调动军队、盟友、民心与制度承诺争取最终优势。",
+        "pressure": "让胜利所需手段与人物曾许诺建立的秩序发生冲突。",
+        "climax": "让人物完成决定天下归属的决战、受禅、建制或退让。",
+        "payoff": "交代新秩序、权力归属、治理代价与人物在历史中的位置。"
+      },
       "worldCardRefs": [
         "ancient.snapshot.frontier_pressure",
         "ancient.snapshot.local_society",

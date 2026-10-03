@@ -40,13 +40,14 @@ export function NarrativeAssetChanges({ current, previous }: { current?: PublicN
   if (!current) return null;
   const place = current.locations.find((entry) => entry.id === current.currentLocationId);
   const moved = place && current.currentLocationId !== previous?.currentLocationId;
+  const revisited = moved && previous?.locations.some((entry) => entry.id === place.id);
   const changed = current.abilities.filter((entry) => {
     const old = previous?.abilities.find((item) => item.id === entry.id);
     return !old || old.mastery !== entry.mastery || old.status !== entry.status || old.description !== entry.description || old.name !== entry.name;
   });
   if (!moved && !changed.length) return null;
   return <div className="narrative-asset-changes">
-    {moved ? <span>行至 · {place.name}</span> : null}
+    {moved ? <span>{revisited ? "重返" : "行至"} · {place.name}</span> : null}
     {changed.map((entry) => <span key={entry.id}>{entry.name} · {entry.status === "unavailable" ? "暂不可用" : entry.mastery}</span>)}
   </div>;
 }

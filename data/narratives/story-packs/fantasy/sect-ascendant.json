@@ -7,6 +7,10 @@
   "tagline": "从入门与传承起步，在道统兴衰中走出自己的大道。",
   "summary": "围绕修行成长、同门关系、秘境行动和道统危机展开；人物会实际运用并发展本领，在一次次行动中形成自己的道路。",
   "routePromise": "人物将以独特身份接触一方道统，学习、试炼并实际运用本领，在同伴、强敌和宗门危机中取得能够改变局势的位置，最终决定这份传承与自身大道的去向。",
+  "protagonistTrajectory": "从初识灵机的门外之人，成长为能以自身本领迎战强敌、承担宗门存亡并开辟道路的修行者。",
+  "coreOpposition": "修行资源与道统竞争、异族和诡异威胁，以及宗门内部道路分歧共同形成的压力。",
+  "stakesProgression": "从个人入道与同伴安危，扩大到一脉传承和宗门存亡，最终触及修行道路与天地秩序。",
+  "endingQuestion": "人物走到道途尽头时，是继承既有道统、改造它，还是用自己的一生另开新路？",
   "centralConflict": "宗门正同时遭遇道统传承之争与外部强敌或灾劫的逼迫，内部继承、同门关系和对外存亡逐步汇成同一场危机，人物必须以真正的修行与行动改变结局。",
   "entryLens": "依据人设适配正式收徒、杂役旁听、家族举荐、异象觉醒、带艺投门、被夺舍后求庇护或敌对身份潜入等入口。",
   "originSeeds": [
@@ -36,6 +40,13 @@
       "dramaticQuestion": "人物为何修行，又愿意接受怎样的师门约束？",
       "pressureDirection": "资质差异、功法代价、真实任务与同辈竞争迫使人物形成自己的方法。",
       "payoffMeaning": "人物能够独立运用本领完成一次真实行动，并获得同伴或师长认可。",
+      "beatOutline": {
+        "setup": "让人物因异象、资质或现实危机接触一方道统。",
+        "escalation": "通过修炼、试炼与首次实战掌握可用本领并结识同伴。",
+        "pressure": "让资源竞争、门规与外部威胁检验人物选择的道路。",
+        "climax": "让人物独立运用所学解决一次具有危险的真实任务。",
+        "payoff": "确认修行身份、本领、同伴关系与继续深入道途的资格。"
+      },
       "worldCardRefs": [
         "fantasy.snapshot.old_pact",
         "fantasy.snapshot.cultivation_cost",
@@ -52,6 +63,13 @@
       "dramaticQuestion": "道统的延续需要忠诚、改变，还是反叛？",
       "pressureDirection": "派系分歧、秘境危险、强敌与外部势力使师门承诺彼此冲突。",
       "payoffMeaning": "人物成为一脉中不可忽略的力量，并改变了宗门走向。",
+      "beatOutline": {
+        "setup": "让宗门内外的重大难题要求人物承担超过弟子身份的责任。",
+        "escalation": "通过探索、对决、结盟或传法扩大人物在一脉中的影响。",
+        "pressure": "让师门立场、同伴安危与修行突破彼此冲突。",
+        "climax": "让人物以本领和判断改变一次宗门级危机的结果。",
+        "payoff": "固定人物在道统中的权责，并交代因此形成的敌友与代价。"
+      },
       "worldCardRefs": [
         "fantasy.snapshot.cultivation_cost",
         "fantasy.snapshot.central_figures",
@@ -68,6 +86,13 @@
       "dramaticQuestion": "人物继承的究竟是力量、制度，还是值得继续的信念？",
       "pressureDirection": "师门存亡、个人突破、众生代价与天道规则集中碰撞。",
       "payoffMeaning": "人物使道统得以重生、另开一脉或在自己手中终结。",
+      "beatOutline": {
+        "setup": "让足以动摇道统根基的敌人、异变或内部决裂真正发生。",
+        "escalation": "调动同门、盟友、传承与已掌握的本领迎接最终危机。",
+        "pressure": "迫使人物在飞升、自身道路与守护宗门众人之间取舍。",
+        "climax": "让人物完成一场决定道统存亡与自身大道的终极行动。",
+        "payoff": "交代道统去向、人物境界、重要关系与其为世界留下的新道路。"
+      },
       "worldCardRefs": [
         "fantasy.snapshot.central_figures",
         "fantasy.snapshot.old_pact",

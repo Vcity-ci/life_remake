@@ -7,6 +7,10 @@
   "tagline": "辨认诡异的规律，在污染与未知中带回活人的答案。",
   "summary": "以诡异生态、禁区探索和规律发现为主线；危险不是等待击杀的怪物，人物需要观察、试验、付出代价并决定知识如何使用。",
   "routePromise": "人物将因一次异象或失踪事件接触禁区规律，逐渐成为能够进入未知并带人归来的行者，最终面对一片足以改变世界秩序的诡异源头。",
+  "protagonistTrajectory": "从偶然撞见异象的幸存者，成长为能识别规则、组织探索并直面诡异源头的禁区行者。",
+  "coreOpposition": "不可理解却有规律的诡异生态、利用禁区的势力与知识扩散造成的污染。",
+  "stakesProgression": "从个人生还与一名失踪者，扩大到探索队和聚落安危，最终影响现实世界与未知的边界。",
+  "endingQuestion": "人物理解未知之后，会封闭它、利用它，还是接受人类必须与它共同生活？",
   "centralConflict": "一处会吞噬记忆、生命或现实规则的异常区域正在扩张，失踪与异变逐步波及聚落和势力边界，人物必须理解其规律并决定封锁、利用还是深入源头。",
   "entryLens": "依据人设适配灾民、采药人、调查者、宗门弟子、异族向导、受污染者、被古老存在寄生或主动追寻失落之地等入口。",
   "originSeeds": [
@@ -36,6 +40,13 @@
       "dramaticQuestion": "人物看到的是灾害、生命，还是某种正在回应的存在？",
       "pressureDirection": "错误判断会直接伤害身体、同伴或故乡，知识必须由行动验证。",
       "payoffMeaning": "人物拥有了进入未知的本领、伙伴和必须继续追索的问题。",
+      "beatOutline": {
+        "setup": "让一项异象或失踪事件打破人物熟悉的生活规律。",
+        "escalation": "通过观察、试探和逃生辨认第一条可验证的禁区规则。",
+        "pressure": "让救人、取证与污染风险迫使人物继续深入。",
+        "climax": "让人物凭已知规则完成第一次进入未知并带回成果的行动。",
+        "payoff": "确认行者身份、探索伙伴、本领与尚未解释的核心问题。"
+      },
       "worldCardRefs": [
         "fantasy.snapshot.two_layers",
         "fantasy.snapshot.three_rifts",
@@ -51,6 +62,13 @@
       "dramaticQuestion": "危险知识应该被封锁、分享还是利用？",
       "pressureDirection": "宗门、商旅、异族与个人愿望争夺探索成果，同伴关系经受消耗。",
       "payoffMeaning": "人物改变了人们进入禁区的方式，也承担了知识扩散的后果。",
+      "beatOutline": {
+        "setup": "让更深禁区与现实势力的联系要求一次有组织的探索。",
+        "escalation": "招募伙伴、准备规则工具并穿越多重异常环境。",
+        "pressure": "让队员生命、知识价值与污染扩散无法同时保全。",
+        "climax": "让人物领导探索队揭开一项改变禁区认知的真相。",
+        "payoff": "重塑进入禁区的方法，并交代知识扩散带来的敌友与责任。"
+      },
       "worldCardRefs": [
         "fantasy.snapshot.three_rifts",
         "fantasy.snapshot.cultivation_cost",
@@ -66,6 +84,13 @@
       "dramaticQuestion": "未知必须被毁灭，还是可以理解并重新划定边界？",
       "pressureDirection": "污染、牺牲、力量诱惑和不同文明的生存需要集中冲突。",
       "payoffMeaning": "禁区的未来、人物自身变化与世界对未知的认知得到不可逆答案。",
+      "beatOutline": {
+        "setup": "让诡异源头开始影响现实秩序并召回历次探索代价。",
+        "escalation": "汇集幸存者、知识、本领与世界势力进入最终深处。",
+        "pressure": "迫使人物在封锁、利用、救援与自身异化之间取舍。",
+        "climax": "让人物直接面对源头并作出改变两个世界边界的行动。",
+        "payoff": "交代禁区未来、现实认知、人物变化与伙伴结局。"
+      },
       "worldCardRefs": [
         "fantasy.snapshot.cultivation_cost",
         "fantasy.snapshot.two_layers",

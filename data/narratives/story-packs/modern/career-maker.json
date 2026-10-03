@@ -7,6 +7,10 @@
   "tagline": "在工作、创造与交换中，建立真正属于自己的事业。",
   "summary": "从第一份可被社会需要的能力开始，经历组织、市场与合作者的压力，最终以事业、产品、作品或团队留下成果。",
   "routePromise": "人物将通过工作与创造取得资源和影响力，在稳定、野心、伦理与个人生活之间作出连续选择，最终建立或失去一份真正属于自己的事业。",
+  "protagonistTrajectory": "从职场或创作领域的新人，成长为能组织团队、承担市场后果并定义自身事业价值的主事者。",
+  "coreOpposition": "行业竞争、资源限制、组织权力与个人伦理和生活之间的持续冲突。",
+  "stakesProgression": "从一份工作与个人信用，扩大到团队和客户，最终涉及事业存亡、社会影响与人生关系。",
+  "endingQuestion": "人物建立的事业究竟证明了成功，还是成为自己愿意长期承担的创造与责任？",
   "centralConflict": "行业变化与组织权力正在重写成功规则，人物亲手建立的工作成果不断受到资源竞争、伦理代价和生活责任的拉扯，事业无法只靠完成任务自然长成。",
   "entryLens": "依据人设适配受雇、创业、手艺、自由职业、内容创作、家业接班或偶然机会等入口。",
   "originSeeds": [
@@ -36,6 +40,13 @@
       "dramaticQuestion": "人物能靠什么在社会交换中站稳脚跟？",
       "pressureDirection": "经验不足、收入需求与组织规则迫使人物证明价值。",
       "payoffMeaning": "人物取得了独立行动所需的能力、信用或第一批伙伴。",
+      "beatOutline": {
+        "setup": "让人物面对一项真实工作、创作机会或行业门槛。",
+        "escalation": "通过交付成果、解决问题或争取合作建立第一份信用。",
+        "pressure": "让期限、竞争、收入与个人底线发生冲突。",
+        "climax": "让人物独立完成一次足以决定去留的工作行动。",
+        "payoff": "确认能力、信用、伙伴与可以继续发展的事业方向。"
+      },
       "worldCardRefs": [
         "modern.snapshot.transition_2027",
         "modern.snapshot.ai_and_work",
@@ -51,6 +62,13 @@
       "dramaticQuestion": "人物要以什么代价扩大自己的事业？",
       "pressureDirection": "竞争、资金、管理、声誉与亲密关系同时牵动决定。",
       "payoffMeaning": "人物已经能影响一群人的工作与现实选择。",
+      "beatOutline": {
+        "setup": "让既有成果带来团队、业务或创作规模的扩张。",
+        "escalation": "通过组织协作、争取资源和承担市场反馈形成体系。",
+        "pressure": "让团队利益、商业伦理与个人生活彼此挤压。",
+        "climax": "让人物主导一次决定组织或作品走向的重大行动。",
+        "payoff": "固定事业结构、核心伙伴与人物必须承担的领导责任。"
+      },
       "worldCardRefs": [
         "modern.snapshot.ai_and_work",
         "modern.snapshot.housing_and_mobility",
@@ -66,6 +84,13 @@
       "dramaticQuestion": "成功之后，人物究竟想留下什么？",
       "pressureDirection": "控制权、伦理、公共影响与个人生活集中发生冲突。",
       "payoffMeaning": "事业的去向与人物对成功的定义获得不可逆答案。",
+      "beatOutline": {
+        "setup": "让重大危机、机会或传承问题检验整个事业。",
+        "escalation": "调动团队、作品、资本与公共信用争取最终方向。",
+        "pressure": "迫使人物在扩张、伦理、亲近之人与个人健康间取舍。",
+        "climax": "让人物完成决定事业存续与价值的最终行动。",
+        "payoff": "交代事业去向、团队命运、生活代价与人物对成功的答案。"
+      },
       "worldCardRefs": [
         "modern.snapshot.housing_and_mobility",
         "modern.snapshot.transition_2027",

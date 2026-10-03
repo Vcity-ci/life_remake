@@ -1,4 +1,4 @@
-import type { NarrativeBeat, NarrativeEpisodeRecord, NarrativeHorizonPlan, NarrativeStatTier, StatKey } from "@reroll/shared";
+import type { NarrativeBeat, NarrativeDecisionBrief, NarrativeEpisodeRecord, NarrativeHorizonPlan, NarrativeStatTier, StatKey } from "@reroll/shared";
 
 export type NarrativeTurnKind = "background" | "scene";
 export type NarrativeTurnCapability = "background" | "scene" | "choice";
@@ -33,11 +33,13 @@ export interface NarrativeTurnEnvelope {
   storyPatterns: Array<{ id: string; label: string; summary: string }>;
   socialForces: NarrativeSocialForceReference[];
   focusReferences: NarrativeTurnFocusReference[];
+  currentLocationId?: string;
   statTiers: Record<StatKey, NarrativeStatTier>;
   recentChanges?: string[];
+  actSummary?: string;
+  actProgress?: Array<{ beat: Exclude<NarrativeBeat, "ending">; changes: string[] }>;
   growthFocus?: { id: string; label: string; description: string };
   clock: { mode: "advance" | "hold"; sameAgeTurnCount: number; maxSameAgeTurns: number };
-  horizon?: Pick<NarrativeHorizonPlan, "revision" | "dramaticQuestion" | "developingTension" | "intents" | "focusRefs" | "payoffShape">;
 }
 
 export interface NarrativeHorizonInput {
@@ -61,11 +63,25 @@ export interface NarrativeTurnPlan {
   turnKind: NarrativeTurnKind;
   patternIds: string[];
   forceIds: string[];
-  focusRefs: string[];
+  conflictRefs: string[];
+  abilityRefs: string[];
+  locationDirective: {
+    mode: "stay" | "revisit" | "move";
+    locationRef?: string;
+    purpose?: string;
+  };
   sceneGoal: string;
   presentation: "summary" | "scene" | "choice";
+  decisionBrief?: NarrativeDecisionBrief;
   clockRequest: "advance" | "hold";
-  horizonIntentId?: string;
+}
+
+export function narrativeTurnPlanFocusIds(plan: NarrativeTurnPlan): string[] {
+  return Array.from(new Set([
+    ...plan.conflictRefs,
+    ...plan.abilityRefs,
+    ...(plan.locationDirective.locationRef ? [plan.locationDirective.locationRef] : [])
+  ]));
 }
 
 export function recentCommittedNarrativeChanges(episodes: NarrativeEpisodeRecord[], limit = 3): string[] {
@@ -81,9 +97,8 @@ export function narrativeTurnCapabilities(
   const capabilities: NarrativeTurnCapability[] = [];
   if (allowedTurnKinds.includes("background")) capabilities.push("background");
   if (!earlyLife && allowedTurnKinds.includes("scene")) {
-    if (beat === "pressure" || beat === "climax") capabilities.push("choice");
-    else if (beat === "setup" || beat === "escalation") capabilities.push("scene", "choice");
-    else capabilities.push("scene");
+    if (beat === "payoff") capabilities.push("scene");
+    else capabilities.push("scene", "choice");
   }
   return capabilities;
 }

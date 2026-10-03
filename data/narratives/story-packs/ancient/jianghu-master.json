@@ -7,6 +7,10 @@
   "tagline": "以技艺、师承和恩仇行走秩序边缘，决定力量最终归于何处。",
   "summary": "取材自 Material 的江湖线：从街头、山林、武馆、镖局或戏班获得技艺和师承，在恩仇与组织纷争中建立声望，最终面对开宗、招安、辅佐或归隐。",
   "routePromise": "人物将在正式秩序之外以技艺、承诺和关系建立自己的位置，并回答个人力量如何面对更大的世道。",
+  "protagonistTrajectory": "从初入江湖的学艺者，成长为以武艺、承诺和门人影响武林秩序的一代宗师。",
+  "coreOpposition": "个人恩义与帮派、官府及武林规则之间不断升级的冲突。",
+  "stakesProgression": "从师承与个人生死，扩大到同道、门派和一方江湖的存亡与风气。",
+  "endingQuestion": "人物登临武道高处后，会把力量变成威名、传承还是守护世道的责任？",
   "centralConflict": "旧有江湖秩序因门派争端、宿怨与强权介入逐渐失效，技艺与承诺都被迫接受公开挑战，人物必须决定自己建立何种新规矩。",
   "entryLens": "依据人设适配镖师、猎户、戏班、武馆、寺观、流民、官宦子弟离家或其他江湖入口。",
   "originSeeds": [
@@ -36,6 +40,13 @@
       "dramaticQuestion": "人物愿意为力量承担怎样的规矩和人情？",
       "pressureDirection": "生存、门规、护送、比试或恩仇让技艺第一次接受现实检验。",
       "payoffMeaning": "人物拥有独立行走江湖的能力和名号。",
+      "beatOutline": {
+        "setup": "以师承、挑战或求生契机让人物踏入真实江湖。",
+        "escalation": "通过练艺、比武、护送或寻仇验证第一身本领。",
+        "pressure": "让门规、恩怨与身边人的安危迫使人物表明立场。",
+        "climax": "让人物在一次公开较量或生死冲突中独立担当。",
+        "payoff": "确立名号、技艺边界及首批可信同道与仇敌。"
+      },
       "worldCardRefs": [
         "ancient.snapshot.nine_regions",
         "ancient.snapshot.local_society",
@@ -51,6 +62,13 @@
       "dramaticQuestion": "人物的名声来自侠义、胜负、恐惧还是可靠？",
       "pressureDirection": "旧仇、组织责任、通缉和他人求助不断扩大行动后果。",
       "payoffMeaning": "人物成为能够影响江湖格局的一方人物。",
+      "beatOutline": {
+        "setup": "让既有名声招来帮派、官府和旧怨的共同关注。",
+        "escalation": "通过夺宝、结盟、清理门户或主持公道扩大影响。",
+        "pressure": "让私人承诺与江湖大局无法同时周全。",
+        "climax": "让人物解决一场改变多方关系的武林危机。",
+        "payoff": "固定人物的江湖立场、核心伙伴和需要承担的公共责任。"
+      },
       "worldCardRefs": [
         "ancient.snapshot.local_society",
         "ancient.snapshot.popular_faith",
@@ -66,6 +84,13 @@
       "dramaticQuestion": "巅峰之后，人物要把力量传给谁、用在何处？",
       "pressureDirection": "旧伤、旧部、弟子、官府和时代变局同时索要答案。",
       "payoffMeaning": "人物的技艺传承、组织归属和江湖评价得到收束。",
+      "beatOutline": {
+        "setup": "让武林秩序的最终危机触及人物全部传承与关系。",
+        "escalation": "召集门人同道并让一生所学参与最后角力。",
+        "pressure": "迫使人物在个人自由、门派延续与世道安危间取舍。",
+        "climax": "让人物完成决定宗门或江湖格局的最后行动。",
+        "payoff": "交代传承去向、组织归属、江湖评价与人物最终生活。"
+      },
       "worldCardRefs": [
         "ancient.snapshot.popular_faith",
         "ancient.snapshot.nine_regions",

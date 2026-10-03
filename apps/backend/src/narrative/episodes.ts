@@ -6,6 +6,8 @@ export interface NarrativeEpisodeRecall {
   digests: Array<{ id: string; text: string; sourceIds: string[] }>;
 }
 
+export type NarrativeEpisodeRecallMode = "archive" | "horizon" | "prose";
+
 function overlaps(values: string[], focusIds: Set<string>): boolean {
   return values.some((value) => focusIds.has(value));
 }
@@ -13,27 +15,32 @@ function overlaps(values: string[], focusIds: Set<string>): boolean {
 /** Deterministic ordering: active scene, explicit focus, current act, prior act canon, then route history. */
 export function selectNarrativeEpisodeRecall(
   state: NarrativeRunState,
-  input: { actId?: string; routeId?: string; focusIds?: string[] },
+  input: { actId?: string; routeId?: string; focusIds?: string[]; mode?: NarrativeEpisodeRecallMode },
   limit = 5
 ): NarrativeEpisodeRecall {
+  const mode = input.mode ?? "archive";
   const focusIds = new Set(input.focusIds ?? []);
   const activeSourceId = state.activeScene ? state.scene.lastEventId : undefined;
-  const relevantDigests = state.memoryDigests.filter((digest) =>
-    digest.scope === "run" ||
-    (digest.scope === "act" && digest.scopeId === input.actId) ||
-    (digest.scope === "route" && digest.scopeId === input.routeId) ||
-    (digest.scope === "character" && digest.scopeId && focusIds.has(digest.scopeId)) ||
-    (digest.scope === "faction" && digest.scopeId && focusIds.has(digest.scopeId)) ||
-    (digest.scope === "location" && digest.scopeId && focusIds.has(digest.scopeId)) ||
-    (digest.scope === "ability" && digest.scopeId && focusIds.has(digest.scopeId))
-  ).sort((a, b) => {
+  const relevantDigests = (mode === "prose" ? [] : state.memoryDigests.filter((digest) => mode === "horizon"
+    ? digest.scope === "act" && digest.scopeId === input.actId
+    : digest.scope === "run" ||
+      (digest.scope === "act" && digest.scopeId === input.actId) ||
+      (digest.scope === "route" && digest.scopeId === input.routeId) ||
+      (digest.scope === "character" && digest.scopeId && focusIds.has(digest.scopeId)) ||
+      (digest.scope === "faction" && digest.scopeId && focusIds.has(digest.scopeId)) ||
+      (digest.scope === "location" && digest.scopeId && focusIds.has(digest.scopeId)) ||
+      (digest.scope === "ability" && digest.scopeId && focusIds.has(digest.scopeId))
+  )).sort((a, b) => {
     const scopePriority = (scope: typeof a.scope) => scope === "act" ? 4 : scope === "route" ? 3 : scope === "character" || scope === "faction" || scope === "location" || scope === "ability" ? 2 : 1;
     return scopePriority(b.scope) - scopePriority(a.scope) || b.updatedAt - a.updatedAt;
   }).slice(0, 4);
-  const coveredEpisodeIds = new Set(state.memoryDigests.find((digest) => digest.id === "run")?.coveredEpisodeIds ?? []);
-  const canon = state.actCanon
+  const coveredEpisodeIds = new Set([
+    ...(state.memoryDigests.find((digest) => digest.id === "run")?.coveredEpisodeIds ?? []),
+    ...relevantDigests.flatMap((digest) => digest.coveredEpisodeIds)
+  ]);
+  const canon = (mode === "prose" ? [] : state.actCanon)
     .filter((entry) => entry.actId !== input.actId)
-    .slice(-2)
+    .slice(mode === "horizon" ? -1 : -2)
     .map((entry) => ({
       actId: entry.actId,
       sourceEventId: entry.sourceEventId,
@@ -41,7 +48,9 @@ export function selectNarrativeEpisodeRecall(
       text: `${entry.resolvedTension}；${entry.lastingConsequence}；${entry.continuation}`
     }));
   const canonSourceIds = new Set(canon.map((entry) => entry.sourceEventId));
-  const ranked = state.episodes.filter((episode) => !canonSourceIds.has(episode.sourceEventId)).map((episode, index) => {
+  const completedActIds = new Set(state.actCanon.map((entry) => entry.actId));
+  const ranked = state.episodes.filter((episode) => !canonSourceIds.has(episode.sourceEventId) &&
+    (mode === "archive" || !episode.actId || !completedActIds.has(episode.actId))).map((episode, index) => {
     let score = index / Math.max(1, state.episodes.length);
     const isActive = Boolean(activeSourceId && episode.sourceEventId === activeSourceId);
     const isFocused = overlaps([

@@ -158,7 +158,9 @@ export function buildConversationPromptMessages(
       { role: "assistant" as const, content: round.assistant, groupId, sourceId: round.id, required: false }
     ];
   });
-  const recent = collectConversationRounds(conversation.history).slice(-recentRoundLimit);
+  const recent = recentRoundLimit === 0
+    ? []
+    : collectConversationRounds(conversation.history).slice(-recentRoundLimit);
   const requiredFrom = Math.max(0, recent.length - requiredRecentRounds);
   return [
     ...(includeHeadMemory && memory ? [{ role: "user" as const, content: memory, groupId: "summary", sourceId: conversation.summaryThroughMemoryId, required: true }] : []),

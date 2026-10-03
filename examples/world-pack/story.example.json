@@ -35,7 +35,7 @@
       "pressure": { "weights": { "intelligence": 0.2, "charisma": 0.2, "family": 0.2, "fortune": 0.2, "physique": 0.2 }, "threshold": 19 },
       "climax": { "weights": { "intelligence": 0.2, "charisma": 0.2, "family": 0.2, "fortune": 0.2, "physique": 0.2 }, "threshold": 27 }
     },
-    "statTiers": { "lowMax": 8, "highMin": 22 },
+    "statTiers": { "lowMax": 8, "highMin": 22, "overrides": { "physique": { "lowMax": 4, "highMin": 22 } } },
     "statTierPresentation": {
       "intelligence": { "low": "学思未定", "steady": "融会贯通", "high": "见微知著" },
       "charisma": { "low": "拘谨青涩", "steady": "待人得体", "high": "众望所归" },

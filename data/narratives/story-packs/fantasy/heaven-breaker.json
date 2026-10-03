@@ -7,6 +7,10 @@
   "tagline": "从夺舍、诅咒或天命中夺回自身，最终直面世界规则。",
   "summary": "承接高概念人设的奇幻路线；人物可以出生便卷入夺舍、古老存在或天地异变，但仍需通过具体行动掌握自身与力量。",
   "routePromise": "人物将从一项侵入自身命运的异常力量开始，逐步分辨其来源、目的与代价，联合或超越世间势力，最终决定自己与天道规则的关系。",
+  "protagonistTrajectory": "从被异常意志与命运摆布的承受者，成长为能掌控自身力量并挑战天地规则的破局者。",
+  "coreOpposition": "侵入人物命运的高位力量、争夺其价值的世间势力与不可违逆的天地规则。",
+  "stakesProgression": "从身体与自我边界，扩大到伙伴和势力存亡，最终涉及众生命运与世界规则。",
+  "endingQuestion": "当人物有能力打破安排自己命运的规则时，会建立自由、成为新的支配者，还是被力量同化？",
   "centralConflict": "维持世界运转的天道秩序正在主动收割、改写或排斥不受控制的命数，人物身上的异常使其成为追捕与利用的目标，也成为挑战既定规则的缺口。",
   "entryLens": "依据人设适配人皇夺舍、转世记忆、天生诅咒、古神寄生、预言之子、失败容器、异宝认主或其他高概念开局，不把人物压回固定修行起点。",
   "originSeeds": [
@@ -36,6 +40,13 @@
       "dramaticQuestion": "人物的记忆、欲望和力量中，哪些真正属于自己？",
       "pressureDirection": "夺舍意志、预言、亲近之人的恐惧与力量诱惑持续侵入选择。",
       "payoffMeaning": "人物建立了自我边界，并能主动使用或拒绝这份异常力量。",
+      "beatOutline": {
+        "setup": "让异常力量以可感知的方式侵入人物生活与身体。",
+        "escalation": "通过试探、对抗与第一次主动使用确认其能力和危险。",
+        "pressure": "让异常意志、外部觊觎与重要关系共同挑战人物自我。",
+        "climax": "让人物夺回一次关键行动的控制权并付出真实代价。",
+        "payoff": "确立自我边界、力量用法与继续追查来源的主动地位。"
+      },
       "worldCardRefs": [
         "fantasy.snapshot.cultivation_cost",
         "fantasy.snapshot.two_layers",
@@ -51,6 +62,13 @@
       "dramaticQuestion": "摆脱操控是否必须摧毁制造这份命运的秩序？",
       "pressureDirection": "宗门、城邦、异族与古老存在都试图利用人物的特殊性。",
       "payoffMeaning": "人物不再只是被争夺的容器，而成为能够反向改变局势的力量。",
+      "beatOutline": {
+        "setup": "让异常背后的势力与古老因果进入现实冲突。",
+        "escalation": "通过追索、结盟、修炼和对决反向利用既有安排。",
+        "pressure": "让自由所需代价威胁伙伴、身份与人物仍珍视的人性。",
+        "climax": "让人物摧毁或夺取一项为其预设命运的关键结构。",
+        "payoff": "确认人物从被争夺对象变为能改变大局的独立力量。"
+      },
       "worldCardRefs": [
         "fantasy.snapshot.two_layers",
         "fantasy.snapshot.central_figures",
@@ -66,6 +84,13 @@
       "dramaticQuestion": "自由意味着超脱世界、取代旧天，还是让众生拥有选择？",
       "pressureDirection": "个人完整、亲近之人、众生秩序与终极力量无法全部无损保全。",
       "payoffMeaning": "人物从命运的承受者成为规则的回答者，世界也留下不可逆变化。",
+      "beatOutline": {
+        "setup": "让支配人物与众生的规则显露最终代价和脆弱处。",
+        "escalation": "汇集伙伴、敌手、旧因果与全部能力逼近规则核心。",
+        "pressure": "迫使人物在个人解脱、众生代价与新秩序风险间取舍。",
+        "climax": "让人物以完整意志完成一次改写、拒绝或承担天道的行动。",
+        "payoff": "交代规则变化、众生命运、人物自我与重要关系的最终结果。"
+      },
       "worldCardRefs": [
         "fantasy.snapshot.central_figures",
         "fantasy.snapshot.cultivation_cost",

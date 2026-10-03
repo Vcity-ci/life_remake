@@ -7,6 +7,10 @@
   "tagline": "以货物、信用与远路连接天下，让财富成为家业、地位或风暴。",
   "summary": "取材自 Material 的商贾线：从店铺、作坊、码头或商队积累第一份信用，进入行会与官商竞争，最终决定财富怎样转化为家族和社会位置。",
   "routePromise": "人物将通过经营、信用、运输和信息建立商业网络，并面对财富与权力、家族和公共责任之间的转换。",
+  "protagonistTrajectory": "从一门小生意或家业边缘起步，成长为能调动货物流通、信用关系和地方资源的商界主事者。",
+  "coreOpposition": "市场风险、官府权力、行会竞争与家族责任对商业信用的持续挤压。",
+  "stakesProgression": "从个人温饱与一笔信用，扩大到伙计、家族和商路网络，最终影响地方生计与财富传承。",
+  "endingQuestion": "人物积累的财富最终只属于自己，还是能成为一种经得起权力与时间考验的秩序？",
   "centralConflict": "商路、货源与信用正被战争、灾荒或权力垄断持续挤压，既有商业网络面临被吞并或崩解的危险，人物必须把财富转化为能够抵御冲击的秩序。",
   "entryLens": "依据人设适配商户、工匠、船户、盐茶从业者、翻译、没落家庭或偶然获得商机等入口。",
   "originSeeds": [
@@ -36,6 +40,13 @@
       "dramaticQuestion": "人物凭什么让别人愿意与其做下一次生意？",
       "pressureDirection": "家道、关卡、货损、竞争和人情债考验初始积累。",
       "payoffMeaning": "人物拥有可延续的营生和第一条可靠网络。",
+      "beatOutline": {
+        "setup": "让人物从生活所需发现一项真实交易机会与风险。",
+        "escalation": "通过买卖、运输、借贷或手艺建立第一批信用关系。",
+        "pressure": "让行情、债务、同行竞争与家人需要同时逼近。",
+        "climax": "让人物完成一次足以决定营生存亡的交易或履约。",
+        "payoff": "确认可延续的本钱、信用网络与已结下的商业关系。"
+      },
       "worldCardRefs": [
         "ancient.snapshot.coastal_trade",
         "ancient.snapshot.nine_regions",
@@ -51,6 +62,13 @@
       "dramaticQuestion": "商业扩张能否不以失去自主和信用为代价？",
       "pressureDirection": "垄断、走私、征税、权贵索取和伙伴分利放大风险。",
       "payoffMeaning": "人物成为能够调动资金、货物与消息的重要商人。",
+      "beatOutline": {
+        "setup": "让已有营生进入跨地商路、行会或官商关系。",
+        "escalation": "通过合伙、开拓、竞争或救市扩大网络与影响。",
+        "pressure": "让利润、信用、家族意见与权力索取相互冲突。",
+        "climax": "让人物调动资金与人脉应对一次网络级商业危机。",
+        "payoff": "重排商路、合作与对手关系，使人物成为重要主事者。"
+      },
       "worldCardRefs": [
         "ancient.snapshot.nine_regions",
         "ancient.snapshot.local_society",
@@ -66,6 +84,13 @@
       "dramaticQuestion": "人物留下的是一笔财富、一个家族还是一种可持续的秩序？",
       "pressureDirection": "官府清算、政治投资、继承和行业更替集中出现。",
       "payoffMeaning": "商业成果及其与权力、家族的关系得到最终回答。",
+      "beatOutline": {
+        "setup": "让家业传承或政局变化检验人物建立的商业秩序。",
+        "escalation": "调动商路、家族与公共信用守住或改造事业。",
+        "pressure": "迫使人物在财富安全、亲近之人与公共责任间取舍。",
+        "climax": "让人物完成决定家业与地方经济走向的最终行动。",
+        "payoff": "交代财富去向、家族关系、公共影响与人物晚年位置。"
+      },
       "worldCardRefs": [
         "ancient.snapshot.local_society",
         "ancient.snapshot.coastal_trade",

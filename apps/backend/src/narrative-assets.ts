@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { narrativeTextOverlap } from "./narrative-memory.js";
 import { commitNarrativeMemory } from "./narrative-memory.js";
-import type { NarrativeAssetLinks, NarrativeAssetMoment, NarrativeAssets, NarrativeAssetUpdates, NarrativeRunState, PublicNarrativeAssets } from "@reroll/shared";
+import type { NarrativeAssetActivity, NarrativeAssetLinks, NarrativeAssetMoment, NarrativeAssets, NarrativeAssetUpdates, NarrativeRunState, PublicNarrativeAssets } from "@reroll/shared";
 
 const text = z.string().trim().min(1);
 const moment = z.object({ ageFrom: z.number().nonnegative().optional(), age: z.number().nonnegative() });
@@ -47,6 +47,38 @@ export function narrativeAbilityDirectory(raw?: NarrativeAssets): Array<{ id: st
     .map((entry) => ({ id: entry.id, label: `${entry.name}（${entry.mastery}）` }));
 }
 
+export function narrativeLocationDirectory(raw?: NarrativeAssets): Array<{ id: string; label: string }> {
+  const assets = normalizeNarrativeAssets(raw);
+  return assets.locations.map((entry) => ({
+    id: entry.id,
+    label: `${entry.name}${entry.id === assets.currentLocationId ? "（当前所在）" : ""}`
+  }));
+}
+
+/** Applies deterministic visit/use bookkeeping without rewriting the asset archive. */
+export function applyNarrativeAssetActivity(
+  previous: NarrativeAssets | undefined,
+  activity: NarrativeAssetActivity | undefined,
+  when: NarrativeAssetMoment
+): NarrativeAssets {
+  const assets = structuredClone(normalizeNarrativeAssets(previous));
+  if (!activity) return assets;
+  const visited = new Set(activity.locationIds);
+  if (activity.currentLocationId) visited.add(activity.currentLocationId);
+  for (const id of visited) {
+    const location = assets.locations.find((entry) => entry.id === id);
+    if (!location) throw new Error("location_activity_reference_invalid");
+    location.lastSeen = { ...when };
+  }
+  for (const id of activity.abilityIds) {
+    if (!assets.abilities.some((entry) => entry.id === id && entry.status === "available")) {
+      throw new Error("ability_activity_reference_invalid");
+    }
+  }
+  if (activity.currentLocationId) assets.currentLocationId = activity.currentLocationId;
+  return assets;
+}
+
 export function parseNarrativeAssetUpdates(raw: unknown, assets?: NarrativeAssets): NarrativeAssetUpdates | undefined {
   if (raw === undefined) return undefined;
   const result = updates.parse(raw);
@@ -78,7 +110,7 @@ export function narrativeAssetUpdatesSchema(_assets?: NarrativeAssets): Record<s
   const string = { type: "string", minLength: 1 };
   return {
     type: "object",
-    description: "同步登记正文中已经发生的地点与本领变化；无变化可省略。已有对象用 ref 引用，新对象用 new；地点是实际空间，本领是主角已经学会的能力。不得登记尚未选择的奖励、计划或他人的能力。",
+    description: "同步登记正文中已经发生的地点与本领变化；对应类型无变化时数组为空。已有对象用 ref 引用，新对象用 new；地点是实际空间，本领是主角已经学会的能力。不得登记尚未选择的奖励、计划或他人的能力。",
     additionalProperties: false,
     properties: {
       locations: {
@@ -110,6 +142,33 @@ export function narrativeAssetUpdatesSchema(_assets?: NarrativeAssets): Record<s
       }
     }
   };
+}
+
+export function narrativeContinuityAssetContract(_assets: NarrativeAssets): {
+  properties: Record<string, unknown>;
+  required: string[];
+} {
+  const schema = narrativeAssetUpdatesSchema() as { properties: Record<string, unknown> };
+  return {
+    properties: {
+      locationUpdates: schema.properties.locations,
+      abilityUpdates: schema.properties.abilities
+    },
+    required: ["locationUpdates", "abilityUpdates"]
+  };
+}
+
+export function parseNarrativeContinuityAssetUpdates(
+  raw: Record<string, unknown>, assets: NarrativeAssets
+): NarrativeAssetUpdates {
+  const contract = narrativeContinuityAssetContract(assets);
+  for (const field of contract.required) {
+    if (!Object.hasOwn(raw, field)) throw new Error(`${field}_required`);
+  }
+  return parseNarrativeAssetUpdates({
+    locations: raw.locationUpdates,
+    abilities: raw.abilityUpdates
+  }, assets)!;
 }
 
 const identity = (value: string): string => value.normalize("NFKC").replace(/\s+/g, "").toLocaleLowerCase();

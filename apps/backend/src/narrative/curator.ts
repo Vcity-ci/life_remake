@@ -5,6 +5,7 @@ import type {
 } from "@reroll/shared";
 import type { ChatConversationState } from "../conversation.js";
 import type { InternalRunState } from "../engine.js";
+import { canonicalNarrativeIdentity } from "../narrative-identities.js";
 
 const CURATION_BATCH_SIZE = 6;
 const CURATION_MIN_EPISODES = 3;
@@ -102,7 +103,8 @@ function curationScopes(run: InternalRunState, episodes: NarrativeEpisodeRecord[
     ...unique(episodes.flatMap((episode) => episode.locationIds)).map((value) => ({ scope: "location" as const, value })),
     ...unique(episodes.flatMap((episode) => episode.abilityIds)).map((value) => ({ scope: "ability" as const, value }))
   ];
-  const payoffPending = episodes.some((episode) => episode.beat === "payoff" || episode.turnKind === "ending");
+  const completedActEpisodeIds = new Set(run.narrative.actCanon.map((canon) => canon.sourceEventId));
+  const completionPending = episodes.some((episode) => completedActEpisodeIds.has(episode.sourceEventId) || episode.turnKind === "ending");
   return candidates.map(({ scope, value }) => {
     const id = scopeId(scope, value);
     const previous = run.narrative.memoryDigests.find((digest) => digest.id === id);
@@ -118,15 +120,16 @@ function curationScopes(run: InternalRunState, episodes: NarrativeEpisodeRecord[
     if (!scope.episodeIds.length) return false;
     if (scope.scope === "run") return true;
     const alreadySummarized = run.narrative.memoryDigests.some((digest) => digest.id === scope.id);
-    return !alreadySummarized || scope.episodeIds.length >= CURATION_MIN_EPISODES || payoffPending;
+    return !alreadySummarized || scope.episodeIds.length >= CURATION_MIN_EPISODES || completionPending;
   });
 }
 
 export function prepareNarrativeMemoryCuration(run: InternalRunState): NarrativeMemoryCurationWork | undefined {
   const covered = new Set(run.narrative.memoryDigests.find((digest) => digest.id === "run")?.coveredEpisodeIds ?? []);
   const uncovered = run.narrative.episodes.filter((episode) => !covered.has(episode.id));
-  const payoffPending = uncovered.some((episode) => episode.beat === "payoff" || episode.turnKind === "ending");
-  if (uncovered.length < CURATION_MIN_EPISODES && !payoffPending) return undefined;
+  const completedActEpisodeIds = new Set(run.narrative.actCanon.map((canon) => canon.sourceEventId));
+  const completionPending = uncovered.some((episode) => completedActEpisodeIds.has(episode.sourceEventId) || episode.turnKind === "ending");
+  if (uncovered.length < CURATION_MIN_EPISODES && !completionPending) return undefined;
   const selected = uncovered.slice(0, CURATION_BATCH_SIZE);
   const memoryById = new Map(run.narrative.memoryEntries.map((memory) => [memory.id, memory]));
   const facts = run.story.factLedger?.facts ?? [];
@@ -208,19 +211,21 @@ function mergeDigestProposals(
   const nextDigests = [...run.narrative.memoryDigests];
   for (const proposal of proposals) {
     const scope = scopeById.get(proposal.id)!;
-    const previous = nextDigests.find((digest) => digest.id === proposal.id);
+    const canonicalScopeId = scope.scopeId ? canonicalNarrativeIdentity(run.narrative, scope.scopeId) : undefined;
+    const digestId = scopeId(scope.scope, canonicalScopeId);
+    const previous = nextDigests.find((digest) => digest.id === digestId);
     const coveredEpisodeIds = mergeCovered(previous?.coveredEpisodeIds ?? [], scope.episodeIds);
     const digest: NarrativeMemoryDigest = {
-      id: proposal.id,
+      id: digestId,
       scope: scope.scope,
-      scopeId: scope.scopeId,
+      scopeId: canonicalScopeId,
       revision: (previous?.revision ?? 0) + 1,
       throughEpisodeId: scope.episodeIds.at(-1)!,
       coveredEpisodeIds,
       summary: proposal.summary.trim(),
       activeFactIds: unique(proposal.activeFactIds).filter((id) => validFacts.has(id) && !resolvedFacts.has(id)),
       historicalFactIds: unique(proposal.historicalFactIds).filter((id) => resolvedFacts.has(id)),
-      characterIds: unique(proposal.characterIds).filter((id) => validCharacters.has(id)),
+      characterIds: unique(unique(proposal.characterIds).filter((id) => validCharacters.has(id)).map((id) => canonicalNarrativeIdentity(run.narrative, id))),
       updatedAt: now
     };
     const index = nextDigests.findIndex((entry) => entry.id === digest.id);

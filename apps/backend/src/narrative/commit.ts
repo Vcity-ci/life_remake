@@ -13,6 +13,8 @@ export interface NarrativeCommitDraft {
   factionId?: string;
   factIds?: string[];
   characterIds?: string[];
+  locationIds?: string[];
+  abilityIds?: string[];
   storyDelta?: string;
 }
 
@@ -38,8 +40,8 @@ export function commitNarrativeEpisode(run: InternalRunState, draft: NarrativeCo
     memoryIds: memory ? [memory.id] : [],
     factIds: unique([...(draft.factIds ?? []), ...(memory?.factIds ?? [])]),
     characterIds: unique([...(draft.characterIds ?? []), ...(memory?.characterIds ?? [])]),
-    locationIds: unique(memory?.locationIds ?? []),
-    abilityIds: unique(memory?.abilityIds ?? []),
+    locationIds: unique([...(draft.locationIds ?? []), ...(memory?.locationIds ?? [])]),
+    abilityIds: unique([...(draft.abilityIds ?? []), ...(memory?.abilityIds ?? [])]),
     storyDelta: draft.storyDelta?.trim() || undefined,
     createdAt: Date.now()
   };

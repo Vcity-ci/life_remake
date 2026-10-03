@@ -7,6 +7,10 @@
   "tagline": "离开熟悉的地方，在迁徙与重建中寻找归属。",
   "summary": "围绕升学、搬迁、转行与城市生活展开；地点不是布景，而会持续改变人物的机会、关系和生活半径。",
   "routePromise": "人物将离开或重新认识熟悉的生活圈，在城市迁徙、职业转换和新关系中争取立足，最终决定何处以及怎样的生活才算归属。",
+  "protagonistTrajectory": "从被迁徙与城市节奏推着走的外来者，成长为能建立生活网络并主动决定归属方式的人。",
+  "coreOpposition": "住房、工作、身份门槛与亲密关系对个人自由和安全感的长期拉扯。",
+  "stakesProgression": "从住处和生计，扩大到朋友、伴侣与家庭责任，最终决定城市归属和一生的生活形态。",
+  "endingQuestion": "归属究竟来自一座城市的接纳，还是人物亲手建立并愿意维护的生活关系？",
   "centralConflict": "居住、工作与关系网络持续变化，使人物每一次立足都面临被成本、身份门槛或城市更新重新推离的风险，归属必须通过真实选择和共同生活建立。",
   "entryLens": "依据人设适配求学离乡、务工、家庭搬迁、职业调动、逃离旧关系或主动寻找新生活等入口。",
   "originSeeds": [
@@ -36,6 +40,13 @@
       "dramaticQuestion": "人物为什么离开，又准备舍弃什么？",
       "pressureDirection": "费用、资格、家庭牵挂和陌生环境压缩选择空间。",
       "payoffMeaning": "人物在新的地方获得了继续生活的实际位置。",
+      "beatOutline": {
+        "setup": "让迁移、失业或生活变化迫使人物跨出原有圈子。",
+        "escalation": "通过找住处、谋生与认识新的人建立第一处落脚点。",
+        "pressure": "让经济压力、陌生规则与旧关系牵挂同时逼近。",
+        "climax": "让人物完成一次真正改变生活半径的行动。",
+        "payoff": "确认新的住处、工作入口与能继续生活的关系支点。"
+      },
       "worldCardRefs": [
         "modern.snapshot.transition_2027",
         "modern.snapshot.housing_and_mobility",
@@ -51,6 +62,13 @@
       "dramaticQuestion": "适应一座城市是否意味着改变自己？",
       "pressureDirection": "阶层差异、通勤、孤独与故乡责任同时拉扯人物。",
       "payoffMeaning": "人物建立了新的生活秩序，也明确了自己无法同时拥有的一切。",
+      "beatOutline": {
+        "setup": "让暂时落脚转变为是否长期扎根的现实问题。",
+        "escalation": "通过工作调整、邻里往来和亲密关系建立生活网络。",
+        "pressure": "让事业机会、住房成本、家庭期待与情感需要冲突。",
+        "climax": "让人物为留下或继续迁移作出结构性的生活选择。",
+        "payoff": "固定新的生活秩序，并诚实交代因此失去的可能。"
+      },
       "worldCardRefs": [
         "modern.snapshot.housing_and_mobility",
         "modern.snapshot.platform_reputation",
@@ -66,6 +84,13 @@
       "dramaticQuestion": "家是地点、关系，还是人物选择的生活？",
       "pressureDirection": "留下、返回或再次远行都要求付出不可逆的代价。",
       "payoffMeaning": "人物对归属和生活方式作出可以回望一生的决定。",
+      "beatOutline": {
+        "setup": "让家庭事件、城市变化或新的迁移机会检验已有归属。",
+        "escalation": "让人物调动长期关系与生活积累寻找可持续选择。",
+        "pressure": "迫使人物在熟悉、安全、机会与陪伴之间取舍。",
+        "climax": "让人物完成决定长期归处与生活方式的最终行动。",
+        "payoff": "交代居所、关系、工作与人物对何为归属的答案。"
+      },
       "worldCardRefs": [
         "modern.snapshot.platform_reputation",
         "modern.snapshot.transition_2027",

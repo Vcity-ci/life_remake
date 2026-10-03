@@ -14,6 +14,7 @@ import type {
   ItemDefinition,
   ItemInstance,
   NarrativeComponentDefinition,
+  NarrativeDecisionBrief,
   NarrativeAttributeEffect,
   NarrativeAttributePolicy,
   NarrativeActHandoff,
@@ -156,6 +157,12 @@ export interface DirectedMilestonePresentation {
     id: DecisionType;
     label: string;
     description: string;
+    abilityRefs?: string[];
+    locationDirective?: {
+      mode: "stay" | "revisit" | "move";
+      locationRef?: string;
+      purpose?: string;
+    };
   }>;
 }
 
@@ -205,7 +212,7 @@ export interface InternalRunState extends RunState {
     factIds?: string[];
     locationIds?: string[];
     abilityIds?: string[];
-    horizonIntentId?: string;
+    decisionBrief?: NarrativeDecisionBrief;
   };
   narrativeReservoir: NarrativeReservoirState;
   turnRecords: TurnRecord[];
@@ -218,7 +225,7 @@ export interface InternalRunState extends RunState {
     age: number;
     stageId: string;
     stageLabel: string;
-    dangerBelowPhysique: number;
+    lowPhysiqueMax: number;
     lowPhysiqueYears: number;
     triggerRisk: number;
     cause: string;
@@ -738,6 +745,12 @@ function survivalCause(run: InternalRunState, stageLabel: string): string {
   return `${stageLabel}久病难支`;
 }
 
+function resetRecoveredSurvivalStreak(run: InternalRunState): void {
+  if (resolveNarrativeStatTiers(run.stats, run.narrative.statTierConfig).physique !== "low") {
+    ensureSurvivalState(run).lowPhysiqueYears = 0;
+  }
+}
+
 /**
  * Death is never resolved here. An annual low-physique risk only opens a public
  * survival crisis, which must be settled by one of the three player choices.
@@ -757,11 +770,8 @@ function updateAnnualSurvivalRisk(
     state.lowPhysiqueYears = 0;
     return;
   }
-  if (state.stageId !== stage.id) {
-    state.stageId = stage.id;
-    state.lowPhysiqueYears = 0;
-  }
-  if (run.stats.physique >= stage.dangerBelowPhysique) {
+  state.stageId = stage.id;
+  if (resolveNarrativeStatTiers(run.stats, run.narrative.statTierConfig).physique !== "low") {
     state.lowPhysiqueYears = 0;
     return;
   }
@@ -777,7 +787,7 @@ function updateAnnualSurvivalRisk(
     age: run.age,
     stageId: stage.id,
     stageLabel: stage.label,
-    dangerBelowPhysique: stage.dangerBelowPhysique,
+    lowPhysiqueMax: resolveNarrativeStatTierBounds("physique", run.narrative.statTierConfig).lowMax,
     lowPhysiqueYears: state.lowPhysiqueYears,
     triggerRisk,
     cause: survivalCause(run, stage.label)
@@ -805,7 +815,7 @@ function toPublicSurvivalCrisis(run: InternalRunState): PublicSurvivalCrisis | u
     age: crisis.age,
     stageLabel: crisis.stageLabel,
     summary: `${crisis.cause}。此刻只能在有限的选择中求一线生机。`,
-    dangerBelowPhysique: crisis.dangerBelowPhysique,
+    lowPhysiqueMax: resolveNarrativeStatTierBounds("physique", run.narrative.statTierConfig).lowMax,
     choices: (["self_rescue", "seek_help", "trust_fate"] as SurvivalChoice[]).map((choice) => {
       const stat = survivalChoiceStat(choice);
       const tier = tiers[stat];
@@ -838,9 +848,10 @@ export function resolveSurvivalCrisis(
   const recovered = tier === "high" || rng() < successRate;
   const copy = survivalChoiceCopy[choice];
   if (recovered) {
-    const restoredTo = crisis.dangerBelowPhysique + rule.recovery.restoreBuffer;
+    const restoredTo = resolveNarrativeStatTierBounds("physique", run.narrative.statTierConfig).lowMax + rule.recovery.restoreBuffer;
     const changes = { physique: Math.max(0, restoredTo - run.stats.physique) };
     run.stats = applyChanges(run.stats, changes);
+    resetRecoveredSurvivalStreak(run);
     ensureSurvivalState(run).stageId = crisis.stageId;
     ensureSurvivalState(run).lowPhysiqueYears = 0;
     run.survivalCrisis = undefined;
@@ -1200,6 +1211,7 @@ export function settleNarrativeBackgroundOutcomes(
     );
     event.statChanges = changes;
     run.stats = applyChanges(run.stats, changes);
+    resetRecoveredSurvivalStreak(run);
     run.ageStage = resolveAgeStage(run.age, world);
     refreshRunFame(run);
     updateNegativeStreaks(run);
@@ -2116,7 +2128,9 @@ export function applyDirectedMilestonePresentation(
     return {
       ...option,
       label: override.label.trim() || option.label,
-      description: override.description.trim() || option.description
+      description: override.description.trim() || option.description,
+      abilityRefs: override.abilityRefs ?? [],
+      locationDirective: override.locationDirective
     };
   });
 }
@@ -3325,6 +3339,7 @@ export function advanceWithDirectedEvent(
     );
   const tone = classifyEventTone(changes, stageCap, tuning);
   run.stats = applyChanges(run.stats, changes);
+  resetRecoveredSurvivalStreak(run);
   run.ageStage = stage;
   updateNegativeStreaks(run);
   if (candidate.preview.item && !run.items.some((item) => item.id === candidate.preview.item?.id)) {
@@ -3417,10 +3432,10 @@ export interface DynamicNarrativeScenePayload {
   actHandoff?: NarrativeActHandoff;
   sceneClockMode?: "advance" | "hold";
   createsDecision?: boolean;
-  horizonIntentId?: string;
+  decisionBrief?: NarrativeDecisionBrief;
 }
 
-function applyObserverFactResolutions(
+export function applyObserverFactResolutions(
   run: InternalRunState,
   factIds: string[] | undefined,
   actId: string,
@@ -3451,7 +3466,7 @@ export function advanceWithDynamicNarrativeScene(
   world: WorldConfig,
   narrativeWorld: NarrativeWorldDefinition,
   payload: DynamicNarrativeScenePayload
-): { updated: InternalRunState; fromAge: number; toAge: number; chunk: YearEvent[]; factIds: string[]; carryFactIds: string[] } {
+): { updated: InternalRunState; fromAge: number; toAge: number; chunk: YearEvent[]; factIds: string[]; carryFactIds: string[]; completedActId?: string } {
   if (run.ended || run.nextMilestoneChoice || run.survivalCrisis) return { updated: run, fromAge: run.age, toAge: run.age, chunk: [], factIds: [], carryFactIds: [] };
   if (run.narrative.enabled && run.story.mainlineCompleted) {
     throw new Error("dynamic_scene_after_mainline_complete");
@@ -3485,6 +3500,7 @@ export function advanceWithDynamicNarrativeScene(
       seedrandom(`${run.seed}:family-support:dynamic:${run.age}:${payload.patternIds.join(",")}:${payload.beat}`)
     );
   run.stats = applyChanges(run.stats, settledChanges);
+  resetRecoveredSurvivalStreak(run);
   run.ageStage = resolveAgeStage(run.age, world);
   updateNegativeStreaks(run);
   const sceneId = `dynamic:${act.id}:${payload.beat}:${run.age}:${run.history.length + 1}`;
@@ -3564,6 +3580,7 @@ export function advanceWithDynamicNarrativeScene(
       status: "active"
     };
     character.lastSeenAge = run.age;
+    character.status = "active";
     // Existing records are the canonical identity. The model may describe a
     // changed circumstance in prose, but cannot rename or recast the person.
     if (participant.description) character.description = participant.description;
@@ -3616,6 +3633,7 @@ export function advanceWithDynamicNarrativeScene(
     };
   }
   let inheritedCarryFactIds: string[] = [];
+  let completedActId: string | undefined;
   if (payload.beat === "payoff" && payload.beatDecision === "advance") {
     if (!payload.actHandoff) throw new Error("dynamic_scene_act_handoff_required");
     const acts = narrativeWorld.mainlineActs ?? [];
@@ -3682,6 +3700,7 @@ export function advanceWithDynamicNarrativeScene(
       decisionCount: runtime.decisionCount
     });
     if (!recorded) throw new Error("dynamic_mainline_act_already_completed");
+    completedActId = act.id;
     run.narrative.payoffCount = Math.min(8, run.narrative.payoffCount + 1);
     run.narrative.lastResolvedSceneAge = run.age;
     run.narrative.sceneClock = { ...run.narrative.sceneClock, mode: "advance", sameAgeTurnCount: 0 };
@@ -3712,13 +3731,13 @@ export function advanceWithDynamicNarrativeScene(
       factId,
       characterIds: storedCharacterIds,
       factIds: relatedFactIds,
-      horizonIntentId: payload.horizonIntentId
+      decisionBrief: payload.decisionBrief
     };
     run.yearsSinceLastMilestone = 0;
   } else if (!run.ended && !run.survivalCrisis) {
     run.yearsSinceLastMilestone += 1;
   }
-  return { updated: run, fromAge, toAge: run.age, chunk: [event], factIds: narrativeFactIds, carryFactIds: inheritedCarryFactIds };
+  return { updated: run, fromAge, toAge: run.age, chunk: [event], factIds: narrativeFactIds, carryFactIds: inheritedCarryFactIds, completedActId };
 }
 
 function dynamicDecisionPolicies(): Record<DecisionType, PendingDirectedDecisionPolicy> {
@@ -3768,6 +3787,12 @@ export function autoAdvanceToCheckpoint(
   if (run.ended || run.nextMilestoneChoice || run.survivalCrisis) {
     return { updated: run, fromAge: run.age, toAge: run.age, chunk: [] };
   }
+  if (options?.narrativeWorld) {
+    run.narrative = ensureNarrativeActRuntime(run.narrative, options.narrativeWorld, run.age);
+  }
+  if (options?.narrativeWorld) {
+    run.narrative = ensureNarrativeActRuntime(run.narrative, options.narrativeWorld, run.age);
+  }
 
   const fromAge = run.age;
   const chunk: YearEvent[] = [];
@@ -3801,6 +3826,7 @@ export function autoAdvanceToCheckpoint(
 
     if (!options?.deferNarrativeAttributeEffects) {
       run.stats = applyChanges(run.stats, changes);
+      resetRecoveredSurvivalStreak(run);
     }
     run.ageStage = resolveAgeStage(run.age, world);
     if (!options?.deferNarrativeAttributeEffects) updateNegativeStreaks(run);
@@ -3913,6 +3939,7 @@ export function applyMilestoneDecisionAndAdvance(
     applyStoryDirection(run, committedDirection, true);
   }
   run.stats = applyChanges(run.stats, decisionChanges);
+  resetRecoveredSurvivalStreak(run);
   updateNegativeStreaks(run);
 
   const decisionEvent: YearEvent = {
@@ -3990,13 +4017,12 @@ export function applyMilestoneDecisionAndAdvance(
       for (const fact of run.story.factLedger?.facts ?? []) {
         if (!resolvedFactIds.includes(fact.id)) continue;
         fact.resolution = options.factResolution;
-        fact.resolutionSummary = "这项世界事实已在高潮抉择中得到不可逆的处置。";
+        fact.resolutionSummary ??= fact.progressSummary ?? "这项世界事实已在高潮抉择中得到不可逆的处置。";
       }
     }
     run.narrative = recordNarrativeSceneDecision(run.narrative);
     if (options.beatDecision === "advance") {
       run.narrative = advanceNarrativeActBeat(run.narrative, options.narrativeWorld, run.age, { decision: true }).state;
-      if (pendingDynamicScene.beat === "climax") run.narrative.climaxCount = Math.min(8, run.narrative.climaxCount + 1);
     }
     commitNarrativeMemory(run.narrative, {
       id: `memory:${sourceEventId}`, age: run.age,
@@ -4042,13 +4068,19 @@ export function applyMilestoneDecisionAndAdvance(
   };
 }
 
+export function resolveNarrativeStatTierBounds(
+  stat: StatKey,
+  config?: InternalRunState["narrative"]["statTierConfig"]
+): { lowMax: number; highMin: number } {
+  return config?.overrides?.[stat] ?? { lowMax: config?.lowMax ?? 8, highMin: config?.highMin ?? 22 };
+}
+
 export function resolveNarrativeStatTiers(
   stats: Stats,
   config?: InternalRunState["narrative"]["statTierConfig"]
 ): Record<StatKey, NarrativeStatTier> {
-  const lowMax = config?.lowMax ?? 8;
-  const highMin = config?.highMin ?? 22;
   return allStatKeys.reduce<Record<StatKey, NarrativeStatTier>>((tiers, stat) => {
+    const { lowMax, highMin } = resolveNarrativeStatTierBounds(stat, config);
     tiers[stat] = stats[stat] <= lowMax ? "low" : stats[stat] >= highMin ? "high" : "steady";
     return tiers;
   }, {} as Record<StatKey, NarrativeStatTier>);

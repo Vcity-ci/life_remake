@@ -7,6 +7,10 @@
   "tagline": "没有宗门替你决定道路，便用每一次交易、结盟与对决走出来。",
   "summary": "从边地生存和流动网络出发，围绕资源、信用、同伴与自创本领展开，最终形成不依附既有道统的道路。",
   "routePromise": "人物将以散修或流动身份积累本领、资源与伙伴，在宗门和城邦夹缝中建立信用，最终让自己的道路足以保护、传授或改变一方秩序。",
+  "protagonistTrajectory": "从缺乏庇护的独行散修，成长为拥有自创本领、可靠盟友与独立传承道路的开拓者。",
+  "coreOpposition": "宗门垄断、危险委托、资源争夺与散修群体缺乏共同保障的生存困境。",
+  "stakesProgression": "从个人修炼与一桩委托，扩大到伙伴和据点网络，最终关系到散修群体能否拥有独立道路。",
+  "endingQuestion": "人物追求的自由能否变成他人也可行走的道路，而不只是强者独享的例外？",
   "centralConflict": "宗门、城邦与强大修士正在垄断修行资源，而持续扩大的劫难又迫使散修彼此依存，人物必须在被收编、被猎取与自建道路之间争取生存空间。",
   "entryLens": "依据人设适配孤儿、行商护卫、逃宗弟子、异族旅人、落魄家族、被夺舍者或自行摸索力量的普通人。",
   "originSeeds": [
@@ -36,6 +40,13 @@
       "dramaticQuestion": "没有靠山时，人物愿意以什么换取力量？",
       "pressureDirection": "资源稀缺、骗局、追杀与临时盟约不断检验判断。",
       "payoffMeaning": "人物获得了能够自由行动的基本实力和可再次合作的人。",
+      "beatOutline": {
+        "setup": "让生计、修炼资源或危险委托把人物推入一次真实行动。",
+        "escalation": "通过交易、探索或战斗验证本领并结识可合作之人。",
+        "pressure": "让报酬、信用、伤亡风险与宗门压力同时逼近。",
+        "climax": "让人物凭自己的本领完成一次危险委托并承担后果。",
+        "payoff": "确认独立行动能力、信用与可再次合作的伙伴。"
+      },
       "worldCardRefs": [
         "fantasy.snapshot.mortal_life",
         "fantasy.snapshot.cultivation_cost",
@@ -51,6 +62,13 @@
       "dramaticQuestion": "个人自由能否与共同承诺同时存在？",
       "pressureDirection": "宗门垄断、城邦规则、利益分配与同伴危机迫使人物承担组织责任。",
       "payoffMeaning": "人物成为一张关系网络的核心，而不再只是独行者。",
+      "beatOutline": {
+        "setup": "让既有信用连接多个据点、群体或长期需求。",
+        "escalation": "通过护路、结盟、交换资源或共同探索建立网络。",
+        "pressure": "让伙伴利益、宗门封锁与网络安全发生冲突。",
+        "climax": "让人物组织众人应对一次足以切断生存网络的危机。",
+        "payoff": "固定据点、盟友与互助规则，使人物成为网络核心。"
+      },
       "worldCardRefs": [
         "fantasy.snapshot.cultivation_cost",
         "fantasy.snapshot.other_civilizations",
@@ -66,6 +84,13 @@
       "dramaticQuestion": "人物的道路能否成为他人也能行走的道路？",
       "pressureDirection": "个人突破、伙伴安全、资源秩序与强大势力的招揽集中碰撞。",
       "payoffMeaning": "人物建立传承、自由共同体或一条不受旧道统垄断的新路。",
+      "beatOutline": {
+        "setup": "让旧道统或世界危机威胁散修群体全部生存空间。",
+        "escalation": "汇集自创本领、盟友与据点资源建立共同应对。",
+        "pressure": "迫使人物在个人飞升、伙伴安全与开放传承间取舍。",
+        "climax": "让人物完成决定独立道路能否存在的最终行动。",
+        "payoff": "交代传承、共同体、人物去向与新道路留下的影响。"
+      },
       "worldCardRefs": [
         "fantasy.snapshot.other_civilizations",
         "fantasy.snapshot.mortal_life",

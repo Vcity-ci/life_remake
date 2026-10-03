@@ -7,6 +7,10 @@
   "tagline": "在家族、城邦与修行资源之间，掌握一座城的命运。",
   "summary": "以修行城邦、家族网络、资源贸易和防卫秩序为中心，从基层事务进入权力核心，最终面对守城、夺城或改制。",
   "routePromise": "人物将从城邦或修行家族中的具体位置起步，通过本领、经营与关系获得决定权，并在内外危机中回答力量如何成为可持续的治理。",
+  "protagonistTrajectory": "从仙城秩序中的普通一员，成长为能调动修士、资源和防务并承担一城命运的治理者。",
+  "coreOpposition": "城内派系与资源争夺、城外敌对势力和禁区扩张对共同秩序的夹击。",
+  "stakesProgression": "从一家一坊的生计，扩大到派系与城防，最终决定整座仙城的制度和存亡。",
+  "endingQuestion": "掌握一城力量之后，人物能否让秩序服务众人，而不是成为另一种掠夺？",
   "centralConflict": "城邦赖以生存的灵脉、贸易或防护体系正在遭受外敌与内部争权的双重冲击，人物必须把个人力量转化为足以保护居民并约束强者的治理。",
   "entryLens": "依据人设适配家族子弟、坊市学徒、守卫、客卿、流民、异族商旅、被夺舍的继承人或偶然得到资源经营权等入口。",
   "originSeeds": [
@@ -36,6 +40,13 @@
       "dramaticQuestion": "人物靠血脉、财富、本领还是众人信任进入权力结构？",
       "pressureDirection": "资源短缺、家族利益与普通居民的安全要求不同答案。",
       "payoffMeaning": "人物获得了能够持续影响城邦事务的位置与盟友。",
+      "beatOutline": {
+        "setup": "让坊市、家族或城防中的现实难题触及人物生活。",
+        "escalation": "通过本领、经营或交涉解决局部危机并结识盟友。",
+        "pressure": "让地方利益、修行资源与城规要求发生冲突。",
+        "climax": "让人物承担一次影响一坊或一家存亡的行动。",
+        "payoff": "确认人物的城中位置、盟友和可以持续参与治理的权责。"
+      },
       "worldCardRefs": [
         "fantasy.snapshot.old_pact",
         "fantasy.snapshot.mortal_life",
@@ -51,6 +62,13 @@
       "dramaticQuestion": "掌握资源的人应当先保护谁？",
       "pressureDirection": "宗门、家族、商路、异族和城内弱者争夺有限力量。",
       "payoffMeaning": "人物已经能够调动一城资源，也必须承担由此产生的敌意与责任。",
+      "beatOutline": {
+        "setup": "让已有位置卷入全城派系与外部压力。",
+        "escalation": "通过结盟、整备、建设或镇压形成治理联盟。",
+        "pressure": "让资源分配、派系忠诚与城外威胁相互逼迫。",
+        "climax": "让人物调动一城资源解决一次重大内外危机。",
+        "payoff": "重排派系与治理权责，并留下明确的支持者和敌人。"
+      },
       "worldCardRefs": [
         "fantasy.snapshot.mortal_life",
         "fantasy.snapshot.three_rifts",
@@ -66,6 +84,13 @@
       "dramaticQuestion": "一座修行之城应成为少数强者的堡垒，还是众人共同生活的秩序？",
       "pressureDirection": "守城代价、内部背叛、资源分配与个人突破集中冲突。",
       "payoffMeaning": "城邦存亡及其制度因人物的选择获得最终方向。",
+      "beatOutline": {
+        "setup": "让战争、禁区或秩序崩溃成为整座城的最终检验。",
+        "escalation": "动员城防、民众、盟友与修行力量形成共同应对。",
+        "pressure": "迫使人物在守城、变法、牺牲与撤离之间选择。",
+        "climax": "让人物完成决定仙城存亡与制度的最终行动。",
+        "payoff": "交代城邦未来、治理制度、人物位置与众人承担的代价。"
+      },
       "worldCardRefs": [
         "fantasy.snapshot.three_rifts",
         "fantasy.snapshot.old_pact",

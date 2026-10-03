@@ -4,7 +4,7 @@ export const relationshipStances = ["friendly", "guarded", "hostile", "indebted"
 const factKinds = ["open_question", "stake", "commitment", "cost", "relationship_change"] as const;
 
 export function isNarrativeFactModelMutable(id: string): boolean {
-  return id.startsWith("dynamic:") || /^act:.+:continuation$/.test(id);
+  return id.startsWith("dynamic:") || id.startsWith("carry:") || /^act:.+:continuation$/.test(id);
 }
 
 export function normalizeNarrativeHandoffFact(fact: StoryFactRecord): StoryFactRecord {

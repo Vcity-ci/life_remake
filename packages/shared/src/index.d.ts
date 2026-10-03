@@ -11,6 +11,10 @@ export type EventStoryRole = "daily" | "main" | "branch" | "milestone" | "closur
 export type EventStoryPosition = "origin" | "accumulation" | "pressure" | "turn" | "resolution";
 export type StoryClosureState = "open" | "guiding" | "finished";
 export type NarrativeBeat = "setup" | "escalation" | "pressure" | "climax" | "payoff" | "ending";
+export interface NarrativeDecisionBrief {
+    question: string;
+    stakes: string;
+}
 export type NarrativeArcPhase = "setup" | "rising" | "pressure" | "climax" | "aftermath" | "ending";
 export type NarrativeThreadStatus = "seeded" | "escalating" | "climax" | "resolved";
 export type EndingPolarity = "good" | "normal" | "bad";
@@ -333,6 +337,14 @@ export interface NarrativeStoryPackActDefinition {
     dramaticQuestion: string;
     pressureDirection: string;
     payoffMeaning: string;
+    /** Causal duties for the five engine beats. They guide progression without fixing events, ages, NPCs or places. */
+    beatOutline: {
+        setup: string;
+        escalation: string;
+        pressure: string;
+        climax: string;
+        payoff: string;
+    };
     focusForceIds?: string[];
     /** World-owned cards that are especially useful in this act. References are recall hints, never gates. */
     worldCardRefs?: string[];
@@ -355,6 +367,14 @@ export interface NarrativeStoryPackDefinition {
     tagline: string;
     summary: string;
     routePromise: string;
+    /** The protagonist's long-term identity and agency change along this IF line. */
+    protagonistTrajectory: string;
+    /** The opposition that keeps producing concrete conflict instead of a preferred surface motif. */
+    coreOpposition: string;
+    /** How personal, relational and world-scale costs increase across the three acts. */
+    stakesProgression: string;
+    /** The final human question this life must answer, regardless of ending quality. */
+    endingQuestion: string;
     /** Persistent dramatic conflict instantiated once per run; acts express its escalation. */
     centralConflict: string;
     entryLens: string;
@@ -490,6 +510,10 @@ export interface NarrativeGrowthFocusDefinition {
 export interface NarrativeStatTierConfig {
     lowMax: number;
     highMin: number;
+    overrides?: Partial<Record<StatKey, {
+        lowMax: number;
+        highMin: number;
+    }>>;
 }
 /** Player-facing wording for a world's internal low / steady / high stat tiers. */
 export type NarrativeStatTierPresentation = Record<StatKey, Record<NarrativeStatTier, string>>;
@@ -527,8 +551,6 @@ export interface NarrativeSurvivalStage {
     id: string;
     label: string;
     ageStageIds: AgeStageId[];
-    /** A crisis can accumulate only while physique is strictly below this value. */
-    dangerBelowPhysique: number;
     baseCrisisRisk: number;
     additionalYearRisk: number;
     maxCrisisRisk: number;
@@ -739,6 +761,18 @@ export interface NarrativeAssetUpdates {
         status: NarrativeAbility["status"];
     }>;
 }
+/** Explicit semantic identity decisions proposed by continuity, scoped to one run. */
+export interface NarrativeIdentityMerge {
+    kind: "character" | "ability";
+    sourceRef: string;
+    targetRef: string;
+}
+/** Assets actually visited or used during one rendered turn; this is not an archive mutation. */
+export interface NarrativeAssetActivity {
+    locationIds: string[];
+    currentLocationId?: string;
+    abilityIds: string[];
+}
 /**
  * Optional continuity proposed by the narrator. The engine assigns IDs for
  * newly introduced facts and only accepts references already in this run.
@@ -916,7 +950,6 @@ export interface NarrativeSessionPremise {
 }
 export interface NarrativeBeatObservation {
     decision: "hold" | "advance";
-    horizonDecision: "hold" | "consume" | "replan";
     resolvedFactIds: string[];
     carryFactIds: string[];
     actId: string;
@@ -951,6 +984,7 @@ export interface NarrativeRunState {
     /** Global act beat. routeProgress is retained only to read old snapshots. */
     actRuntime?: NarrativeActRuntime;
     dynamicCharacters: NarrativeDynamicCharacter[];
+    identityAliases?: Record<string, string>;
     assets?: NarrativeAssets;
     memoryEntries: NarrativeMemoryEntry[];
     episodes: NarrativeEpisodeRecord[];
@@ -1220,6 +1254,12 @@ export interface MilestoneChoice {
         risk: number;
         reward: number;
         description: string;
+        abilityRefs?: string[];
+        locationDirective?: {
+            mode: "stay" | "revisit" | "move";
+            locationRef?: string;
+            purpose?: string;
+        };
     }>;
 }
 export interface AscensionState {
@@ -1312,7 +1352,7 @@ export interface PublicSurvivalCrisis {
     age: number;
     stageLabel: string;
     summary: string;
-    dangerBelowPhysique: number;
+    lowPhysiqueMax: number;
     choices: Array<{
         id: SurvivalChoice;
         label: string;
@@ -1518,5 +1558,11 @@ export interface AiMilestoneOptions {
         id: DecisionType;
         label: string;
         description: string;
+        abilityRefs?: string[];
+        locationDirective?: {
+            mode: "stay" | "revisit" | "move";
+            locationRef?: string;
+            purpose?: string;
+        };
     }>;
 }

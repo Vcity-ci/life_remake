@@ -7,6 +7,10 @@
   "tagline": "从求知与选择出发，让所学真正进入现实生活。",
   "summary": "围绕学习、升学、专业与知识实践展开的人生路线；成绩只是入口，人物最终要决定自己为何而学、又把能力用于何处。",
   "routePromise": "人物将从具体的学习环境中形成兴趣与能力，经历升学、专业和现实资源的取舍，最终让所学成为事业、创造或生活方式的一部分。",
+  "protagonistTrajectory": "从被教育环境塑造的学生，成长为能够选择知识方向、解决现实问题并留下专业成果的人。",
+  "coreOpposition": "个人兴趣与评价体系、家庭资源、升学就业压力和现实需求之间的冲突。",
+  "stakesProgression": "从一次学习机会与自我认同，扩大到专业选择和重要关系，最终决定事业贡献与生活方式。",
+  "endingQuestion": "人物学到的一切，最终是通往身份的门票，还是理解世界并创造价值的方法？",
   "centralConflict": "教育竞争、家庭资源与制度门槛不断决定谁能继续学习，人物必须让真正的兴趣和能力穿过考试、选择与现实压力，而非只被评价体系塑形。",
   "entryLens": "依据人设适配普通校园、职业教育、自学、竞赛、家庭传承或成年后重返学习等入口，不预设学历层级。",
   "originSeeds": [
@@ -36,6 +40,13 @@
       "dramaticQuestion": "人物愿意为什么而学，又能否找到适合自己的方法？",
       "pressureDirection": "成绩、资源、家庭期待与个人兴趣开始发生冲突。",
       "payoffMeaning": "人物拥有了可以继续深造或投入现实的能力基础。",
+      "beatOutline": {
+        "setup": "让学校、家庭或一次发现显露人物真正愿意投入的方向。",
+        "escalation": "通过训练、作品、竞赛或师友关系形成可验证的能力。",
+        "pressure": "让评价、资源、家庭期待与个人兴趣发生冲突。",
+        "climax": "让人物完成一次决定学习方向的真实挑战或选择。",
+        "payoff": "确认能力基础、学习关系与继续前行的具体机会。"
+      },
       "worldCardRefs": [
         "modern.snapshot.education_channels",
         "modern.snapshot.ai_and_work",
@@ -51,6 +62,13 @@
       "dramaticQuestion": "所学应当服从安全、热爱，还是现实责任？",
       "pressureDirection": "机会成本、制度门槛和重要关系要求人物承担选择后果。",
       "payoffMeaning": "人物确立了知识进入现实的道路，也失去了一部分可能。",
+      "beatOutline": {
+        "setup": "让升学、专业与工作机会要求人物选择现实道路。",
+        "escalation": "通过深造、实习、研究或转向把知识投入实际环境。",
+        "pressure": "让经济条件、关系与职业前景无法同时满足。",
+        "climax": "让人物作出会长期改变生活结构的专业选择。",
+        "payoff": "固定知识进入现实的路径，并交代被放弃的可能与新责任。"
+      },
       "worldCardRefs": [
         "modern.snapshot.ai_and_work",
         "modern.snapshot.transition_2027",
@@ -66,6 +84,13 @@
       "dramaticQuestion": "人物的知识最终改变了什么？",
       "pressureDirection": "职业伦理、公共影响、个人生活与长期投入集中接受检验。",
       "payoffMeaning": "人物以研究、教育、技术、作品或专业实践留下了明确结果。",
+      "beatOutline": {
+        "setup": "让一个重要现实问题检验人物多年的专业积累。",
+        "escalation": "调动同伴、机构与知识完成能够被社会使用的工作。",
+        "pressure": "让专业伦理、现实利益与个人生活发生最终冲突。",
+        "climax": "让人物以研究、教育、技术或作品回应这个问题。",
+        "payoff": "交代成果影响、职业归宿、重要关系与人物对所学的最终理解。"
+      },
       "worldCardRefs": [
         "modern.snapshot.transition_2027",
         "modern.snapshot.education_channels",

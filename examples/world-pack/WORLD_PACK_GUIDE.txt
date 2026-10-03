@@ -43,7 +43,9 @@ IF 子世界包回答“玩家要在这个世界里完成怎样的一生”：�
 - worldCards：运行时合并后的通用知识卡。创作源放在 data/narratives/world-cards/<worldId>/**/*.json；基础 story 文件保留空数组即可。
 - opening：早年叙事配置。
 - progression：普通年份节奏、能力门槛、属性档位、成长方向和完成条件。
-- survival：不同年龄阶段的体魄风险与濒死规则。
+- survival：连续最低档体魄的宽限年份、各年龄阶段危机概率及濒死恢复规则，放在 progression.survival。
+- progression.statTiers：lowMax / highMin 给出通用档位；overrides 可为单个属性覆盖两项边界。示例体魄 lowMax=4、highMin=22，其他属性沿用 8 / 22。
+- survival.stages：年龄阶段只设置 baseCrisisRisk / additionalYearRisk / maxCrisisRisk，体魄风险依据 statTiers 的最低档判定。startAge=4、graceYears=3 表示从四岁起累计，第三个连续低体魄年份开始概率检查；恢复到低档上限 + recovery.restoreBuffer。
 - endingBlueprints：恰好包含 good、normal、bad 三种世界级蓝图。
 
 四、worldCards

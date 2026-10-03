@@ -7,6 +7,10 @@
   "tagline": "在相遇、共同生活与漫长照料中，回答爱如何成为选择。",
   "summary": "以亲情、友情、爱情与家庭边界为中心的人生路线，不把婚姻视作唯一终点，而关注关系如何经受现实年月。",
   "routePromise": "人物将从原生家庭和早年关系中理解亲密，在相遇与共同生活中学习承诺、边界和照料，最终形成自己愿意承担的家庭与关系方式。",
+  "protagonistTrajectory": "从受原生关系影响而学习靠近他人的人，成长为能表达需要、守住边界并承担长期陪伴的人。",
+  "coreOpposition": "个人需求、原生家庭、现实生计与亲密关系承诺之间反复出现的矛盾。",
+  "stakesProgression": "从一次相遇和自我袒露，扩大到共同生活与家庭责任，最终面对照料、失去和代际延续。",
+  "endingQuestion": "人物最终学会的爱，是占有与牺牲，还是能让彼此作为完整的人共同生活？",
   "centralConflict": "原生家庭期待、现实生计与伴侣之间的信任不断发生冲突，人物必须在重要关系遭遇距离、失望或责任压力时重新决定何为承诺与边界。",
   "entryLens": "依据人设适配青梅旧友、校园相识、工作伙伴、网络相遇、重组家庭、独身互助或其他长期关系入口。",
   "originSeeds": [
@@ -36,6 +40,13 @@
       "dramaticQuestion": "人物能否真实地看见他人，也让自己被看见？",
       "pressureDirection": "家庭经验、性格防御与现实距离考验最初信任。",
       "payoffMeaning": "双方形成了愿意继续投入的关系与共同记忆。",
+      "beatOutline": {
+        "setup": "让一段相遇或既有关系显露改变人物生活的可能。",
+        "escalation": "通过共同经历、坦白与试探建立真实了解。",
+        "pressure": "让家庭经验、个人边界与现实安排考验靠近的意愿。",
+        "climax": "让双方对是否继续投入作出可观察的行动。",
+        "payoff": "确认关系形式、共同记忆与仍需学习面对的差异。"
+      },
       "worldCardRefs": [
         "modern.snapshot.family_care",
         "modern.snapshot.housing_and_mobility",
@@ -51,6 +62,13 @@
       "dramaticQuestion": "感情如何进入并承受具体生活？",
       "pressureDirection": "个人成长与共同责任不再天然一致，冲突需要真实协商。",
       "payoffMeaning": "关系形成了可持续结构，或诚实地改变了原有形式。",
+      "beatOutline": {
+        "setup": "让住处、工作、金钱或家庭计划要求关系进入日常责任。",
+        "escalation": "通过协商分工、共同选择与冲突修复建立生活结构。",
+        "pressure": "让事业、双方家庭与个人愿望无法同时满足。",
+        "climax": "让人物完成一次决定关系能否持续的承诺或边界行动。",
+        "payoff": "固定可持续的关系结构，或诚实交代双方选择的新形式。"
+      },
       "worldCardRefs": [
         "modern.snapshot.housing_and_mobility",
         "modern.snapshot.transition_2027",
@@ -66,6 +84,13 @@
       "dramaticQuestion": "岁月改变一切之后，人物仍愿意怎样相待？",
       "pressureDirection": "失去、责任与个人未竟愿望集中考验关系的本质。",
       "payoffMeaning": "人物最终形成了关于爱、家庭与陪伴的完整答案。",
+      "beatOutline": {
+        "setup": "让疾病、照料、代际变化或远行检验长期关系。",
+        "escalation": "召回共同生活积累并让双方重新协商未来。",
+        "pressure": "迫使人物在自我生活、责任、失去与陪伴间取舍。",
+        "climax": "让人物完成一项定义此后家庭与关系的最终行动。",
+        "payoff": "交代陪伴方式、家庭形态、个人归宿与这段关系留下的意义。"
+      },
       "worldCardRefs": [
         "modern.snapshot.transition_2027",
         "modern.snapshot.family_care",

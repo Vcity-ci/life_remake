@@ -7,6 +7,10 @@
   "tagline": "从入仕门径走入权力核心，决定辅政、摄政还是取而代之。",
   "summary": "取材自 Material 的权臣线：依靠教育、官职、人脉和制度能力进入朝局，经营门生故吏与军政资源，最终直面皇权反制和家族去向。",
   "routePromise": "人物将在官僚与宫廷秩序中积累职位、关系和实际控制力，并决定自己如何使用足以改变朝局的权力。",
+  "protagonistTrajectory": "从政治秩序的旁观者与执行者，成长为能够结盟、施政并左右最高权力安排的中枢人物。",
+  "coreOpposition": "君主意志、官僚派系与人物政治理想之间无法永久调和的权力冲突。",
+  "stakesProgression": "从个人仕途与名誉，扩大到门生盟友和政策成败，最终触及政权归属与天下治理。",
+  "endingQuestion": "当人物有能力重排朝局时，权力究竟是手段、责任还是最终目的？",
   "centralConflict": "君权更替与派系争衡正在撕裂朝廷的决策秩序，各方围绕用人、财政、军权和继承问题争夺国家方向，人物无法只靠守成置身事外。",
   "entryLens": "依据人设适配家学、科举、军功、幕府、婚盟或宫廷关系等入仕入口，不固定家庭阶层。",
   "originSeeds": [
@@ -35,6 +39,13 @@
       "dramaticQuestion": "人物凭借什么被权力中心看见？",
       "pressureDirection": "才干、门第、靠山与原则之间开始产生交换。",
       "payoffMeaning": "人物获得真实的仕途入口和第一批政治资产。",
+      "beatOutline": {
+        "setup": "让人物看见朝局中的真实利益与进入庙堂的机会。",
+        "escalation": "通过施政、进言或结盟获得第一项职位与政治关系。",
+        "pressure": "让君命、派系立场与个人原则产生现实冲突。",
+        "climax": "让人物在一项政务或宫廷争端中公开承担立场与后果。",
+        "payoff": "确认人物的政治位置、盟友与对手，并留下继续入局的权责。"
+      },
       "worldCardRefs": [
         "ancient.snapshot.jingyuan_reform",
         "ancient.snapshot.central_figures",
@@ -50,6 +61,13 @@
       "dramaticQuestion": "人物能否控制资源而不先被关系反噬？",
       "pressureDirection": "派系斗争和制度责任迫使人物公开站队。",
       "payoffMeaning": "人物能够影响重要任命、政策或军政决定。",
+      "beatOutline": {
+        "setup": "让既有职位带来必须经营的派系、政策或宫廷关系。",
+        "escalation": "通过合纵连横、任用人才或推动政令建立权力网络。",
+        "pressure": "让盟友诉求、政策代价与君主疑心彼此冲突。",
+        "climax": "让人物主导一次改变朝局的施政、罢黜、廷争或权力反制。",
+        "payoff": "固定人物的中枢地位，并交代由此树立的政治秩序与宿敌。"
+      },
       "worldCardRefs": [
         "ancient.snapshot.central_figures",
         "ancient.snapshot.local_society",
@@ -65,6 +83,13 @@
       "dramaticQuestion": "人物要成为秩序的辅弼、主人还是牺牲品？",
       "pressureDirection": "君臣猜忌、家族野心和天下稳定集中冲突。",
       "payoffMeaning": "人物与皇权的最终关系及其制度后果得到回答。",
+      "beatOutline": {
+        "setup": "让皇权反制或政权危机从既有派系格局中发生。",
+        "escalation": "使人物调动门生、军政资源和公共名望争夺最终主动。",
+        "pressure": "迫使人物在忠诚、制度、亲近之人与自身权位间明确取舍。",
+        "climax": "让人物完成一次决定最高权力归属的公开政治行动。",
+        "payoff": "交代政权安排、制度遗产、主要关系与人物最终政治身份。"
+      },
       "worldCardRefs": [
         "ancient.snapshot.local_society",
         "ancient.snapshot.jingyuan_reform",

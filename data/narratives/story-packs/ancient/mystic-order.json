@@ -7,6 +7,10 @@
   "tagline": "以医术、经典、仪式与灾异解释影响人心，也承受信仰进入权力后的代价。",
   "summary": "取材自 Material 的宗教与方术线：从寺观、山村、医家或方术传承建立能力和声望，进入民间与宫廷，最终面对知识、信仰和政治权力的冲突。",
   "routePromise": "人物将凭借医术、仪式、经典、天文或方术获得社会影响，并决定这份精神与知识权力如何面对朝廷、教门和众生。",
+  "protagonistTrajectory": "从接触异术与民间苦难的学徒，成长为能够施术救人、统合教众并决定传承命运的宗师。",
+  "coreOpposition": "真实灾异与疾病、教门竞争、民众信念和朝廷控制之间的冲突。",
+  "stakesProgression": "从个人修习与一人性命，扩大到教众和地方安危，最终牵动信仰秩序与政权态度。",
+  "endingQuestion": "人物掌握超出常人的知识后，会用神秘维持权威，还是让传承真正回应众生？",
   "centralConflict": "灾异、疫病或民间信仰危机不断扩大，朝廷正统、地方教门与百姓自救相互冲突，人物必须证明自己的知识究竟能够救人、聚众还是制造新的统治。",
   "entryLens": "依据人设适配巫祝、僧道、医者、隐士、占卜世家、罪臣之后或偶然得到传承等入口。",
   "originSeeds": [
@@ -36,6 +40,13 @@
       "dramaticQuestion": "人物如何证明所学不只是虚名或幻术？",
       "pressureDirection": "疾病、灾异、师门规矩和民间期待检验最初所学。",
       "payoffMeaning": "人物建立真实能力、声望与传承身份。",
+      "beatOutline": {
+        "setup": "让疾病、灾异或异常征兆把人物引向一门真实传承。",
+        "escalation": "通过学习、治病、仪式或辨异证明能力并接触教门关系。",
+        "pressure": "让救人代价、师门禁忌与民众期待彼此冲突。",
+        "climax": "让人物独立处理一次真实灾病或异常事件。",
+        "payoff": "确立传承身份、能力边界与最初信众或质疑者。"
+      },
       "worldCardRefs": [
         "ancient.snapshot.popular_faith",
         "ancient.snapshot.local_society",
@@ -51,6 +62,13 @@
       "dramaticQuestion": "人物能否影响权力而不被权力塑造成工具？",
       "pressureDirection": "宫廷需求、教派竞争、真假灾异和公共责任彼此冲突。",
       "payoffMeaning": "人物成为能够影响民间或朝局的精神与知识权威。",
+      "beatOutline": {
+        "setup": "让人物的声望进入更大的教门、地方或朝廷视野。",
+        "escalation": "通过治灾、神迹、辩经或组织教众扩大公共影响。",
+        "pressure": "让信仰需求、知识真伪、教门利益与政治控制互相逼迫。",
+        "climax": "让人物处理一场牵动大量民众的宗教或灾异危机。",
+        "payoff": "固定人物的教门权威、公共责任及与朝廷的关系。"
+      },
       "worldCardRefs": [
         "ancient.snapshot.local_society",
         "ancient.snapshot.central_figures",
@@ -66,6 +84,13 @@
       "dramaticQuestion": "人物留下的是可验证的学问、信仰秩序，还是被权力吞没的神话？",
       "pressureDirection": "君主猜忌、教派分裂、预言成败和继承问题集中出现。",
       "payoffMeaning": "传承是否延续、人物如何被后世理解得到回答。",
+      "beatOutline": {
+        "setup": "让传承存亡与更大灾异或政治清算同时到来。",
+        "escalation": "召集门人、运用一生所学并争取社会力量。",
+        "pressure": "迫使人物在自保、真相、信众与传承纯粹性间取舍。",
+        "climax": "让人物完成封印、救治、辩经、起事或解散教门等最终行动。",
+        "payoff": "交代传承去向、众生结果、政治评价与人物身后名。"
+      },
       "worldCardRefs": [
         "ancient.snapshot.central_figures",
         "ancient.snapshot.popular_faith",

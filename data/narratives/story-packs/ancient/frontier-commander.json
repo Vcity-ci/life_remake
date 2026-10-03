@@ -7,6 +7,10 @@
   "tagline": "在烽火、互市与朝廷猜忌之间，决定一支军队和一方边地的命运。",
   "summary": "取材自 Material 的边将线：从边地生活或军中入口积累功勋和部曲，处理粮饷、异族与朝局关系，最终面对外敌、军心和中央制衡。",
   "routePromise": "人物将通过边境经验、军功与关系取得军中决定权，并回答武力究竟用来守护、割据还是重塑秩序。",
+  "protagonistTrajectory": "从被边地局势支配的无名之人，成长为能够亲自操练、作战、统军并决定一方攻守的将帅。",
+  "coreOpposition": "外敌持续入侵与军镇、朝廷、边民之间相互冲突的安全诉求。",
+  "stakesProgression": "从个人生存与同袍信任，扩大到部伍存亡、边民安危，最终牵动疆土归属与军政秩序。",
+  "endingQuestion": "当人物真正握有兵权时，会用它守护谁，又愿意为此承担什么后果？",
   "centralConflict": "一股正在由边境侵扰升级为全面战争的外部力量持续压迫边地，使军镇、朝廷与边民必须围绕守土、求和或扩张付出真实代价。",
   "entryLens": "依据人设适配军户、边民、罪臣之后、朝廷将门、翻译向导或意外投军等入口。",
   "originSeeds": [
@@ -36,6 +40,13 @@
       "dramaticQuestion": "人物凭什么在边地活下来并获得信任？",
       "pressureDirection": "小规模冲突、军纪、互市和地方生计相互牵动。",
       "payoffMeaning": "人物已经历真实军旅行动，其能力与判断被军中认可，并拥有可依靠的同袍关系和明确位置；文书或账目成果不能单独完成本幕。",
+      "beatOutline": {
+        "setup": "让人物从边地日常看见军情逼近，并找到进入军旅行动的位置。",
+        "escalation": "通过操练、巡防、侦察或初次交锋建立同袍关系与实际本领。",
+        "pressure": "让敌情、军纪与边民安危同时逼迫人物承担风险。",
+        "climax": "让人物在一次真实军事危机中亲自行动并影响小队存亡。",
+        "payoff": "确认军中对人物能力的认可，并交代由此获得的职责与敌我关系。"
+      },
       "worldCardRefs": [
         "ancient.snapshot.frontier_pressure",
         "ancient.snapshot.nine_regions",
@@ -51,6 +62,13 @@
       "dramaticQuestion": "人物如何同时对军队、边民与朝廷负责？",
       "pressureDirection": "战功、失利、部曲忠诚和朝堂评价不断改变人物位置。",
       "payoffMeaning": "人物已作出产生军事后果的指挥或战术决断，能够影响一方攻守与部众存亡；单纯核验手续或整理供给不能单独完成本幕。",
+      "beatOutline": {
+        "setup": "让既有军功把人物推入需要调度兵马与资源的位置。",
+        "escalation": "以练兵、布阵、夜袭、追击或守备扩大人物的指挥范围。",
+        "pressure": "让军心、粮道、战机与朝廷命令形成不能兼得的压力。",
+        "climax": "让人物独立作出一次改变战局的攻守决断并承担伤亡后果。",
+        "payoff": "重排军中权责、部曲归属与敌我态势，使人物成为真正的掌军者。"
+      },
       "worldCardRefs": [
         "ancient.snapshot.nine_regions",
         "ancient.snapshot.central_figures",
@@ -66,6 +84,13 @@
       "dramaticQuestion": "重兵在手之后，人物守护的是朝廷、边地还是自己的事业？",
       "pressureDirection": "入朝、留镇、割据、联盟与决战形成不可回避的选择。",
       "payoffMeaning": "一场具有战争尺度的危机已被人物以符合其身份的方式实际应对，边境秩序、军队归属和人物政治位置因此得到最终回答。",
+      "beatOutline": {
+        "setup": "让全面战争或边境崩解从前两幕积累的矛盾中爆发。",
+        "escalation": "调动旧部、盟友、城防与民众形成一方战争格局。",
+        "pressure": "让决战需要、朝廷猜忌与边地长期生存正面冲突。",
+        "climax": "让人物以主将身份完成一场具有战争尺度的攻守行动。",
+        "payoff": "回答疆土、军队与人物权力的最终归属，并留下可评价的边地秩序。"
+      },
       "worldCardRefs": [
         "ancient.snapshot.central_figures",
         "ancient.snapshot.frontier_pressure",

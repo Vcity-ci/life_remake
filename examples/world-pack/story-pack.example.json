@@ -7,6 +7,10 @@
   "tagline": "用一句话说明玩家将进入怎样的人生。",
   "summary": "说明这条 IF 线如何串联基础世界中的力量、处境和人生尺度。",
   "routePromise": "描述从人物起点到最终结果的长期故事承诺，不规定每一场具体事件。",
+  "protagonistTrajectory": "描述人物从何种身份与行动能力，成长为能够承担何种责任的人。",
+  "coreOpposition": "描述持续制造矛盾的力量关系，而不是某个固定物件或单一事件。",
+  "stakesProgression": "描述代价如何从个人生活扩大到关系、事业与世界层面。",
+  "endingQuestion": "描述无论好坏结局都必须回答的人生问题。",
   "centralConflict": "描述这条路线长期存在、会随人物行动升级并最终需要回答的核心矛盾。",
   "entryLens": "说明模型如何依据玩家人设与身世，为同一路线选择不同身份和开场契机。",
   "originSeeds": [
@@ -24,6 +28,13 @@
       "dramaticQuestion": "人物能否从被动处境转为主动选择？",
       "pressureDirection": "世界中的关系与制度开始要求人物付出代价。",
       "payoffMeaning": "人物已经拥有可持续行动的身份、关系或能力。",
+      "beatOutline": {
+        "setup": "让人物看见这一幕的现实处境与可进入的位置。",
+        "escalation": "让人物以一次行动进入矛盾并取得初步关系或能力。",
+        "pressure": "让选择的代价逼近人物已有生活与重要关系。",
+        "climax": "让人物用已经积累的资源作出决定性行动。",
+        "payoff": "确认行动造成的结果，并建立下一幕的新身份与处境。"
+      },
       "worldCardRefs": ["my_world.setting.selective_entry"]
     },
     {
@@ -33,6 +44,13 @@
       "dramaticQuestion": "人物愿意用什么换取更大的可能？",
       "pressureDirection": "既有成果、重要关系与现实责任发生冲突。",
       "payoffMeaning": "人物的选择已经改变自己与周围人的未来。",
+      "beatOutline": {
+        "setup": "展示上一幕成果如何带来更大的责任。",
+        "escalation": "让人物主动经营新的合作或对抗。",
+        "pressure": "使事业、关系与责任无法同时保全。",
+        "climax": "让人物承担一次会改变他人处境的重大选择。",
+        "payoff": "固定新的权责格局与尚未偿还的代价。"
+      },
       "worldCardRefs": ["my_world.rule.consequences_are_lived"]
     },
     {
@@ -42,6 +60,13 @@
       "dramaticQuestion": "人物最终成为什么样的人，又留下了什么？",
       "pressureDirection": "路线目标、历史代价和未竟关系集中到最后的取舍。",
       "payoffMeaning": "路线的核心承诺得到不可逆的回答。",
+      "beatOutline": {
+        "setup": "让最终检验从既有成果与代价中自然发生。",
+        "escalation": "使人物过去建立的关系与能力参与最终局势。",
+        "pressure": "迫使人物明确最终愿意守住和舍弃什么。",
+        "climax": "让人物以符合其一生轨迹的方式完成最终行动。",
+        "payoff": "交代核心矛盾的结果、人物归宿与留下的影响。"
+      },
       "worldCardRefs": ["my_world.rule.consequences_are_lived"]
     }
   ],

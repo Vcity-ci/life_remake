@@ -335,9 +335,10 @@ function selectNarrativeWorldCardMatches(
     // route, faction and state scopes remain authoritative.
     const focused = focusedCardIds.has(card.id);
     const preferred = preferredCardIds.has(card.id);
-    const match = sticky || focused ? scoped : worldCardMatches(card, cardQuery);
+    const semanticMatch = worldCardMatches(card, cardQuery);
+    const match = sticky || focused ? scoped : preferred && !semanticMatch.matched ? scoped : semanticMatch;
     if (!match.matched) {
-      diagnostics?.push({ id: card.id, reason: preferred ? "story_pack_trigger" : "trigger" });
+      diagnostics?.push({ id: card.id, reason: "trigger" });
       return [];
     }
     const elapsed = state ? Math.max(0, sequence - state.lastActivatedSequence) : Number.MAX_SAFE_INTEGER;
@@ -379,9 +380,18 @@ function selectNarrativeWorldCardMatches(
   // A task-matched prose example is a distinct context layer, not ordinary
   // lore competing for the final slot. Reserve at most one example so the
   // authored voice cannot be starved by higher-priority setting cards.
+  // Story-pack references provide a bounded cold-start direction. They still
+  // obey task/act/beat/state scopes, cooldowns, inclusion groups and the total
+  // context budget; current semantic matches fill the remaining slots.
+  const anchorIds = new Set<string>();
+  for (const anchor of scored.filter((entry) => preferredCardIds.has(entry.card.id) && entry.card.kind !== "style_example").slice(0, 2)) {
+    anchorIds.add(anchor.card.id);
+    add(anchor);
+  }
   const styleExample = scored.find((entry) => entry.card.kind === "style_example");
   if (styleExample) add(styleExample);
   for (const entry of scored) {
+    if (preferredCardIds.has(entry.card.id) && !anchorIds.has(entry.card.id) && !worldCardMatches(entry.card, cardQuery).matched) continue;
     if (!add(entry)) continue;
     // A continued sticky card must not repeatedly fan out or renew its
     // related cards. Relations are followed only on a fresh activation.
@@ -754,9 +764,15 @@ export function ensureNarrativeRunState(
     const config = value as Partial<NarrativeStatTierConfig> | undefined;
     const lowMax = Number(config?.lowMax);
     const highMin = Number(config?.highMin);
-    return Number.isFinite(lowMax) && Number.isFinite(highMin) && lowMax >= 0 && highMin > lowMax
-      ? { lowMax: Math.trunc(lowMax), highMin: Math.trunc(highMin) }
-      : undefined;
+    if (!Number.isFinite(lowMax) || !Number.isFinite(highMin) || lowMax < 0 || highMin <= lowMax) return undefined;
+    const overrides: NonNullable<NarrativeStatTierConfig["overrides"]> = {};
+    for (const stat of ["intelligence", "charisma", "family", "fortune", "physique"] as const) {
+      const bounds = config?.overrides?.[stat];
+      if (bounds && Number.isFinite(bounds.lowMax) && Number.isFinite(bounds.highMin) && bounds.lowMax >= 0 && bounds.highMin > bounds.lowMax) {
+        overrides[stat] = { lowMax: Math.trunc(bounds.lowMax), highMin: Math.trunc(bounds.highMin) };
+      }
+    }
+    return { lowMax: Math.trunc(lowMax), highMin: Math.trunc(highMin), ...(Object.keys(overrides).length ? { overrides } : {}) };
   };
   const statKeys: Array<keyof Stats> = ["intelligence", "charisma", "family", "fortune", "physique"];
   const tierKeys: NarrativeStatTier[] = ["low", "steady", "high"];
@@ -855,7 +871,9 @@ export function ensureNarrativeRunState(
     opening,
     sessionPremise,
     arcPhase: phase.includes(state.arcPhase) ? state.arcPhase : defaults.arcPhase,
-    climaxCount: Math.max(0, Math.min(8, Number(state.climaxCount) || 0)),
+    // A committed act payoff records that its preceding climax was completed.
+    climaxCount: Math.min(8, Math.max(0, Number(state.climaxCount) || 0,
+      new Set(completedScenes.map((scene) => scene.mainlineActId).filter(Boolean)).size)),
     payoffCount: Math.max(0, Math.min(8, Number(state.payoffCount) || 0)),
     threads: Array.isArray(state.threads)
       ? state.threads
@@ -865,6 +883,7 @@ export function ensureNarrativeRunState(
     routeProgress,
     actRuntime,
     dynamicCharacters,
+    identityAliases: state.identityAliases ? { ...state.identityAliases } : undefined,
     assets: normalizeNarrativeAssets(state.assets),
     memoryEntries,
     episodes,
@@ -916,7 +935,7 @@ export function ensureNarrativeActRuntime(
   age: number
 ): NarrativeRunState {
   const next = ensureNarrativeRunState(state, state.enabled, age);
-  if (world?.progression?.statTiers) next.statTierConfig = { ...world.progression.statTiers };
+  if (world?.progression?.statTiers) next.statTierConfig = structuredClone(world.progression.statTiers);
   if (!next.statTierPresentation && world?.progression?.statTierPresentation) {
     next.statTierPresentation = structuredClone(world.progression.statTierPresentation);
   }
@@ -968,6 +987,7 @@ export function advanceNarrativeActBeat(
     ? uniqueRecent([...runtime.selectedRouteIds, options.selectedRouteId], 12)
     : runtime.selectedRouteIds;
   if (runtime.beat !== "payoff") {
+    if (runtime.beat === "climax") next.climaxCount = Math.min(8, next.climaxCount + 1);
     next.actRuntime = {
       ...runtime,
       beat: actBeats[Math.min(actBeats.length - 1, currentIndex + 1)],
@@ -975,6 +995,7 @@ export function advanceNarrativeActBeat(
       selectedRouteIds,
       decisionCount: runtime.decisionCount + (options?.decision ? 1 : 0)
     };
+    if (next.horizonPlan) next.horizonPlan = { ...next.horizonPlan, status: "stale" };
     return { state: next };
   }
   const completedActId = runtime.actId;
@@ -1699,6 +1720,7 @@ export function selectDynamicNarrativeContext(
     actId?: string;
     text?: string;
     backgroundAllowed?: boolean;
+    resolvedFactVisibility?: "none" | "current-act" | "all";
   }
 ): DynamicNarrativeContextSelection {
   const origin = query.task === "origin";
@@ -1723,8 +1745,11 @@ export function selectDynamicNarrativeContext(
   };
   const facts = (source.story.factLedger?.facts ?? []).map(normalizeNarrativeHandoffFact);
   const selectedFacts = origin ? [] : facts.filter((fact) => fact.status === "open" && relevance(fact) > 0 && (belongsToCurrentAct(fact) || explicitlyFocused(fact)))
-    .sort((a, b) => rankFact(b) - rankFact(a)).slice(0, background ? 1 : query.backgroundAllowed ? 2 : 4);
-  const resolvedFacts = origin ? [] : facts.filter((fact) => fact.status === "resolved" && (query.task === "ending" || relevance(fact) > 0))
+    .sort((a, b) => Number(explicitlyFocused(b)) - Number(explicitlyFocused(a)) || rankFact(b) - rankFact(a)).slice(0, background ? 1 : query.backgroundAllowed ? 2 : 4);
+  const resolvedFactVisibility = query.task === "ending" ? "all" : query.resolvedFactVisibility ?? "none";
+  const resolvedFacts = origin || resolvedFactVisibility === "none" ? [] : facts.filter((fact) => fact.status === "resolved" &&
+    (resolvedFactVisibility === "all" || Boolean(query.actId && fact.actId === query.actId)) &&
+    (query.task === "ending" || relevance(fact) > 0))
     .sort((a, b) => rankFact(b) - rankFact(a)).slice(0, query.task === "ending" ? 8 : 2);
   const factIds = [...selectedFacts, ...resolvedFacts.filter((fact) => query.factIds?.includes(fact.id))].map((fact) => fact.id);
   const rankedCharacters = source.narrative.dynamicCharacters
@@ -1829,13 +1854,6 @@ function buildTaskNarrativePlan(
     lifeContext ? focus?.description : "",
     task === "horizon" ? source.narrative.sessionPremise?.storyPromise : "",
     premiseKeywords,
-    task === "planning" && source.narrative.horizonPlan?.status === "active" && source.narrative.horizonPlan.actId === act?.id
-      ? [
-          source.narrative.horizonPlan.developingTension,
-          ...source.narrative.horizonPlan.intents.filter((intent) => intent.status === "active").map((intent) => intent.goal),
-          source.narrative.horizonPlan.payoffShape
-        ].join(" ")
-      : "",
     task === "decision" ? recentNarratives.at(-1)?.summary : ""
   ].filter(Boolean).join(" ");
   const recalledPatternIds = task === "decision" ? pending?.patternIds : options?.patternIds;
@@ -1844,9 +1862,13 @@ function buildTaskNarrativePlan(
   const episodeRecall = selectNarrativeEpisodeRecall(source.narrative, {
     actId: act?.id,
     routeId: recalledPatternIds?.[0],
-    focusIds: episodeFocusIds
+    focusIds: episodeFocusIds,
+    mode: task === "horizon" ? "horizon" : task === "closure" || task === "ending" ? "archive" : "prose"
   });
-  const priorActCarryFactIds = beat === "setup" ? (episodeRecall.canon.at(-1)?.factIds ?? []) : [];
+  const priorActCanon = source.narrative.actCanon
+    .filter((entry) => entry.actId !== act?.id)
+    .at(-1);
+  const priorActCarryFactIds = beat === "setup" ? (priorActCanon?.factIds ?? []) : [];
   const focusFactIds = Array.from(new Set([...(options?.focusIds ?? []), ...priorActCarryFactIds]))
     .filter((id) => source.story.factLedger?.facts.some((fact) => fact.id === id));
   const selectedRecall = selectDynamicNarrativeContext(source, {
@@ -1865,13 +1887,16 @@ function buildTaskNarrativePlan(
       ? pending?.characterIds
       : (options?.focusIds ?? []).filter((id) => source.narrative.dynamicCharacters.some((character) => character.id === id)),
     locationIds: task === "decision"
-      ? pending?.locationIds
+      ? Array.from(new Set([...(pending?.locationIds ?? []), ...(options?.focusIds ?? []).filter((id) => source.narrative.assets?.locations.some((location) => location.id === id))]))
       : (options?.focusIds ?? []).filter((id) => source.narrative.assets?.locations.some((location) => location.id === id)),
     abilityIds: task === "decision"
-      ? pending?.abilityIds
+      ? Array.from(new Set([...(pending?.abilityIds ?? []), ...(options?.focusIds ?? []).filter((id) => source.narrative.assets?.abilities.some((ability) => ability.id === id))]))
       : (options?.focusIds ?? []).filter((id) => source.narrative.assets?.abilities.some((ability) => ability.id === id)),
     memoryIds: episodeRecall.memoryIds,
-    text: taskQuery
+    text: taskQuery,
+    resolvedFactVisibility: beat === "payoff" && (task === "planning" || task === "rendering" || task === "dynamic")
+      ? "current-act"
+      : task === "ending" ? "all" : "none"
   });
   const exactFocusIds = new Set(options?.focusIds ?? []);
   const exactAssetSources = (selectedRecall.assetSources ?? []).filter((entry) => exactFocusIds.has(entry.id));
@@ -1957,8 +1982,11 @@ function buildTaskNarrativePlan(
     !selectedWorldCardIds.has(entry.id) && all.findIndex((candidate) => candidate.id === entry.id && candidate.reason === entry.reason) === index);
   const previousActId = source.narrative.completedScenes.filter((scene) => scene.mainlineActId).at(-1)?.mainlineActId;
   const facts = (source.story.factLedger?.facts ?? []).map(normalizeNarrativeHandoffFact);
-  const handoff = task === "origin" || task === "ending" || beat !== "setup" ? [] : facts.filter((fact) =>
-    previousActId && previousActId !== act?.id && fact.id.startsWith(`act:${previousActId}:`) && fact.status === "resolved");
+  // Dynamic worlds retain synthetic act facts as engine evidence. Ordinary
+  // model turns receive the canonical act result and explicit carry facts
+  // instead of a second prose projection of the same completed act.
+  const handoff = (task === "closure" || task === "ending") && beat === "setup" ? facts.filter((fact) =>
+    previousActId && previousActId !== act?.id && fact.id.startsWith(`act:${previousActId}:`) && fact.status === "resolved") : [];
   const premise = source.narrative.sessionPremise;
   const premiseArc = premise?.arcs.find((entry) => entry.actId === act?.id);
   const premiseAnchor = [
@@ -1980,11 +2008,14 @@ function buildTaskNarrativePlan(
         ? [premiseAnchor[0], world.mainlineSkeleton?.payoff].filter(Boolean).join("\n")
         : undefined;
   const routeGuidance = !storyPack ? undefined : task === "background"
-    ? `${storyPack.name}：${storyPack.tagline}`
-    : task === "planning" || task === "horizon" || task === "settlement" || task === "rendering" || task === "dynamic" || task === "decision"
+    ? `${storyPack.name}：${storyPack.tagline}；人物长期轨迹=${storyPack.protagonistTrajectory}`
+    : task === "planning"
       ? [
-          `${storyPack.name}：${storyPack.routePromise}；贯穿矛盾=${storyPack.centralConflict}`,
-          storyPackAct ? `当前阶段“${storyPackAct.label}”：目标=${storyPackAct.objective}；核心问题=${storyPackAct.dramaticQuestion}；阶段成果=${storyPackAct.payoffMeaning}` : ""
+          `${storyPack.name}：${storyPack.routePromise}；人物轨迹=${storyPack.protagonistTrajectory}；持续对抗=${storyPack.coreOpposition}`,
+          `风险升级=${storyPack.stakesProgression}；终局问题=${storyPack.endingQuestion}`,
+          storyPackAct ? `当前阶段“${storyPackAct.label}”：目标=${storyPackAct.objective}；核心问题=${storyPackAct.dramaticQuestion}；阶段成果=${storyPackAct.payoffMeaning}` : "",
+          storyPackAct ? `本幕完整发展大纲：${(["setup", "escalation", "pressure", "climax", "payoff"] as const).map((step) => `${step}：${storyPackAct.beatOutline[step]}`).join("；")}` : "",
+          beat ? `本轮只发展当前节拍“${beat}”。` : ""
         ].filter(Boolean).join("\n")
       : undefined;
   return {

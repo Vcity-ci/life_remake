@@ -23,7 +23,10 @@
     },
     "statTiers": {
       "lowMax": 8,
-      "highMin": 22
+      "highMin": 22,
+      "overrides": {
+        "physique": { "lowMax": 4, "highMin": 22 }
+      }
     },
     "statTierPresentation": {
       "intelligence": {
@@ -62,7 +65,6 @@
           "ageStageIds": [
             "child"
           ],
-          "dangerBelowPhysique": 1,
           "baseCrisisRisk": 0.04,
           "additionalYearRisk": 0.03,
           "maxCrisisRisk": 0.14
@@ -73,7 +75,6 @@
           "ageStageIds": [
             "youth"
           ],
-          "dangerBelowPhysique": 2,
           "baseCrisisRisk": 0.06,
           "additionalYearRisk": 0.04,
           "maxCrisisRisk": 0.22
@@ -85,7 +86,6 @@
             "prime",
             "middle"
           ],
-          "dangerBelowPhysique": 3,
           "baseCrisisRisk": 0.08,
           "additionalYearRisk": 0.05,
           "maxCrisisRisk": 0.3
@@ -96,7 +96,6 @@
           "ageStageIds": [
             "elder"
           ],
-          "dangerBelowPhysique": 5,
           "baseCrisisRisk": 0.12,
           "additionalYearRisk": 0.06,
           "maxCrisisRisk": 0.42

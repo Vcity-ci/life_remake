@@ -7,6 +7,10 @@
   "tagline": "当原来的答案失效，重新决定余生要怎样度过。",
   "summary": "从一条看似确定的人生道路起步，经由失去、迷茫或主动离开完成转向；重启不是清空过去，而是重新使用已有经历。",
   "routePromise": "人物将先建立一种被自己或他人认可的生活，随后面对足以动摇它的失去与迷茫，最终利用旧经验开辟新的生活方向。",
+  "protagonistTrajectory": "从沿既定道路建立生活的人，经过失去与自我怀疑，成长为能主动重组经验并选择第二种人生的人。",
+  "coreOpposition": "外部评价和旧有投入对人物的束缚，与现实变化和内在需求之间的冲突。",
+  "stakesProgression": "从一条个人道路与安全感，扩大到工作和重要关系的破裂，最终决定新的身份与生活网络。",
+  "endingQuestion": "人物能否不否定过去，也不被过去绑住，把一次破裂变成真正属于自己的新生活？",
   "centralConflict": "一次持续性的失去、失败或身份断裂使人物原有生活无法继续，旧责任仍在追赶，而新的道路要求其放弃部分既得认同并重新证明自身价值。",
   "entryLens": "依据人设适配学业受挫、职业倦怠、关系变化、健康事件、家庭责任、成功后的空洞或主动追寻另一种生活。",
   "originSeeds": [
@@ -36,6 +40,13 @@
       "dramaticQuestion": "人物追求的是自己的愿望，还是熟悉的评价标准？",
       "pressureDirection": "现实回报使人物继续投入，也逐渐暴露被忽略的需要。",
       "payoffMeaning": "人物拥有了一段真实积累，同时看见了它无法解决的问题。",
+      "beatOutline": {
+        "setup": "让人物进入一条看似可靠并值得投入的生活道路。",
+        "escalation": "通过工作、关系与日常努力获得真实积累和认可。",
+        "pressure": "让道路的隐性代价逐步触及健康、关系或自我需求。",
+        "climax": "让人物完成一次确认这条道路价值与边界的关键行动。",
+        "payoff": "交代已有成果、安全感与它始终无法回答的问题。"
+      },
       "worldCardRefs": [
         "modern.snapshot.transition_2027",
         "modern.snapshot.family_care",
@@ -51,6 +62,13 @@
       "dramaticQuestion": "失去旧身份后，人物还剩下什么？",
       "pressureDirection": "收入、家庭、年龄、羞耻与不确定性共同阻止转向。",
       "payoffMeaning": "人物承认旧答案已经失效，并作出真正改变生活结构的行动。",
+      "beatOutline": {
+        "setup": "让失去、停滞或主动怀疑打破旧生活的稳定。",
+        "escalation": "通过尝试、求助和整理旧经验寻找新的可能。",
+        "pressure": "让经济风险、他人评价与对失败的恐惧逼迫人物退回。",
+        "climax": "让人物作出真正改变工作、关系或生活结构的行动。",
+        "payoff": "确认旧路已经结束，同时保住可用于新生的能力与关系。"
+      },
       "worldCardRefs": [
         "modern.snapshot.family_care",
         "modern.snapshot.housing_and_mobility",
@@ -66,6 +84,13 @@
       "dramaticQuestion": "第二次选择能否比第一次更接近人物真正想要的人生？",
       "pressureDirection": "旧责任与新机会发生最终碰撞，重启成果需要现实检验。",
       "payoffMeaning": "人物以新的关系、工作或生活方式完成对自我的重新定义。",
+      "beatOutline": {
+        "setup": "让新的方向面对能否长期维持的现实检验。",
+        "escalation": "把旧经验、现有关系与新选择组合成稳定生活。",
+        "pressure": "让旧身份的回报与新道路的价值形成最后拉扯。",
+        "climax": "让人物完成一次定义第二种人生的长期承诺。",
+        "payoff": "交代新工作、关系、生活方式与人物如何理解自己的过去。"
+      },
       "worldCardRefs": [
         "modern.snapshot.housing_and_mobility",
         "modern.snapshot.transition_2027",

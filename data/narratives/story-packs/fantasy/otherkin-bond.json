@@ -7,6 +7,10 @@
   "tagline": "跨越血脉与文明边界，在敌意中重写彼此的关系。",
   "summary": "围绕异族身份、边境接触、文明误解与共同危机展开；不同族群内部也有分歧，主角可以是任何一方或夹在其间的人。",
   "routePromise": "人物将因血脉、身世或一次边境相遇进入异族关系，在冲突与合作中取得跨越阵营的信任，最终决定两个或多个文明能否形成新的相处方式。",
+  "protagonistTrajectory": "从被族群边界定义的个体，成长为能跨越文明、承担双方信任并重塑共同边界的关键人物。",
+  "coreOpposition": "长期敌意、资源冲突、文化误读与利用战争获利的势力共同阻碍跨族合作。",
+  "stakesProgression": "从一段个人关系与身份认同，扩大到联盟存亡和族群安全，最终决定多个文明的共同未来。",
+  "endingQuestion": "人物能否在不抹去差异的前提下，让彼此敌视的文明拥有共同生活的可能？",
   "centralConflict": "两个文明因领地、资源与历史创伤走向全面冲突，双方内部都有人借恐惧扩大敌意，人物必须让跨族关系经受背叛、战争与共同危机的检验。",
   "entryLens": "依据人设适配混血、俘虏、翻译、边民、使者、异族养子、敌方修士或意外共享力量与记忆等入口。",
   "originSeeds": [
@@ -36,6 +40,13 @@
       "dramaticQuestion": "人物相信 inherited 的敌意，还是眼前具体的人？",
       "pressureDirection": "语言、习俗、身份暴露与双方恐惧使理解付出代价。",
       "payoffMeaning": "人物拥有了另一文明中的名字、关系和必须回应的承诺。",
+      "beatOutline": {
+        "setup": "让边境冲突或一次互助使人物真正遇见另一文明。",
+        "escalation": "通过共同危险、交换知识或守诺建立个人信任。",
+        "pressure": "让双方偏见、身份秘密与现实利益考验这段关系。",
+        "climax": "让人物在一次族群冲突中公开保护共同事实或重要之人。",
+        "payoff": "确认跨族名字、承诺与继续往来的真实关系。"
+      },
       "worldCardRefs": [
         "fantasy.snapshot.other_civilizations",
         "fantasy.snapshot.three_rifts",
@@ -51,6 +62,13 @@
       "dramaticQuestion": "个人信任怎样成为群体可以接受的盟约？",
       "pressureDirection": "各自内部的强硬者、旧仇和资源争端持续破坏合作。",
       "payoffMeaning": "人物成为双方都无法绕开的中介、代表或共同领袖。",
+      "beatOutline": {
+        "setup": "让共同威胁迫使私人信任升级为阵营合作。",
+        "escalation": "通过协商、并肩作战或资源交换建立联盟结构。",
+        "pressure": "让背叛嫌疑、旧仇与盟友伤亡逼迫人物表态。",
+        "climax": "让人物挫败一次足以摧毁联盟的冲突或阴谋。",
+        "payoff": "固定双方合作方式与人物作为中介或领袖的责任。"
+      },
       "worldCardRefs": [
         "fantasy.snapshot.three_rifts",
         "fantasy.snapshot.two_layers",
@@ -66,6 +84,13 @@
       "dramaticQuestion": "和平需要同化、分隔，还是共同创造新的秩序？",
       "pressureDirection": "生存空间、牺牲、身份忠诚和古老誓约集中爆发。",
       "payoffMeaning": "族群关系因人物的选择形成战争、联盟或全新的共同生活方式。",
+      "beatOutline": {
+        "setup": "让战争、迁徙或天地异变把多个文明推向最终边界。",
+        "escalation": "调动两边关系、力量与共同经验建立最终应对。",
+        "pressure": "迫使人物在某一族群的安全与共同未来之间取舍。",
+        "climax": "让人物完成决定文明战争、联盟或共居方式的行动。",
+        "payoff": "交代族群边界、重要关系、人物归属与新秩序能否延续。"
+      },
       "worldCardRefs": [
         "fantasy.snapshot.two_layers",
         "fantasy.snapshot.other_civilizations",

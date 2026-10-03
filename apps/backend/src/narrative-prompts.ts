@@ -38,7 +38,7 @@ export function narrativeProseProfile(
   };
   if (presentation === "decision") return {
     purpose: "decision", targetMinLength: 120, targetMaxLength: 200, reviewAtLength: 260, hardMaxLength: 420,
-    instruction: "承接玩家刚选的行动，落实行动经过、直接后果和人物的新处境；保留一个已经形成、可由下一回合自然承接的压力或变化。"
+    instruction: "承接玩家已经选定的行动，写清行动的直接结果、代价或收获，以及人物由此形成的新处境。在本次结果自然结束的位置收笔。"
   };
   if (presentation === "choice") return {
     purpose: "choice", targetMinLength: 110, targetMaxLength: beat === "climax" ? 240 : 190,
@@ -95,8 +95,8 @@ export function narrativeTaskRule(task: NarrativeTask, pack: PromptPackResolved)
     case "curation": return "整理已经提交的经历与引用，不创造新的游戏事实。";
     case "horizon": return "为当前世界幕提出短程叙事意图，不选择或排除路线，不写玩家正文。";
     case "settlement": return "只通过指定工具提交本轮已经形成的结构化变化，不写玩家正文。";
-    case "continuity": return "依据本轮已经批准的结果与最终正文，同步其中实际发生的事实、关系、地点与本领变化。";
-    case "reviewing": return "整理已经生成的玩家正文，使其忠于已批准计划和既有事实，不改变结构化结果。";
+    case "continuity": return "只从本轮最终正文提取相对可写引用目录的持久差量，不推演剧情或补写对象经历。";
+    case "reviewing": return "只编辑本次提供的玩家正文与抉择背景，不调用历史补写内容，不改变结构化结果。";
     case "rendering": return "依据已批准的回合计划与结构化结果写本轮正文，不再改变结算内容。";
     case "decision": return narrativeProseProfileInstruction(narrativeProseProfile("decision"));
     case "closure": return "主线完成后只提交结局申请，不写结局正文。";

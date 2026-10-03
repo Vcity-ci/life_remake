@@ -32,6 +32,11 @@ function stringList(value: unknown, min = 0): value is string[] {
   return Array.isArray(value) && value.length >= min && value.every(nonEmpty);
 }
 
+function validBeatOutline(value: NarrativeStoryPackDefinition["acts"][number]["beatOutline"]): boolean {
+  return Boolean(value) && ["setup", "escalation", "pressure", "climax", "payoff"].every((beat) =>
+    nonEmpty(value[beat as keyof typeof value]));
+}
+
 export function validateNarrativeStoryPack(
   value: NarrativeStoryPackDefinition,
   world: NarrativeWorldDefinition
@@ -43,7 +48,9 @@ export function validateNarrativeStoryPack(
     throw new Error("story_pack_identity_invalid");
   }
   if (!nonEmpty(value.name) || !nonEmpty(value.tagline) || !nonEmpty(value.summary) ||
-      !nonEmpty(value.routePromise) || !nonEmpty(value.centralConflict) || !nonEmpty(value.entryLens) ||
+      !nonEmpty(value.routePromise) || !nonEmpty(value.protagonistTrajectory) || !nonEmpty(value.coreOpposition) ||
+      !nonEmpty(value.stakesProgression) || !nonEmpty(value.endingQuestion) ||
+      !nonEmpty(value.centralConflict) || !nonEmpty(value.entryLens) ||
       !stringList(value.originSeeds, 1) || !stringList(value.stakeAxes, 1) ||
       !Array.isArray(value.acts) || value.acts.length !== 3) {
     throw new Error(`${value.id}_story_pack_content_invalid`);
@@ -64,7 +71,7 @@ export function validateNarrativeStoryPack(
   for (const act of value.acts) {
     if (!nonEmpty(act.id) || !act.id.startsWith(`${value.id}.`) || actIds.has(act.id) ||
         !nonEmpty(act.label) || !nonEmpty(act.objective) || !nonEmpty(act.dramaticQuestion) ||
-        !nonEmpty(act.pressureDirection) || !nonEmpty(act.payoffMeaning) ||
+        !nonEmpty(act.pressureDirection) || !nonEmpty(act.payoffMeaning) || !validBeatOutline(act.beatOutline) ||
         act.focusForceIds?.some((id) => !forceIds.has(id)) ||
         act.worldCardRefs?.some((id) => !knownCardIds.has(id))) {
       throw new Error(`${value.id}_story_pack_act_invalid:${act?.id ?? "unknown"}`);

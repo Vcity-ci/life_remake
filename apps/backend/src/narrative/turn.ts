@@ -1,4 +1,4 @@
-import type { NarrativeBeat, NarrativeDecisionBrief, NarrativeEpisodeRecord, NarrativeHorizonPlan, NarrativeStatTier, StatKey } from "@reroll/shared";
+import type { NarrativeBeat, NarrativeDecisionBrief, NarrativeEpisodeRecord, NarrativeStageTask, NarrativeStatTier, StatKey } from "@reroll/shared";
 
 export type NarrativeTurnKind = "background" | "scene";
 export type NarrativeTurnCapability = "background" | "scene" | "choice";
@@ -29,6 +29,7 @@ export interface NarrativeTurnEnvelope {
   backgroundAgeRange: { fromAge: number; toAge: number };
   act: { id: string; label: string; prompt: string };
   beat: Exclude<NarrativeBeat, "ending">;
+  stageTask?: NarrativeStageTask;
   capabilities: NarrativeTurnCapability[];
   storyPatterns: Array<{ id: string; label: string; summary: string }>;
   socialForces: NarrativeSocialForceReference[];
@@ -38,6 +39,7 @@ export interface NarrativeTurnEnvelope {
   recentChanges?: string[];
   actSummary?: string;
   actProgress?: Array<{ beat: Exclude<NarrativeBeat, "ending">; changes: string[] }>;
+  previousActResult?: string;
   growthFocus?: { id: string; label: string; description: string };
   clock: { mode: "advance" | "hold"; sameAgeTurnCount: number; maxSameAgeTurns: number };
 }
@@ -73,6 +75,7 @@ export interface NarrativeTurnPlan {
   sceneGoal: string;
   presentation: "summary" | "scene" | "choice";
   decisionBrief?: NarrativeDecisionBrief;
+  stageTask?: NarrativeStageTask;
   clockRequest: "advance" | "hold";
 }
 

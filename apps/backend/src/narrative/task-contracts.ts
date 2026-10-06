@@ -60,7 +60,10 @@ export function narrativeTaskContract(task: NarrativeTask): NarrativeTaskContrac
   const identity = identityByTask[task];
   const taskInstruction = task === "background" || task === "rendering" || task === "decision"
     ? assetHandoffInstruction
-    : task === "continuity" ? continuityToolInstruction : "";
+    : task === "continuity" ? continuityToolInstruction
+    : task === "planning"
+      ? "依据 IF 的当前幕大纲建立当前节拍的 stageTask，明确阶段目标与完成含义；本轮 sceneGoal 只执行其中一步。阶段任务跨回合沿用，仅在实际选择或变化使原任务不再适用时更新。fork 只在解决方式存在实质分歧时设计，openingSituation 表明其出现条件；未形成分歧可直接叙事并进入下一阶段。已经回答的问题承接其后果；新问题应来自变化后的处境。普通人生过渡保留阶段任务。"
+      : "";
   return {
     task,
     identity,

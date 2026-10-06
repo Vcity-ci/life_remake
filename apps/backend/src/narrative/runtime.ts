@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { DecisionType, NarrativeAgentAttemptRecord, NarrativeAttributePolicy, NarrativeBeatObservation, NarrativeDecisionBrief, NarrativeFactResolution, NarrativeStoryPackSnapshot, NarrativeWorldDefinition, WorldConfig } from "@reroll/shared";
+import type { DecisionType, NarrativeAgentAttemptRecord, NarrativeAttributePolicy, NarrativeBeatObservation, NarrativeDecisionBrief, NarrativeFactResolution, NarrativeStageTask, NarrativeStoryPackSnapshot, NarrativeWorldDefinition, WorldConfig } from "@reroll/shared";
 import {
   generateDynamicNarrativeScene,
   generateDirectedDecisionSettlement,
@@ -115,6 +115,7 @@ export async function runNarrativeAgentTurn(input: NarrativeAgentTurnInput): Pro
         locationDirective: { mode: "stay", ...(run.narrative.assets?.currentLocationId ? { locationRef: run.narrative.assets.currentLocationId } : {}) },
         sceneGoal: `叙述${envelope.backgroundAgeRange.fromAge}岁至${envelope.backgroundAgeRange.toAge}岁的人生变化`,
         presentation: "summary",
+        stageTask: envelope.stageTask,
         clockRequest: "advance"
       }
     : await generateNarrativeTurnPlan(run, world, envelope, context);
@@ -279,6 +280,7 @@ export async function runNarrativeAgentTurn(input: NarrativeAgentTurnInput): Pro
       actId: envelope.act.id,
       beat: envelope.beat,
       arcQuestion: arc?.dramaticQuestion ?? envelope.act.prompt,
+      stageTask: plan.stageTask,
       actObjective: storyPackAct?.objective,
       payoffMeaning: storyPackAct?.payoffMeaning,
       beatOutline: storyPackAct?.beatOutline,
@@ -381,7 +383,7 @@ export async function runNarrativeAgentDecision(input: {
   narrativeWorld: NarrativeWorldDefinition;
   context: NarrativeContext;
   callId: string;
-  decision: { decision: DecisionType; label: string; description: string; abilityRefs?: string[]; locationDirective?: NarrativeTurnPlan["locationDirective"]; decisionBrief?: NarrativeDecisionBrief; attributePolicy: NarrativeAttributePolicy; factResolutionModes?: NarrativeFactResolution[] };
+  decision: { decision: DecisionType; label: string; description: string; abilityRefs?: string[]; locationDirective?: NarrativeTurnPlan["locationDirective"]; decisionBrief?: NarrativeDecisionBrief; stageTask?: NarrativeStageTask; attributePolicy: NarrativeAttributePolicy; factResolutionModes?: NarrativeFactResolution[] };
   onProgress?: (stage: "settling" | "rendering" | "syncing") => Promise<void> | void;
 }): Promise<{ attemptId: string; outcome: DirectedDecisionNarrativeOutcome; observation: NarrativeBeatObservation }> {
   const attemptId = `attempt:${randomUUID()}`;
@@ -496,6 +498,7 @@ export async function runNarrativeAgentDecision(input: {
     actId: runtime.actId,
     beat: runtime.beat,
     arcQuestion: arc?.dramaticQuestion ?? input.narrativeWorld.mainlineActs?.find((entry) => entry.id === runtime.actId)?.prompt ?? "当前经历",
+    stageTask: runtime.stageTask,
     actObjective: storyPackAct?.objective,
     payoffMeaning: storyPackAct?.payoffMeaning,
     beatOutline: storyPackAct?.beatOutline,

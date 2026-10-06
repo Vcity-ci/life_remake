@@ -11,6 +11,7 @@ import assert from "node:assert/strict";
 import { dynamicNarrativeRenderPrompt, dynamicNarrativeScenePrompt, memoryCurationPrompt, narrativeOriginPrompt, type DynamicNarrativeSceneInput } from "./ai.js";
 import { retrieveNarrativeMemories } from "./narrative.js";
 import test from "node:test";
+import OpenAI from "openai";
 import { createDefaultGameplayTuning } from "@reroll/shared";
 import type { BackgroundCard, DifficultyConfig, EventDefinition, ItemDefinition, NarrativeAttributePolicy, NarrativeWorldDefinition, ResolvedNarrativeExperience, StoryDirectionDefinition, WorldConfig } from "@reroll/shared";
 import {
@@ -45,7 +46,8 @@ import { composeNarrativeContext } from "./narrative/context/orchestrator.js";
 import { commitNarrativeActCanon, commitNarrativeEpisode, runNarrativeTurnTransaction } from "./narrative/commit.js";
 import { selectNarrativeEpisodeRecall } from "./narrative/episodes.js";
 import { applyNarrativeMemoryCuration, applyNarrativeScopedMemoryCuration, prepareNarrativeMemoryCuration } from "./narrative/curator.js";
-import { commitNarrativeAgentTurn } from "./narrative/runtime.js";
+import { commitNarrativeAgentTurn, runNarrativeAgentTurn, runNarrativeAgentDecision } from "./narrative/runtime.js";
+import { commitNarrativeStageTask } from "./narrative/stage-task.js";
 import { defaultNarrativeContextProviders } from "./narrative/context/collectors.js";
 import { narrativeTurnCapabilities, recentCommittedNarrativeChanges, type NarrativeTurnEnvelope } from "./narrative/turn.js";
 import { narrativeTaskContract } from "./narrative/task-contracts.js";
@@ -2739,8 +2741,9 @@ test("本局前提保持稳定，完整 IF 路线只进入规划而不在正文�
     const horizonPlan = buildNarrativePromptPlan(run, definition, null, "horizon")!;
     assert.match(horizonPlan.mainlineSkeleton ?? "", /人物如何保住自我/);
     const planningPlan = buildNarrativePromptPlan(run, definition, null, "planning")!;
-    assert.match(planningPlan.mainlineSkeleton ?? "", /人物将以自己的选择改变处境/);
-    assert.doesNotMatch(planningPlan.mainlineSkeleton ?? "", /人物如何保住自我/);
+    assert.equal(planningPlan.mainlineSkeleton, undefined);
+    assert.match(planningPlan.routeGuidance ?? "", /人物将以自己的选择改变处境/);
+    assert.doesNotMatch(planningPlan.routeGuidance ?? "", /人物如何保住自我/);
     assert.match(planningPlan.routeGuidance ?? "", new RegExp((definition as ResolvedNarrativeExperience).storyPack.name));
     const plan = buildNarrativePromptPlan(run, definition, null, "rendering")!;
     assert.deepEqual(plan.activeLore, []);
@@ -2795,7 +2798,7 @@ test("三世界的幕任务归属场景工具，纯背景和混合请求保持�
       const text = request.history.map((entry) => entry.content).join("\n");
       const routeLore = new Set(definition.lore.filter((entry) => entry.directionIds?.length).map((entry) => entry.text));
       assert.equal(taskPrompt.includes(input.act.prompt), input.presentation !== "summary");
-      assert.equal(ctx.narrativePlan!.mainlineSkeleton, contextTask === "planning" ? definition.mainlineSkeleton!.premise : undefined);
+      assert.equal(ctx.narrativePlan!.mainlineSkeleton, undefined);
       assert.ok(!text.includes("不得写结局"));
       assert.ok(ctx.narrativePlan!.activeLore.every((entry) => !routeLore.has(entry)));
       if (allowedTurnKinds.includes("background")) {
@@ -3071,7 +3074,7 @@ test("选定 IF 路线固定在本局前提中，正文不重复注入摘要而�
   ];
   const planning = buildNarrativePromptPlan(run, definition, null, "planning")!;
   assert.equal(planning.memoryDigests?.some((entry) => entry.id === "route:obsolete"), false);
-  assert.match(planning.mainlineSkeleton ?? "", /人物将从自身处境进入天下乱局/);
+  assert.match(planning.routeGuidance ?? "", /人物将从自身处境进入天下乱局/);
   const rendering = buildNarrativePromptPlan(run, definition, null, "rendering", { patternIds: [], factionIds: [forceId] })!;
   assert.deepEqual(rendering.memoryDigests, []);
   const horizon = buildNarrativePromptPlan(run, definition, null, "horizon")!;
@@ -3951,17 +3954,20 @@ test("规划工具决定抉择，问题与后果意图保留到待选存档和�
     statTiers: { intelligence: "steady", charisma: "steady", family: "steady", fortune: "steady", physique: "steady" },
     clock: { mode: "advance", sameAgeTurnCount: 0, maxSameAgeTurns: 3 }
   };
-  const raw = { conflictRefs: [], abilityRefs: [], forceIds: [], locationDirective: { mode: "stay" }, sceneGoal: "选择下一步去向", clockRequest: "hold", decisionBrief: { question: "留在故地还是迁居？", stakes: "决定以后生活的位置和交往圈子。" } };
+  const raw = { conflictRefs: [], abilityRefs: [], forceIds: [], locationDirective: { mode: "stay" }, sceneGoal: "选择下一步去向", clockRequest: "hold", stageTask: { goal: "建立新的立足之处", completionMeaning: "人物在取舍后已经开始建立自己的生活" }, decisionBrief: { question: "留在故地还是迁居？", stakes: "决定以后生活的位置和交往圈子。" } };
   const tools = narrativeTurnPlanTools(envelope).map((tool) => tool.function as { name: string; parameters: { required: string[] } });
   assert.ok(tools.find((tool) => tool.name === "plan_choice_turn")!.parameters.required.includes("decisionBrief"));
   assert.ok(!tools.find((tool) => tool.name === "plan_scene_turn")!.parameters.required.includes("decisionBrief"));
   const plan = parseNarrativeTurnPlan(raw, "plan_choice_turn", envelope);
+  commitNarrativeStageTask(run.narrative, { actId: act.id, beat: "pressure" }, plan.stageTask);
   advanceWithDynamicNarrativeScene(run, world, definition, {
     patternIds: [], forceIds: [], beat: "pressure", beatDecision: "hold", narrative: "新的去处已有落脚机会，你需要决定是否启程。",
     participants: [], createsDecision: plan.presentation === "choice", decisionBrief: plan.decisionBrief
   });
   assert.ok(run.nextMilestoneChoice);
-  const restored = structuredClone(run);
+  const restored = JSON.parse(JSON.stringify(run)) as ReturnType<typeof makeRun>;
+  restored.narrative = ensureNarrativeRunState(restored.narrative, true);
+  assert.deepEqual(restored.narrative.actRuntime?.stageTask, plan.stageTask);
   assert.deepEqual(restored.pendingDynamicScene?.decisionBrief, raw.decisionBrief);
   const [factId] = applyNarrativeFactUpdates(restored, { introduce: [{ kind: "open_question", label: "去向尚未确定" }], touchFactIds: [], resolveFactIds: [] }, { sourceEventId: "choice-question", actId: act.id });
   const proposal = parseFactUpdates({ updates: [{ factId, status: "resolved", summary: "人物已经选择迁居并启程。" }] }, factUpdateContract([factId]))!;
@@ -3972,9 +3978,182 @@ test("规划工具决定抉择，问题与后果意图保留到待选存档和�
   assert.equal(restored.pendingDynamicScene, undefined);
   assert.equal(restored.nextMilestoneChoice, undefined);
   assert.equal(restored.narrative.actRuntime!.beat, "climax");
+  assert.equal(restored.narrative.actRuntime!.stageTask, undefined);
   assert.equal(restored.story.factLedger!.facts.find((fact) => fact.id === factId)?.resolutionSummary, "人物已经选择迁居并启程。");
   assert.ok(restored.stats.family > run.stats.family);
   assert.equal(run.pendingDynamicScene?.decisionBrief?.question, raw.decisionBrief.question, "另一份快照未被结果提交污染");
+});
+
+test("阶段任务跨背景与同年回合保留，失败不提交，五拍切换清除旧任务", async () => {
+  const definition = await loadNarrativeExperienceForTest("ancient");
+  const run = makeRun();
+  run.worldId = definition.worldId;
+  run.narrative.enabled = true;
+  run.narrative = ensureNarrativeActRuntime(run.narrative, definition, 20);
+  run.age = 20;
+  const task = { goal: "形成可持续的立足之处", completionMeaning: "人物已经形成新的处境", fork: { question: "选择哪种解决方式？", stakes: "改变下一步的处境", openingSituation: "两种方式均已具备实施条件" } };
+  const scope = { actId: run.narrative.actRuntime!.actId, beat: run.narrative.actRuntime!.beat };
+  await assert.rejects(runNarrativeTurnTransaction(run, async (working) => {
+    commitNarrativeStageTask(working.narrative, scope, task);
+    throw new Error("生成失败");
+  }), /生成失败/);
+  assert.equal(run.narrative.actRuntime!.stageTask, undefined);
+  commitNarrativeStageTask(run.narrative, scope, task);
+  settleQuietYearForTest(run, definition);
+  assert.deepEqual(run.narrative.actRuntime!.stageTask, task);
+  const envelope: NarrativeTurnEnvelope = {
+    callId: "reuse", source: "scene", worldId: run.worldId, currentAge: run.age, sceneAge: run.age,
+    backgroundAgeRange: { fromAge: run.age + 1, toAge: run.age + 1 }, act: { id: scope.actId, label: "当前幕", prompt: "阶段目标" },
+    beat: "setup", stageTask: task, capabilities: ["background", "scene", "choice"], storyPatterns: [], socialForces: [], focusReferences: [],
+    statTiers: resolveNarrativeStatTiers(run.stats), clock: { mode: "hold", sameAgeTurnCount: 0, maxSameAgeTurns: 3 }
+  };
+  const raw = { conflictRefs: [], abilityRefs: [], forceIds: [], locationDirective: { mode: "stay" }, sceneGoal: "完成其中一步", clockRequest: "hold" };
+  assert.deepEqual(parseNarrativeTurnPlan(raw, "plan_scene_turn", envelope).stageTask, task);
+  assert.deepEqual(parseNarrativeTurnPlan(raw, "plan_background_turn", envelope).stageTask, task);
+  assert.throws(() => parseNarrativeTurnPlan(raw, "plan_scene_turn", { ...envelope, stageTask: undefined }), /narrative_outcome_invalid/);
+  assert.throws(() => parseNarrativeTurnPlan({ ...raw, stageTask: { goal: "不完整" } }, "plan_scene_turn", envelope), /narrative_outcome_invalid/);
+  const initialTool = narrativeTurnPlanTools({ ...envelope, stageTask: undefined })[1].function as { parameters: { required: string[] } };
+  assert.ok(initialTool.parameters.required.includes("stageTask"));
+  for (const beat of ["setup", "escalation", "pressure", "climax", "payoff"] as const) {
+    run.narrative.actRuntime!.beat = beat;
+    commitNarrativeStageTask(run.narrative, { actId: scope.actId, beat }, task);
+    run.narrative = advanceNarrativeActBeat(run.narrative, definition, run.age).state;
+    assert.equal(run.narrative.actRuntime!.stageTask, undefined);
+  }
+  assert.notEqual(run.narrative.actRuntime!.actId, scope.actId);
+  commitNarrativeStageTask(run.narrative, scope, task);
+  assert.equal(run.narrative.actRuntime!.stageTask, undefined, "旧幕异步或迟到提案不能覆盖新幕");
+});
+
+test("规划请求只使用一次幕背景，正文和连续性保留各自的按需召回", async () => {
+  const definition = await loadNarrativeExperienceForTest("ancient");
+  const run = makeRun();
+  run.worldId = definition.worldId;
+  run.narrative.enabled = true;
+  run.narrative = ensureNarrativeActRuntime(run.narrative, definition, 20);
+  const actId = run.narrative.actRuntime!.actId;
+  const covered = commitNarrativeEpisode(run, { callId: "covered", sourceEventId: "covered", turnKind: "scene", age: 20, actId, beat: "setup", storyDelta: "已被摘要替代的过程" });
+  commitNarrativeEpisode(run, { callId: "fresh", sourceEventId: "fresh", turnKind: "decision", age: 20, actId, beat: "setup", storyDelta: "玩家选择已改变去向" });
+  run.narrative.memoryDigests = [{ id: `act:${actId}`, scope: "act", scopeId: actId, revision: 1, throughEpisodeId: covered.id, coveredEpisodeIds: [covered.id], summary: "已有的阶段历史结果", activeFactIds: [], historicalFactIds: [], characterIds: [], updatedAt: 1 }];
+  const progress = narrativeActProgress(run, actId);
+  const envelope: NarrativeTurnEnvelope = {
+    callId: "clean", source: "scene", worldId: run.worldId, currentAge: 20, sceneAge: 20, backgroundAgeRange: { fromAge: 21, toAge: 21 },
+    act: { id: actId, label: "当前幕", prompt: "重复的幕提示" }, beat: "setup", capabilities: ["scene"], storyPatterns: [], socialForces: [], focusReferences: [],
+    statTiers: resolveNarrativeStatTiers(run.stats), clock: { mode: "hold", sameAgeTurnCount: 0, maxSameAgeTurns: 3 }, actSummary: progress.summary, actProgress: progress.changes
+  };
+  const ctx = memoryTestContext(run);
+  ctx.narrativePlan = buildNarrativePromptPlan(run, definition, null, "planning");
+  ctx.conversation = {
+    systemHash: "prior", headCore: "原会话规则", headMemory: "另一份历史摘要", archive: [],
+    history: [
+      { role: "user", content: "原历史输入", turnId: "memory:covered" },
+      { role: "assistant", content: "已被摘要替代的过程" },
+      { role: "user", content: "最近的历史输入", turnId: "memory:fresh" },
+      { role: "assistant", content: "玩家选择已改变去向" }
+    ]
+  };
+  const request = prepareNarrativeOutcomeRequest(run, world, ctx, narrativeTurnPlanTools(envelope), narrativeTurnPlanningPrompt(envelope), { task: "planning" });
+  const text = request.history.map((entry) => entry.content).join("\n");
+  assert.equal(text.split(progress.summary!).length - 1, 1);
+  assert.equal(text.split("玩家选择已改变去向").length - 1, 1);
+  assert.doesNotMatch(text, /已被摘要替代的过程|重复的幕提示|另一份历史摘要|原历史输入|最近的历史输入/);
+  assert.equal(request.contextManifest.historyMessageCount, 0);
+  assert.equal(request.contextManifest.fragments.filter((entry) => entry.section === "route").length, 1);
+  const actOutline = (definition as ResolvedNarrativeExperience).storyPack.acts[0].beatOutline;
+  assert.ok(text.includes(actOutline.setup) && text.includes(actOutline.payoff));
+});
+
+test("原生工具全链路交接阶段任务、待选岔路口、作答后资产和下一轮规划", async (t) => {
+  const definition = await loadNarrativeExperienceForTest("ancient");
+  const run = makeRun();
+  run.worldId = definition.worldId;
+  run.age = 20; run.stats = { intelligence: 50, charisma: 50, family: 50, fortune: 50, physique: 100 };
+  run.narrative.enabled = true;
+  run.narrative = ensureNarrativeActRuntime(run.narrative, definition, run.age);
+  run.narrative.actRuntime!.beat = "pressure";
+  const act = definition.mainlineActs![0];
+  run.narrative.activeScene = { id: "current-scene", threadId: `arc:${act.id}`, phase: "pressure", mainlineActId: act.id, openedAge: 20, lastTouchedAge: 20 };
+  run.narrative.sceneClock.mode = "hold";
+  const task = { goal: "改变人物在当前矛盾中的位置", completionMeaning: "取舍后的新处境已实际形成", fork: { question: "如何回应眼前困难？", stakes: "下一步的去向与依仗将改变", openingSituation: "不同解决方式已经具备实际代价" } };
+  const brief = { question: task.fork.question, stakes: task.fork.stakes };
+  const base = { conflictRefs: [], abilityRefs: [], forceIds: [], locationDirective: { mode: "stay" }, sceneGoal: "为解决当前问题迈出一步", clockRequest: "hold" };
+  const activity = { locationIds: [], abilityIds: [] };
+  const scripts: Array<{ name: string; args: Record<string, unknown> }> = [
+    { name: "plan_scene_turn", args: { ...base, stageTask: task } },
+    { name: "resolve_scene_outcome", args: { participants: [], effects: [{ stat: "intelligence", direction: "up", band: "light" }] } },
+    { name: "render_scene_prose", args: { narrative: "你完成先前的一步行动，眼前的困难由此有了新的变化。", storyDelta: "已形成可取舍的处境", assetActivity: activity, continuityRequired: false } },
+    { name: "observe_story_beat", args: { beatDecision: "hold", resolvedFactIds: [], carryFactIds: [] } },
+    { name: "plan_choice_turn", args: { ...base, decisionBrief: brief } },
+    { name: "resolve_choice_scene", args: { participants: [] } },
+    { name: "render_choice_prose", args: { narrative: "事情走到一个分岔之处，不同的解决方式各有自己的代价。", background: "你需要决定下一步采用哪种方式面对眼前的困难。", storyDelta: "解决方式等待玩家决定", assetActivity: activity, continuityRequired: false, optionOverrides: ["safe", "balanced", "risky"].map((id) => ({ id, label: id === "safe" ? "稳妥前行" : id === "balanced" ? "权衡前行" : "冒险前行", description: "作出取舍并改变下一步去向。", abilityRefs: [], locationDirective: { mode: "stay" } })) } },
+    { name: "resolve_decision_outcome", args: { effects: [{ stat: "family", direction: "up", band: "light" }] } },
+    { name: "render_decision_outcome", args: { narrative: "你按选定的方式来到新的落脚之处，并学会了处理眼前困难的方法。", storyDelta: "选择已改变去向并获得新的本领", assetActivity: activity, continuityRequired: true } },
+    { name: "sync_narrative_continuity", args: { locationUpdates: [{ ref: "new", name: "新的落脚处", description: "人物本次行动抵达的地方", current: true }], abilityUpdates: [{ ref: "new", name: "应对之法", description: "本次行动中掌握的方法", source: "本次取舍后习得", mastery: "初通", status: "available" }], factIntroductions: [], factUpdates: [] } },
+    { name: "observe_story_beat", args: { beatDecision: "hold", resolvedFactIds: [], carryFactIds: [] } }
+  ];
+  const calls: Array<{ name: string; text: string }> = [];
+  t.mock.method(OpenAI.Chat.Completions.prototype, "create", async (payload: { tools: Array<{ function: { name: string } }>; messages: Array<{ content: string }> }) => {
+    const step = scripts.shift();
+    assert.ok(step, "不能产生计划之外的模型请求");
+    assert.ok(payload.tools.some((tool) => tool.function.name === step.name));
+    calls.push({ name: step.name, text: payload.messages.map((entry) => entry.content).join("\n") });
+    return { choices: [{ finish_reason: "tool_calls", message: { content: null, tool_calls: [{ id: `mock:${calls.length}`, type: "function", function: { name: step.name, arguments: JSON.stringify(step.args) } }] } }] };
+  });
+  const context = () => ({ ...memoryTestContext(run), apiKey: "not-sent", narrativePlan: buildNarrativePromptPlan(run, definition, null, "planning") });
+  const envelope = (): NarrativeTurnEnvelope => ({
+    callId: "native", source: "scene", worldId: run.worldId, currentAge: run.age, sceneAge: run.age,
+    backgroundAgeRange: { fromAge: run.age + 1, toAge: run.age + 1 }, act, beat: "pressure", stageTask: run.narrative.actRuntime!.stageTask,
+    capabilities: ["scene", "choice"], storyPatterns: [], socialForces: [], focusReferences: [], statTiers: resolveNarrativeStatTiers(run.stats), clock: { mode: "hold", sameAgeTurnCount: 0, maxSameAgeTurns: 3 }
+  });
+  const generate = () => runNarrativeAgentTurn({ run, world, narrativeWorld: definition, context: context(), envelope: envelope(), buildRenderInput: (plan) => ({
+    act, beat: "pressure", presentation: plan.presentation, allowedTurnKinds: ["scene"], sceneAge: run.age, backgroundAgeRange: envelope().backgroundAgeRange,
+    storyPatterns: [], socialForces: [], knownCharacters: [], knownFactIds: [], statTiers: resolveNarrativeStatTiers(run.stats), backgroundAttributePolicy: dynamicBackgroundAttributePolicy(run), attributePolicy: plan.presentation === "scene" ? dynamicSceneAttributePolicy() : undefined
+  }) });
+  const commitScene = (turn: Awaited<ReturnType<typeof generate>>) => {
+    commitNarrativeStageTask(run.narrative, { actId: act.id, beat: "pressure" }, turn.plan.stageTask);
+    advanceWithDynamicNarrativeScene(run, world, definition, { ...turn.scene, beat: "pressure", beatDecision: turn.scene.beatDecision ?? "hold", decisionBrief: turn.plan.decisionBrief, attributeOutcome: turn.scene.attributeEffects ? { effects: turn.scene.attributeEffects } : undefined, attributePolicy: turn.plan.presentation === "scene" ? dynamicSceneAttributePolicy() : undefined, sceneClockMode: "hold" });
+    commitNarrativeEpisode(run, { callId: "native", sourceEventId: run.narrative.scene.lastEventId!, turnKind: "scene", age: run.age, actId: act.id, beat: "pressure", storyDelta: turn.scene.storyDelta });
+  };
+  const first = await generate();
+  assert.equal(Boolean(run.narrative.actRuntime!.stageTask), false, "生成提案尚未提交");
+  commitScene(first);
+  assert.deepEqual(run.narrative.actRuntime!.stageTask, task);
+  assert.equal(run.nextMilestoneChoice, undefined, "预想的岔路口不会提前弹出抉择");
+  const choice = await generate(); commitScene(choice);
+  assert.deepEqual(run.pendingDynamicScene!.decisionBrief, brief);
+  const pending = structuredClone(run.pendingDynamicScene);
+  const decisionContext = { ...context(), narrativePlan: buildNarrativePromptPlan(run, definition, null, "decision") };
+  const result = await runNarrativeAgentDecision({ run, world, narrativeWorld: definition, context: decisionContext, callId: "answer", decision: {
+    decision: "safe", label: "稳妥前行", description: "进入新的地方掌握新的方法", stageTask: run.narrative.actRuntime!.stageTask, decisionBrief: brief,
+    locationDirective: { mode: "move", purpose: "开始新的生活" }, attributePolicy: { allowedStats: ["family"], allowedDirections: ["up"], allowedBands: ["light"], minEffects: 1, maxEffects: 1 }
+  } });
+  const settled = applyMilestoneDecisionAndAdvance(run, world, difficulty, "safe", { narrativeWorld: definition, narrativeOutcome: { effects: result.outcome.effects }, narrative: result.outcome.narrative, beatDecision: result.observation.decision });
+  const assets = commitNarrativeAssets(run.narrative, applyNarrativeAssetUpdates(run.narrative.assets, result.outcome.assetUpdates, { age: run.age }), result.outcome.assetUpdates, { age: run.age }, {}, settled.sourceEventId);
+  commitNarrativeEpisode(run, { callId: "answer", sourceEventId: settled.sourceEventId, turnKind: "decision", age: run.age, actId: act.id, beat: "pressure", storyDelta: result.outcome.storyDelta, ...assets });
+  appendPublicTurnRecord(run, { entryId: settled.sourceEventId, kind: "choice_outcome", narrative: result.outcome.narrative, age: run.age, ageStage: { label: "青年" }, statChanges: settled.decisionEvent.statChanges });
+  assert.equal(run.age, 20, "作答后仍在同年");
+  assert.equal(run.narrative.actRuntime!.beat, "pressure");
+  assert.equal(run.narrative.actRuntime!.stageTask!.fork, undefined);
+  assert.equal(run.narrative.actRuntime!.stageTask!.goal, task.goal);
+  assert.equal(run.pendingDynamicScene, undefined);
+  assert.equal(pending!.decisionBrief!.question, brief.question);
+  assert.equal(toClientRun(run).narrativeAssets!.locations.length, 1);
+  assert.equal(toClientRun(run).narrativeAssets!.abilities.length, 1);
+  const nextProgress = narrativeActProgress(run, act.id);
+  assert.ok(nextProgress.changes.some((entry) => entry.changes.includes(result.outcome.storyDelta)));
+  const nextEnvelope = { ...envelope(), actSummary: nextProgress.summary, actProgress: nextProgress.changes };
+  const nextContext = context();
+  const nextRequest = prepareNarrativeOutcomeRequest(run, world, nextContext, narrativeTurnPlanTools(nextEnvelope), narrativeTurnPlanningPrompt(nextEnvelope), { task: "planning" });
+  const nextText = nextRequest.history.map((entry) => entry.content).join("\n");
+  assert.ok(nextText.includes(task.goal) && nextText.includes(result.outcome.storyDelta));
+  assert.ok(nextText.includes(assets.locationIds[0]) && nextText.includes(assets.abilityIds[0]), "正式提交的资产进入下一轮目录");
+  assert.equal(nextEnvelope.stageTask!.fork, undefined, "下一轮不会再次接到已回答的岔路口");
+  assert.ok(calls.find((entry) => entry.name === "render_scene_prose")!.text.includes(task.goal));
+  assert.ok(calls.find((entry) => entry.name === "observe_story_beat")!.text.includes(task.completionMeaning));
+  const continuityCall = calls.find((entry) => entry.name === "sync_narrative_continuity")!.text;
+  assert.ok(continuityCall.includes(result.outcome.narrative));
+  assert.ok(!continuityCall.includes(task.goal), "连续性仅提取实际正文，不接收规划任务");
+  assert.equal(scripts.length, 0);
 });
 
 test("三世界的压力和高潮可直接叙事，同年保持且无需生成新的抉择", async () => {

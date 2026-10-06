@@ -3,7 +3,7 @@ import { buildConversationPromptMessages, keepRecentConversationRounds, projectC
 import OpenAI from "openai";
 import { ZodError } from "zod";
 import { factUpdateContract, parseFactUpdates, relationshipStances, relationshipUpdatesSchema, parseRelationshipUpdates, normalizeNarrativeHandoffFact, isNarrativeFactModelMutable } from "./narrative-continuity.js";
-import type { NarrativeDecisionBrief, NarrativeIdentityMerge, NarrativeRelationshipUpdate } from "@reroll/shared";
+import type { NarrativeDecisionBrief, NarrativeIdentityMerge, NarrativeRelationshipUpdate, NarrativeStageTask } from "@reroll/shared";
 import { resolvePromptPack, narrativeTaskRule, narrativeToolRule, narrativeProseProfile, narrativeProseProfileInstruction, normalizeNarrativeText, isNarrativePlainText, type PromptPackResolved, type NarrativeTask } from "./narrative-prompts.js";
 import { createHash, randomUUID } from "node:crypto";
 import { resolveNarrativeStatTiers, type InternalRunState } from "./engine.js";
@@ -18,6 +18,7 @@ import type { NarrativeAssetActivity, NarrativeAssets, NarrativeAssetUpdates } f
 import { narrativeAbilityDirectory, narrativeAssetUpdatesSchema, narrativeContinuityAssetContract, narrativeLocationDirectory, parseNarrativeAssetUpdates, parseNarrativeContinuityAssetUpdates } from "./narrative-assets.js";
 import { narrativeTurnPlanFocusIds, recentCommittedNarrativeChanges, type NarrativeHorizonInput, type NarrativeSocialForceReference, type NarrativeTurnEnvelope, type NarrativeTurnPlan } from "./narrative/turn.js";
 import type { NarrativeObservationFact } from "./narrative/observation.js";
+import { normalizeNarrativeStageTask } from "./narrative/stage-task.js";
 import {
   prepareNarrativeMemoryCuration,
   type NarrativeMemoryCurationResult,
@@ -691,6 +692,7 @@ export async function observeNarrativeBeat(
     actId: string;
     beat: Exclude<NarrativeBeat, "ending">;
     arcQuestion: string;
+    stageTask?: NarrativeStageTask;
     actObjective?: string;
     payoffMeaning?: string;
     beatOutline?: Partial<Record<Exclude<NarrativeBeat, "ending">, string>>;
@@ -750,6 +752,7 @@ export function narrativeBeatObservationPrompt(
   input: {
     beat: Exclude<NarrativeBeat, "ending">;
     arcQuestion: string;
+    stageTask?: NarrativeStageTask;
     actObjective?: string;
     payoffMeaning?: string;
     beatOutline?: Partial<Record<Exclude<NarrativeBeat, "ending">, string>>;
@@ -772,8 +775,8 @@ export function narrativeBeatObservationPrompt(
     `当前故事弧问题：${input.arcQuestion}。`,
     input.actObjective ? `本幕人物变化目标：${input.actObjective}。` : "",
     input.payoffMeaning ? `本幕应形成的阶段结果：${input.payoffMeaning}。` : "",
-    `当前节拍=${input.beat}；达成含义=${beatMeaning}。`,
-    `本幕五节拍职责：${(["setup", "escalation", "pressure", "climax", "payoff"] as const).map((beat) => `${beat}=${input.beatOutline?.[beat] || "按本幕目标自然发展"}`).join(" | ")}`,
+    `当前节拍=${input.beat}；达成含义=${input.stageTask?.completionMeaning ?? input.beatOutline?.[input.beat] ?? beatMeaning}。`,
+    input.stageTask ? `当前阶段任务：${input.stageTask.goal}` : "",
     input.actSummary ? `本幕已经提交的历史摘要：${input.actSummary}` : "",
     `本幕尚未进入摘要的已提交变化：${input.actProgress.map((entry) => `${entry.beat}=[${entry.changes.join("；") || "无未摘要变化"}]`).join(" | ") || "无"}`,
     `本轮已经发生的变化：${input.currentDelta}`,
@@ -887,6 +890,22 @@ export async function refineNarrativeProse(
 
 export function narrativeTurnPlanTools(input: NarrativeTurnEnvelope): Record<string, unknown>[] {
   const commonProperties: Record<string, unknown> = {
+    stageTask: {
+      type: "object", additionalProperties: false, required: ["goal", "completionMeaning"],
+      description: "首次进入当前节拍时建立阶段任务；已有任务继续适用时省略。实际结果改变发展方向时才提交替换任务。",
+      properties: {
+        goal: { type: "string", minLength: 1, maxLength: 220, description: "当前节拍要在本幕矛盾中实现的具体发展，可由多个回合共同完成。" },
+        completionMeaning: { type: "string", minLength: 1, maxLength: 220, description: "什么已经发生的结果意味着当前阶段完成；成功、受损或失败都可以形成阶段结果。" },
+        fork: {
+          type: "object", additionalProperties: false, required: ["question", "stakes", "openingSituation"],
+          properties: {
+            question: { type: "string", minLength: 1, maxLength: 100 },
+            stakes: { type: "string", minLength: 1, maxLength: 140 },
+            openingSituation: { type: "string", minLength: 1, maxLength: 180, description: "在什么具体处境形成后，解决方式才存在值得玩家决定的实质分歧。" }
+          }
+        }
+      }
+    },
     conflictRefs: {
       type: "array",
       maxItems: 3,
@@ -938,7 +957,7 @@ export function narrativeTurnPlanTools(input: NarrativeTurnEnvelope): Record<str
         parameters: {
           type: "object",
           additionalProperties: false,
-          required: ["conflictRefs", "abilityRefs", "locationDirective", "sceneGoal", "clockRequest", ...(scene ? ["forceIds"] : []), ...(choice ? ["decisionBrief"] : [])],
+          required: ["conflictRefs", "abilityRefs", "locationDirective", "sceneGoal", "clockRequest", ...(scene ? ["forceIds"] : []), ...(scene && !input.stageTask ? ["stageTask"] : []), ...(choice ? ["decisionBrief"] : [])],
           properties
         }
       }
@@ -957,19 +976,21 @@ export function narrativeTurnPlanningPrompt(input: NarrativeTurnEnvelope): strin
   const locations = input.focusReferences.filter((entry) => entry.kind === "location");
   return [
     `回合=${input.callId}；当前年龄=${input.currentAge}岁；场景年龄=${input.sceneAge}岁；背景年龄=${input.backgroundAgeRange.fromAge}-${input.backgroundAgeRange.toAge}岁。`,
-    `当前世界幕：${input.act.label}。${input.act.prompt}`,
+    `当前世界幕：${input.act.label}。`,
     `当前节拍=${input.beat}；本轮可用形式=${input.capabilities.join("、")}。`,
+    input.stageTask ? `当前阶段任务：${JSON.stringify(input.stageTask)}` : "当前节拍尚未建立阶段任务。",
     input.socialForces.length ? `当前世界的社会力量：${input.socialForces.map((entry) => `${entry.id}=${entry.label}：${compactText(entry.summary, 60)}${entry.methods?.length ? `；可采用=${entry.methods.join("、")}` : ""}`).join(" | ")}` : "",
     conflicts.length ? `可形成本轮矛盾的对象：${conflicts.map((entry) => `${entry.id}=${entry.kind}:${entry.label}`).join(" | ")}` : "",
     abilities.length ? `人物当前可用本领：${abilities.map((entry) => `${entry.id}=${entry.label}`).join(" | ")}` : "",
     locations.length ? `已知地点目录：${locations.map((entry) => `${entry.id}=${entry.label}${entry.id === input.currentLocationId ? "（当前）" : ""}`).join(" | ")}` : "",
     input.growthFocus ? `人物当前成长侧重：${input.growthFocus.label}。${input.growthFocus.description}` : "",
+    input.previousActResult ? `上一幕留下的当前处境：${input.previousActResult}` : "",
     input.actSummary ? `当前幕已发生的累计进展：${input.actSummary}` : "",
     input.actProgress ? `摘要之外已经发生的变化：${input.actProgress.filter((entry) => entry.changes.length).map((entry) => `${entry.beat}：${entry.changes.join("；")}`).join("\n")}` :
       input.recentChanges?.length ? `最近已发生的变化：${input.recentChanges.join("；")}。已发生结果优先于此前提出的短程意图。` : "",
     `人物能力档位：${Object.entries(input.statTiers).map(([key, value]) => `${key}=${value}`).join("；")}`,
-    "根据选定的 IF 路线、本局故事前提、已发生经历与当前节拍，只规划本轮。conflictRefs 指明本轮由什么问题推动；abilityRefs 只列人物本轮会实际依仗或检验的本领；locationDirective 明确空间状态：stay 留在当前地点，revisit 前往已知地点，move 前往本轮将建立的新地点。forceIds 只在确实参与本轮时选择，可以为空。",
-    input.capabilities.includes("choice") ? "需要玩家决定尚未选定的解决方式，且选择会改变后续处境时，调用 plan_choice_turn，并用 decisionBrief 写清问题与影响。" : "",
+    "按选定 IF 的本幕大纲组织当前阶段，再用 sceneGoal 交接本轮执行的一步。conflictRefs 指明本轮由什么问题推动；abilityRefs 只列人物本轮会实际依仗或检验的本领；locationDirective 明确空间状态：stay 留在当前地点，revisit 前往已知地点，move 前往本轮将建立的新地点。forceIds 只在确实参与本轮时选择，可以为空。",
+    input.capabilities.includes("choice") ? "岔路口所需处境已经形成，或本轮可以自然展开到那里，且不同解决方式会改变后续处境时，调用 plan_choice_turn。decisionBrief 提交这次实际交给玩家的问题与影响。预想了岔路口但尚未走到它时，继续展开当前阶段。" : "",
     input.capabilities.includes("scene") ? "承接已经作出的选择、直接行动及其结果时调用 plan_scene_turn。" : "",
     input.capabilities.includes("background") ? "生活与成长过渡用 plan_background_turn。" : "",
     "当前节拍说明故事发展位置，不指定必须出现抉择。已发生结果优先于此前的短程意图。",
@@ -1030,8 +1051,15 @@ export function parseNarrativeTurnPlan(raw: Record<string, unknown>, toolName: s
   const stakes = normalizeNarrativeText(rawBrief.stakes);
   if (presentation === "choice" && (!question || !stakes)) throw invalidNarrativeOutcome("narrative_turn_plan_content_invalid");
   const decisionBrief = presentation === "choice" ? { question, stakes } : undefined;
+  let stageTask = raw.stageTask === undefined ? input.stageTask : normalizeNarrativeStageTask(raw.stageTask);
+  if ((raw.stageTask !== undefined && !stageTask) || (turnKind === "scene" && !stageTask)) {
+    throw invalidNarrativeOutcome("narrative_turn_plan_stage_task_invalid");
+  }
+  if (decisionBrief && stageTask) {
+    stageTask = { ...stageTask, fork: { ...decisionBrief, openingSituation: stageTask.fork?.openingSituation ?? sceneGoal } };
+  }
   if (turnKind === "background") {
-    return { callId: input.callId, turnKind, patternIds: [], forceIds: [], conflictRefs, abilityRefs, locationDirective, sceneGoal, presentation, clockRequest: "advance" };
+    return { callId: input.callId, turnKind, patternIds: [], forceIds: [], conflictRefs, abilityRefs, locationDirective, sceneGoal, presentation, stageTask, clockRequest: "advance" };
   }
   const patternIds = Array.isArray(raw.patternIds)
     ? Array.from(new Set(raw.patternIds.filter((id): id is string => typeof id === "string" && input.storyPatterns.some((entry) => entry.id === id)))).slice(0, 2)
@@ -1039,7 +1067,7 @@ export function parseNarrativeTurnPlan(raw: Record<string, unknown>, toolName: s
   const forceIds = Array.isArray(raw.forceIds)
     ? Array.from(new Set(raw.forceIds.filter((id): id is string => typeof id === "string" && input.socialForces.some((entry) => entry.id === id)))).slice(0, 2)
     : [];
-  return { callId: input.callId, turnKind, patternIds, forceIds, conflictRefs, abilityRefs, locationDirective, sceneGoal, presentation, decisionBrief, clockRequest };
+  return { callId: input.callId, turnKind, patternIds, forceIds, conflictRefs, abilityRefs, locationDirective, sceneGoal, presentation, decisionBrief, stageTask, clockRequest };
 }
 
 export class DirectedStoryTurnError extends Error {
@@ -1478,7 +1506,7 @@ export function memoryCurationPrompt(work: NarrativeMemoryCurationWork, scopes: 
     runScope
       ? "用上一版摘要与本批新变化更新 run 长期摘要。"
       : "为确实被本批经历改变的对象更新长期视图；没有变化的对象可以不返回。",
-    "run 摘要只整理故事脉络：关键转折、玩家选择、当前主要矛盾、尚未解决的压力与最新处境；人物、地点、本领的档案说明不重复写入。对象摘要只保留该对象目前有效的状态。只有仍未解决且在本批经历中发生实质变化的事实放入 activeFactIds；重复提及但状态未变不提高其重要性。已解决事实退出待解决内容，放入 historicalFactIds并只保留结果。只能引用目录中的 ID。",
+    "run 摘要只整理故事脉络：关键转折、玩家选择、当前主要矛盾、尚未解决的压力与最新处境；人物、地点、本领的档案说明不重复写入。各轮的幕与拍已由引擎提交，沿用这些归属概括经历与结果。对象摘要只保留该对象目前有效的状态。只有仍未解决且在本批经历中发生实质变化的事实放入 activeFactIds；重复提及但状态未变不提高其重要性。已解决事实退出待解决内容，放入 historicalFactIds并只保留结果。只能引用目录中的 ID。",
     `作用域：${scopes.map((scope) => `${scope.id}；此前摘要=${scope.previousSummary || "无"}；当前状态=${scope.currentState || "无"}；本批=${scope.episodeIds.join("、")}`).join("\n")}`,
     `事实目录：${work.validFactIds.join("、") || "无"}；其中已解决：${work.resolvedFactIds.join("、") || "无"}。`,
     `人物目录：${work.validCharacterIds.join("、") || "无"}。`,
@@ -4307,13 +4335,14 @@ function decisionSettlementForPrompt(settlement: DirectedDecisionSettlement): st
 export async function renderDirectedDecisionNarrative(
   run: InternalRunState,
   world: WorldConfig,
-  input: { decision: DecisionType; label: string; description: string; abilityRefs?: string[]; locationDirective?: NarrativeTurnPlan["locationDirective"]; decisionBrief?: NarrativeDecisionBrief },
+  input: { decision: DecisionType; label: string; description: string; abilityRefs?: string[]; locationDirective?: NarrativeTurnPlan["locationDirective"]; decisionBrief?: NarrativeDecisionBrief; stageTask?: NarrativeStageTask },
   settlement: DirectedDecisionSettlement,
   ctx: NarrativeContext
 ): Promise<{ narrative: string; storyDelta: string; assetActivity: NarrativeAssetActivity; continuityRefs: NarrativeContinuityRefs; continuityRequired: boolean }> {
   const proseProfile = narrativeProseProfile("decision");
   const prompt = [
     `人物在${run.age}岁选择了“${compactText(input.label, 36)}”：${compactText(input.description, 90)}。`,
+    input.stageTask ? `这次行动所处的阶段任务：${input.stageTask.goal}。承接玩家选择造成的实际结果。` : "",
     input.decisionBrief ? `本次选择所回答的问题：${input.decisionBrief.question}；涉及的后续处境：${input.decisionBrief.stakes}。写清已选行动对这一问题形成的实际结果。` : "",
     input.abilityRefs?.length ? `这项行动实际依仗本领：${input.abilityRefs.join("、")}；正文需要表现它怎样参与解决问题。` : "",
     input.locationDirective ? `这项行动的空间结果：${input.locationDirective.mode}${input.locationDirective.locationRef ? `:${input.locationDirective.locationRef}` : ""}${input.locationDirective.purpose ? `（${input.locationDirective.purpose}）` : ""}。` : "",
@@ -4522,6 +4551,7 @@ export function dynamicNarrativeScenePrompt(
   const resolvesChoice = toolSet.names.includes("resolve_choice_scene");
   const prompt = [
     input.plan ? `已批准回合计划：目标=${input.plan.sceneGoal}；呈现=${input.plan.presentation}；时间请求=${input.plan.clockRequest}；矛盾对象=${input.plan.conflictRefs.join("、") || "无"}；可用本领=${input.plan.abilityRefs.join("、") || "无"}；地点动作=${input.plan.locationDirective.mode}${input.plan.locationDirective.locationRef ? `:${input.plan.locationDirective.locationRef}` : ""}${input.plan.locationDirective.purpose ? `（${input.plan.locationDirective.purpose}）` : ""}。` : "",
+    input.presentation !== "summary" && input.plan?.stageTask ? `本轮服务的阶段任务：${input.plan.stageTask.goal}` : "",
     input.plan ? `场景时间标签必须为${input.plan.clockRequest === "hold" ? "continuous" : "spanning"}。` : "",
     sceneAllowed ? `场景发生年龄：${input.sceneAge}岁。` : "",
     resolvesScene || resolvesChoice ? `当前世界幕：${input.act.label}。${input.act.prompt}` : "",
@@ -4561,6 +4591,7 @@ export function dynamicNarrativeRenderPrompt(input: DynamicNarrativeSceneInput, 
   const proseProfile = narrativeProseProfile(input.presentation, input.beat);
   return [
     `已批准回合计划：目标=${input.plan?.sceneGoal ?? "延续人物经历"}；呈现=${input.presentation}；年龄=${age}。`,
+    input.presentation !== "summary" && input.plan?.stageTask ? `当前阶段要发展：${input.plan.stageTask.goal}。本轮展开上述执行目标，后续步骤由后续回合承接。` : "",
     input.plan?.decisionBrief ? `本次抉择围绕同一个未决问题：${input.plan.decisionBrief.question}；选择将改变：${input.plan.decisionBrief.stakes}。不同选项给出不同解决方式与实际去向，停在玩家作出决定之前。` : "",
     input.plan ? `本轮叙事义务：围绕${input.plan.conflictRefs.join("、") || "眼前处境"}展开；${input.plan.abilityRefs.length ? `只有确实采用的选项才使用本领 ${input.plan.abilityRefs.join("、")}` : "不强行使用本领"}；地点动作=${input.plan.locationDirective.mode}${input.plan.locationDirective.locationRef ? `:${input.plan.locationDirective.locationRef}` : ""}${input.plan.locationDirective.purpose ? `（${input.plan.locationDirective.purpose}）` : ""}。` : "",
     `已审批结构化结果：${JSON.stringify(settlement)}。`,

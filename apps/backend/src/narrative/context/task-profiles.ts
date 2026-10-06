@@ -21,7 +21,7 @@ const TASK_BUDGETS: Record<NarrativeTask, number> = {
 const TASK_LAYER_RATIOS: Record<NarrativeTask, Record<NarrativeContextLayer, number>> = {
   origin: { stable: .32, runtime: .08, active: .05, recall: .10, history: .15, task: .30 },
   background: { stable: .18, runtime: .08, active: .08, recall: .12, history: .34, task: .20 },
-  planning: { stable: .12, runtime: .22, active: .22, recall: .15, history: .19, task: .10 },
+  planning: { stable: .12, runtime: .12, active: .22, recall: .15, history: 0, task: .39 },
   observation: { stable: 0, runtime: 0, active: 0, recall: 0, history: 0, task: 1 },
   curation: { stable: .02, runtime: .03, active: .05, recall: .10, history: .05, task: .75 },
   horizon: { stable: .10, runtime: .26, active: .24, recall: .22, history: .10, task: .08 },
@@ -65,7 +65,7 @@ const TASK_HISTORY: Record<NarrativeTask, NarrativeTaskContextProfile["history"]
   horizon: { includeHeadMemory: false, includeArchive: false, recentRoundLimit: 1, requiredRecentRounds: 1 },
   settlement: { includeHeadMemory: false, includeArchive: false, recentRoundLimit: 0, requiredRecentRounds: 0 },
   continuity: { includeHeadMemory: false, includeArchive: false, recentRoundLimit: 0, requiredRecentRounds: 0 },
-  planning: { includeHeadMemory: false, includeArchive: false, recentRoundLimit: 1, requiredRecentRounds: 1 },
+  planning: { includeHeadMemory: false, includeArchive: false, recentRoundLimit: 0, requiredRecentRounds: 0 },
   observation: { includeHeadMemory: false, includeArchive: false, recentRoundLimit: 0, requiredRecentRounds: 0 },
   background: { includeHeadMemory: false, includeArchive: false, recentRoundLimit: 1, requiredRecentRounds: 1 },
   rendering: { includeHeadMemory: false, includeArchive: false, recentRoundLimit: 2, requiredRecentRounds: 1 },

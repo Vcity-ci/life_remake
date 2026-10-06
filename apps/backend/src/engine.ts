@@ -1,6 +1,7 @@
 import { validateNarrativeEffects } from "./narrative-attributes.js";
 import seedrandom from "seedrandom";
 import { commitNarrativeMemory } from "./narrative-memory.js";
+import { consumeNarrativeStageFork } from "./narrative/stage-task.js";
 import { factUpdateContract, parseFactUpdates, narrativeFactResolutionModes, normalizeNarrativeHandoffFact } from "./narrative-continuity.js";
 import { createHash } from "node:crypto";
 import type {
@@ -4021,6 +4022,7 @@ export function applyMilestoneDecisionAndAdvance(
       }
     }
     run.narrative = recordNarrativeSceneDecision(run.narrative);
+    consumeNarrativeStageFork(run.narrative, { actId: pendingDynamicScene.mainlineActId, beat: pendingDynamicScene.beat });
     if (options.beatDecision === "advance") {
       run.narrative = advanceNarrativeActBeat(run.narrative, options.narrativeWorld, run.age, { decision: true }).state;
     }

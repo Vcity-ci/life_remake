@@ -757,6 +757,13 @@ export interface NarrativeRouteProgress {
   lastEventId?: string;
 }
 
+/** A planner-owned task retained until the engine advances the current beat. */
+export interface NarrativeStageTask {
+  goal: string;
+  completionMeaning: string;
+  fork?: NarrativeDecisionBrief & { openingSituation: string };
+}
+
 /** The only dramatic beat currently owned by the engine for a world act. */
 export interface NarrativeActRuntime {
   actId: string;
@@ -767,6 +774,7 @@ export interface NarrativeActRuntime {
   decisionCount: number;
   growthFocusId?: string;
   growthFocusOptions?: NarrativeGrowthFocusDefinition[];
+  stageTask?: NarrativeStageTask;
 }
 
 /** A player-visible recurring person generated during this particular life. */

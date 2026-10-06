@@ -45,6 +45,7 @@ import type { NarrativeTask } from "./narrative-prompts.js";
 import { createDefaultGameplayTuning } from "@reroll/shared";
 import { formatNarrativeAssets, normalizeNarrativeAssets, selectNarrativeAssets } from "./narrative-assets.js";
 import { selectNarrativeEpisodeRecall } from "./narrative/episodes.js";
+import { normalizeNarrativeStageTask } from "./narrative/stage-task.js";
 
 export interface NarrativePromptSource {
   aiConversation?: AiConversationState;
@@ -829,7 +830,8 @@ export function ensureNarrativeRunState(
       selectedRouteIds: uniqueRecent(state.actRuntime.selectedRouteIds ?? [], 12),
       decisionCount: Math.max(0, Math.min(32, Number(state.actRuntime.decisionCount) || 0)),
       growthFocusId: state.actRuntime.growthFocusId?.trim() || undefined,
-      growthFocusOptions: normalizeGrowthFocuses(state.actRuntime.growthFocusOptions)
+      growthFocusOptions: normalizeGrowthFocuses(state.actRuntime.growthFocusOptions),
+      stageTask: normalizeNarrativeStageTask(state.actRuntime.stageTask)
     } satisfies NarrativeActRuntime
     : undefined;
   const rawClock = state.sceneClock;
@@ -991,6 +993,7 @@ export function advanceNarrativeActBeat(
     next.actRuntime = {
       ...runtime,
       beat: actBeats[Math.min(actBeats.length - 1, currentIndex + 1)],
+      stageTask: undefined,
       lastAdvancedAge: age,
       selectedRouteIds,
       decisionCount: runtime.decisionCount + (options?.decision ? 1 : 0)
@@ -1014,6 +1017,8 @@ export function advanceNarrativeActBeat(
     next.activeMainlineActId = nextAct.id;
     // The previous per-route marker is legacy state; a new act never inherits it.
     next.routeProgress = [];
+  } else {
+    next.actRuntime = { ...runtime, stageTask: undefined };
   }
   if (next.horizonPlan) next.horizonPlan = { ...next.horizonPlan, status: "stale" };
   return { state: next, completedActId };
@@ -1850,6 +1855,7 @@ function buildTaskNarrativePlan(
     : "";
   const taskQuery = [
     options?.semanticQuery,
+    task === "planning" ? source.narrative.actRuntime?.stageTask?.goal : "",
     lifeContext || task === "origin" ? source.personaPrompt : act?.prompt,
     lifeContext ? focus?.description : "",
     task === "horizon" ? source.narrative.sessionPremise?.storyPromise : "",
@@ -2001,7 +2007,7 @@ function buildTaskNarrativePlan(
           : act ? `${act.label}：${act.prompt}` : ""
       ].filter(Boolean).join("\n")
       : task === "planning"
-        ? premiseAnchor.join("\n")
+        ? storyPack ? undefined : premiseAnchor.join("\n")
         : task === "origin"
           ? undefined
         : task === "closure" || task === "ending"
@@ -2011,6 +2017,7 @@ function buildTaskNarrativePlan(
     ? `${storyPack.name}：${storyPack.tagline}；人物长期轨迹=${storyPack.protagonistTrajectory}`
     : task === "planning"
       ? [
+          ...premiseAnchor,
           `${storyPack.name}：${storyPack.routePromise}；人物轨迹=${storyPack.protagonistTrajectory}；持续对抗=${storyPack.coreOpposition}`,
           `风险升级=${storyPack.stakesProgression}；终局问题=${storyPack.endingQuestion}`,
           storyPackAct ? `当前阶段“${storyPackAct.label}”：目标=${storyPackAct.objective}；核心问题=${storyPackAct.dramaticQuestion}；阶段成果=${storyPackAct.payoffMeaning}` : "",

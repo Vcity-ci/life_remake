@@ -54,6 +54,7 @@ import { commitNarrativeActCanon, commitNarrativeEpisode, runNarrativeTurnTransa
 import { narrativeTurnCapabilities, recentCommittedNarrativeChanges, type NarrativeTurnEnvelope } from "./narrative/turn.js";
 import { commitNarrativeAgentTurn, invalidateNarrativeHorizon, runNarrativeAgentDecision, runNarrativeAgentEnding, runNarrativeAgentTurn } from "./narrative/runtime.js";
 import { hasNarrativeFactCompletion, narrativeActProgress, narrativeFactProgressForCommit, narrativeObservationFacts } from "./narrative/observation.js";
+import { commitNarrativeStageTask } from "./narrative/stage-task.js";
 import { approveStoryClosure, approveStoryIntent } from "./tool-gateway.js";
 import { providerLimits } from "./constants.js";
 import { getCloudApiKey, getDeployMode, readRuntimeConfig, writeRuntimeConfig } from "./config.js";
@@ -1265,6 +1266,7 @@ async function generateDirectedSegmentForRunUnsafe(options: DirectedSegmentOptio
   ].filter((entry, index, all) => all.findIndex((candidate) => candidate.id === entry.id) === index);
   const growthFocus = runtime.growthFocusOptions?.find((focus) => focus.id === runtime.growthFocusId);
   const actProgress = narrativeActProgress(run, act.id);
+  const previousAct = run.narrative.actCanon.filter((entry) => entry.actId !== act.id).at(-1);
   const envelope: NarrativeTurnEnvelope = {
     callId,
     source: allowedTurnKinds.length === 1 && allowedTurnKinds[0] === "background" ? "background" : "scene",
@@ -1274,6 +1276,7 @@ async function generateDirectedSegmentForRunUnsafe(options: DirectedSegmentOptio
     backgroundAgeRange: turnAges.backgroundAgeRange,
     act: { id: act.id, label: act.label, prompt: actPrompt },
     beat: runtime.beat,
+    stageTask: runtime.stageTask,
     capabilities,
     storyPatterns,
     socialForces,
@@ -1283,6 +1286,7 @@ async function generateDirectedSegmentForRunUnsafe(options: DirectedSegmentOptio
     recentChanges: recentCommittedNarrativeChanges(run.narrative.episodes),
     actSummary: actProgress.summary,
     actProgress: actProgress.changes,
+    previousActResult: previousAct ? [previousAct.lastingConsequence, previousAct.continuation].filter(Boolean).join("；") : undefined,
     growthFocus,
     clock: { ...run.narrative.sceneClock }
   };
@@ -1318,6 +1322,7 @@ async function generateDirectedSegmentForRunUnsafe(options: DirectedSegmentOptio
   const turnPlan = canonicalizeNarrativeReferences(run.narrative, agentTurn.plan);
   const scene = canonicalizeNarrativeReferences(run.narrative, agentTurn.scene);
   await options.onProgress?.("committing");
+  commitNarrativeStageTask(run.narrative, { actId: act.id, beat: runtime.beat }, turnPlan.stageTask);
   if (scene.turnKind === "background") {
     if (!scene.backgroundAttributeEffects) throw new Error("dynamic_background_outcome_missing");
     const backgroundYears = turnAges.backgroundAgeRange.toAge - run.age;
@@ -2084,6 +2089,7 @@ async function runStepFlowUnlocked(
           abilityRefs: selectedAbilityRefs,
           locationDirective: selectedOption?.locationDirective,
           decisionBrief: pendingDynamicScene?.decisionBrief,
+          stageTask: run.narrative.actRuntime?.stageTask,
           attributePolicy: policy,
           factResolutionModes: narrativeFactResolutionModes(activeAct, pendingDynamicScene)
         },

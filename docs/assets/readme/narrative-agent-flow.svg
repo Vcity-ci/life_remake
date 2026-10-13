@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="500" viewBox="0 0 1200 500" role="img" aria-labelledby="title desc">
   <title id="title">Life Remake 叙事 Agent 完整运行链路</title>
-  <desc id="desc">上下文编排依次进入幕间规划、单回合规划、精确召回与渲染、引擎结算和原子提交，已提交回合由异步记忆整理器生成长期摘要。</desc>
+  <desc id="desc">上下文进入回合规划与材料交接，正文及审校后进行属性结算、连续性和节拍观察，再由引擎原子提交；已提交变化异步形成有效背景与本幕进展。</desc>
   <style>
     .canvas { fill: #111416; }
     .panel { fill: #1a1f22; stroke: #3a4549; stroke-width: 1.5; }
@@ -24,15 +24,15 @@
   </g>
   <g transform="translate(252 118)">
     <rect class="panel" width="170" height="144" rx="8"/><circle class="accent" cx="24" cy="25" r="6"/>
-    <text class="light" x="39" y="31">Horizon</text><text class="muted" x="20" y="62">戏剧问题与张力</text><text class="muted" x="20" y="84">数回合短程意图</text><text class="muted" x="20" y="106">可能的阶段结果</text><text class="small" x="20" y="130">不选择或排除路线</text>
+    <text class="light" x="39" y="31">Turn Planner</text><text class="muted" x="20" y="62">IF 大纲与阶段任务</text><text class="muted" x="20" y="84">材料用途与实质分歧</text><text class="muted" x="20" y="106">本轮目标与时间</text><text class="small" x="20" y="130">只规划，不写正文</text>
   </g>
   <g transform="translate(450 118)">
     <rect class="panel" width="170" height="144" rx="8"/><circle class="accent" cx="24" cy="25" r="6"/>
-    <text class="light" x="39" y="31">Turn Planner</text><text class="muted" x="20" y="62">背景 / 场景</text><text class="muted" x="20" y="84">路线、阵营、关注</text><text class="muted" x="20" y="106">呈现方式与时间</text><text class="small" x="20" y="130">只规划，不写正文</text>
+    <text class="light" x="39" y="31">Renderer</text><text class="muted" x="20" y="62">人物状态与材料</text><text class="muted" x="20" y="84">正文与抉择</text><text class="muted" x="20" y="106">实际活动和变化声明</text><text class="small" x="20" y="130">必要审校后形成成稿</text>
   </g>
   <g transform="translate(648 118)">
     <rect class="panel" width="170" height="144" rx="8"/><circle class="accent" cx="24" cy="25" r="6"/>
-    <text class="light" x="39" y="31">Renderer</text><text class="muted" x="20" y="62">精确二次召回</text><text class="muted" x="20" y="84">正文与抉择</text><text class="muted" x="20" y="106">结构化变化</text><text class="small" x="20" y="130">随后整理玩家正文</text>
+    <text class="light" x="39" y="31">结果处理</text><text class="muted" x="20" y="62">属性取自最终成稿</text><text class="muted" x="20" y="84">连续性登记持久变化</text><text class="muted" x="20" y="106">观察本幕实际进展</text><text class="small" x="20" y="130">待选行动仍不发生</text>
   </g>
   <g transform="translate(846 118)">
     <rect class="panel" width="170" height="144" rx="8"/><circle class="accent" cx="24" cy="25" r="6"/>
@@ -45,9 +45,9 @@
   <path class="soft" d="M1095 280 V338 H846"/><path class="accent" d="M850 332 L838 338 L850 344 Z"/>
   <g transform="translate(622 318)">
     <rect class="panel" width="216" height="112" rx="8"/><circle class="accent" cx="24" cy="25" r="6"/>
-    <text class="light" x="40" y="31">Memory Curator</text><text class="muted" x="20" y="62">按 run / act / route /</text><text class="muted" x="20" y="82">faction / character 整理</text><text class="small" x="20" y="102">异步 · revision 校验</text>
+    <text class="light" x="40" y="31">Memory Curator</text><text class="muted" x="20" y="62">run 有效事实背景</text><text class="muted" x="20" y="82">act 进展及未覆盖变化</text><text class="small" x="20" y="102">异步 · revision 校验</text>
   </g>
   <path class="soft" d="M622 374 H140 V280"/><path class="accent" d="M134 284 L140 272 L146 284 Z"/>
-  <text x="274" y="357" class="muted">Digest 与已提交经历进入下一轮按需召回</text>
+  <text x="274" y="357" class="muted">有效背景与本幕进展交给下一轮规划</text>
   <rect class="tag" x="54" y="456" width="1092" height="24" rx="12"/><text class="tagtext" x="600" y="472" text-anchor="middle">WORLD PACK + TOOL CALLS + DETERMINISTIC ENGINE + ANONYMOUS SAVE</text>
 </svg>

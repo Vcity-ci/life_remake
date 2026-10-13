@@ -1,5 +1,48 @@
 # 技术文档（v1.0.1）
 
+## 增量机制：2026-10-12 +08:00 — 成稿与资产用途交接
+
+- `resolveNarrativeStatLabels` 复用本局属性阈值与世界包文字快照，供 `toClientRun`、规划及正文请求使用。数值转换、家境支持、同年累计和濒死判定沿引擎执行。
+- `NarrativeAbility.usage` 与 `NarrativeLocation.spatialDescription` 沿共享类型、工具 Schema、解析、提交、归并、恢复和任务投影传递。公开快照继续展示原说明与掌握状态；`prepareNarrativeAssetUses` 只在选定旧对象缺少用途字段时请求提炼，不改写展示档案。
+- `generateDynamicNarrativeScene` 负责成稿和引用声明；`settleDynamicNarrativeScene` 只读取最终正文、实际年龄与属性工具规则。抉择结果先经 `renderDirectedDecisionNarrative` 及必要审校，再由 `generateDirectedDecisionSettlement` 提取受控变化。待选场景使用已有 Renderer 与选项协议。
+- `synchronizeNarrativeAgentScene` 复用连续性差量合同，并在普通年份完成逐年生存结算之后调用。被中断的背景使用实际正文与来源 ID，新事实在观察前准备 ID；人物与资产在成功提交后进入公开快照。
+- `prepareNarrativeMemoryCuration` 按 3 条变化起批、每批最多 6 条，幕收束或结局可提前触发。一次请求同时返回 run／act 视图；以 revision 和 Episode 覆盖范围提交。写入时按最新账本过滤已完成事项的活动引用，摘要不裁定完成或创建新的事实。
+- `effective_facts` 摘要提供有效背景与本幕进展；未覆盖变化仍传给规划和观察。普通叙事任务读取用途和实际近期正文，关联经历原文留在归档侧，历史选项不作为已发生行动回传。
+
+## 增量机制：2026-10-10 +08:00 — 部分绑定与可用材料目录
+
+- `NarrativeTurnPlan.materials` 保存需求召回后的本轮候选。`assetBindings` 只选择场景组织重点，正文生成保留完整候选和 Planner 的 `abilityRefs`。选项可引用候选中的其他可用本领或已知地点；未知引用仍被拒绝。
+- 渲染与正文整理通过内部 `materials` 参数共享候选引用。动态目录、`continuityRefs`、`assetActivity` 与选项解析保持相同地点／本领范围；活动和变更范围相同时只列一次目录。原生 Schema 不使用动态枚举，事实范围及同轮人物目录保持各自职责。
+- 选择仍是未来行动。玩家作答后按选中本领和去向召回，连续性依据最终正文提交新地点、新本领或既有能力进阶，成功提交后进入公开快照及下一轮目录。候选与绑定均不提前授予资产。
+- 146 项后端回归及共享、后端、前端构建通过，包含边将高潮原错误组合回放，以及部分绑定后的审校、选择、同步、提交、公开快照、恢复与下一轮召回。确定性测试使用模拟原生工具；真实模型的故事表现与耗时仍需试玩验证。
+
+## 增量机制：2026-10-09 +08:00 — 规划材料、同轮身份与事实目录交接
+
+- Planner 的 `assetNeeds?` 使用 `kind / purpose / ref?` 描述本轮材料用途。回合 Brief 用执行目标与需求共同查询原召回模块，将二次召回的可用人物、地点、本领交给场景结算。结算的 `assetBindings?` 选择场景组织重点；正文和选项使用本轮完整可用目录，未习得能力与未选择的去向不提前入档。
+- `narrative/handoff.ts` 保存本轮来源和候选人物。首次结构化出现后由引擎分配正常人物 ID，正文的审批结果、连续性工具 Schema、身份目录、解析器和登记端使用同一 ID。连续性可以更新该候选或将其归并到既有人物；已有身份优先保留，候选在成功提交前不进入公开状态。地点、本领仍由连续性依据实际正文提交 `new` 或既有 ID，沿原资产提交模块登记与积累。
+- `prepareNarrativeFactUpdates` 在观察前按本局与提交来源分配新事实 ID。观察目录合并原开放事项与本轮新增开放事项，提交沿用相同来源和 ID；完成裁定随后关闭对应事实。普通年份在实际终点确定后准备目录，被濒死中断的原生成结果由最终正文及其差量替换。
+- 连续性请求只组成当前任务层：最终正文、可更新事实状态、单份身份目录和本轮身份候选。叙事义务由任务 system prompt 承担，参数结构由原生 Schema 声明；`factIntroductions / factUpdates / locationUpdates / abilityUpdates` 与解析一致。有同步工作时始终开放新增事实字段，旧事实为空不影响新增。
+- 145 项后端回归及共享、后端、前端构建通过。原生工具模拟覆盖二次召回进入选项与恢复、同轮候选引用与归并、新事实同轮观察和关闭、本领原 ID 升级、新地点登记、中断背景及失败不发布。真实模型的叙事质量与 Token 变化仍需试玩采样。
+
+## 增量机制：2026-10-09 +08:00 — 六阶段交接修正
+
+- `render_origin.participants?` 与场景、连续性工具复用 `narrativeParticipantsSchema` 和 `parseDynamicNarrativeParticipants`。连续性工具的 `participants` 为数组，无人物变化时返回空数组；主角身份由 `narrativeProtagonistAnchor` 投影。
+- `NarrativeRelationshipUpdate` 的 `role / status / description` 可独立提交；`stance / summary` 在态度变化时成对提交。`registerNarrativeParticipants` 在正式提交时登记 NPC，已知角色的当前 `role` 可以随叙事变化。
+- 规划目录提供本领 ID、名称、掌握状态和短用途。`abilityUpdates` 区分同一能力的进阶与独立新能力；`locationUpdates` 表达空间变化。计划和选项中的可用引用保留为行动依据，实际使用与到达读取最终正文声明。
+- `NarrativeAgentTurnResult.time` 将 `hold` 映射到当前年龄、`advance` 映射到下一年龄，背景区间沿用 Envelope。`index.ts` 将 `sceneAge` 交给引擎，同年计数可以超过节奏参考值。背景遇到濒死中断时，`render_background_segment` 返回实际终点的完整正文结果，身份合并与资产提交在该结果确定后执行。
+- `observe_story_beat` 返回 `resolutions: [{ factId, summary }]`，解析派生内部 `resolvedFactIds`。引擎写入观察确认的具体结果；payoff 推进时观察器返回确认的三项 `actHandoff`。其他开放事项保留自身状态与原幕归属。
+- `refine_narrative_prose` 对完整正文任务同时返回 `storyDelta / assetActivity / continuityRefs / continuityRequired`，抉择场景保留整理后的 `background`。审校输入限于本轮身份、时间、行动目标、已审批结果与待整理正文，沿原引用目录核对元信息。
+- Curator 使用本批对象最后一个关联 Episode 的精确 `turnId` 取得历史快照；同年龄多个回合分别关联。缺少快照时使用批次增量；对象摘要覆盖位置较新或相同则拒绝旧提交。全局 revision、异步调度频率及原 step 事务继续沿用。
+- 验证：142 项后端回归通过，共享包、后端、前端构建通过。原生工具模拟覆盖新增人物、角色升迁、独立资产、同年与跨年、局部事实完成、最终正文和延迟摘要交接；真实模型的故事表现需新局试玩确认。
+
+## 增量机制：2026-10-07 +08:00 — 观察反馈与收束交接
+
+- `NarrativeBeatObservation.progressGap?` 是 `observe_story_beat` 的可选短反馈，Schema 上限 180 字符。解析仅在非 `factsOnly` 的 `hold` 结果保留；缺省响应及旧存档继续有效。Observer 的推进依据优先读取 `beatOutline[currentBeat]`，阶段任务的完成含义单独作为局部目标呈现。
+- 普通场景和抉择后果均通过原 `runtime.ts` 观察路径写入 `lastBeatObservation`。`narrativeStageProgressGap` 按 `actId / beat / decision` 选择反馈，`index.ts` 传入回合 Envelope；规划任务仅注入一次。恢复沿原状态规范化保留字段，五拍迁移后的反馈因作用域不同自动退出。
+- `narrativeStoryPackNextAct` 从当前 IF 快照查找后继幕，payoff 的路线片段和独立场景结算分别取得短目标；最后一幕使用最终处境与余波。完整下一幕大纲仍留给下一幕 Planner。
+- `narrativePreviousActResult` 将 Canon 三项结果明确标为已结束矛盾、持续得失和形成的处境，替换原来只拼接后两项的输入。Canon 仍在 payoff 观察确认与引擎结算后提交；不改变事实依据、资产累积或异步摘要归属。
+- 138 项后端回归和共享、后端、前端构建通过。原生工具模拟覆盖场景与抉择反馈、恢复与作用域、payoff 下一幕交接、完成事实退出与资产保留、本局前提时代切片。未调用真实模型；新局的故事分量与战争结果仍需实际试玩验证。
+
 ## 增量机制：2026-10-06 +08:00 — 阶段任务协议与提交边界
 
 - 共享 `NarrativeStageTask` 使用 `goal / completionMeaning / fork?`；`fork` 使用 `question / stakes / openingSituation`。`NarrativeTurnEnvelope` 传入已有任务，`NarrativeTurnPlan` 返回本轮有效任务；首次主线规划必须建立任务，沿用时工具可省略该字段，解析器复用输入任务。
@@ -68,7 +111,7 @@
 - `narrative.ts` 以当前任务、世界幕、拍点、计划路线／阵营、显式 focus、近期 Episode 文本和最近公开叙事构造召回查询。字面关键词与 `/pattern/flags` 均可匹配；状态匹配、文本命中、粘滞、冷却、优先级、互斥组和字符预算共同决定最终卡片。
 - `narrative/context/` 将 world / scenario / example / author_note 放入不同 section，并在 trace 中记录卡片 ID、激活原因、注入位置与估算 Token。标题等作者字段不进入玩家正文。
 - `prepareNarrativeOutcomeRequest` 的事实、人物、地点和本领引用只来自本轮精确召回；provider 返回 incomplete 或截断时，后端区分记录 `tool_arguments_truncated`，不会把协议或校验细节投影给玩家。
-- Memory Curator 的整局摘要上限为 600 字符，并继续以 revision 和 Episode 覆盖范围提交；不进行粗暴裁剪。三套世界包和社区示例均已迁移到 v8。
+- Memory Curator 以 revision、Episode 覆盖范围和合法引用提交完整摘要；摘要篇幅由任务提示引导。三套世界包和社区示例均已迁移到 v8。
 
 ## 增量机制：2026-09-15 13:21 +08:00 — Curator、Horizon 与 Agent Runtime
 

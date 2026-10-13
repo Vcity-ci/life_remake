@@ -64,6 +64,7 @@ export function applyNarrativeIdentityMerges(run: InternalRunState, changes: Nar
       }
       if (source.updated.age >= target.updated.age) {
         target.description = source.description; target.mastery = source.mastery;
+        target.usage = source.usage ?? target.usage;
         target.status = source.status; target.updated = { ...source.updated };
       }
       for (const key of ["characterIds", "factionIds", "routeIds", "factIds"] as const) target[key] = union(target[key], source[key]);
@@ -111,14 +112,15 @@ export function applyNarrativeIdentityMerges(run: InternalRunState, changes: Nar
 export function narrativeCharacterDirectory(state: NarrativeRunState) {
   return state.dynamicCharacters.map((entry) => ({
     id: entry.id, name: entry.name, factionId: entry.factionId, role: entry.role,
-    description: `${entry.status === "gone" ? "已离场。" : entry.status === "resolved" ? "此前交往已告一段落。" : ""}${entry.description.slice(0, 80)}`
+    description: `${entry.status === "gone" ? "已离场。" : entry.status === "resolved" ? "此前交往已告一段落。" : ""}${entry.description}`
   }));
 }
 
-export function formatNarrativeIdentityDirectory(state: NarrativeRunState): string {
+export function formatNarrativeIdentityDirectory(state: NarrativeRunState, detailedIds: string[] = []): string {
+  const selected = new Set(detailedIds);
   return [
-    `人物身份目录：${state.dynamicCharacters.map((entry) => `${entry.id}=${entry.name}（${entry.role}，${entry.status}）`).join("；") || "无"}`,
-    `地点身份目录：${(state.assets?.locations ?? []).map((entry) => `${entry.id}=${entry.name}：${entry.description.slice(0, 60)}`).join("；") || "无"}`,
-    `本领身份目录：${(state.assets?.abilities ?? []).map((entry) => `${entry.id}=${entry.name}（${entry.mastery}，${entry.status}）：${entry.description.slice(0, 80)}`).join("；") || "无"}`
+    `人物身份目录：${state.dynamicCharacters.map((entry) => `${entry.id}=${entry.name}（${entry.role}，${entry.status}）：${entry.description}${selected.has(entry.id) && entry.relationship ? `；关系=${entry.relationship.summary}` : ""}`).join("；") || "无"}`,
+    `地点身份目录：${(state.assets?.locations ?? []).map((entry) => `${entry.id}=${entry.name}${selected.has(entry.id) && entry.spatialDescription ? `：${entry.spatialDescription}` : ""}`).join("；") || "无"}`,
+    `本领身份目录：${(state.assets?.abilities ?? []).map((entry) => `${entry.id}=${entry.name}（${entry.status}）${entry.usage ? `：${entry.usage}` : ""}`).join("；") || "无"}`
   ].join("\n");
 }

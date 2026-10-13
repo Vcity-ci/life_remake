@@ -1,4 +1,13 @@
 import type { NarrativeFactResolution, NarrativeMainlineActDefinition, NarrativeFactUpdates, NarrativeRelationshipUpdate, StoryFactRecord } from "@reroll/shared";
+import { createHash } from "node:crypto";
+
+/** Allocate the fact directory before observation, using the eventual committed source. */
+export function prepareNarrativeFactUpdates(runId: string, sourceEventId: string, updates?: NarrativeFactUpdates): NarrativeFactUpdates | undefined {
+  if (!updates) return undefined;
+  return { ...updates, introduce: updates.introduce.map((fact, index) => ({ ...fact,
+    id: `dynamic:${createHash("sha256").update(`${runId}:${sourceEventId}:${index}:${fact.kind}:${fact.label}`).digest("hex").slice(0, 16)}`
+  })) };
+}
 
 export const relationshipStances = ["friendly", "guarded", "hostile", "indebted", "dependent", "competitive"] as const;
 const factKinds = ["open_question", "stake", "commitment", "cost", "relationship_change"] as const;
@@ -81,7 +90,7 @@ export function parseFactUpdates(raw: unknown, contract: ReturnType<typeof factU
       if (!factKinds.includes(kind as typeof factKinds[number])) throw new Error("fact_kind_invalid");
       if (row.priority !== undefined && (typeof row.priority !== "number" || !Number.isInteger(row.priority) || row.priority < 1 || row.priority > 4)) throw new Error("fact_priority_invalid");
       if (row.status !== undefined && row.status !== "open" && row.status !== "resolved") throw new Error("fact_status_invalid");
-      return { kind: kind as typeof factKinds[number], label: text(row.label), priority: row.priority as number | undefined, ...(row.status ? { status: row.status as "open" | "resolved" } : {}) };
+      return { kind: kind as typeof factKinds[number], label: text(row.label), priority: row.priority as number | undefined, ...(row.status ? { status: row.status as "open" | "resolved" } : {}), ...(typeof row.id === "string" ? { id: row.id } : {}) };
     }),
     touchFactIds: refs(source.touchFactIds, contract.factIds),
     resolveFactIds: refs(source.resolveFactIds, contract.mutableIds),
@@ -92,10 +101,12 @@ export function parseFactUpdates(raw: unknown, contract: ReturnType<typeof factU
 
 export function relationshipUpdatesSchema(_characterIds: string[]) {
   return { type: "array", items: {
-    type: "object", additionalProperties: false, required: ["characterRef", "stance", "summary"],
+    type: "object", additionalProperties: false, required: ["characterRef"],
     properties: {
       characterRef: { type: "string", description: "使用本轮可更新人物中给出的角色 ID。" },
-      stance: { type: "string", enum: relationshipStances }, summary: { type: "string" },
+      stance: { type: "string", enum: relationshipStances, description: "态度变化时与 summary 一起提交。" },
+      summary: { type: "string", description: "态度变化的简短说明，与 stance 一起提交；身份或离场状态可独立更新。" },
+      role: { type: "string", description: "身份或职位实际改变时填写当前简短身份；仍引用原人物 ID。" },
       status: { type: "string", enum: ["active", "resolved", "gone"], description: "人物仍在场、这段交往已告一段落、或已经离场（包括死亡）；具体处境写入 description。" },
       description: { type: "string", description: "人物当前身份与处境，替换已过时的档案描述。" }
     }
@@ -105,10 +116,14 @@ export function relationshipUpdatesSchema(_characterIds: string[]) {
 export function parseRelationshipUpdates(raw: unknown, characterIds: string[]): NarrativeRelationshipUpdate[] | undefined {
   if (raw === undefined) return undefined;
   return rows(raw).map((entry) => {
-    const row = object(entry), characterRef = text(row.characterRef), stance = text(row.stance);
-    if (!characterIds.includes(characterRef) || !relationshipStances.includes(stance as typeof relationshipStances[number])) throw new Error("relationship_reference_invalid");
+    const row = object(entry), characterRef = text(row.characterRef);
+    if (!characterIds.includes(characterRef)) throw new Error("relationship_reference_invalid");
+    const stance = row.stance === undefined ? undefined : text(row.stance);
+    if (stance !== undefined && !relationshipStances.includes(stance as typeof relationshipStances[number])) throw new Error("relationship_reference_invalid");
+    if ((stance !== undefined) !== (row.summary !== undefined)) throw new Error("relationship_pair_required");
     if (row.status !== undefined && !["active", "resolved", "gone"].includes(row.status as string)) throw new Error("character_status_invalid");
-    return { characterRef, stance: stance as typeof relationshipStances[number], summary: text(row.summary),
+    return { characterRef, ...(stance ? { stance: stance as typeof relationshipStances[number], summary: text(row.summary) } : {}),
+      ...(row.role !== undefined ? { role: text(row.role) } : {}),
       ...(row.status ? { status: row.status as "active" | "resolved" | "gone" } : {}),
       ...(row.description !== undefined ? { description: text(row.description) } : {}) };
   });

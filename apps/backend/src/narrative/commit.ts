@@ -2,6 +2,7 @@ import type { NarrativeActHandoff, NarrativeActCanon, NarrativeEpisodeRecord } f
 import type { InternalRunState } from "../engine.js";
 
 export interface NarrativeCommitDraft {
+  turnId?: string;
   callId: string;
   sourceEventId: string;
   turnKind: NarrativeEpisodeRecord["turnKind"];
@@ -30,6 +31,7 @@ export function commitNarrativeEpisode(run: InternalRunState, draft: NarrativeCo
     id: `episode:${draft.sourceEventId}`,
     callId: draft.callId,
     sourceEventId: draft.sourceEventId,
+    turnId: draft.turnId,
     turnKind: draft.turnKind,
     ageFrom: draft.ageFrom,
     age: draft.age,

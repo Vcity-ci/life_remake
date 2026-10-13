@@ -75,9 +75,7 @@ export function pendingConversationContext(conversation: ChatConversationState):
   if (!conversation.archive.length) return "";
   const passages: string[] = [];
   for (const round of conversation.archive) {
-    const digest = round.user.includes("本段记事：")
-      ? round.user.slice(0, 320)
-      : `${round.user}\n${round.assistant.length > 240 ? "…" + round.assistant.slice(-240) : round.assistant}`;
+    const digest = `${round.user}\n${round.assistant}`;
     const similar = passages.indexOf(digest);
     if (similar >= 0) passages.splice(similar, 1);
     passages.push(digest);

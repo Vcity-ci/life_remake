@@ -20,42 +20,38 @@ export interface NarrativeProseProfile {
   purpose: NarrativeProsePurpose;
   targetMinLength: number;
   targetMaxLength: number;
-  reviewAtLength: number;
-  hardMaxLength: number;
   backgroundTargetMaxLength?: number;
-  backgroundHardMaxLength?: number;
   instruction: string;
 }
 
-/** Writing targets guide scope; hard limits are deliberately loose protocol safety bounds. */
+/** Writing targets guide the scope and pacing of each narrative task. */
 export function narrativeProseProfile(
   presentation: NarrativeProsePresentation,
   beat?: NarrativeProseBeat
 ): NarrativeProseProfile {
   if (presentation === "summary") return {
-    purpose: "background", targetMinLength: 45, targetMaxLength: 90, reviewAtLength: 120, hardMaxLength: 240,
+    purpose: "background", targetMinLength: 45, targetMaxLength: 90,
     instruction: "概述这一年龄段最值得记住的一项生活变化；允许平静与留白，不把主线、召回资料或未来安排逐项写完。"
   };
   if (presentation === "decision") return {
-    purpose: "decision", targetMinLength: 120, targetMaxLength: 200, reviewAtLength: 260, hardMaxLength: 420,
+    purpose: "decision", targetMinLength: 120, targetMaxLength: 200,
     instruction: "承接玩家已经选定的行动，写清行动的直接结果、代价或收获，以及人物由此形成的新处境。在本次结果自然结束的位置收笔。"
   };
   if (presentation === "choice") return {
     purpose: "choice", targetMinLength: 110, targetMaxLength: beat === "climax" ? 240 : 190,
-    reviewAtLength: beat === "climax" ? 310 : 250, hardMaxLength: 520,
-    backgroundTargetMaxLength: beat === "climax" ? 100 : 80, backgroundHardMaxLength: 220,
+    backgroundTargetMaxLength: beat === "climax" ? 100 : 80,
     instruction: "把一个具体矛盾推到必须选择的时刻，并停在行动发生之前；不要替玩家选择，也不要提前写出任何选项的结果。"
   };
   if (beat === "climax") return {
-    purpose: "climax", targetMinLength: 180, targetMaxLength: 320, reviewAtLength: 400, hardMaxLength: 620,
+    purpose: "climax", targetMinLength: 180, targetMaxLength: 320,
     instruction: "展开本轮决定性行动及即时反应；高潮可以同年分成多轮，本轮只完成当前计划要求的动作，不包办整场高潮。"
   };
   if (beat === "payoff") return {
-    purpose: "payoff", targetMinLength: 160, targetMaxLength: 280, reviewAtLength: 350, hardMaxLength: 560,
+    purpose: "payoff", targetMinLength: 160, targetMaxLength: 280,
     instruction: "交代当前矛盾已经形成的结果、代价与人物的新处境；完成本段收束，不重新开启另一段主线。"
   };
   return {
-    purpose: "scene", targetMinLength: 120, targetMaxLength: 220, reviewAtLength: 290, hardMaxLength: 520,
+    purpose: "scene", targetMinLength: 120, targetMaxLength: 220,
     instruction: "从上一段已经形成的处境自然进入本轮，展开一个可观察的行动、相遇或变化；写清它怎样改变人物眼前的处境，再在自然承接点停下。"
   };
 }
@@ -92,12 +88,12 @@ export function narrativeTaskRule(task: NarrativeTask, pack: PromptPackResolved)
     case "background": return pack.yearNormalRule;
     case "planning": return "只规划下一回合的叙事任务，通过工具提交选择，不写玩家正文。";
     case "observation": return "只判断已经发生的故事是否完成当前意图、节拍与事实生命周期，通过工具提交裁决。";
-    case "curation": return "整理已经提交的经历与引用，不创造新的游戏事实。";
+    case "curation": return "用已提交变化更新有效事实背景与本幕进展。";
     case "horizon": return "为当前世界幕提出短程叙事意图，不选择或排除路线，不写玩家正文。";
     case "settlement": return "只通过指定工具提交本轮已经形成的结构化变化，不写玩家正文。";
     case "continuity": return "只从本轮最终正文提取相对可写引用目录的持久差量，不推演剧情或补写对象经历。";
     case "reviewing": return "只编辑本次提供的玩家正文与抉择背景，不调用历史补写内容，不改变结构化结果。";
-    case "rendering": return "依据已批准的回合计划与结构化结果写本轮正文，不再改变结算内容。";
+    case "rendering": return "依据回合计划、人物当前状态和可用材料写本轮实际发生的故事。";
     case "decision": return narrativeProseProfileInstruction(narrativeProseProfile("decision"));
     case "closure": return "主线完成后只提交结局申请，不写结局正文。";
     case "ending": return pack.endingHint;
@@ -108,10 +104,13 @@ export function narrativeTaskRule(task: NarrativeTask, pack: PromptPackResolved)
 export function narrativeToolRule(name: string, pack: PromptPackResolved): string {
   switch (name) {
     case "render_origin": return narrativeTaskRule("origin", pack);
+    case "render_background_prose":
     case "render_background_segment": return narrativeTaskRule("background", pack);
+    case "render_scene_prose":
     case "render_scene": return "写当前节拍的一项具体经历、人物行动与处境变化；在自然承接点停下。";
+    case "render_choice_prose":
     case "render_choice_scene": return pack.milestoneRule;
-    case "resolve_decision_outcome": return narrativeTaskRule("decision", pack);
+    case "render_decision_outcome": return narrativeTaskRule("decision", pack);
     default: return narrativeTaskRule("dynamic", pack);
   }
 }

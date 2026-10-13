@@ -47,14 +47,14 @@ const TASK_SECTIONS: Record<NarrativeTask, NarrativeContextSection[]> = {
   curation: ["task"],
   horizon: ["persona", "origin", "world", "mainline", "route", "handoff", "lore", "characters", "facts", "history", "task"],
   settlement: ["task"],
-  continuity: ["characters", "facts", "locations", "abilities", "task"],
+  continuity: ["task"],
   planning: ["persona", "talents", "origin", "world", "palette", "mainline", "route", "lore", "characters", "facts", "locations", "abilities", "history", "authorNote", "task"],
   observation: ["task"],
   background: ["persona", "talents", "origin", "world", "palette", "route", "lore", "characters", "factDirectory", "facts", "locations", "abilities", "styleExamples", "history", "authorNote", "task"],
-  rendering: ["persona", "talents", "origin", "world", "palette", "route", "lore", "characters", "factDirectory", "facts", "locations", "abilities", "memories", "styleExamples", "history", "authorNote", "task"],
-  dynamic: ["persona", "talents", "origin", "world", "palette", "route", "lore", "characters", "factDirectory", "facts", "locations", "abilities", "memories", "styleExamples", "history", "authorNote", "task"],
+  rendering: ["persona", "talents", "origin", "world", "palette", "route", "lore", "characters", "factDirectory", "facts", "locations", "abilities", "styleExamples", "history", "authorNote", "task"],
+  dynamic: ["persona", "talents", "origin", "world", "palette", "route", "lore", "characters", "factDirectory", "facts", "locations", "abilities", "styleExamples", "history", "authorNote", "task"],
   reviewing: ["task"],
-  decision: ["persona", "talents", "origin", "world", "palette", "route", "characters", "facts", "locations", "abilities", "memories", "styleExamples", "history", "authorNote", "task"],
+  decision: ["persona", "talents", "origin", "world", "palette", "route", "characters", "facts", "locations", "abilities", "styleExamples", "history", "authorNote", "task"],
   closure: ["persona", "origin", "mainline", "handoff", "facts", "digests", "task"],
   ending: ["persona", "talents", "origin", "world", "ending", "task"]
 };

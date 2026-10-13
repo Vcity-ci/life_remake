@@ -2,9 +2,11 @@ import { randomUUID } from "node:crypto";
 import type { DecisionType, NarrativeAgentAttemptRecord, NarrativeAttributePolicy, NarrativeBeatObservation, NarrativeDecisionBrief, NarrativeFactResolution, NarrativeStageTask, NarrativeStoryPackSnapshot, NarrativeWorldDefinition, WorldConfig } from "@reroll/shared";
 import {
   generateDynamicNarrativeScene,
+  settleDynamicNarrativeScene,
   generateDirectedDecisionSettlement,
   generateEndingNarrative,
   generateNarrativeTurnPlan,
+  prepareNarrativeAssetUses,
   observeNarrativeBeat,
   renderDirectedDecisionNarrative,
   synchronizeNarrativeContinuity,
@@ -16,12 +18,18 @@ import {
   type DynamicNarrativeSceneInput,
   type DynamicNarrativeSceneResult,
   type DirectedDecisionNarrativeOutcome,
+  type NarrativeReviewedProse,
   type NarrativeContext
 } from "../ai.js";
-import type { InternalRunState } from "../engine.js";
+import { resolveNarrativeStatLabels, type InternalRunState } from "../engine.js";
 import { buildNarrativePromptPlan, type NarrativePromptPlan } from "../narrative.js";
 import { narrativeProseProfile } from "../narrative-prompts.js";
-import { narrativeTurnPlanFocusIds, type NarrativeTurnEnvelope, type NarrativeTurnPlan } from "./turn.js";
+import { narrativeStoryPackNextAct } from "../narrative-experience.js";
+import { narrativeTurnPlanFocusIds, resolveNarrativeTurnTime, type NarrativeTurnTime, type NarrativeTurnEnvelope, type NarrativeTurnPlan } from "./turn.js";
+import { narrativeProtagonistAnchor } from "../narrative-characters.js";
+import type { NarrativeRoundHandoff } from "./handoff.js";
+import { prepareNarrativeFactUpdates } from "../narrative-continuity.js";
+import { canonicalizeNarrativeReferences } from "../narrative-identities.js";
 import { hasNarrativeFactCompletion, narrativeActProgress, narrativeFactProgressForCommit, narrativeObservationFacts } from "./observation.js";
 
 export interface NarrativeAgentTurnInput {
@@ -35,6 +43,7 @@ export interface NarrativeAgentTurnInput {
 }
 
 export interface NarrativeAgentTurnResult {
+  time: NarrativeTurnTime;
   attemptId: string;
   plan: NarrativeTurnPlan;
   scene: DynamicNarrativeSceneResult;
@@ -46,16 +55,24 @@ interface NarrativeTurnBrief {
   promptPlan: NarrativePromptPlan;
   focusIds: string[];
   worldCardIds: string[];
+  handoff: NarrativeRoundHandoff;
 }
 
 function createNarrativeTurnBrief(
   attemptId: string,
   plan: NarrativeTurnPlan,
-  promptPlan: NarrativePromptPlan
+  promptPlan: NarrativePromptPlan,
+  sourceEventId: string,
+  run: InternalRunState
 ): NarrativeTurnBrief {
   return {
     id: `${attemptId}:brief`,
-    plan,
+    handoff: { sourceEventId, characters: [] },
+    plan: { ...plan, materials: [
+      ...(promptPlan.recall?.characters ?? []).map((entry) => ({ id: entry.id, kind: "character" as const, label: entry.name, description: entry.description })),
+      ...(promptPlan.recall?.assetSources ?? []).filter((entry) => entry.kind !== "ability" || run.narrative.assets?.abilities.some((ability) => ability.id === entry.id && ability.status === "available"))
+        .map((entry) => ({ id: entry.id, kind: entry.kind, label: (entry.kind === "location" ? run.narrative.assets?.locations : run.narrative.assets?.abilities)?.find((asset) => asset.id === entry.id)?.name ?? entry.id, description: entry.text }))
+    ] },
     promptPlan,
     focusIds: Array.from(new Set([
       ...narrativeTurnPlanFocusIds(plan),
@@ -112,8 +129,7 @@ export async function runNarrativeAgentTurn(input: NarrativeAgentTurnInput): Pro
         forceIds: [],
         conflictRefs: [],
         abilityRefs: [],
-        locationDirective: { mode: "stay", ...(run.narrative.assets?.currentLocationId ? { locationRef: run.narrative.assets.currentLocationId } : {}) },
-        sceneGoal: `叙述${envelope.backgroundAgeRange.fromAge}岁至${envelope.backgroundAgeRange.toAge}岁的人生变化`,
+        sceneGoal: `叙述${envelope.backgroundAgeRange.fromAge}岁至${envelope.backgroundAgeRange.toAge}岁在当前住处的日常生活、成长与身边关系`,
         presentation: "summary",
         stageTask: envelope.stageTask,
         clockRequest: "advance"
@@ -135,24 +151,27 @@ export async function runNarrativeAgentTurn(input: NarrativeAgentTurnInput): Pro
   });
 
   const renderTask = plan.turnKind === "background" ? "background" : "rendering";
+  const time = resolveNarrativeTurnTime(envelope, plan);
+  await prepareNarrativeAssetUses(run, world, context, narrativeTurnPlanFocusIds(plan));
   const promptPlan = buildNarrativePromptPlan(run, narrativeWorld, null, renderTask, {
     backgroundAllowed: plan.turnKind === "background",
     factionIds: plan.forceIds,
     patternIds: plan.patternIds,
-    focusIds: narrativeTurnPlanFocusIds(plan),
-    semanticQuery: plan.sceneGoal
+    focusIds: backgroundOnly ? run.narrative.activeCharacterIds : narrativeTurnPlanFocusIds(plan),
+    semanticQuery: [plan.sceneGoal, ...(plan.assetNeeds ?? []).map((need) => need.purpose)].join("；")
   });
   if (!promptPlan) throw new Error("narrative_agent_prompt_plan_missing");
-  const brief = createNarrativeTurnBrief(attemptId, plan, promptPlan);
+  const sourceEventId = plan.turnKind === "background"
+    ? `background:${time.backgroundAgeRange.fromAge}:${time.backgroundAgeRange.toAge}:${run.history.length + time.backgroundAgeRange.toAge - time.backgroundAgeRange.fromAge + 1}`
+    : `dynamic:${envelope.act.id}:${envelope.beat}:${time.sceneAge}:${run.history.length + 1}`;
+  const brief = createNarrativeTurnBrief(attemptId, plan, promptPlan, sourceEventId, run);
   context.narrativePlan = brief.promptPlan;
-  await input.onProgress?.("settling");
-  let scene = await generateDynamicNarrativeScene(
-    run,
-    world,
-    { ...input.buildRenderInput(brief.plan, brief.promptPlan), plan: brief.plan },
-    context,
-    () => input.onProgress?.("rendering")
-  );
+  await input.onProgress?.("rendering");
+  const nextAct = envelope.beat === "payoff"
+    ? narrativeStoryPackNextAct((narrativeWorld as NarrativeWorldDefinition & { storyPack?: NarrativeStoryPackSnapshot }).storyPack, envelope.act.id)
+    : undefined;
+  const renderInput = { ...input.buildRenderInput(brief.plan, brief.promptPlan), ...time, statTierLabels: resolveNarrativeStatLabels(run.stats, run.narrative.statTierConfig, run.narrative.statTierPresentation), handoff: brief.handoff, protagonistAnchor: narrativeProtagonistAnchor(run), plan: brief.plan };
+  let scene = await generateDynamicNarrativeScene(run, world, renderInput, context);
   appendAttempt(run, {
     callId: envelope.callId,
     attemptId,
@@ -174,32 +193,32 @@ export async function runNarrativeAgentTurn(input: NarrativeAgentTurnInput): Pro
   {
     const proseProfile = narrativeProseProfile(plan.presentation, envelope.beat);
     const reviewInput = {
+      handoff: scene.handoff,
+      materials: brief.plan.materials,
       callId: envelope.callId,
       task: scene.turnKind === "background" ? "background" as const : scene.createsDecision ? "choice" as const : "scene" as const,
       ageLabel: scene.turnKind === "background"
-        ? `${envelope.backgroundAgeRange.fromAge}-${envelope.backgroundAgeRange.toAge}岁`
-        : `${envelope.sceneAge}岁`,
+        ? `${time.backgroundAgeRange.fromAge}-${time.backgroundAgeRange.toAge}岁`
+        : `${time.sceneAge}岁`,
       sceneGoal: plan.sceneGoal,
       narrative: scene.narrative,
       background: scene.milestoneCopy?.background,
       targetMinLength: proseProfile.targetMinLength,
       targetMaxLength: proseProfile.targetMaxLength,
-      reviewAtLength: proseProfile.reviewAtLength,
-      maxLength: proseProfile.hardMaxLength,
       backgroundTargetMaxLength: proseProfile.backgroundTargetMaxLength,
-      backgroundMaxLength: proseProfile.backgroundHardMaxLength,
-      interactionState: scene.createsDecision ? "choice_pending" as const : "none" as const
+      interactionState: scene.createsDecision ? "choice_pending" as const : "none" as const,
+      beat: envelope.beat,
+      protagonistAnchor: narrativeProtagonistAnchor(run),
+      storyDelta: scene.storyDelta,
+      assetActivity: scene.assetActivity,
+      continuityRefs: scene.continuityRefs,
+      continuityRequired: scene.continuityRequired,
+      approvedResult: JSON.stringify({ options: scene.milestoneCopy?.optionOverrides })
     };
     if (shouldRefineNarrativeProse(reviewInput)) {
-      const reviewPlan = buildNarrativePromptPlan(run, narrativeWorld, null, "reviewing", {
-        factionIds: scene.forceIds,
-        patternIds: scene.patternIds,
-        focusIds: narrativeTurnPlanFocusIds(plan)
-      });
-      if (!reviewPlan) throw new Error("narrative_review_prompt_plan_missing");
       const previousPlan = context.narrativePlan;
-      context.narrativePlan = reviewPlan;
-      let reviewed: Awaited<ReturnType<typeof refineNarrativeProse>>;
+      context.narrativePlan = { ...promptPlan, task: "reviewing" };
+      let reviewed: NarrativeReviewedProse;
       try {
         reviewed = await refineNarrativeProse(run, world, reviewInput, context);
       } finally {
@@ -207,7 +226,7 @@ export async function runNarrativeAgentTurn(input: NarrativeAgentTurnInput): Pro
       }
       scene = {
         ...scene,
-        narrative: reviewed.narrative,
+        ...reviewed,
         milestoneCopy: scene.milestoneCopy && reviewed.background
           ? { ...scene.milestoneCopy, background: reviewed.background }
           : scene.milestoneCopy
@@ -231,46 +250,16 @@ export async function runNarrativeAgentTurn(input: NarrativeAgentTurnInput): Pro
       });
     }
   }
-  const writeSet = buildNarrativeContinuityWriteSet(
-    run,
-    narrativeContinuityWritableSet(run, promptPlan),
-    scene.continuityRefs
-  );
-  let continuityStatus: NarrativeAgentAttemptRecord["continuityStatus"] = "skipped";
-  if (hasNarrativeContinuityWork(writeSet, scene.continuityRequired)) {
-    await input.onProgress?.("syncing");
-    const continuityFocusIds = Array.from(new Set([
-      ...writeSet.factIds,
-      ...writeSet.characterIds,
-      ...writeSet.locationIds,
-      ...writeSet.abilityIds
-    ]));
-    const continuityPlan = buildNarrativePromptPlan(run, narrativeWorld, null, "continuity", {
-      factionIds: scene.forceIds,
-      patternIds: scene.patternIds,
-      focusIds: continuityFocusIds
-    });
-    if (!continuityPlan) throw new Error("narrative_continuity_prompt_plan_missing");
-    const previousPlan = context.narrativePlan;
-    context.narrativePlan = continuityPlan;
-    let continuity: Awaited<ReturnType<typeof synchronizeNarrativeContinuity>>;
-    try {
-      continuity = await synchronizeNarrativeContinuity(run, world, {
-        callId: envelope.callId,
-        source: plan.turnKind,
-        subject: plan.sceneGoal,
-        narrative: [scene.narrative, scene.milestoneCopy?.background].filter(Boolean).join("\n"),
-        focusIds: continuityFocusIds,
-        writeSet,
-        continuityRequired: scene.continuityRequired
-      }, context);
-    } finally {
-      context.narrativePlan = previousPlan;
-    }
-    continuityStatus = continuity.assetUpdates || continuity.factUpdates || continuity.relationshipUpdates || continuity.identityMerges?.length
-      ? "requested_changed" : "requested_empty";
-    scene = { ...scene, ...continuity };
+  if (!scene.createsDecision) {
+    await input.onProgress?.("settling");
+    scene = await settleDynamicNarrativeScene(run, world, renderInput, scene, context);
   }
+  // Annual survival may shorten a background interval before its assets can be registered.
+  if (scene.turnKind === "background") return { attemptId, plan, scene, time };
+  const synchronized = await synchronizeNarrativeAgentScene({ ...input, scene, plan, promptPlan, callId: envelope.callId });
+  scene = synchronized.scene;
+  const { writeSet, continuityStatus } = synchronized;
+  if (scene.turnKind === "scene") scene.factUpdates = prepareNarrativeFactUpdates(run.runId, scene.handoff!.sourceEventId, scene.factUpdates);
   if (scene.turnKind === "scene" && (!scene.createsDecision || hasNarrativeFactCompletion(scene.factUpdates))) {
     const arc = run.narrative.sessionPremise?.arcs.find((entry) => entry.actId === envelope.act.id);
     const storyPackAct = activeStoryPackAct(narrativeWorld, envelope.act.id);
@@ -288,7 +277,7 @@ export async function runNarrativeAgentTurn(input: NarrativeAgentTurnInput): Pro
       actSummary: progress.summary,
       currentDelta: scene.storyDelta,
       activeFacts: narrativeObservationFacts(run, envelope.act.id, scene.factUpdates, [...plan.conflictRefs, ...writeSet.factIds]),
-      proposedActHandoff: scene.actHandoff,
+      nextAct: nextAct ? { label: nextAct.label, objective: nextAct.objective } : undefined,
       factsOnly: scene.createsDecision === true
     }, context);
     if (!scene.createsDecision) run.narrative.lastBeatObservation = observation;
@@ -297,7 +286,8 @@ export async function runNarrativeAgentTurn(input: NarrativeAgentTurnInput): Pro
       beatDecision: observation.decision,
       factUpdates: narrativeFactProgressForCommit(scene.factUpdates),
       observerResolvedFactIds: observation.resolvedFactIds,
-      actHandoff: scene.actHandoff ? { ...scene.actHandoff, carryFactIds: observation.carryFactIds } : undefined
+      observerResolutions: observation.resolutions,
+      actHandoff: observation.actHandoff
     };
   } else if (scene.createsDecision) {
     scene = { ...scene, factUpdates: narrativeFactProgressForCommit(scene.factUpdates), beatDecision: "hold" };
@@ -320,7 +310,61 @@ export async function runNarrativeAgentTurn(input: NarrativeAgentTurnInput): Pro
     continuityStatus,
     contextFragmentIds: contextFragmentIds(context)
   });
-  return { attemptId, plan, scene };
+  return { attemptId, plan, scene, time };
+}
+
+export async function synchronizeNarrativeAgentScene(input: {
+  run: InternalRunState; world: WorldConfig; narrativeWorld: NarrativeWorldDefinition;
+  context: NarrativeContext; scene: DynamicNarrativeSceneResult; plan: NarrativeTurnPlan;
+  promptPlan: NarrativePromptPlan; callId: string;
+  onProgress?: NarrativeAgentTurnInput["onProgress"];
+}) {
+  const { run, world, narrativeWorld, context, plan, promptPlan, callId } = input;
+  let scene = input.scene;
+  const writeSet = buildNarrativeContinuityWriteSet(
+    run,
+    narrativeContinuityWritableSet(run, promptPlan),
+    scene.continuityRefs
+  );
+  let continuityStatus: NarrativeAgentAttemptRecord["continuityStatus"] = "skipped";
+  if (hasNarrativeContinuityWork(writeSet, scene.continuityRequired) || scene.participants.some((entry) => entry.recurring && !run.narrative.dynamicCharacters.some((known) => known.id === entry.characterRef))) {
+    await input.onProgress?.("syncing");
+    const continuityFocusIds = Array.from(new Set([
+      ...writeSet.factIds,
+      ...writeSet.characterIds,
+      ...writeSet.locationIds,
+      ...writeSet.abilityIds
+    ]));
+    const continuityPlan = buildNarrativePromptPlan(run, narrativeWorld, null, "continuity", {
+      factionIds: scene.forceIds,
+      patternIds: scene.patternIds,
+      focusIds: continuityFocusIds
+    });
+    if (!continuityPlan) throw new Error("narrative_continuity_prompt_plan_missing");
+    const previousPlan = context.narrativePlan;
+    context.narrativePlan = continuityPlan;
+    let continuity: Awaited<ReturnType<typeof synchronizeNarrativeContinuity>>;
+    try {
+      continuity = await synchronizeNarrativeContinuity(run, world, {
+        callId: callId,
+        source: plan.turnKind,
+        subject: plan.sceneGoal,
+        narrative: [scene.narrative, scene.milestoneCopy?.background].filter(Boolean).join("\n"),
+        focusIds: continuityFocusIds,
+        writeSet,
+        continuityRequired: scene.continuityRequired,
+        socialForces: narrativeWorld.socialForces,
+        handoff: scene.handoff
+      }, context);
+    } finally {
+      context.narrativePlan = previousPlan;
+    }
+    continuityStatus = continuity.assetUpdates || continuity.factUpdates || continuity.relationshipUpdates || continuity.participants?.length || continuity.identityMerges?.length
+      ? "requested_changed" : "requested_empty";
+    scene = { ...scene, ...continuity, participants: continuity.handoff?.characters ?? scene.participants };
+    scene = canonicalizeNarrativeReferences({ ...run.narrative, identityAliases: { ...run.narrative.identityAliases, ...scene.handoff?.identityAliases } }, scene);
+  }
+  return { scene, writeSet, continuityStatus };
 }
 
 export function commitNarrativeAgentTurn(run: InternalRunState, attemptId: string, episodeId: string): void {
@@ -387,6 +431,13 @@ export async function runNarrativeAgentDecision(input: {
   onProgress?: (stage: "settling" | "rendering" | "syncing") => Promise<void> | void;
 }): Promise<{ attemptId: string; outcome: DirectedDecisionNarrativeOutcome; observation: NarrativeBeatObservation }> {
   const attemptId = `attempt:${randomUUID()}`;
+  await prepareNarrativeAssetUses(input.run, input.world, input.context, [
+    ...(input.decision.abilityRefs ?? []), ...(input.decision.locationDirective?.locationRef ? [input.decision.locationDirective.locationRef] : [])
+  ]);
+  input.context.narrativePlan = buildNarrativePromptPlan(input.run, input.narrativeWorld, null, "decision", {
+    factionIds: input.run.pendingDynamicScene?.forceIds, patternIds: input.run.pendingDynamicScene?.patternIds,
+    focusIds: [...(input.decision.abilityRefs ?? []), ...(input.decision.locationDirective?.locationRef ? [input.decision.locationDirective.locationRef] : [])]
+  });
   const turnPlan = input.context.narrativePlan;
   const briefId = `${attemptId}:brief`;
   const briefFocusIds = Array.from(new Set([
@@ -409,10 +460,8 @@ export async function runNarrativeAgentDecision(input: {
     focusIds: briefFocusIds,
     worldCardIds: briefWorldCardIds
   });
-  await input.onProgress?.("settling");
-  const settlement = await generateDirectedDecisionSettlement(input.run, input.world, input.decision, input.context);
   await input.onProgress?.("rendering");
-  const rendered = await renderDirectedDecisionNarrative(input.run, input.world, input.decision, settlement, input.context);
+  let rendered = await renderDirectedDecisionNarrative(input.run, input.world, input.decision, input.context);
   const decisionWritableSet = narrativeContinuityWritableSet(input.run, input.context.narrativePlan);
   const proseProfile = narrativeProseProfile("decision", input.run.narrative.actRuntime?.beat);
   const reviewInput = {
@@ -423,25 +472,26 @@ export async function runNarrativeAgentDecision(input: {
     narrative: rendered.narrative,
     targetMinLength: proseProfile.targetMinLength,
     targetMaxLength: proseProfile.targetMaxLength,
-    reviewAtLength: proseProfile.reviewAtLength,
-    maxLength: proseProfile.hardMaxLength,
-    interactionState: "none" as const
+    interactionState: "choice_resolved" as const,
+    protagonistAnchor: narrativeProtagonistAnchor(input.run),
+    storyDelta: rendered.storyDelta,
+    assetActivity: rendered.assetActivity,
+    continuityRefs: rendered.continuityRefs,
+    continuityRequired: rendered.continuityRequired,
+    approvedResult: JSON.stringify({ selectedAction: input.decision.label, description: input.decision.description })
   };
   let narrative = rendered.narrative;
   if (shouldRefineNarrativeProse(reviewInput)) {
-    const reviewPlan = buildNarrativePromptPlan(input.run, input.narrativeWorld, null, "reviewing", {
-      factionIds: input.run.pendingDynamicScene?.forceIds,
-      patternIds: input.run.pendingDynamicScene?.patternIds,
-      focusIds: briefFocusIds
-    });
-    if (!reviewPlan) throw new Error("decision_review_prompt_plan_missing");
-    input.context.narrativePlan = reviewPlan;
+    input.context.narrativePlan = turnPlan ? { ...turnPlan, task: "reviewing" } : undefined;
     try {
-      narrative = (await refineNarrativeProse(input.run, input.world, reviewInput, input.context)).narrative;
+      rendered = { ...rendered, ...await refineNarrativeProse(input.run, input.world, reviewInput, input.context) };
+      narrative = rendered.narrative;
     } finally {
       input.context.narrativePlan = turnPlan;
     }
   }
+  await input.onProgress?.("settling");
+  const settlement = await generateDirectedDecisionSettlement(input.run, input.world, { ...input.decision, narrative }, input.context);
   const writeSet = buildNarrativeContinuityWriteSet(
     input.run,
     decisionWritableSet,
@@ -472,13 +522,15 @@ export async function runNarrativeAgentDecision(input: {
         narrative,
         focusIds: continuityFocusIds,
         writeSet,
-        continuityRequired: rendered.continuityRequired
+        continuityRequired: rendered.continuityRequired,
+        socialForces: input.narrativeWorld.socialForces,
+        handoff: { sourceEventId: `${input.run.pendingDynamicScene?.id ?? input.callId}:decision:${input.run.history.length + 1}`, characters: [] }
       }, input.context);
     } finally {
       input.context.narrativePlan = turnPlan;
     }
     const changes = continuity as DirectedDecisionNarrativeOutcome;
-    continuityStatus = changes.assetUpdates || changes.factUpdates || changes.relationshipUpdates || changes.identityMerges?.length
+    continuityStatus = changes.assetUpdates || changes.factUpdates || changes.relationshipUpdates || changes.participants?.length || changes.identityMerges?.length
       ? "requested_changed" : "requested_empty";
   }
   const outcome: DirectedDecisionNarrativeOutcome = {
@@ -488,6 +540,7 @@ export async function runNarrativeAgentDecision(input: {
     assetActivity: rendered.assetActivity,
     ...continuity
   };
+  outcome.factUpdates = prepareNarrativeFactUpdates(input.run.runId, outcome.handoff?.sourceEventId ?? `${input.run.pendingDynamicScene?.id ?? input.callId}:decision:${input.run.history.length + 1}`, outcome.factUpdates);
   const runtime = input.run.narrative.actRuntime;
   if (!runtime) throw new Error("decision_beat_observer_runtime_missing");
   const arc = input.run.narrative.sessionPremise?.arcs.find((entry) => entry.actId === runtime.actId);
@@ -511,6 +564,7 @@ export async function runNarrativeAgentDecision(input: {
   }, input.context);
   input.run.narrative.lastBeatObservation = observation;
   outcome.observerResolvedFactIds = observation.resolvedFactIds;
+  outcome.observerResolutions = observation.resolutions;
   outcome.factUpdates = narrativeFactProgressForCommit(outcome.factUpdates);
   appendAttempt(input.run, {
     callId: input.callId,

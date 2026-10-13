@@ -9,6 +9,11 @@ import { validateNarrativeWorldFactContract } from "./content.js";
 
 const readinessStages: NarrativeMainlineActDefinition["readinessStage"][] = ["opening", "pressure", "climax"];
 
+export function narrativeStoryPackNextAct(storyPack: NarrativeStoryPackSnapshot | undefined, actId: string) {
+  const index = storyPack?.acts.findIndex((act) => act.id === actId) ?? -1;
+  return index >= 0 ? storyPack?.acts[index + 1] : undefined;
+}
+
 function endingDirection(
   storyPack: NarrativeStoryPackSnapshot,
   polarity: EndingBlueprint["polarity"]

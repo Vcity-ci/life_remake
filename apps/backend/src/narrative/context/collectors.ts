@@ -141,7 +141,8 @@ const characterProvider: NarrativeContextProvider = {
     for (const character of plan.recall?.characters ?? []) {
       const rendered = plan.activeCharacters.find((entry) => entry.startsWith(`${character.id}=`))
         ?? `${character.id}=${character.name}（${character.factionId ?? "无阵营"}，${character.role}）${character.description ? "：" + character.description : ""}${character.relationship ? "；关系：" + character.relationship : ""}`;
-      values.push(...fragment({ id: `active:character:${character.id}`, layer: "active", section: "characters", sourceType: "character", sourceIds: [`character:${character.id}`], priority: 88, content: rendered }));
+      values.push(...fragment({ id: `active:character:${character.id}`, layer: "active", section: "characters", sourceType: "character", sourceIds: [`character:${character.id}`], priority: 88, content: rendered,
+        required: ["background", "rendering", "dynamic", "decision"].includes(plan.task) }));
     }
     const knownIds = new Set((plan.recall?.characters ?? []).map((entry) => entry.id));
     for (const character of plan.activeCharacters.filter((entry) => !Array.from(knownIds).some((id) => entry.startsWith(`${id}=`)))) {
@@ -157,6 +158,8 @@ const factProvider: NarrativeContextProvider = {
     if (!plan?.task) return [];
     const detailed = new Set([...(plan.recall?.facts ?? []).map((entry) => entry.id), ...(plan.recall?.resolvedFacts ?? []).map((entry) => entry.id)]);
     return [
+      ...(plan.effectiveBackground ? fragment({ id: "runtime:effective-background", layer: "runtime", section: "facts", sourceType: "effective-background", priority: 92,
+        content: `当前有效背景：${plan.effectiveBackground}`, required: true }) : []),
       ...(plan.factDirectory ?? []).filter((fact) => !detailed.has(fact.id)).flatMap((fact) => fragment({ id: `active:fact-directory:${fact.id}`, layer: "active", section: "factDirectory", sourceType: "fact-directory", sourceIds: [`fact:${fact.id}`], priority: 55, content: `${fact.id}=${fact.label}` })),
       ...(plan.recall?.facts ?? []).flatMap((fact) => fragment({ id: `active:fact:${fact.id}`, layer: "active", section: "facts", sourceType: "fact", sourceIds: [`fact:${fact.id}`], priority: 95, content: `${fact.id}：${fact.label}` })),
       ...(plan.recall?.resolvedFacts ?? []).flatMap((fact) => fragment({ id: `recall:resolved-fact:${fact.id}`, layer: "recall", section: "resolvedFacts", sourceType: "resolved-fact", sourceIds: [`fact:${fact.id}`], priority: plan.task === "ending" ? 90 : 45, content: fact.label }))
@@ -175,6 +178,7 @@ const assetProvider: NarrativeContextProvider = {
       sourceType: asset.kind,
       sourceIds: [`${asset.kind}:${asset.id}`],
       priority: asset.text.includes("当前所在") ? 82 : 52,
+      required: ["background", "rendering", "dynamic", "decision"].includes(plan.task ?? ""),
       content: asset.text
     }));
     return plan.assetContext ? fragment({ id: narrativeContentId("assets", plan.assetContext), layer: "recall", section: "assets", sourceType: "assets", priority: 60, content: plan.assetContext }) : [];

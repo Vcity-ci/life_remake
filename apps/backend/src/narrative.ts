@@ -41,11 +41,12 @@ import type {
 } from "@reroll/shared";
 import { narrativeTextOverlap } from "./narrative-memory.js";
 import { normalizeNarrativeHandoffFact } from "./narrative-continuity.js";
-import type { NarrativeTask } from "./narrative-prompts.js";
+import { normalizeNarrativeText, type NarrativeTask } from "./narrative-prompts.js";
 import { createDefaultGameplayTuning } from "@reroll/shared";
 import { formatNarrativeAssets, normalizeNarrativeAssets, selectNarrativeAssets } from "./narrative-assets.js";
 import { selectNarrativeEpisodeRecall } from "./narrative/episodes.js";
 import { normalizeNarrativeStageTask } from "./narrative/stage-task.js";
+import { narrativeStoryPackNextAct } from "./narrative-experience.js";
 
 export interface NarrativePromptSource {
   aiConversation?: AiConversationState;
@@ -105,6 +106,7 @@ export interface NarrativePromptPlan {
   actHandoff?: string[];
   actCanon?: Array<{ actId: string; sourceEventId: string; text: string; factIds: string[] }>;
   memoryDigests?: Array<{ id: string; text: string; sourceIds: string[] }>;
+  effectiveBackground?: string;
   styleRules: string[];
   endingGuide?: string;
   activeLore: string[];
@@ -549,7 +551,7 @@ export function ensureNarrativeRunState(
         introducedAge: normalizeAge(component.introducedAge),
         lastTouchedAge: normalizeAge(component.lastTouchedAge),
         facts: Array.isArray(component.facts)
-          ? uniqueRecent(component.facts.map((fact) => compactText(String(fact), 120)), 6)
+          ? uniqueRecent(component.facts.map((fact) => (String(fact)).trim()), 6)
           : []
       }))
     : [];
@@ -598,7 +600,7 @@ export function ensureNarrativeRunState(
     if (!value || typeof value !== "object") return undefined;
     const source = value as Partial<NarrativeCharacterRelationship>;
     if (!relationshipStances.includes(source.stance as NarrativeCharacterRelationship["stance"])) return undefined;
-    const summary = typeof source.summary === "string" ? compactText(source.summary, 160) : "";
+    const summary = typeof source.summary === "string" ? (source.summary).trim() : "";
     if (!summary) return undefined;
     return {
       stance: source.stance as NarrativeCharacterRelationship["stance"],
@@ -614,10 +616,10 @@ export function ensureNarrativeRunState(
       ))
       .map((character) => ({
         id: compactText(character.id, 80),
-        name: compactText(character.name, 60),
+        name: (character.name).trim(),
         factionId: character.factionId ? compactText(character.factionId, 80) : undefined,
-        role: compactText(character.role, 100),
-        description: compactText(character.description, 240),
+        role: (character.role).trim(),
+        description: (character.description).trim(),
         relatedFactIds: uniqueRecent(character.relatedFactIds ?? [], 8),
         relatedRouteIds: uniqueRecent(character.relatedRouteIds ?? [], 8),
         relationship: normalizeRelationship(character.relationship),
@@ -664,7 +666,7 @@ export function ensureNarrativeRunState(
       characterIds: uniqueRecent(entry.characterIds ?? [], 8),
       locationIds: uniqueRecent(entry.locationIds ?? [], 6),
       abilityIds: uniqueRecent(entry.abilityIds ?? [], 6),
-      storyDelta: entry.storyDelta?.trim() ? compactText(entry.storyDelta, 140) : undefined,
+      storyDelta: entry.storyDelta?.trim() ? (entry.storyDelta).trim() : undefined,
       createdAt: Number.isFinite(entry.createdAt) ? Math.max(0, Math.trunc(entry.createdAt)) : 0
     }))
     : [];
@@ -676,9 +678,9 @@ export function ensureNarrativeRunState(
       sourceEventId: compactText(entry.sourceEventId, 140),
       resolvedAge: normalizeAge(entry.resolvedAge),
       routeId: entry.routeId ? compactText(entry.routeId, 100) : undefined,
-      resolvedTension: compactText(entry.resolvedTension, 180),
-      lastingConsequence: compactText(entry.lastingConsequence, 180),
-      continuation: compactText(entry.continuation, 180),
+      resolvedTension: (entry.resolvedTension).trim(),
+      lastingConsequence: (entry.lastingConsequence).trim(),
+      continuation: (entry.continuation).trim(),
       factIds: uniqueRecent(entry.factIds ?? [], 12)
     }))
     : [];
@@ -688,6 +690,7 @@ export function ensureNarrativeRunState(
       entry?.id && digestScopes.includes(entry.scope) && entry?.throughEpisodeId && entry?.summary
     )).slice(-64).map((entry) => ({
       id: compactText(entry.id, 140),
+      format: entry.format === "effective_facts" ? "effective_facts" : undefined,
       scope: entry.scope,
       scopeId: entry.scopeId ? compactText(entry.scopeId, 120) : undefined,
       revision: Math.max(1, Math.trunc(Number(entry.revision) || 1)),
@@ -709,15 +712,15 @@ export function ensureNarrativeRunState(
           actId: compactText(rawHorizon.actId, 120),
           revision: Math.max(1, Math.trunc(Number(rawHorizon.revision) || 1)),
           throughEpisodeId: rawHorizon.throughEpisodeId ? compactText(rawHorizon.throughEpisodeId, 140) : undefined,
-          dramaticQuestion: compactText(rawHorizon.dramaticQuestion, 220),
-          developingTension: compactText(rawHorizon.developingTension, 260),
+          dramaticQuestion: (rawHorizon.dramaticQuestion).trim(),
+          developingTension: (rawHorizon.developingTension).trim(),
           intents: rawHorizonIntents.slice(0, 4).filter((entry) => entry?.id && entry?.goal).map((entry) => ({
             id: compactText(entry.id, 180),
-            goal: compactText(entry.goal, 180),
+            goal: (entry.goal).trim(),
             status: entry.status === "consumed" ? "consumed" : "active"
           })),
           focusRefs: uniqueRecent(rawHorizon.focusRefs ?? [], 8),
-          payoffShape: compactText(rawHorizon.payoffShape, 220),
+          payoffShape: (rawHorizon.payoffShape).trim(),
           status: rawHorizon.status === "stale" ? "stale" : "active",
           createdAt: Math.max(0, Math.trunc(Number(rawHorizon.createdAt) || 0))
         }
@@ -755,8 +758,8 @@ export function ensureNarrativeRunState(
       Array.isArray((focus as NarrativeGrowthFocusDefinition).primaryStats)
     )).slice(0, 8).map((focus) => ({
       id: compactText(focus.id, 80),
-      label: compactText(focus.label, 60),
-      description: compactText(focus.description, 180),
+      label: (focus.label).trim(),
+      description: (focus.description).trim(),
       primaryStats: focus.primaryStats.filter((stat): stat is keyof Stats => ["intelligence", "charisma", "family", "fortune", "physique"].includes(stat)).slice(0, 3),
       secondaryStats: focus.secondaryStats?.filter((stat): stat is keyof Stats => ["intelligence", "charisma", "family", "fortune", "physique"].includes(stat)).slice(0, 3)
     })).filter((focus) => focus.id && focus.label && focus.description && focus.primaryStats.length > 0)
@@ -788,7 +791,7 @@ export function ensureNarrativeRunState(
       for (const tier of tierKeys) {
         const label = labels[tier];
         if (typeof label !== "string" || !label.trim()) return undefined;
-        normalized[tier] = compactText(label, 32);
+        normalized[tier] = (label).trim();
       }
       presentation[stat] = normalized;
     }
@@ -798,9 +801,9 @@ export function ensureNarrativeRunState(
     ? {
       status: "ready" as const,
       profile: {
-        summary: compactText(state.opening.profile.summary, 180),
+        summary: (state.opening.profile.summary).trim(),
         seedHints: Array.isArray(state.opening.profile.seedHints)
-          ? Array.from(new Set(state.opening.profile.seedHints.map((hint) => compactText(String(hint), 90))))
+          ? Array.from(new Set(state.opening.profile.seedHints.map((hint) => (String(hint)).trim())))
           : []
       }
     }
@@ -809,15 +812,15 @@ export function ensureNarrativeRunState(
       : undefined;
   const sessionPremise = state.sessionPremise?.protagonistAnchor?.trim() && state.sessionPremise.centralTension?.trim() && state.sessionPremise.storyPromise?.trim()
     ? {
-        protagonistAnchor: compactText(state.sessionPremise.protagonistAnchor, 220),
-        centralTension: compactText(state.sessionPremise.centralTension, 220),
-        storyPromise: compactText(state.sessionPremise.storyPromise, 260),
-        keywords: uniqueRecent(state.sessionPremise.keywords ?? [], 6).map((value) => compactText(value, 32)),
+        protagonistAnchor: (state.sessionPremise.protagonistAnchor).trim(),
+        centralTension: (state.sessionPremise.centralTension).trim(),
+        storyPromise: (state.sessionPremise.storyPromise).trim(),
+        keywords: uniqueRecent(state.sessionPremise.keywords ?? [], 6).map((value) => (value).trim()),
         arcs: (state.sessionPremise.arcs ?? []).filter((arc) => arc?.actId).slice(0, 8).map((arc) => ({
           actId: compactText(arc.actId, 120),
-          dramaticQuestion: compactText(arc.dramaticQuestion, 180),
-          pressureSource: compactText(arc.pressureSource, 180),
-          payoffPossibility: compactText(arc.payoffPossibility, 180)
+          dramaticQuestion: (arc.dramaticQuestion).trim(),
+          pressureSource: (arc.pressureSource).trim(),
+          payoffPossibility: (arc.payoffPossibility).trim()
         }))
       }
     : undefined;
@@ -838,7 +841,7 @@ export function ensureNarrativeRunState(
   const sceneClock = rawClock && (rawClock.mode === "advance" || rawClock.mode === "hold")
     ? {
         mode: rawClock.mode,
-        sameAgeTurnCount: Math.max(0, Math.min(8, Number(rawClock.sameAgeTurnCount) || 0)),
+        sameAgeTurnCount: Math.max(0, Math.trunc(Number(rawClock.sameAgeTurnCount) || 0)),
         maxSameAgeTurns: Math.max(1, Math.min(5, Number(rawClock.maxSameAgeTurns) || defaults.sceneClock.maxSameAgeTurns))
       }
     : defaults.sceneClock;
@@ -857,10 +860,10 @@ export function ensureNarrativeRunState(
     rawEndingBrief.lifeTheme?.trim() && rawEndingBrief.achievement?.trim() && rawEndingBrief.cost?.trim() && rawEndingBrief.legacy?.trim()
       ? {
           polarity: rawEndingBrief.polarity,
-          lifeTheme: compactText(rawEndingBrief.lifeTheme, 120),
-          achievement: compactText(rawEndingBrief.achievement, 180),
-          cost: compactText(rawEndingBrief.cost, 180),
-          legacy: compactText(rawEndingBrief.legacy, 180),
+          lifeTheme: (rawEndingBrief.lifeTheme).trim(),
+          achievement: (rawEndingBrief.achievement).trim(),
+          cost: (rawEndingBrief.cost).trim(),
+          legacy: (rawEndingBrief.legacy).trim(),
           anchorIds: uniqueRecent(rawEndingBrief.anchorIds ?? [], 3),
           createdAt: Math.max(0, Math.trunc(Number(rawEndingBrief.createdAt) || 0))
         }
@@ -1111,7 +1114,7 @@ function applyNarrativeComponentTransitions(
       ...(current?.facts ?? []),
       ...(current ? [] : component.facts ?? []),
       ...(transition.fact ? [transition.fact] : [])
-    ].map((fact) => compactText(fact, 120)), 6);
+    ].map((fact) => (fact).trim()), 6);
     states.set(component.id, {
       id: component.id,
       status: transition.status,
@@ -1749,60 +1752,42 @@ export function selectDynamicNarrativeContext(
     return relevance(fact) + (fact.priority ?? 0) / 4 - stalePenalty - repetitionPenalty;
   };
   const facts = (source.story.factLedger?.facts ?? []).map(normalizeNarrativeHandoffFact);
-  const selectedFacts = origin ? [] : facts.filter((fact) => fact.status === "open" && relevance(fact) > 0 && (belongsToCurrentAct(fact) || explicitlyFocused(fact)))
+  const selectedFacts = origin ? [] : facts.filter((fact) => fact.status === "open" && (!background || explicitlyFocused(fact)) && relevance(fact) > 0 && (belongsToCurrentAct(fact) || explicitlyFocused(fact)))
     .sort((a, b) => Number(explicitlyFocused(b)) - Number(explicitlyFocused(a)) || rankFact(b) - rankFact(a)).slice(0, background ? 1 : query.backgroundAllowed ? 2 : 4);
   const resolvedFactVisibility = query.task === "ending" ? "all" : query.resolvedFactVisibility ?? "none";
   const resolvedFacts = origin || resolvedFactVisibility === "none" ? [] : facts.filter((fact) => fact.status === "resolved" &&
     (resolvedFactVisibility === "all" || Boolean(query.actId && fact.actId === query.actId)) &&
     (query.task === "ending" || relevance(fact) > 0))
     .sort((a, b) => rankFact(b) - rankFact(a)).slice(0, query.task === "ending" ? 8 : 2);
-  const factIds = [...selectedFacts, ...resolvedFacts.filter((fact) => query.factIds?.includes(fact.id))].map((fact) => fact.id);
-  const rankedCharacters = source.narrative.dynamicCharacters
-    .map((character) => ({ character, score:
-      overlapCount([character.id], query.characterIds) * 20 +
-      overlapCount([character.id], source.narrative.activeCharacterIds) * 8 +
-      narrativeTextOverlap(`${character.name} ${character.description} ${character.relationship?.summary ?? ""}`, query.text ?? "") * 10 +
-      overlapCount(character.relatedFactIds, factIds) * 5 +
-      (character.factionId && query.factionIds?.includes(character.factionId) ? 4 : 0)
-    })).sort((a, b) => b.score - a.score);
-  const detailed = rankedCharacters.filter(({ score }) => score > 0).slice(0, 5).map(({ character }) => character.id);
-  const characters = rankedCharacters.filter(({ character }) => detailed.includes(character.id)).map(({ character }) => ({
+  const directCharacters = Array.from(new Set(query.characterIds ?? source.narrative.activeCharacterIds));
+  const characters = source.narrative.dynamicCharacters.filter((character) => directCharacters.includes(character.id)).map((character) => ({
     id: character.id, name: character.name, factionId: character.factionId, role: character.role,
-    description: `${character.status === "active" ? "" : character.status === "gone" ? "已离场。" : "此前交往已告一段落。"}${detailed.includes(character.id) ? character.description : ""}`,
-    relationship: detailed.includes(character.id) && character.relationship ? `${character.relationship.stance}：${character.relationship.summary}` : undefined
+    description: `${character.status === "active" ? "" : character.status === "gone" ? "已离场。" : "此前交往已告一段落。"}${character.description}`,
+    relationship: character.relationship ? `${character.relationship.stance}：${character.relationship.summary}` : undefined
   }));
-  const directCharacters = Array.from(new Set([
-    ...(query.characterIds ?? []),
-    ...rankedCharacters.filter(({ character }) => query.text?.includes(character.name)).map(({ character }) => character.id)
-  ]));
-  const assetQuery = {
-    characterIds: directCharacters,
-    factIds: query.factIds,
-    factionIds: query.factionIds,
+  const assets = source.narrative.assets ?? normalizeNarrativeAssets();
+  const selectedAssets = selectNarrativeAssets(assets, {
     locationIds: query.locationIds,
     abilityIds: query.abilityIds,
-    text: query.text
-  };
-  const assets = source.narrative.assets ?? normalizeNarrativeAssets();
-  const selectedAssets = selectNarrativeAssets(assets, assetQuery);
-  const selectedLocationIds = new Set(selectedAssets.locations.map((entry) => entry.id));
-  const selectedAbilityIds = new Set(selectedAssets.abilities.map((entry) => entry.id));
-  const memorySources = origin ? [] : retrieveNarrativeMemoryEntries(source, {
+    includeCurrentLocation: query.task !== "continuity"
+  });
+  if (query.task !== "continuity") selectedAssets.abilities = selectedAssets.abilities.filter((entry) => entry.status === "available");
+  const memorySources = !["horizon", "closure", "ending"].includes(query.task ?? "") ? [] : retrieveNarrativeMemoryEntries(source, {
     ...query, characterIds: directCharacters, factIds: query.factIds, memoryIds: query.memoryIds,
-    abilityIds: selectedAssets.abilities.filter((entry) => query.text?.includes(entry.name)).map((entry) => entry.id)
+    abilityIds: selectedAssets.abilities.map((entry) => entry.id)
   });
   return {
-    assetContext: formatNarrativeAssets(assets, assetQuery),
+    assetContext: formatNarrativeAssets(selectedAssets),
     assetSources: [
       ...selectedAssets.locations.map((entry) => ({
         id: entry.id,
         kind: "location" as const,
-        text: `${entry.id}=${entry.name}${entry.id === assets.currentLocationId ? "（当前所在）" : ""}${selectedLocationIds.has(entry.id) ? "：" + entry.description.slice(0, 100) : ""}`
+        text: `${entry.id}=${entry.name}${entry.id === assets.currentLocationId ? "（当前所在）" : ""}${entry.spatialDescription ? `：${entry.spatialDescription}` : ""}`
       })),
       ...selectedAssets.abilities.map((entry) => ({
         id: entry.id,
         kind: "ability" as const,
-        text: `${entry.id}=${entry.name}（${entry.status === "available" ? "可用" : "不可用"}）${selectedAbilityIds.has(entry.id) ? entry.mastery + "：" + entry.description.slice(0, 120) : ""}`
+        text: `${entry.id}=${entry.name}（${entry.status === "available" ? "可用" : "不可用"}）${entry.usage ? `：${entry.usage}` : ""}`
       }))
     ],
     characters,
@@ -1865,18 +1850,28 @@ function buildTaskNarrativePlan(
   const recalledPatternIds = task === "decision" ? pending?.patternIds : options?.patternIds;
   const recalledForceIds = task === "decision" ? pending?.forceIds : options?.factionIds;
   const episodeFocusIds = Array.from(new Set([...(options?.focusIds ?? []), ...(recalledForceIds ?? [])]));
-  const episodeRecall = selectNarrativeEpisodeRecall(source.narrative, {
+  const episodeRecall = ["horizon", "closure", "ending"].includes(task) ? selectNarrativeEpisodeRecall(source.narrative, {
     actId: act?.id,
     routeId: recalledPatternIds?.[0],
     focusIds: episodeFocusIds,
     mode: task === "horizon" ? "horizon" : task === "closure" || task === "ending" ? "archive" : "prose"
-  });
+  }) : { memoryIds: [], canon: [], digests: [] };
   const priorActCanon = source.narrative.actCanon
     .filter((entry) => entry.actId !== act?.id)
     .at(-1);
   const priorActCarryFactIds = beat === "setup" ? (priorActCanon?.factIds ?? []) : [];
   const focusFactIds = Array.from(new Set([...(options?.focusIds ?? []), ...priorActCarryFactIds]))
     .filter((id) => source.story.factLedger?.facts.some((fact) => fact.id === id));
+  const latestEpisode = source.narrative.episodes.at(-1);
+  const assetFocusIds = options?.focusIds ?? (task === "continuity" ? [] : [
+    ...source.narrative.activeCharacterIds,
+    ...(latestEpisode?.characterIds ?? []),
+    ...(latestEpisode?.locationIds ?? []),
+    ...(latestEpisode?.abilityIds ?? [])
+  ]);
+  const focusedCharacterIds = assetFocusIds.filter((id) => source.narrative.dynamicCharacters.some((character) => character.id === id));
+  const focusedLocationIds = assetFocusIds.filter((id) => source.narrative.assets?.locations.some((location) => location.id === id));
+  const focusedAbilityIds = assetFocusIds.filter((id) => source.narrative.assets?.abilities.some((ability) => ability.id === id));
   const selectedRecall = selectDynamicNarrativeContext(source, {
     task,
     actId: act?.id,
@@ -1890,14 +1885,14 @@ function buildTaskNarrativePlan(
           ...focusFactIds
         ])),
     characterIds: task === "decision"
-      ? pending?.characterIds
-      : (options?.focusIds ?? []).filter((id) => source.narrative.dynamicCharacters.some((character) => character.id === id)),
+      ? Array.from(new Set([...(pending?.characterIds ?? []), ...focusedCharacterIds]))
+      : focusedCharacterIds,
     locationIds: task === "decision"
-      ? Array.from(new Set([...(pending?.locationIds ?? []), ...(options?.focusIds ?? []).filter((id) => source.narrative.assets?.locations.some((location) => location.id === id))]))
-      : (options?.focusIds ?? []).filter((id) => source.narrative.assets?.locations.some((location) => location.id === id)),
+      ? Array.from(new Set([...(pending?.locationIds ?? []), ...focusedLocationIds]))
+      : focusedLocationIds,
     abilityIds: task === "decision"
-      ? Array.from(new Set([...(pending?.abilityIds ?? []), ...(options?.focusIds ?? []).filter((id) => source.narrative.assets?.abilities.some((ability) => ability.id === id))]))
-      : (options?.focusIds ?? []).filter((id) => source.narrative.assets?.abilities.some((ability) => ability.id === id)),
+      ? Array.from(new Set([...(pending?.abilityIds ?? []), ...focusedAbilityIds]))
+      : focusedAbilityIds,
     memoryIds: episodeRecall.memoryIds,
     text: taskQuery,
     resolvedFactVisibility: beat === "payoff" && (task === "planning" || task === "rendering" || task === "dynamic")
@@ -1949,6 +1944,7 @@ function buildTaskNarrativePlan(
   const worldCardDiagnostics: Array<{ id: string; reason: string }> = [];
   const storyPack = (world as NarrativeWorldDefinition & { storyPack?: NarrativeStoryPackSnapshot }).storyPack;
   const storyPackAct = storyPack?.acts.find((entry) => entry.id === act?.id);
+  const nextStoryPackAct = storyPackAct && beat === "payoff" ? narrativeStoryPackNextAct(storyPack, storyPackAct.id) : undefined;
   const preferredWorldCardIds = Array.from(new Set([
     ...(storyPack?.worldCardRefs ?? []),
     ...(storyPackAct?.worldCardRefs ?? [])
@@ -2013,16 +2009,18 @@ function buildTaskNarrativePlan(
         : task === "closure" || task === "ending"
         ? [premiseAnchor[0], world.mainlineSkeleton?.payoff].filter(Boolean).join("\n")
         : undefined;
-  const routeGuidance = !storyPack ? undefined : task === "background"
-    ? `${storyPack.name}：${storyPack.tagline}；人物长期轨迹=${storyPack.protagonistTrajectory}`
-    : task === "planning"
+  const routeGuidance = !storyPack ? undefined : task === "planning"
       ? [
           ...premiseAnchor,
           `${storyPack.name}：${storyPack.routePromise}；人物轨迹=${storyPack.protagonistTrajectory}；持续对抗=${storyPack.coreOpposition}`,
+          `路线核心矛盾=${storyPack.centralConflict}`,
           `风险升级=${storyPack.stakesProgression}；终局问题=${storyPack.endingQuestion}`,
           storyPackAct ? `当前阶段“${storyPackAct.label}”：目标=${storyPackAct.objective}；核心问题=${storyPackAct.dramaticQuestion}；阶段成果=${storyPackAct.payoffMeaning}` : "",
           storyPackAct ? `本幕完整发展大纲：${(["setup", "escalation", "pressure", "climax", "payoff"] as const).map((step) => `${step}：${storyPackAct.beatOutline[step]}`).join("；")}` : "",
-          beat ? `本轮只发展当前节拍“${beat}”。` : ""
+          beat ? `本轮只发展当前节拍“${beat}”。` : "",
+          beat === "payoff" ? nextStoryPackAct
+            ? `收束交接方向：下一幕“${nextStoryPackAct.label}”的目标=${nextStoryPackAct.objective}。以本幕实际结果形成进入该处境的因果条件。`
+            : "本幕是所选路线的最后一幕，收束形成最终处境与余波。" : ""
         ].filter(Boolean).join("\n")
       : undefined;
   return {
@@ -2032,6 +2030,7 @@ function buildTaskNarrativePlan(
     actHandoff: handoff.map((fact) => fact.resolutionSummary ?? fact.progressSummary ?? fact.label),
     actCanon: episodeRecall.canon,
     memoryDigests: episodeRecall.digests,
+    effectiveBackground: task === "planning" ? source.narrative.memoryDigests.find((digest) => digest.id === "run" && digest.format === "effective_facts")?.summary : undefined,
     persona: source.personaPrompt,
     talents: source.cards.map((card) => [
       `${card.name}：${card.narrative?.bias ?? card.description ?? ""}`,
@@ -2053,8 +2052,7 @@ function buildTaskNarrativePlan(
     ].join("\n") : world.storyBible,
     narrativePaletteContext: world.narrativePalette ? {
       background: [
-        `生活场景：${world.narrativePalette.sceneModes.join("、")}`,
-        `生活中的张力来源：${world.narrativePalette.conflictSources.join("、")}`
+        `日常生活环境：${world.worldCore?.everydayLife ?? "家庭起居、谋生学习、身体成长与身边人的交往"}`
       ].join("；"),
       scene: [
         `可用场景：${world.narrativePalette.sceneModes.join("、")}`,
@@ -2213,17 +2211,17 @@ export function buildNarrativePromptPlan(
   return {
     storyBible: world.storyBible,
     origin: source.narrative.opening?.status === "ready"
-      ? compactText([
+      ? normalizeNarrativeText([
         source.narrative.opening.profile?.summary ?? "",
         ...(source.narrative.opening.profile?.seedHints ?? [])
-      ].filter(Boolean).join("；"), 220)
+      ].filter(Boolean).join("；"))
       : "",
     mainlineSkeleton: world.mainlineSkeleton
-      ? compactText([
+      ? normalizeNarrativeText([
         `总冲突：${world.mainlineSkeleton.premise}`,
         `当前骨架节点：${skeletonFocus}`,
         activeMainlineAct ? `当前世界推进：${activeMainlineAct.prompt}` : ""
-      ].join("\n"), 380)
+      ].join("\n"))
       : undefined,
     styleRules: world.styleRules.slice(0, 4),
     activeLore,
@@ -2231,25 +2229,18 @@ export function buildNarrativePromptPlan(
     plotEssentials: Array.from(new Set([...factEssentials, ...plotEssentials])).slice(0, 6),
     activeThreads,
     activeCharacters: Array.from(new Set([...staticActiveCharacters, ...dynamicActiveCharacters, ...routeCharacters])).slice(0, 5),
-    assetContext: formatNarrativeAssets(source.narrative.assets, {
-      routeIds: directionId ? [directionId] : undefined,
-      characterIds: source.narrative.activeCharacterIds,
-      factIds: (source.story.factLedger?.facts ?? [])
-        .filter((fact) => fact.status === "open")
-        .filter((fact) => !directionId || !fact.routeIds?.length || fact.routeIds.includes(directionId))
-        .slice(-4)
-        .map((fact) => fact.id),
-      maxLocations: 3,
-      maxAbilities: 3
-    }),
+    assetContext: formatNarrativeAssets(selectNarrativeAssets(source.narrative.assets ?? normalizeNarrativeAssets(), {
+      locationIds: options?.focusIds,
+      abilityIds: options?.focusIds
+    })),
     scene: `场景=${source.narrative.assets?.locations.find((entry) => entry.id === source.narrative.assets?.currentLocationId)?.name ?? source.narrative.scene.place}；冲突=${source.narrative.scene.conflict}；余波=${source.narrative.scene.aftermath}`,
     authorNote: buildAuthorNote(source, activeComponents[0]),
-    endingGuide: world.endingGuide ? compactText(world.endingGuide, 150) : undefined,
+    endingGuide: world.endingGuide ? normalizeNarrativeText(world.endingGuide) : undefined,
     ending: [
       ending
         ? `结局倾向=${ending.title}/${ending.polarity}；评价人物这一生实际形成的选择、关系、能力与代价。最终余响以本局已完成经历为准，不把世界包中的可能性写成本局既定事实。`
         : "",
-      world.endingGuide ? `结局文风：${compactText(world.endingGuide, 150)}` : ""
+      world.endingGuide ? `结局文风：${normalizeNarrativeText(world.endingGuide)}` : ""
     ].filter(Boolean).join("\n"),
     selectedRoute: selectedRoute ? {
       label: selectedRoute.label || selectedRoute.directionId,
@@ -2345,34 +2336,34 @@ export function formatNarrativePromptPlan(
 ): string {
   if (!plan) return "";
   if (plan.task) return [formatTaskNarrativeContext(plan), projection === "ending" ? [plan.ending, plan.endingGuide ? `结局文风：${plan.endingGuide}` : ""].filter(Boolean).join("\n") : ""].filter(Boolean).join("\n");
-  const lore = compactText((plan.contextLayers?.lore ?? plan.activeLore).map((entry) => compactText(entry, 78)).join("；"), 240);
-  const essentials = compactText((plan.contextLayers?.essentials ?? plan.plotEssentials).map((entry) => compactText(entry, 112)).join("；"), 360);
-  const shortTerm = compactText((plan.contextLayers?.shortTerm ?? []).map((entry) => compactText(entry, 100)).join("；"), 200);
-  const threads = compactText(plan.activeThreads.map((entry) => compactText(entry, 88)).join("；"), 220);
-  const characters = compactText(plan.activeCharacters.map((entry) => compactText(entry, 72)).join("；"), 220);
+  const lore = normalizeNarrativeText((plan.contextLayers?.lore ?? plan.activeLore).map((entry) => normalizeNarrativeText(entry)).join("；"));
+  const essentials = normalizeNarrativeText((plan.contextLayers?.essentials ?? plan.plotEssentials).map((entry) => normalizeNarrativeText(entry)).join("；"));
+  const shortTerm = normalizeNarrativeText((plan.contextLayers?.shortTerm ?? []).map((entry) => normalizeNarrativeText(entry)).join("；"));
+  const threads = normalizeNarrativeText(plan.activeThreads.map((entry) => normalizeNarrativeText(entry)).join("；"));
+  const characters = normalizeNarrativeText(plan.activeCharacters.map((entry) => normalizeNarrativeText(entry)).join("；"));
   const route = plan.selectedRoute;
   const routeDetail = route && projection !== "planning"
-    ? compactText([
+    ? normalizeNarrativeText([
       `当前路线视角：${route.summary}`,
       route.perspective ? `人物落点：${route.perspective}` : "",
       route.escalation ? `可加重的矛盾：${route.escalation}` : "",
       route.crisis ? `与世界危机的连接：${route.crisis}` : "",
       route.payoffFocus ? `可回收方向：${route.payoffFocus}` : "",
       route.materials.length ? `既有素材：${route.materials.join("；")}` : ""
-    ].filter(Boolean).join("\n"), 520)
+    ].filter(Boolean).join("\n"))
     : "";
   return [
-    plan.origin ? `人物身世：${compactText(plan.origin, 180)}` : "",
+    plan.origin ? `人物身世：${normalizeNarrativeText(plan.origin)}` : "",
     plan.mainlineSkeleton ? `必须遵循的主线因果：${plan.mainlineSkeleton}` : "",
     lore ? `相关世界事实：${lore}` : "",
     essentials ? `已确立的关键事实：${essentials}` : "",
     threads ? `仍待回应的旧事：${threads}` : "",
     characters ? `此刻相关的人物：${characters}` : "",
     plan.assetContext ?? "",
-    plan.scene ? compactText(plan.scene, 180) : "",
+    plan.scene ? normalizeNarrativeText(plan.scene) : "",
     shortTerm ? `近期余波：${shortTerm}` : "",
     routeDetail,
-    plan.authorNote ? `写作重点：${compactText(plan.authorNote, 140)}` : "",
-    projection === "ending" && plan.ending ? compactText(plan.ending, 220) : ""
+    plan.authorNote ? `写作重点：${normalizeNarrativeText(plan.authorNote)}` : "",
+    projection === "ending" && plan.ending ? normalizeNarrativeText(plan.ending) : ""
   ].filter(Boolean).join("\n");
 }

@@ -568,7 +568,7 @@ export default function App(): React.JSX.Element {
         async (event: GameStreamEvent) => {
           if (event.type === "progress") {
             const progressText = {
-              settling: "正在结算这次选择的后果...",
+              settling: "正在结算这段经历的变化...",
               rendering: "正在书写这段经历...",
               syncing: "正在整理人物与故事脉络...",
               committing: "正在保存人生记录..."

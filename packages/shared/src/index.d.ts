@@ -730,6 +730,7 @@ export interface NarrativeLocation extends NarrativeAssetLinks {
     id: string;
     name: string;
     description: string;
+    spatialDescription?: string;
     introduced: NarrativeAssetMoment;
     lastSeen: NarrativeAssetMoment;
 }
@@ -737,6 +738,7 @@ export interface NarrativeAbility extends NarrativeAssetLinks {
     id: string;
     name: string;
     description: string;
+    usage?: string;
     source: string;
     mastery: string;
     status: "available" | "unavailable";
@@ -759,12 +761,14 @@ export interface NarrativeAssetUpdates {
         ref: string;
         name: string;
         description: string;
+        spatialDescription?: string;
         current: boolean;
     }>;
     abilities: Array<{
         ref: string;
         name: string;
         description: string;
+        usage?: string;
         source: string;
         mastery: string;
         status: NarrativeAbility["status"];
@@ -788,7 +792,8 @@ export interface NarrativeAssetActivity {
  */
 export interface NarrativeFactUpdates {
     introduce: Array<Pick<StoryFactDefinition, "kind" | "label" | "priority"> & {
-        status?: "open" | "resolved";
+        status?: "open" | "resolved"; /** Engine-assigned before observation. Not a model tool field. */
+        id?: string;
     }>;
     touchFactIds: string[];
     resolveFactIds: string[];
@@ -803,8 +808,9 @@ export interface NarrativeFactUpdates {
 }
 export interface NarrativeRelationshipUpdate {
     characterRef: string;
-    stance: NarrativeRelationshipStance;
-    summary: string;
+    stance?: NarrativeRelationshipStance;
+    summary?: string;
+    role?: string;
     status?: NarrativeDynamicCharacter["status"];
     description?: string;
 }
@@ -857,6 +863,7 @@ export type NarrativeMemoryDigestScope = "run" | "act" | "route" | "character" |
 /** Model-curated view over committed Episodes. It may summarize, never create game facts. */
 export interface NarrativeMemoryDigest {
     id: string;
+    format?: "effective_facts";
     scope: NarrativeMemoryDigestScope;
     scopeId?: string;
     revision: number;
@@ -959,7 +966,14 @@ export interface NarrativeSessionPremise {
 }
 export interface NarrativeBeatObservation {
     decision: "hold" | "advance";
+    /** A current-beat shortfall for the next planner, present only on hold. */
+    progressGap?: string;
     resolvedFactIds: string[];
+    resolutions?: Array<{
+        factId: string;
+        summary: string;
+    }>;
+    actHandoff?: NarrativeActHandoff;
     carryFactIds: string[];
     actId: string;
     beat: Exclude<NarrativeBeat, "ending">;

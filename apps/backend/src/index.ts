@@ -1,4 +1,5 @@
 import { commitNarrativeMemory } from "./narrative-memory.js";
+import { registerNarrativeParticipants } from "./narrative-characters.js";
 import dotenv from "dotenv";
 import cors from "cors";
 import express from "express";
@@ -32,7 +33,7 @@ import type {
   YearEvent
 } from "@reroll/shared";
 import { createDefaultGameplayTuning } from "@reroll/shared";
-import { narrativeFactResolutionModes } from "./narrative-continuity.js";
+import { narrativeFactResolutionModes, prepareNarrativeFactUpdates } from "./narrative-continuity.js";
 import { applyNarrativeAssetActivity, applyNarrativeAssetUpdates, commitNarrativeAssets, narrativeAbilityDirectory, narrativeLocationDirectory } from "./narrative-assets.js";
 import { applyNarrativeIdentityMerges, canonicalizeNarrativeReferences, narrativeCharacterDirectory } from "./narrative-identities.js";
 import {
@@ -51,9 +52,9 @@ import {
 } from "./ai.js";
 import { generateNarrativeRender, generateNarrativeTurn } from "./narrative-provider.js";
 import { commitNarrativeActCanon, commitNarrativeEpisode, runNarrativeTurnTransaction } from "./narrative/commit.js";
-import { narrativeTurnCapabilities, recentCommittedNarrativeChanges, type NarrativeTurnEnvelope } from "./narrative/turn.js";
-import { commitNarrativeAgentTurn, invalidateNarrativeHorizon, runNarrativeAgentDecision, runNarrativeAgentEnding, runNarrativeAgentTurn } from "./narrative/runtime.js";
-import { hasNarrativeFactCompletion, narrativeActProgress, narrativeFactProgressForCommit, narrativeObservationFacts } from "./narrative/observation.js";
+import { narrativePreviousActResult, narrativeTurnCapabilities, recentCommittedNarrativeChanges, type NarrativeTurnEnvelope } from "./narrative/turn.js";
+import { commitNarrativeAgentTurn, invalidateNarrativeHorizon, runNarrativeAgentDecision, runNarrativeAgentEnding, runNarrativeAgentTurn, synchronizeNarrativeAgentScene } from "./narrative/runtime.js";
+import { hasNarrativeFactCompletion, narrativeActProgress, narrativeFactProgressForCommit, narrativeObservationFacts, narrativeStageProgressGap } from "./narrative/observation.js";
 import { commitNarrativeStageTask } from "./narrative/stage-task.js";
 import { approveStoryClosure, approveStoryIntent } from "./tool-gateway.js";
 import { providerLimits } from "./constants.js";
@@ -1085,7 +1086,7 @@ async function generateOpeningForRun(options: OpeningGenerationOptions): Promise
   };
   let opening: Awaited<ReturnType<typeof generateNarrativeOrigin>>;
   try {
-    opening = await generateNarrativeOrigin(run, world, narrativeCtx);
+    opening = await generateNarrativeOrigin(run, world, narrativeCtx, narrativeWorld.socialForces ?? []);
   } catch (error) {
     logNarrativeOutcomeFailure(options, error, "render_origin");
     throw error;
@@ -1097,7 +1098,8 @@ async function generateOpeningForRun(options: OpeningGenerationOptions): Promise
     opening: { status: "ready", profile: opening.profile },
     sessionPremise
   };
-  commitNarrativeMemory(run.narrative, { id: "memory:origin", age: 0, factionIds: [], characterIds: [], factIds: [], text: opening.narrative });
+  const originCharacters = registerNarrativeParticipants(run, opening.participants, "origin").map(({ character }) => character.id);
+  commitNarrativeMemory(run.narrative, { id: "memory:origin", age: 0, factionIds: [], characterIds: originCharacters, factIds: [], text: opening.narrative });
   commitNarrativeAssets(run.narrative, applyNarrativeAssetUpdates(run.narrative.assets, opening.assetUpdates, { age: 0 }), opening.assetUpdates, { age: 0 }, {}, "origin");
   run.aiConversation = run.aiConversation ?? {};
   recordDirectedStoryTurnOutcome(narrativeCtx, run, { kind: "origin", sourceEventId: "origin", narrative: opening.narrative, statChanges: {} });
@@ -1277,6 +1279,7 @@ async function generateDirectedSegmentForRunUnsafe(options: DirectedSegmentOptio
     act: { id: act.id, label: act.label, prompt: actPrompt },
     beat: runtime.beat,
     stageTask: runtime.stageTask,
+    progressGap: narrativeStageProgressGap(run, { actId: act.id, beat: runtime.beat }),
     capabilities,
     storyPatterns,
     socialForces,
@@ -1286,7 +1289,7 @@ async function generateDirectedSegmentForRunUnsafe(options: DirectedSegmentOptio
     recentChanges: recentCommittedNarrativeChanges(run.narrative.episodes),
     actSummary: actProgress.summary,
     actProgress: actProgress.changes,
-    previousActResult: previousAct ? [previousAct.lastingConsequence, previousAct.continuation].filter(Boolean).join("；") : undefined,
+    previousActResult: narrativePreviousActResult(previousAct),
     growthFocus,
     clock: { ...run.narrative.sceneClock }
   };
@@ -1318,14 +1321,13 @@ async function generateDirectedSegmentForRunUnsafe(options: DirectedSegmentOptio
         : undefined
     })
   });
-  applyNarrativeIdentityMerges(run, agentTurn.scene.identityMerges);
-  const turnPlan = canonicalizeNarrativeReferences(run.narrative, agentTurn.plan);
-  const scene = canonicalizeNarrativeReferences(run.narrative, agentTurn.scene);
-  await options.onProgress?.("committing");
+  let turnPlan = agentTurn.plan;
+  let scene = agentTurn.scene;
+  const committedAges = agentTurn.time;
   commitNarrativeStageTask(run.narrative, { actId: act.id, beat: runtime.beat }, turnPlan.stageTask);
   if (scene.turnKind === "background") {
     if (!scene.backgroundAttributeEffects) throw new Error("dynamic_background_outcome_missing");
-    const backgroundYears = turnAges.backgroundAgeRange.toAge - run.age;
+    const backgroundYears = committedAges.backgroundAgeRange.toAge - run.age;
     const advanced = autoAdvanceToCheckpoint(run, world, difficulty, {
       targetYears: backgroundYears,
       maxTargetYears: backgroundMaxYears,
@@ -1347,16 +1349,27 @@ async function generateDirectedSegmentForRunUnsafe(options: DirectedSegmentOptio
       advanced.toAge = run.age;
     }
     let background = scene;
-    if (run.age < turnAges.backgroundAgeRange.toAge) {
+    if (run.age < committedAges.backgroundAgeRange.toAge) {
       narrativeCtx.narrativePlan = buildNarrativePromptPlan(run, narrativeWorld, null, "background");
-      const interrupted = await renderInterruptedBackground(run, world, narrativeCtx, turnAges.backgroundAgeRange.fromAge, advanced.chunk);
+      const interrupted = await renderInterruptedBackground(run, world, narrativeCtx, committedAges.backgroundAgeRange.fromAge, advanced.chunk, narrativeWorld.socialForces ?? []);
       background = {
-        ...scene, ...interrupted, storyDelta: interrupted.narrative,
+        ...scene, ...interrupted,
+        handoff: interrupted.handoff,
         factUpdates: interrupted.factUpdates, assetUpdates: interrupted.assetUpdates,
-        relationshipUpdates: interrupted.relationshipUpdates
+        relationshipUpdates: interrupted.relationshipUpdates, identityMerges: interrupted.identityMerges
       };
     }
+    const sourceId = `background:${committedAges.backgroundAgeRange.fromAge}:${run.age}:${run.history.length}`;
+    if (background.handoff) background.handoff.sourceEventId = sourceId;
+    const synchronized = await synchronizeNarrativeAgentScene({ run, world, narrativeWorld, context: narrativeCtx,
+      scene: background, plan: turnPlan, promptPlan: narrativeCtx.narrativePlan!, callId,
+      onProgress: options.onProgress });
+    background = synchronized.scene;
+    applyNarrativeIdentityMerges(run, background.identityMerges);
+    background = canonicalizeNarrativeReferences(run.narrative, background);
+    background.factUpdates = prepareNarrativeFactUpdates(run.runId, sourceId, background.factUpdates);
     let backgroundResolvedFactIds: string[] = [];
+    let backgroundResolutions: Array<{ factId: string; summary: string }> = [];
     if (hasNarrativeFactCompletion(background.factUpdates)) {
       const observation = await observeNarrativeBeat(run, world, {
         callId, actId: act.id, beat: runtime.beat, arcQuestion: "", actProgress: [],
@@ -1365,24 +1378,26 @@ async function generateDirectedSegmentForRunUnsafe(options: DirectedSegmentOptio
         factsOnly: true
       }, narrativeCtx);
       backgroundResolvedFactIds = observation.resolvedFactIds;
+      backgroundResolutions = observation.resolutions ?? [];
     }
+    await options.onProgress?.("committing");
     advanced.chunk.forEach((event, index) => {
       event.summary = index === advanced.chunk.length - 1 ? background.narrative : "";
     });
-    const sourceId = `background:${turnAges.backgroundAgeRange.fromAge}:${run.age}:${run.history.length}`;
-    const when = { ageFrom: turnAges.backgroundAgeRange.fromAge, age: run.age };
+    const when = { ageFrom: committedAges.backgroundAgeRange.fromAge, age: run.age };
     let committedBackgroundAssets = { locationIds: [] as string[], abilityIds: [] as string[] };
     {
       const backgroundFactIds = applyNarrativeFactUpdates(run, narrativeFactProgressForCommit(background.factUpdates), {
         sourceEventId: sourceId,
         actId: act.id
       });
-      backgroundFactIds.push(...applyObserverFactResolutions(run, backgroundResolvedFactIds, act.id, sourceId)
+      backgroundFactIds.push(...applyObserverFactResolutions(run, backgroundResolvedFactIds, act.id, sourceId, backgroundResolutions)
         .filter((id) => !backgroundFactIds.includes(id)));
+      const backgroundCharacters = registerNarrativeParticipants(run, background.participants, sourceId, backgroundFactIds, background.handoff?.characters).map(({ character }) => character.id);
       applyNarrativeRelationshipUpdates(run, background.relationshipUpdates, backgroundFactIds);
       commitNarrativeMemory(run.narrative, {
         id: `memory:${sourceId}`, age: run.age, factionIds: [],
-        characterIds: background.relationshipUpdates?.map((entry) => entry.characterRef) ?? [],
+        characterIds: Array.from(new Set([...backgroundCharacters, ...(background.relationshipUpdates?.map((entry) => entry.characterRef) ?? [])])),
         factIds: backgroundFactIds, text: background.narrative
       });
       const activeAssets = applyNarrativeAssetActivity(run.narrative.assets, background.assetActivity, when);
@@ -1408,7 +1423,7 @@ async function generateDirectedSegmentForRunUnsafe(options: DirectedSegmentOptio
       callId,
       sourceEventId: sourceId,
       turnKind: "background",
-      ageFrom: turnAges.backgroundAgeRange.fromAge,
+      ageFrom: committedAges.backgroundAgeRange.fromAge,
       age: run.age,
       actId: act.id,
       beat: runtime.beat,
@@ -1427,7 +1442,12 @@ async function generateDirectedSegmentForRunUnsafe(options: DirectedSegmentOptio
       episodeId: episode.id
     };
   }
+  await options.onProgress?.("committing");
+  applyNarrativeIdentityMerges(run, scene.identityMerges);
+  turnPlan = canonicalizeNarrativeReferences(run.narrative, turnPlan);
+  scene = canonicalizeNarrativeReferences(run.narrative, scene);
   const advanced = advanceWithDynamicNarrativeScene(run, world, narrativeWorld, {
+    handoff: scene.handoff,
     patternIds: scene.patternIds,
     forceIds: scene.forceIds,
     beatDecision: scene.beatDecision ?? "hold",
@@ -1438,10 +1458,12 @@ async function generateDirectedSegmentForRunUnsafe(options: DirectedSegmentOptio
     attributePolicy: turnPlan.presentation === "scene" ? dynamicSceneAttributePolicy() : undefined,
     actHandoff: scene.actHandoff,
     sceneClockMode: scene.scenePacing === "continuous" ? "hold" : scene.scenePacing === "spanning" ? "advance" : undefined,
+    sceneAge: committedAges.sceneAge,
     createsDecision: scene.createsDecision,
     decisionBrief: turnPlan.decisionBrief,
     factUpdates: scene.factUpdates,
     observerResolvedFactIds: scene.observerResolvedFactIds,
+    observerResolutions: scene.observerResolutions,
     relationshipUpdates: scene.relationshipUpdates
   });
   applyDirectedMilestonePresentation(advanced.updated, scene.milestoneCopy);
@@ -1467,7 +1489,7 @@ async function generateDirectedSegmentForRunUnsafe(options: DirectedSegmentOptio
   }
   recordDirectedStoryTurnOutcome(narrativeCtx, run, {
     kind: scene.createsDecision ? "milestone" : "normal",
-    narrative: committedNarrative,
+    narrative: scene.narrative,
     sourceEventId: run.narrative.scene.lastEventId,
     statChanges: advanced.chunk[0]?.statChanges ?? {}
   });
@@ -2037,6 +2059,7 @@ async function runStepFlowUnlocked(
     let relationshipUpdates: import("@reroll/shared").NarrativeRelationshipUpdate[] | undefined;
     let narrativeFactUpdates: import("@reroll/shared").NarrativeFactUpdates | undefined;
     let observerResolvedFactIds: string[] | undefined;
+    let observerResolutions: Array<{ factId: string; summary: string }> | undefined;
     let settledAssets: import("@reroll/shared").NarrativeAssets | undefined;
     let assetUpdates: import("@reroll/shared").NarrativeAssetUpdates | undefined;
     let assetActivity: import("@reroll/shared").NarrativeAssetActivity | undefined;
@@ -2106,12 +2129,11 @@ async function runStepFlowUnlocked(
       factResolution = outcome.factResolution;
       narrativeFactUpdates = outcome.factUpdates;
       observerResolvedFactIds = outcome.observerResolvedFactIds;
+      observerResolutions = outcome.observerResolutions;
       relationshipUpdates = outcome.relationshipUpdates;
-      assetActivity = {
-        locationIds: Array.from(new Set([...outcome.assetActivity.locationIds, ...(selectedLocationRef ? [selectedLocationRef] : [])])),
-        abilityIds: Array.from(new Set([...outcome.assetActivity.abilityIds, ...canonicalizeNarrativeReferences(run.narrative, selectedAbilityRefs)])),
-        currentLocationId: selectedLocationRef ?? outcome.assetActivity.currentLocationId
-      };
+      const decisionCharacters = registerNarrativeParticipants(run, outcome.participants, outcome.handoff?.sourceEventId ?? decisionCallId, [], outcome.handoff?.characters).map(({ character }) => character.id);
+      if (decisionPendingScene) decisionPendingScene.characterIds = Array.from(new Set([...(decisionPendingScene.characterIds ?? []), ...decisionCharacters]));
+      assetActivity = outcome.assetActivity;
       decisionNarrativeLinks = decisionPendingScene
         ? {
           factionId: decisionPendingScene.forceIds[0],
@@ -2138,6 +2160,7 @@ async function runStepFlowUnlocked(
         factResolution,
         narrativeFactUpdates,
         observerResolvedFactIds,
+        observerResolutions,
         narrative: directedDecisionNarrative,
         relationshipUpdates,
         narrativeWorld,

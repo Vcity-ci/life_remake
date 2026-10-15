@@ -2,6 +2,7 @@ import { validateNarrativeEffects } from "./narrative-attributes.js";
 import seedrandom from "seedrandom";
 import { commitNarrativeMemory } from "./narrative-memory.js";
 import { consumeNarrativeStageFork } from "./narrative/stage-task.js";
+import { commitNarrativeActCanon } from "./narrative/commit.js";
 import { registerNarrativeParticipants } from "./narrative-characters.js";
 import { factUpdateContract, parseFactUpdates, prepareNarrativeFactUpdates, narrativeFactResolutionModes, normalizeNarrativeHandoffFact } from "./narrative-continuity.js";
 import { createHash } from "node:crypto";
@@ -491,6 +492,7 @@ export function applyNarrativeRelationshipUpdates(
     if (update.status) character.status = update.status;
     if (update.role) character.role = update.role;
     if (update.description) character.description = update.description;
+    if (update.factionId !== undefined) character.factionId = update.factionId || undefined;
   }
 }
 
@@ -1704,6 +1706,7 @@ function publicNarrativeCharactersSnapshot(run: InternalRunState): NonNullable<T
     .map((character) => ({
       id: character.id,
       name: character.name,
+      factionId: character.factionId,
       role: character.role,
       description: `${character.status === "gone" ? "已离场。" : character.status === "resolved" ? "此前交往已告一段落。" : ""}${character.description}`,
       introducedAge: character.introducedAge
@@ -3463,6 +3466,95 @@ export function applyObserverFactResolutions(
   return accepted;
 }
 
+/** Complete an observed payoff identically after a scene or a player's choice. */
+function completeObservedNarrativeAct(
+  run: InternalRunState,
+  narrativeWorld: NarrativeWorldDefinition,
+  act: NonNullable<NarrativeWorldDefinition["mainlineActs"]>[number],
+  details: { handoff: NarrativeActHandoff; sourceId: string; narrative: string; characterIds: string[]; factionIds: string[]; experienceId?: string; openedAge: number; decisionCount: number }
+): { carryFactIds: string[]; factIds: string[] } {
+  const factId = act.factId ?? act.introduceFactIds?.[0];
+  const threadId = `arc:${act.id}`;
+  const inheritedCarryFactIds: string[] = [];
+  const acts = narrativeWorld.mainlineActs ?? [];
+  const nextAct = acts[acts.findIndex((entry) => entry.id === act.id) + 1];
+  const carriedFactIds = new Set(nextAct ? details.handoff.carryFactIds ?? [] : []);
+  const resolvedActFactIds = Array.from(new Set([
+    ...(factId ? [factId] : []),
+    ...(act.resolveFactIds ?? [])
+  ]));
+  if (resolvedActFactIds.length) {
+    applyStoryFactEffect(run.story, { resolveFactIds: resolvedActFactIds }, run.age, details.sourceId);
+    for (const entry of run.story.factLedger?.facts ?? []) {
+      if (resolvedActFactIds.includes(entry.id) && entry.status === "resolved" && !entry.resolutionSummary) {
+        entry.resolutionSummary = details.handoff.resolvedTension;
+      }
+    }
+  }
+  if (carriedFactIds.size && nextAct) {
+    const ledger = run.story.factLedger ?? (run.story.factLedger = createStoryFactLedger());
+    for (const originalId of carriedFactIds) {
+      const original = ledger.facts.find((fact) => fact.id === originalId && fact.status === "open" && fact.actId === act.id);
+      if (!original) continue;
+      original.status = "resolved";
+      original.resolvedAge = run.age;
+      original.lastTouchedAge = run.age;
+      original.lastSourceEventId = details.sourceId;
+      original.resolutionSummary = original.progressSummary ?? original.label;
+      const successorId = `carry:${nextAct.id}:${createHash("sha256").update(original.id).digest("hex").slice(0, 12)}`;
+      const existing = ledger.facts.find((fact) => fact.id === successorId);
+      if (!existing) {
+        ledger.facts.push({
+          ...original,
+          id: successorId,
+          actId: nextAct.id,
+          status: "open",
+          introducedAge: run.age,
+          lastTouchedAge: run.age,
+          sourceEventId: details.sourceId,
+          resolvedAge: undefined,
+          resolution: undefined,
+          resolutionSummary: undefined,
+          progressSummary: original.progressSummary ?? original.label,
+          lastSourceEventId: details.sourceId
+        });
+      }
+      inheritedCarryFactIds.push(successorId);
+    }
+    run.story.factLedger = normalizeStoryFactLedger(ledger);
+  }
+  const handoffFactIds = recordDynamicActHandoff(run.story, act, details.handoff, run.age, details.sourceId, undefined, details.characterIds, details.factionIds[0]);
+  commitNarrativeMemory(run.narrative, {
+    id: `memory:${details.sourceId}`, age: run.age, text: details.narrative.trim(), factIds: handoffFactIds,
+    characterIds: details.characterIds, factionIds: details.factionIds
+  });
+  for (const id of details.characterIds) {
+    const character = run.narrative.dynamicCharacters.find((entry) => entry.id === id);
+    if (!character) continue;
+    character.relatedFactIds = Array.from(new Set([...character.relatedFactIds, ...handoffFactIds])).slice(-8);
+  }
+  const recorded = recordMainlineActCompletion(run, act, {
+    sourceId: details.sourceId,
+    experienceId: details.experienceId,
+    threadId,
+    openedAge: details.openedAge,
+    decisionCount: details.decisionCount
+  });
+  if (!recorded) throw new Error("dynamic_mainline_act_already_completed");
+  commitNarrativeActCanon(run, {
+    actId: act.id, sourceEventId: details.sourceId, resolvedAge: run.age,
+    routeId: details.experienceId, handoff: details.handoff, factIds: inheritedCarryFactIds
+  });
+  run.narrative.payoffCount = Math.min(8, run.narrative.payoffCount + 1);
+  run.narrative.lastResolvedSceneAge = run.age;
+  run.narrative.activeScene = undefined;
+  run.narrative.sceneClock = { ...run.narrative.sceneClock, mode: "advance", sameAgeTurnCount: 0 };
+  const advanced = advanceNarrativeActBeat(run.narrative, narrativeWorld, run.age);
+  run.narrative = advanced.state;
+  refreshNarrativeClosureEligibility(run, narrativeWorld);
+  return { carryFactIds: inheritedCarryFactIds, factIds: handoffFactIds };
+}
+
 /**
  * The dynamic director records a world-act beat, not a static event candidate.
  * Route IDs remain an open model choice; the engine only validates package IDs
@@ -3536,7 +3628,7 @@ export function advanceWithDynamicNarrativeScene(
   if (factId && payload.beat !== "setup") applyStoryFactEffect(story, { modifyFactIds: [factId] }, run.age, sceneId);
   const threadId = `arc:${act.id}`;
   const previousScene = run.narrative.activeScene?.mainlineActId === act.id ? run.narrative.activeScene : undefined;
-  run.narrative.activeScene = payload.beat === "payoff" && payload.beatDecision === "advance"
+  run.narrative.activeScene = !createsDecision && payload.beat === "payoff" && payload.beatDecision === "advance"
     ? undefined
     : {
       id: previousScene?.id ?? sceneId,
@@ -3553,7 +3645,7 @@ export function advanceWithDynamicNarrativeScene(
     aftermath: "",
     lastEventId: sceneId
   };
-  const storedCharacters = registerNarrativeParticipants(run, payload.participants, sceneId, factId ? [factId] : [], payload.handoff?.characters);
+  const storedCharacters = registerNarrativeParticipants(run, payload.participants, sceneId, factId ? [factId] : [], payload.handoff?.characters, !payload.handoff?.participantsRegistered);
   const storedCharacterIds = storedCharacters.map(({ character }) => character.id);
   const narrativeFactIds = applyNarrativeFactUpdates(run, payload.factUpdates, {
     sourceEventId: sceneId,
@@ -3600,75 +3692,16 @@ export function advanceWithDynamicNarrativeScene(
   }
   let inheritedCarryFactIds: string[] = [];
   let completedActId: string | undefined;
-  if (payload.beat === "payoff" && payload.beatDecision === "advance") {
+  if (!createsDecision && payload.beat === "payoff" && payload.beatDecision === "advance") {
     if (!payload.actHandoff) throw new Error("dynamic_scene_act_handoff_required");
-    const acts = narrativeWorld.mainlineActs ?? [];
-    const nextAct = acts[acts.findIndex((entry) => entry.id === act.id) + 1];
-    const carriedFactIds = new Set(nextAct ? payload.actHandoff.carryFactIds ?? [] : []);
-    const resolvedActFactIds = Array.from(new Set([
-      ...(factId ? [factId] : []),
-      ...(act.resolveFactIds ?? [])
-    ]));
-    if (resolvedActFactIds.length) {
-      applyStoryFactEffect(run.story, { resolveFactIds: resolvedActFactIds }, run.age, sceneId);
-      for (const entry of run.story.factLedger?.facts ?? []) {
-        if (resolvedActFactIds.includes(entry.id) && entry.status === "resolved" && !entry.resolutionSummary) {
-          entry.resolutionSummary = payload.actHandoff.resolvedTension;
-        }
-      }
-    }
-    if (carriedFactIds.size && nextAct) {
-      const ledger = run.story.factLedger ?? (run.story.factLedger = createStoryFactLedger());
-      for (const originalId of carriedFactIds) {
-        const original = ledger.facts.find((fact) => fact.id === originalId && fact.status === "open" && fact.actId === act.id);
-        if (!original) continue;
-        applyStoryFactEffect(run.story, { resolveFactIds: [original.id] }, run.age, sceneId);
-        original.resolutionSummary = original.progressSummary ?? original.label;
-        const successorId = `carry:${nextAct.id}:${createHash("sha256").update(original.id).digest("hex").slice(0, 12)}`;
-        const existing = ledger.facts.find((fact) => fact.id === successorId);
-        if (!existing) {
-          ledger.facts.push({
-            ...original,
-            id: successorId,
-            actId: nextAct.id,
-            status: "open",
-            introducedAge: run.age,
-            lastTouchedAge: run.age,
-            sourceEventId: sceneId,
-            resolvedAge: undefined,
-            resolution: undefined,
-            resolutionSummary: undefined,
-            progressSummary: original.progressSummary ?? original.label,
-            lastSourceEventId: sceneId
-          });
-        }
-        inheritedCarryFactIds.push(successorId);
-      }
-      run.story.factLedger = normalizeStoryFactLedger(ledger);
-    }
-    const handoffFactIds = recordDynamicActHandoff(run.story, act, payload.actHandoff, run.age, sceneId, undefined, storedCharacterIds, payload.forceIds[0]);
-    commitNarrativeMemory(run.narrative, {
-      id: `memory:${sceneId}`, age: run.age, text: payload.narrative.trim(), factIds: handoffFactIds,
-      characterIds: storedCharacterIds, factionIds: payload.forceIds
+    const completed = completeObservedNarrativeAct(run, narrativeWorld, act, {
+      handoff: payload.actHandoff, sourceId: sceneId, narrative: payload.narrative,
+      characterIds: storedCharacterIds, factionIds: payload.forceIds, experienceId: payload.patternIds[0],
+      openedAge: previousScene?.openedAge ?? runtime.enteredAge, decisionCount: previousScene?.decisionCount ?? runtime.decisionCount
     });
-    for (const { character } of storedCharacters) {
-      character.relatedFactIds = Array.from(new Set([...character.relatedFactIds, ...handoffFactIds])).slice(-8);
-    }
-    const recorded = recordMainlineActCompletion(run, act, {
-      sourceId: sceneId,
-      experienceId: payload.patternIds[0],
-      threadId,
-      openedAge: previousScene?.openedAge ?? runtime.enteredAge,
-      decisionCount: runtime.decisionCount
-    });
-    if (!recorded) throw new Error("dynamic_mainline_act_already_completed");
+    inheritedCarryFactIds = completed.carryFactIds;
+    narrativeFactIds.push(...completed.factIds.filter((id) => !narrativeFactIds.includes(id)));
     completedActId = act.id;
-    run.narrative.payoffCount = Math.min(8, run.narrative.payoffCount + 1);
-    run.narrative.lastResolvedSceneAge = run.age;
-    run.narrative.sceneClock = { ...run.narrative.sceneClock, mode: "advance", sameAgeTurnCount: 0 };
-    const advanced = advanceNarrativeActBeat(run.narrative, narrativeWorld, run.age);
-    run.narrative = advanced.state;
-    refreshNarrativeClosureEligibility(run, narrativeWorld);
   } else if (!createsDecision && payload.beatDecision === "advance") {
     run.narrative = advanceNarrativeActBeat(run.narrative, narrativeWorld, run.age).state;
   }
@@ -3857,7 +3890,7 @@ export function applyMilestoneDecisionAndAdvance(
   world: WorldConfig,
   difficulty: DifficultyConfig,
   decision: DecisionType,
-  options?: { narrative?: string; relationshipUpdates?: NarrativeRelationshipUpdate[]; milestoneEventPool?: string[]; narrativeOutcome?: ApprovedNarrativeAttributeOutcome; narrativeFactUpdates?: NarrativeFactUpdates; observerResolvedFactIds?: string[]; observerResolutions?: Array<{ factId: string; summary: string }>; factResolution?: NarrativeFactResolution; narrativeWorld?: NarrativeWorldDefinition | null; beatDecision?: "hold" | "advance" }
+  options?: { narrative?: string; relationshipUpdates?: NarrativeRelationshipUpdate[]; milestoneEventPool?: string[]; narrativeOutcome?: ApprovedNarrativeAttributeOutcome; narrativeFactUpdates?: NarrativeFactUpdates; observerResolvedFactIds?: string[]; observerResolutions?: Array<{ factId: string; summary: string }>; factResolution?: NarrativeFactResolution; narrativeWorld?: NarrativeWorldDefinition | null; beatDecision?: "hold" | "advance"; actHandoff?: NarrativeActHandoff }
 ): { updated: InternalRunState; fromAge: number; toAge: number; chunk: YearEvent[]; decisionEvent: YearEvent; factIds: string[]; sourceEventId: string } {
   if (!run.nextMilestoneChoice) {
     throw new Error("当前没有可用的关键抉择");
@@ -3985,7 +4018,19 @@ export function applyMilestoneDecisionAndAdvance(
     run.narrative = recordNarrativeSceneDecision(run.narrative);
     consumeNarrativeStageFork(run.narrative, { actId: pendingDynamicScene.mainlineActId, beat: pendingDynamicScene.beat });
     if (options.beatDecision === "advance") {
-      run.narrative = advanceNarrativeActBeat(run.narrative, options.narrativeWorld, run.age, { decision: true }).state;
+      if (pendingDynamicScene.beat === "payoff") {
+        if (!options.actHandoff) throw new Error("dynamic_decision_act_handoff_required");
+        const completed = completeObservedNarrativeAct(run, options.narrativeWorld, act, {
+          handoff: options.actHandoff, sourceId: sourceEventId, narrative: decisionEvent.summary,
+          characterIds: pendingDynamicScene.characterIds ?? [], factionIds: pendingDynamicScene.forceIds,
+          experienceId: pendingDynamicScene.patternIds[0],
+          openedAge: run.narrative.activeScene?.openedAge ?? run.narrative.actRuntime!.enteredAge,
+          decisionCount: run.narrative.activeScene?.decisionCount ?? run.narrative.actRuntime!.decisionCount
+        });
+        narrativeFactIds.push(...[...completed.factIds, ...completed.carryFactIds].filter((id) => !narrativeFactIds.includes(id)));
+      } else {
+        run.narrative = advanceNarrativeActBeat(run.narrative, options.narrativeWorld, run.age, { decision: true }).state;
+      }
     }
     commitNarrativeMemory(run.narrative, {
       id: `memory:${sourceEventId}`, age: run.age,
@@ -4127,8 +4172,8 @@ export function toClientRun(run: InternalRunState): PublicRunState {
       modifiers: card.modifiers
     })),
     items: visibleTurn?.itemsSnapshot ?? publicItemsSnapshot(run),
-    narrativeCharacters: visibleTurn?.narrativeCharactersSnapshot ?? publicNarrativeCharactersSnapshot(run),
-    narrativeAssets: visibleTurn
+    narrativeCharacters: visibleEnded ? publicNarrativeCharactersSnapshot(run) : visibleTurn?.narrativeCharactersSnapshot ?? publicNarrativeCharactersSnapshot(run),
+    narrativeAssets: visibleEnded ? publicNarrativeAssetsSnapshot(run.narrative.assets) : visibleTurn
       ? visibleTurn.narrativeAssetsSnapshot ?? { locations: [], abilities: [] }
       : publicNarrativeAssetsSnapshot(run.narrative.assets),
     nextMilestoneChoice: visibleChoice,

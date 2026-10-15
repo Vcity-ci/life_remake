@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import type { NarrativeDynamicCharacter } from "@reroll/shared";
 import type { InternalRunState } from "../engine.js";
 import type { NarrativeParticipant } from "../narrative-characters.js";
@@ -8,22 +8,23 @@ export interface NarrativeRoundHandoff {
   sourceEventId: string;
   characters: NarrativeParticipant[];
   identityAliases?: Record<string, string>;
+  /** Current fields were already staged; final commit only adds reference links. */
+  participantsRegistered?: boolean;
 }
 
 export function prepareRoundParticipants(
   run: InternalRunState, sourceEventId: string, participants: NarrativeParticipant[], candidates: NarrativeParticipant[] = []
 ): NarrativeParticipant[] {
-  const directory = [...run.narrative.dynamicCharacters.map((entry) => ({ ...entry, characterRef: entry.id })), ...candidates];
   return participants.map((participant) => {
     if (participant.characterRef !== "new") {
       const candidate = candidates.find((entry) => entry.characterRef === participant.characterRef);
-      return candidate ? { ...participant, description: participant.description || candidate.description } : participant;
+      return candidate ? { ...candidate, ...participant,
+        factionId: participant.factionId === undefined ? candidate.factionId : participant.factionId,
+        role: participant.role || candidate.role,
+        description: participant.description || candidate.description } : participant;
     }
-    const existing = directory.find((entry) => entry.name === participant.name && (entry.factionId || undefined) === (participant.factionId || undefined));
-    const characterRef = existing?.characterRef ?? `character:${createHash("sha256")
-      .update(`${run.runId}:${sourceEventId}:${participant.name}:${participant.factionId ?? "none"}`).digest("hex").slice(0, 16)}`;
+    const characterRef = `character:${randomUUID()}`;
     const prepared = { ...participant, characterRef };
-    directory.push(prepared);
     return prepared;
   });
 }

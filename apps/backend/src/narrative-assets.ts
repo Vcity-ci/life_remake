@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { commitNarrativeMemory } from "./narrative-memory.js";
-import type { NarrativeAssetActivity, NarrativeAssetLinks, NarrativeAssetMoment, NarrativeAssets, NarrativeAssetUpdates, NarrativeRunState, PublicNarrativeAssets } from "@reroll/shared";
+import type { NarrativeAbility, NarrativeLocation, NarrativeAssetActivity, NarrativeAssetLinks, NarrativeAssetMoment, NarrativeAssets, NarrativeAssetUpdates, NarrativeRunState, PublicNarrativeAssets } from "@reroll/shared";
 
 const text = z.string().trim().min(1);
 const moment = z.object({ ageFrom: z.number().nonnegative().optional(), age: z.number().nonnegative() });
@@ -11,11 +11,11 @@ const ability = z.object({
   status: z.enum(["available", "unavailable"]), introduced: moment, updated: moment
 });
 const updates = z.object({
-  locations: z.array(z.object({ ref: text, name: text.optional(), description: text.optional(), spatialDescription: text.optional(), current: z.boolean().optional() })).default([]),
+  locations: z.array(z.object({ ref: text, name: text.optional(), description: text.optional(), spatialDescription: text.optional(), current: z.boolean().optional() })),
   abilities: z.array(z.object({
     ref: text, name: text.optional(), description: text.optional(), usage: text.optional(), source: text.optional(), mastery: text.optional(),
     status: z.enum(["available", "unavailable"]).optional()
-  })).default([])
+  }))
 });
 
 export function normalizeNarrativeAssets(raw?: NarrativeAssets): NarrativeAssets {
@@ -78,7 +78,7 @@ export function applyNarrativeAssetActivity(
     location.lastSeen = { ...when };
   }
   for (const id of normalized.abilityIds) {
-    if (!assets.abilities.some((entry) => entry.id === id && entry.status === "available")) {
+    if (!assets.abilities.some((entry) => entry.id === id)) {
       throw new Error("ability_activity_reference_invalid");
     }
   }
@@ -93,24 +93,18 @@ export function parseNarrativeAssetUpdates(raw: unknown, assets?: NarrativeAsset
     locations: result.locations.map((entry) => {
       const known = assets?.locations.find((item) => item.id === entry.ref);
       if (entry.ref !== "new" && !known) throw new Error("location_reference_invalid");
-      return {
-        ref: entry.ref, name: text.parse(known?.name ?? entry.name),
-        description: text.parse(entry.description ?? known?.description),
-        spatialDescription: entry.spatialDescription ?? known?.spatialDescription,
-        current: entry.current ?? false
-      };
+      if (!known) { text.parse(entry.name); text.parse(entry.description); text.parse(entry.spatialDescription); }
+      return entry;
     }),
     abilities: result.abilities.map((entry) => {
       const known = assets?.abilities.find((item) => item.id === entry.ref);
       if (entry.ref !== "new" && !known) throw new Error("ability_reference_invalid");
-      return {
-        ref: entry.ref, name: text.parse(known?.name ?? entry.name),
-        description: text.parse(entry.description ?? known?.description),
-        usage: entry.usage ?? known?.usage,
-        source: text.parse(known?.source ?? entry.source),
-        mastery: text.parse(entry.mastery ?? known?.mastery),
-        status: z.enum(["available", "unavailable"]).parse(entry.status ?? known?.status)
-      };
+      if (!known) {
+        text.parse(entry.name); text.parse(entry.description); text.parse(entry.source); text.parse(entry.mastery);
+        text.parse(entry.usage);
+        z.enum(["available", "unavailable"]).parse(entry.status);
+      }
+      return entry;
     })
   };
 }
@@ -121,15 +115,20 @@ export function narrativeAssetUpdatesSchema(_assets?: NarrativeAssets): Record<s
     type: "object",
     description: "同步登记正文中已经发生的地点与本领变化；对应类型无变化时数组为空。已有对象用 ref 引用，新对象用 new；地点是实际空间，本领是主角已经学会的能力。不得登记尚未选择的奖励、计划或他人的能力。",
     additionalProperties: false,
+    required: ["locations", "abilities"],
     properties: {
       locations: {
         type: "array", items: {
           type: "object", additionalProperties: false,
           required: ["ref"],
-          description: "地点是可辨认的实际空间。已有地点用 ref 引用，新地点另需 name 和空间描述；其发生的事件保存在经历中。",
+          anyOf: [
+            { properties: { ref: { const: "new" } }, required: ["name", "description", "spatialDescription"] },
+            { properties: { ref: { not: { const: "new" } } } }
+          ],
+          description: "新增可辨认的实际空间或更新真实的空间变化。仅抵达已有地点由 assetActivity 记录。已有地点用 ref 引用，新地点另需 name 和空间描述；其发生的事件保存在经历中。",
           properties: {
-            ref: { type: "string", description: "使用本轮上下文中的已有地点 ID，或使用 new 新建地点。" },
-            name: string, description: string,
+            ref: { type: "string", description: "完整复制目录中的已有地点 ID，包含 location: 前缀；新建地点使用 new。" },
+            name: { ...string, description: "新地点的稳定名称；更新已有地点保留原名称。" }, description: string,
             spatialDescription: { type: "string", description: "供后续叙事使用的当前空间与稳定环境条件；新地点填写，空间实质变化时更新。事件经过留在 description 与经历记录中。" },
             current: { type: "boolean", description: "本段结束时主角实际所在的地点为 true；仅提及或曾经路过为 false。" }
           }
@@ -139,13 +138,17 @@ export function narrativeAssetUpdatesSchema(_assets?: NarrativeAssets): Record<s
         type: "array", items: {
           type: "object", additionalProperties: false,
           required: ["ref"],
-          description: "本领是可以主动运用、训练或传授的独立能力。熟练提升更新原 ID，独立的新能力新建；自然成长体现为年龄与属性，身份职位保存在人物中。",
+          anyOf: [
+            { properties: { ref: { const: "new" } }, required: ["name", "description", "usage", "source", "mastery", "status"] },
+            { properties: { ref: { not: { const: "new" } } } }
+          ],
+          description: "本领是游戏技能：主角学会后能主动选择使用，改变解决困难的方式或效果的具体技艺、战法、秘法。填写使用方式、效果与限制。同一技法进阶更新原 ID；不同机制新建。普通行走、生理成长、身份职位分别由生活、属性、人物表达。",
           properties: {
-            ref: { type: "string", description: "使用本轮上下文中的已有本领 ID，或使用 new 新建本领。" },
-            name: { type: "string", minLength: 1, description: "稳定、简短的本领名称，也是档案标题。" },
-            description: { type: "string", description: "供玩家查看的能力说明与实际获得、使用经历。" },
+            ref: { type: "string", description: "完整复制目录中的已有本领 ID，包含 ability: 前缀；新建本领使用 new。" },
+            name: { type: "string", minLength: 1, description: "新本领的稳定、简短名称，也是档案标题；已有本领沿用原名称。" },
+            description: { type: "string", minLength: 1, description: "供玩家查看的能力说明与实际获得、使用经历。" },
             usage: { type: "string", description: "当前能怎样主动使用这项能力、实际效果、掌握程度与限制；新本领填写，能力实质变化时更新。只写当前可用状态。" },
-            source: { type: "string", description: "已经发生的获得来历；更新时保留原来历。" },
+            source: { type: "string", minLength: 1, description: "已经发生的获得来历；更新时保留原来历。" },
             mastery: { type: "string", minLength: 1, description: "当前掌握状态的简短称谓，不写经历、来历或整段能力说明。" },
             status: { type: "string", enum: ["available", "unavailable"] }
           }
@@ -182,39 +185,43 @@ export function parseNarrativeContinuityAssetUpdates(
   }, assets)!;
 }
 
-const identity = (value: string): string => value.normalize("NFKC").replace(/\s+/g, "").toLocaleLowerCase();
+export interface NarrativeAssetApplication {
+  assets: NarrativeAssets;
+  locationIds: string[];
+  abilityIds: string[];
+}
 
 /** Work on a copy so rejected updates cannot leave a partially changed archive. */
 export function applyNarrativeAssetUpdates(
   previous: NarrativeAssets | undefined,
   changes: NarrativeAssetUpdates | undefined,
   when: NarrativeAssetMoment
-): NarrativeAssets {
+): NarrativeAssetApplication {
   const assets = structuredClone(normalizeNarrativeAssets(previous));
-  if (!changes) return assets;
+  const applied: NarrativeAssetApplication = { assets, locationIds: [], abilityIds: [] };
+  if (!changes) return applied;
   const normalized = parseNarrativeAssetUpdates(changes, assets)!;
   for (const entry of normalized.locations) {
-    const known = entry.ref === "new"
-      ? assets.locations.find((item) => identity(item.name) === identity(entry.name))
-      : assets.locations.find((item) => item.id === entry.ref);
-    const record = known ?? { id: `location:${randomUUID()}`, name: entry.name, description: entry.description, introduced: { ...when }, lastSeen: { ...when } };
-    record.name = entry.name;
-    record.description = entry.description;
-    if (entry.spatialDescription) record.spatialDescription = entry.spatialDescription;
+    const known = assets.locations.find((item) => item.id === entry.ref);
+    const record: NarrativeLocation = known ?? { id: `location:${randomUUID()}`, name: text.parse(entry.name), description: text.parse(entry.description), introduced: { ...when }, lastSeen: { ...when } };
+    if (entry.description !== undefined) record.description = entry.description;
+    if (entry.spatialDescription !== undefined) record.spatialDescription = entry.spatialDescription;
     record.lastSeen = { ...when };
     if (!known) assets.locations.push(record);
+    applied.locationIds.push(record.id);
     if (entry.current) assets.currentLocationId = record.id;
   }
   for (const entry of normalized.abilities) {
-    const known = entry.ref === "new"
-      ? assets.abilities.find((item) => identity(item.name) === identity(entry.name))
-      : assets.abilities.find((item) => item.id === entry.ref);
-    const record = known ?? { id: `ability:${randomUUID()}`, name: entry.name, description: entry.description, source: entry.source, mastery: entry.mastery, status: entry.status, introduced: { ...when }, updated: { ...when } };
-    Object.assign(record, { name: entry.name, description: entry.description, mastery: entry.mastery, status: entry.status, updated: { ...when } });
-    if (entry.usage) record.usage = entry.usage;
+    const known = assets.abilities.find((item) => item.id === entry.ref);
+    const record: NarrativeAbility = known ?? { id: `ability:${randomUUID()}`, name: text.parse(entry.name), description: text.parse(entry.description), source: text.parse(entry.source), mastery: text.parse(entry.mastery), status: z.enum(["available", "unavailable"]).parse(entry.status), introduced: { ...when }, updated: { ...when } };
+    for (const key of ["description", "usage", "mastery", "status"] as const) {
+      if (entry[key] !== undefined) Object.assign(record, { [key]: entry[key] });
+    }
+    record.updated = { ...when };
     if (!known) assets.abilities.push(record);
+    applied.abilityIds.push(record.id);
   }
-  return assets;
+  return applied;
 }
 
 export interface NarrativeAssetContextQuery {
@@ -250,14 +257,14 @@ export function formatNarrativeAssets(assets?: NarrativeAssets): string {
 /** Archive and recall indexes are committed together, before a public turn is made. */
 export function commitNarrativeAssets(
   state: NarrativeRunState,
-  assets: NarrativeAssets,
-  changes: NarrativeAssetUpdates | undefined,
+  application: NarrativeAssetApplication,
   when: NarrativeAssetMoment,
   links: NarrativeAssetLinks = {},
   sourceEventId?: string
 ): { locationIds: string[]; abilityIds: string[] } {
-  const locations = assets.locations.filter((entry) => changes?.locations.some((change) => change.ref === entry.id || (change.ref === "new" && identity(change.name) === identity(entry.name))));
-  const abilities = assets.abilities.filter((entry) => changes?.abilities.some((change) => change.ref === entry.id || (change.ref === "new" && identity(change.name) === identity(entry.name))));
+  const { assets } = application;
+  const locations = assets.locations.filter((entry) => application.locationIds.includes(entry.id));
+  const abilities = assets.abilities.filter((entry) => application.abilityIds.includes(entry.id));
   for (const entry of [...locations, ...abilities]) {
     for (const key of ["characterIds", "factionIds", "routeIds", "factIds"] as const) {
       entry[key] = Array.from(new Set([...(entry[key] ?? []), ...(links[key] ?? [])]));

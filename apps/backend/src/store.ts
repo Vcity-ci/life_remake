@@ -14,6 +14,7 @@ import type {
 import type { InternalRunState } from "./engine.js";
 import { applyNarrativeMemoryCuration, applyNarrativeScopedMemoryCuration, type NarrativeMemoryCurationResult, type NarrativeMemoryCurationWork } from "./narrative/curator.js";
 import { resolveProjectRoot } from "./project-root.js";
+import { upgradeProviderOutputBudget } from "./config.js";
 
 interface StoredGameEnv {
   runtimeMode: "cloud" | "local";
@@ -300,7 +301,7 @@ async function loadStore(): Promise<void> {
       if (!environment?.sessionId || !environment.runtimeMode) continue;
       envBySession.set(environment.sessionId, {
         runtimeMode: environment.runtimeMode,
-        localProviderConfig: environment.localProviderConfig
+        localProviderConfig: environment.localProviderConfig ? upgradeProviderOutputBudget(environment.localProviderConfig) : undefined
       });
     }
   } catch (error) {
@@ -473,7 +474,7 @@ export async function withSessionLock<T>(sessionId: string, work: () => Promise<
 
 export async function saveGameEnv(sessionId: string, env: StoredGameEnv): Promise<void> {
   await ensureStoreReady();
-  envBySession.set(sessionId, env);
+  envBySession.set(sessionId, { ...env, localProviderConfig: env.localProviderConfig ? upgradeProviderOutputBudget(env.localProviderConfig) : undefined });
   await queuePersist();
 }
 

@@ -38,7 +38,8 @@ export function factUpdateContract(factIds: string[]) {
     factIds, mutableIds,
     schema: {
       type: "object", additionalProperties: false,
-      description: "同步本段发生变化的事项；同一件事情复用已有引用更新状态与内容。新的待处理事项和已形成的历史结果分别标记状态。世界幕完成仍由幕工具结算。",
+      required: ["introduce", "updates"],
+      description: "更新已有待处理事项，或登记新出现、确需后续行动处理的问题、承诺与风险；已有事项复用引用。普通已完成经历归入 storyDelta，地点人物技能变化归入各自资产字段。无操作时两个数组均返回 []。事项完成交给当轮观察器裁定。",
       properties: {
         introduce: { type: "array", items: {
           type: "object", additionalProperties: false, required: ["kind", "label", "status"],
@@ -102,18 +103,23 @@ export function parseFactUpdates(raw: unknown, contract: ReturnType<typeof factU
 export function relationshipUpdatesSchema(_characterIds: string[]) {
   return { type: "array", items: {
     type: "object", additionalProperties: false, required: ["characterRef"],
+    anyOf: [
+      { required: ["stance", "summary"] },
+      { not: { anyOf: [{ required: ["stance"] }, { required: ["summary"] }] } }
+    ],
     properties: {
       characterRef: { type: "string", description: "使用本轮可更新人物中给出的角色 ID。" },
+      factionId: { type: "string", description: "当前所属阵营变化时填写本轮社会力量 ID；空字符串表示退出原阵营，省略保持最新归属。" },
       stance: { type: "string", enum: relationshipStances, description: "态度变化时与 summary 一起提交。" },
-      summary: { type: "string", description: "态度变化的简短说明，与 stance 一起提交；身份或离场状态可独立更新。" },
-      role: { type: "string", description: "身份或职位实际改变时填写当前简短身份；仍引用原人物 ID。" },
+      summary: { type: "string", minLength: 1, description: "态度变化的简短说明，与 stance 一起提交；身份或离场状态可独立更新。" },
+      role: { type: "string", minLength: 1, description: "身份或职位实际改变时填写当前简短身份；仍引用原人物 ID。" },
       status: { type: "string", enum: ["active", "resolved", "gone"], description: "人物仍在场、这段交往已告一段落、或已经离场（包括死亡）；具体处境写入 description。" },
-      description: { type: "string", description: "人物当前身份与处境，替换已过时的档案描述。" }
+      description: { type: "string", minLength: 1, description: "人物当前身份与处境，替换已过时的档案描述。" }
     }
   }};
 }
 
-export function parseRelationshipUpdates(raw: unknown, characterIds: string[]): NarrativeRelationshipUpdate[] | undefined {
+export function parseRelationshipUpdates(raw: unknown, characterIds: string[], factionIds?: string[]): NarrativeRelationshipUpdate[] | undefined {
   if (raw === undefined) return undefined;
   return rows(raw).map((entry) => {
     const row = object(entry), characterRef = text(row.characterRef);
@@ -122,7 +128,10 @@ export function parseRelationshipUpdates(raw: unknown, characterIds: string[]): 
     if (stance !== undefined && !relationshipStances.includes(stance as typeof relationshipStances[number])) throw new Error("relationship_reference_invalid");
     if ((stance !== undefined) !== (row.summary !== undefined)) throw new Error("relationship_pair_required");
     if (row.status !== undefined && !["active", "resolved", "gone"].includes(row.status as string)) throw new Error("character_status_invalid");
+    if (row.factionId !== undefined && (typeof row.factionId !== "string" ||
+      (row.factionId.trim() && factionIds && !factionIds.includes(row.factionId.trim())))) throw new Error("faction_reference_invalid");
     return { characterRef, ...(stance ? { stance: stance as typeof relationshipStances[number], summary: text(row.summary) } : {}),
+      ...(typeof row.factionId === "string" ? { factionId: row.factionId.trim() } : {}),
       ...(row.role !== undefined ? { role: text(row.role) } : {}),
       ...(row.status ? { status: row.status as "active" | "resolved" | "gone" } : {}),
       ...(row.description !== undefined ? { description: text(row.description) } : {}) };

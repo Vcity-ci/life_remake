@@ -850,8 +850,8 @@ export interface PublicNarrativeAssets {
 
 /** Changes describe accomplished events, never the unselected consequences of a choice. */
 export interface NarrativeAssetUpdates {
-  locations: Array<{ ref: string; name: string; description: string; spatialDescription?: string; current: boolean }>;
-  abilities: Array<{ ref: string; name: string; description: string; usage?: string; source: string; mastery: string; status: NarrativeAbility["status"] }>;
+  locations: Array<{ ref: string; name?: string; description?: string; spatialDescription?: string; current?: boolean }>;
+  abilities: Array<{ ref: string; name?: string; description?: string; usage?: string; source?: string; mastery?: string; status?: NarrativeAbility["status"] }>;
 }
 
 /** Explicit semantic identity decisions proposed by continuity, scoped to one run. */
@@ -882,6 +882,8 @@ export interface NarrativeFactUpdates {
 
 export interface NarrativeRelationshipUpdate {
   characterRef: string;
+  /** Omitted keeps current affiliation; an empty string explicitly leaves it. */
+  factionId?: string;
   stance?: NarrativeRelationshipStance;
   summary?: string;
   role?: string;
@@ -1100,6 +1102,19 @@ export interface NarrativeRunState {
   dynamicCharacters: NarrativeDynamicCharacter[];
   identityAliases?: Record<string, string>;
   assets?: NarrativeAssets;
+  /** assets/dynamicCharacters are the effective read view, including these staged revisions. */
+  assetBuffer?: {
+    locations: NarrativeLocation[];
+    abilities: NarrativeAbility[];
+    characters: NarrativeDynamicCharacter[];
+    rounds: Array<{
+      sourceEventId: string;
+      source: "background" | "scene" | "decision";
+      age: number;
+      subject: string;
+      narrative: string;
+    }>;
+  };
   memoryEntries: NarrativeMemoryEntry[];
   episodes: NarrativeEpisodeRecord[];
   actCanon: NarrativeActCanon[];
@@ -1623,6 +1638,7 @@ export interface PublicMilestoneChoice {
 export interface PublicNarrativeCharacter {
   id: string;
   name: string;
+  factionId?: string;
   role: string;
   description: string;
   introducedAge: number;

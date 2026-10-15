@@ -66,7 +66,7 @@ export function applyConversationSummary(
   conversation.summarizedMemoryIds = Array.from(new Set([
     ...(conversation.summarizedMemoryIds ?? []),
     ...work.rounds.flatMap((round) => round.id ? [round.id] : [])
-  ])).slice(-240);
+  ]));
   return true;
 }
 

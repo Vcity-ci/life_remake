@@ -45,7 +45,7 @@
 - `model`
 - `apiPath`（`/chat/completions` 或 `/responses`）
 - `temperature`
-- `maxTokens`
+- `maxTokens`（默认 18240，用于容纳完整工具参数；正文长度由各任务提示词指导，旧默认 1824 在读取时升级）
 - `timeoutMs`
 
 ### 2.2 `storage/custom-content.json`

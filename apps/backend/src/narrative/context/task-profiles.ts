@@ -67,11 +67,11 @@ const TASK_HISTORY: Record<NarrativeTask, NarrativeTaskContextProfile["history"]
   continuity: { includeHeadMemory: false, includeArchive: false, recentRoundLimit: 0, requiredRecentRounds: 0 },
   planning: { includeHeadMemory: false, includeArchive: false, recentRoundLimit: 0, requiredRecentRounds: 0 },
   observation: { includeHeadMemory: false, includeArchive: false, recentRoundLimit: 0, requiredRecentRounds: 0 },
-  background: { includeHeadMemory: false, includeArchive: false, recentRoundLimit: 1, requiredRecentRounds: 1 },
-  rendering: { includeHeadMemory: false, includeArchive: false, recentRoundLimit: 2, requiredRecentRounds: 1 },
-  dynamic: { includeHeadMemory: false, includeArchive: false, recentRoundLimit: 2, requiredRecentRounds: 1 },
+  background: { includeHeadMemory: false, includeArchive: false, recentRoundLimit: 3, requiredRecentRounds: 3 },
+  rendering: { includeHeadMemory: false, includeArchive: false, recentRoundLimit: 3, requiredRecentRounds: 3 },
+  dynamic: { includeHeadMemory: false, includeArchive: false, recentRoundLimit: 3, requiredRecentRounds: 3 },
   reviewing: { includeHeadMemory: false, includeArchive: false, recentRoundLimit: 0, requiredRecentRounds: 0 },
-  decision: { includeHeadMemory: false, includeArchive: false, recentRoundLimit: 1, requiredRecentRounds: 1 },
+  decision: { includeHeadMemory: false, includeArchive: false, recentRoundLimit: 3, requiredRecentRounds: 3 },
   closure: { includeHeadMemory: true, includeArchive: false, recentRoundLimit: 1, requiredRecentRounds: 0 },
   ending: { includeHeadMemory: false, includeArchive: false, recentRoundLimit: 0, requiredRecentRounds: 0 }
 };

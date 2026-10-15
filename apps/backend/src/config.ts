@@ -29,7 +29,7 @@ export function getDefaultRuntimeConfig(): RuntimeConfig {
       model: model && /[A-Za-z]/.test(model) ? model : "deepseek-v4-flash",
       apiPath: process.env.DEFAULT_PROVIDER_API_PATH ?? "/chat/completions",
       temperature: parseNum(process.env.DEFAULT_PROVIDER_TEMPERATURE, 0.9),
-      maxTokens: parseNum(process.env.DEFAULT_PROVIDER_MAX_TOKENS, 1824),
+      maxTokens: parseNum(process.env.DEFAULT_PROVIDER_MAX_TOKENS, 18240),
       timeoutMs: parseNum(process.env.DEFAULT_PROVIDER_TIMEOUT_MS, 45000),
       reasoningEffort: (process.env.DEFAULT_PROVIDER_REASONING_EFFORT?.trim().toLowerCase() as "minimal" | "low" | "medium" | "high" | undefined) ?? "minimal",
       directorMode: (process.env.EVENT_DIRECTOR_MODE?.trim().toLowerCase() as "legacy" | "tool-fast" | "auto" | undefined) ?? "auto"
@@ -41,7 +41,7 @@ export async function readRuntimeConfig(): Promise<RuntimeConfig> {
   try {
     const raw = await fs.readFile(configPath, "utf8");
     const parsed = JSON.parse(raw) as RuntimeConfig;
-    return parsed;
+    return { ...parsed, cloud: upgradeProviderOutputBudget(parsed.cloud) };
   } catch {
     return getDefaultRuntimeConfig();
   }
@@ -76,5 +76,10 @@ export async function writeRuntimeConfig(payload: AdminConfigPayload): Promise<R
 
 export function getCloudApiKey(): string {
   return process.env.CLOUD_MODEL_API_KEY?.trim() ?? "";
+}
+
+/** Upgrade the former application default without replacing explicit custom budgets. */
+export function upgradeProviderOutputBudget<T extends { maxTokens: number }>(provider: T): T {
+  return provider.maxTokens === 1824 ? { ...provider, maxTokens: 18240 } : provider;
 }
 

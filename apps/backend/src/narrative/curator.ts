@@ -6,15 +6,17 @@ import type {
 import type { ChatConversationState } from "../conversation.js";
 import type { InternalRunState } from "../engine.js";
 import { canonicalNarrativeIdentity } from "../narrative-identities.js";
-
-const CURATION_BATCH_SIZE = 6;
-const CURATION_MIN_EPISODES = 3;
+import { estimateNarrativeTokens } from "./context/fragments.js";
+import { narrativeTaskContextProfile } from "./context/task-profiles.js";
 
 export interface NarrativeMemoryCurationScope {
   id: string;
   scope: NarrativeMemoryDigestScope;
   scopeId?: string;
   previousSummary: string;
+  activeFactIds?: string[];
+  historicalFactIds?: string[];
+  characterIds?: string[];
   currentState?: string;
   episodeIds: string[];
 }
@@ -47,14 +49,15 @@ export interface NarrativeMemoryCurationWork {
   validCharacterIds: string[];
   facts: Array<{ id: string; status: string; state: string; actId?: string }>;
   actResults: Array<{ actId: string; result: string; consequence: string; continuation: string }>;
+  assets?: Array<{ id: string; name: string }>;
 }
 
 export interface NarrativeMemoryDigestProposal {
   id: string;
-  summary: string;
-  activeFactIds: string[];
-  historicalFactIds: string[];
-  characterIds: string[];
+  summary?: string;
+  activeFactIds?: string[];
+  historicalFactIds?: string[];
+  characterIds?: string[];
 }
 
 export interface NarrativeMemoryCurationResult {
@@ -90,8 +93,6 @@ function curationScopes(run: InternalRunState, episodes: NarrativeEpisodeRecord[
     { scope: "run" },
     ...unique(episodes.map((episode) => episode.actId)).map((value) => ({ scope: "act" as const, value })),
   ];
-  const completedActEpisodeIds = new Set(run.narrative.actCanon.map((canon) => canon.sourceEventId));
-  const completionPending = episodes.some((episode) => completedActEpisodeIds.has(episode.sourceEventId) || episode.turnKind === "ending");
   return candidates.map(({ scope, value }) => {
     const id = scopeId(scope, value);
     const previous = run.narrative.memoryDigests.find((digest) => digest.id === id);
@@ -100,36 +101,76 @@ function curationScopes(run: InternalRunState, episodes: NarrativeEpisodeRecord[
       scope,
       scopeId: value,
       previousSummary: previous?.format === "effective_facts" ? previous.summary : "",
+      activeFactIds: previous?.activeFactIds ?? [],
+      historicalFactIds: previous?.historicalFactIds ?? [],
+      characterIds: previous?.characterIds ?? [],
       currentState: currentScopeState(run, scope, value),
-      episodeIds: episodesForScope(episodes, scope, value).map((episode) => episode.id)
+      episodeIds: episodesForScope(episodes, scope, value)
+        .filter((episode) => !previous?.coveredEpisodeIds.includes(episode.id)).map((episode) => episode.id)
     };
-  }).filter((scope) => {
-    if (!scope.episodeIds.length) return false;
-    if (scope.scope === "run") return true;
-    const alreadySummarized = run.narrative.memoryDigests.some((digest) => digest.id === scope.id);
-    return !alreadySummarized || scope.episodeIds.length >= CURATION_MIN_EPISODES || completionPending;
-  });
+  }).filter((scope) => scope.episodeIds.length > 0);
 }
 
-export function prepareNarrativeMemoryCuration(run: InternalRunState): NarrativeMemoryCurationWork | undefined {
+/** Keep recent interactions whole; a pending scene and its answer are one exchange. */
+function compressionWindow(run: InternalRunState, uncovered: NarrativeEpisodeRecord[]): NarrativeEpisodeRecord[] {
+  const episodes = run.narrative.episodes;
+  if (run.ended) return uncovered;
+  const groups: Array<{ start: number; end: number }> = [];
+  for (const [index, episode] of episodes.entries()) {
+    const previous = episodes[index - 1];
+    if (episode.turnKind === "decision" && previous && episode.sourceEventId.startsWith(`${previous.sourceEventId}:decision:`)) {
+      groups.at(-1)!.end = index;
+    } else groups.push({ start: index, end: index });
+  }
+  let protectedStart = groups.at(-3)?.start ?? 0;
+  const pendingIndex = episodes.findIndex((episode) => episode.sourceEventId === run.pendingDynamicScene?.id);
+  if (pendingIndex >= 0) protectedStart = Math.min(protectedStart, pendingIndex);
+  const fresh = new Set(uncovered.map((episode) => episode.id));
+  const completions = new Set(run.narrative.actCanon.map((canon) => canon.sourceEventId));
+  const completedEnd = episodes.reduce((last, episode, index) => fresh.has(episode.id) && completions.has(episode.sourceEventId) ? index : last, -1);
+  const availableEnd = Math.max(protectedStart - 1, completedEnd);
+  if (availableEnd < 0) return [];
+  let end = completedEnd;
+  const profile = narrativeTaskContextProfile("planning");
+  const progressBudget = profile.budget.maxEstimatedTokens * profile.budget.layerRatios.task;
+  const eligible = uncovered.filter((episode) => episodes.indexOf(episode) <= availableEnd);
+  const progressTokens = eligible.reduce((sum, episode) => sum + estimateNarrativeTokens(episode.storyDelta ?? ""), 0);
+  if (end < 0 && progressTokens >= progressBudget) {
+    const resolvedSources = new Set((run.story.factLedger?.facts ?? []).filter((fact) => fact.status === "resolved")
+      .map((fact) => fact.lastSourceEventId ?? fact.sourceEventId));
+    const closedEnd = episodes.reduce((last, episode, index) => index <= availableEnd && fresh.has(episode.id) && resolvedSources.has(episode.sourceEventId) ? index : last, -1);
+    end = closedEnd >= 0 ? closedEnd : availableEnd;
+  }
+  return end < 0 ? [] : uncovered.filter((episode) => episodes.indexOf(episode) <= end);
+}
+
+export function prepareNarrativeMemoryCuration(run: InternalRunState, retryEpisodeIds?: string[]): NarrativeMemoryCurationWork | undefined {
   const runDigest = run.narrative.memoryDigests.find((digest) => digest.id === "run");
   const covered = new Set(runDigest?.coveredEpisodeIds ?? []);
-  const uncovered = run.narrative.episodes.filter((episode) => !covered.has(episode.id));
-  const completedActEpisodeIds = new Set(run.narrative.actCanon.map((canon) => canon.sourceEventId));
-  const completionPending = uncovered.some((episode) => completedActEpisodeIds.has(episode.sourceEventId) || episode.turnKind === "ending");
-  if (uncovered.length < CURATION_MIN_EPISODES && !completionPending) return undefined;
-  const selected = uncovered.slice(0, CURATION_BATCH_SIZE);
+  const actCoverage = new Map(run.narrative.memoryDigests.filter((digest) => digest.scope === "act")
+    .map((digest) => [digest.scopeId, new Set(digest.coveredEpisodeIds)]));
+  const uncovered = run.narrative.episodes.filter((episode) => !covered.has(episode.id) ||
+    (episode.actId && !actCoverage.get(episode.actId)?.has(episode.id)));
+  const eligibleWindow = retryEpisodeIds ? uncovered.filter((episode) => retryEpisodeIds.includes(episode.id)) : compressionWindow(run, uncovered);
+  // An acknowledged run summary may leave an act view outstanding. Finish that
+  // same historical interval without waiting for another fresh compression window.
+  const window = retryEpisodeIds ? eligibleWindow : eligibleWindow.length ? eligibleWindow : uncovered.filter((episode) => covered.has(episode.id));
+  if (!window.length) return undefined;
+  const availableScopes = curationScopes(run, window);
+  const requestedEpisodeIds = new Set(availableScopes.flatMap((scope) => scope.episodeIds));
+  const selected = window.filter((episode) => requestedEpisodeIds.has(episode.id));
+  if (!selected.length) return undefined;
+  const selectedIds = new Set(selected.map((episode) => episode.id));
+  const scopes = availableScopes.map((scope) => ({ ...scope, episodeIds: scope.episodeIds.filter((id) => selectedIds.has(id)) }))
+    .filter((scope) => scope.episodeIds.length > 0);
   const memoryById = new Map(run.narrative.memoryEntries.map((memory) => [memory.id, memory]));
   const facts = run.story.factLedger?.facts ?? [];
   const factIds = new Set(facts.map((fact) => fact.id));
   const characterIds = new Set(run.narrative.dynamicCharacters.map((character) => character.id));
-  const scopes = curationScopes(run, selected);
   const priorDigests = run.narrative.memoryDigests.filter((digest) => scopes.some((scope) => scope.id === digest.id));
   const relevantFactIds = new Set([
     ...selected.flatMap((episode) => episode.factIds),
-    ...priorDigests.flatMap((digest) => [...digest.activeFactIds, ...digest.historicalFactIds]),
-    ...facts.filter((fact) => fact.status === "open").map((fact) => fact.id),
-    ...run.narrative.actCanon.flatMap((canon) => canon.factIds)
+    ...priorDigests.flatMap((digest) => [...digest.activeFactIds, ...digest.historicalFactIds])
   ]);
   const relevantCharacterIds = new Set([
     ...selected.flatMap((episode) => episode.characterIds),
@@ -162,13 +203,19 @@ export function prepareNarrativeMemoryCuration(run: InternalRunState): Narrative
     facts: facts.filter((fact) => relevantFactIds.has(fact.id)).map((fact) => ({ id: fact.id,
       status: fact.status, actId: fact.actId,
       state: fact.status === "resolved" ? fact.resolutionSummary ?? fact.progressSummary ?? fact.label : fact.progressSummary ?? fact.label })),
-    actResults: run.narrative.actCanon.map((canon) => ({ actId: canon.actId, result: canon.resolvedTension,
-      consequence: canon.lastingConsequence, continuation: canon.continuation }))
+    actResults: run.narrative.actCanon.filter((canon) => selected.some((episode) => episode.sourceEventId === canon.sourceEventId))
+      .map((canon) => ({ actId: canon.actId, result: canon.resolvedTension,
+        consequence: canon.lastingConsequence, continuation: canon.continuation })),
+    assets: [
+      ...run.narrative.dynamicCharacters.filter((entry) => relevantCharacterIds.has(entry.id)),
+      ...(run.narrative.assets?.locations ?? []).filter((entry) => selected.some((episode) => episode.locationIds.includes(entry.id))),
+      ...(run.narrative.assets?.abilities ?? []).filter((entry) => selected.some((episode) => episode.abilityIds.includes(entry.id)))
+    ].map(({ id, name }) => ({ id, name }))
   };
 }
 
 function mergeCovered(previous: string[], next: string[]): string[] {
-  return Array.from(new Set([...previous, ...next])).slice(-120);
+  return Array.from(new Set([...previous, ...next]));
 }
 
 export function applyNarrativeMemoryCuration(
@@ -180,16 +227,18 @@ export function applyNarrativeMemoryCuration(
   if (work.episodeIds.some((id) => !run.narrative.episodes.some((episode) => episode.id === id))) return false;
   const scopeById = new Map(work.scopes.map((scope) => [scope.id, scope]));
   const proposals = result.digests.filter((proposal, index, all) =>
-    scopeById.has(proposal.id) && proposal.summary.trim().length > 0 &&
+    scopeById.has(proposal.id) && (proposal.summary === undefined || proposal.summary.trim().length > 0) &&
     all.findIndex((entry) => entry.id === proposal.id) === index
   );
-  if (!proposals.some((proposal) => proposal.id === "run")) return false;
   const validFacts = new Set((run.story.factLedger?.facts ?? []).map((fact) => fact.id));
   const resolvedFacts = new Set((run.story.factLedger?.facts ?? []).filter((fact) => fact.status === "resolved").map((fact) => fact.id));
-  const validCharacters = new Set(work.validCharacterIds);
-  mergeDigestProposals(run, work, proposals, validFacts, resolvedFacts, validCharacters);
+  const validCharacters = new Set(run.narrative.dynamicCharacters.map((entry) => entry.id));
+  const updated = mergeDigestProposals(run, work, proposals, validFacts, resolvedFacts, validCharacters);
+  if (!updated.length) return false;
   run.narrative.memoryRevision += 1;
-  projectRunDigestToConversations(run, run.narrative.memoryDigests.find((digest) => digest.id === "run"));
+  if (updated.includes("run")) {
+    projectRunDigestToConversations(run, run.narrative.memoryDigests.find((digest) => digest.id === "run"));
+  }
   return true;
 }
 
@@ -200,18 +249,19 @@ function mergeDigestProposals(
   validFacts = new Set(work.validFactIds),
   resolvedFacts = new Set(work.resolvedFactIds),
   validCharacters = new Set(work.validCharacterIds)
-): number {
+): string[] {
   const scopeById = new Map(work.scopes.map((scope) => [scope.id, scope]));
   const now = Date.now();
   const nextDigests = [...run.narrative.memoryDigests];
-  let updated = 0;
+  const updated: string[] = [];
   for (const proposal of proposals) {
     const scope = scopeById.get(proposal.id)!;
     const canonicalScopeId = scope.scopeId ? canonicalNarrativeIdentity(run.narrative, scope.scopeId) : undefined;
     const digestId = scopeId(scope.scope, canonicalScopeId);
     const previous = nextDigests.find((digest) => digest.id === digestId);
+    if (!previous && proposal.summary === undefined) continue;
     const episodeIndex = (id: string) => run.narrative.episodes.findIndex((entry) => entry.id === id);
-    if (previous && episodeIndex(previous.throughEpisodeId) >= episodeIndex(scope.episodeIds.at(-1)!)) continue;
+    if (proposal.summary !== undefined && previous && episodeIndex(previous.throughEpisodeId) > episodeIndex(scope.episodeIds.at(-1)!)) continue;
     const coveredEpisodeIds = mergeCovered(previous?.coveredEpisodeIds ?? [], scope.episodeIds);
     const digest: NarrativeMemoryDigest = {
       id: digestId,
@@ -219,20 +269,22 @@ function mergeDigestProposals(
       scope: scope.scope,
       scopeId: canonicalScopeId,
       revision: (previous?.revision ?? 0) + 1,
-      throughEpisodeId: scope.episodeIds.at(-1)!,
+      throughEpisodeId: episodeIndex(previous?.throughEpisodeId ?? "") > episodeIndex(scope.episodeIds.at(-1)!) ? previous!.throughEpisodeId : scope.episodeIds.at(-1)!,
       coveredEpisodeIds,
-      summary: proposal.summary.trim(),
-      activeFactIds: unique([...proposal.activeFactIds, ...(previous?.activeFactIds ?? []),
-        ...work.facts.filter((fact) => fact.status === "open" && (scope.scope === "run" || fact.actId === scope.scopeId)).map((fact) => fact.id)])
+      summary: proposal.summary?.trim() ?? previous!.summary,
+      activeFactIds: unique(proposal.activeFactIds ?? previous?.activeFactIds ?? [])
         .filter((id) => validFacts.has(id) && !resolvedFacts.has(id)),
-      historicalFactIds: unique(proposal.historicalFactIds).filter((id) => resolvedFacts.has(id)),
-      characterIds: unique(unique(proposal.characterIds).filter((id) => validCharacters.has(id)).map((id) => canonicalNarrativeIdentity(run.narrative, id))),
+      historicalFactIds: unique(proposal.historicalFactIds ?? previous?.historicalFactIds ?? []).filter((id) => resolvedFacts.has(id)),
+      characterIds: unique(unique(proposal.characterIds ?? previous?.characterIds ?? []).map((id) => canonicalNarrativeIdentity(run.narrative, id)).filter((id) => validCharacters.has(id))),
       updatedAt: now
     };
+    if (previous && digest.summary === previous.summary &&
+      JSON.stringify([digest.coveredEpisodeIds, digest.activeFactIds, digest.historicalFactIds, digest.characterIds]) ===
+      JSON.stringify([previous.coveredEpisodeIds, previous.activeFactIds, previous.historicalFactIds, previous.characterIds])) continue;
     const index = nextDigests.findIndex((entry) => entry.id === digest.id);
     if (index >= 0) nextDigests[index] = digest;
     else nextDigests.push(digest);
-    updated += 1;
+    updated.push(digestId);
   }
   run.narrative.memoryDigests = nextDigests.slice(-64);
   return updated;
@@ -248,11 +300,11 @@ export function applyNarrativeScopedMemoryCuration(
   if (!runDigest || work.episodeIds.some((id) => !runDigest.coveredEpisodeIds.includes(id))) return false;
   const allowed = new Set(work.scopes.filter((scope) => scope.id !== "run").map((scope) => scope.id));
   const proposals = result.digests.filter((proposal, index, all) =>
-    allowed.has(proposal.id) && proposal.summary.trim().length > 0 &&
+    allowed.has(proposal.id) && (proposal.summary === undefined || proposal.summary.trim().length > 0) &&
     all.findIndex((entry) => entry.id === proposal.id) === index
   );
   if (!proposals.length) return false;
-  return mergeDigestProposals(run, work, proposals) > 0;
+  return mergeDigestProposals(run, work, proposals).length > 0;
 }
 
 function projectConversationDigest(
@@ -268,7 +320,7 @@ function projectConversationDigest(
   conversation.summarizedMemoryIds = Array.from(new Set([
     ...(conversation.summarizedMemoryIds ?? []),
     ...coveredMemoryIds
-  ])).slice(-240);
+  ]));
 }
 
 function projectRunDigestToConversations(run: InternalRunState, digest: NarrativeMemoryDigest | undefined): void {

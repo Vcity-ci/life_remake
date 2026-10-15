@@ -159,7 +159,7 @@ const factProvider: NarrativeContextProvider = {
     const detailed = new Set([...(plan.recall?.facts ?? []).map((entry) => entry.id), ...(plan.recall?.resolvedFacts ?? []).map((entry) => entry.id)]);
     return [
       ...(plan.effectiveBackground ? fragment({ id: "runtime:effective-background", layer: "runtime", section: "facts", sourceType: "effective-background", priority: 92,
-        content: `当前有效背景：${plan.effectiveBackground}`, required: true }) : []),
+        content: `人物重要经历（已发生的历史背景）：${plan.effectiveBackground}`, required: true }) : []),
       ...(plan.factDirectory ?? []).filter((fact) => !detailed.has(fact.id)).flatMap((fact) => fragment({ id: `active:fact-directory:${fact.id}`, layer: "active", section: "factDirectory", sourceType: "fact-directory", sourceIds: [`fact:${fact.id}`], priority: 55, content: `${fact.id}=${fact.label}` })),
       ...(plan.recall?.facts ?? []).flatMap((fact) => fragment({ id: `active:fact:${fact.id}`, layer: "active", section: "facts", sourceType: "fact", sourceIds: [`fact:${fact.id}`], priority: 95, content: `${fact.id}：${fact.label}` })),
       ...(plan.recall?.resolvedFacts ?? []).flatMap((fact) => fragment({ id: `recall:resolved-fact:${fact.id}`, layer: "recall", section: "resolvedFacts", sourceType: "resolved-fact", sourceIds: [`fact:${fact.id}`], priority: plan.task === "ending" ? 90 : 45, content: fact.label }))

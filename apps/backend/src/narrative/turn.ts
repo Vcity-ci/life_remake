@@ -123,8 +123,7 @@ export function narrativeTurnCapabilities(
   const capabilities: NarrativeTurnCapability[] = [];
   if (allowedTurnKinds.includes("background")) capabilities.push("background");
   if (!earlyLife && allowedTurnKinds.includes("scene")) {
-    if (beat === "payoff") capabilities.push("scene");
-    else capabilities.push("scene", "choice");
+    capabilities.push("scene", "choice");
   }
   return capabilities;
 }

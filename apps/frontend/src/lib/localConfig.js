@@ -5,7 +5,8 @@ export function readLocalProviderConfig() {
         const raw = localStorage.getItem(PROVIDER_KEY);
         if (!raw)
             return null;
-        return JSON.parse(raw);
+        const config = JSON.parse(raw);
+        return config.maxTokens === 1824 ? { ...config, maxTokens: 18240 } : config;
     }
     catch {
         return null;

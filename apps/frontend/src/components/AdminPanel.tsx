@@ -40,7 +40,7 @@ const defaultProvider: ProviderConfig = {
   model: "deepseek-v4-flash",
   apiPath: "/chat/completions",
   temperature: 0.9,
-  maxTokens: 1824,
+  maxTokens: 18240,
   timeoutMs: 45000,
   reasoningEffort: "minimal"
 };

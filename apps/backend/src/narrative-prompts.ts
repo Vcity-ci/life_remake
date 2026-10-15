@@ -88,10 +88,10 @@ export function narrativeTaskRule(task: NarrativeTask, pack: PromptPackResolved)
     case "background": return pack.yearNormalRule;
     case "planning": return "只规划下一回合的叙事任务，通过工具提交选择，不写玩家正文。";
     case "observation": return "只判断已经发生的故事是否完成当前意图、节拍与事实生命周期，通过工具提交裁决。";
-    case "curation": return "用已提交变化更新有效事实背景与本幕进展。";
+    case "curation": return "压缩选定的已提交历史区间，维护人物的重要人生背景与本幕进展。";
     case "horizon": return "为当前世界幕提出短程叙事意图，不选择或排除路线，不写玩家正文。";
     case "settlement": return "只通过指定工具提交本轮已经形成的结构化变化，不写玩家正文。";
-    case "continuity": return "只从本轮最终正文提取相对可写引用目录的持久差量，不推演剧情或补写对象经历。";
+    case "continuity": return "依据本批最终正文与已有资产目录，整理实际新增及变化，选中 ID 后只更新该项的变化字段，其他对象与字段保留。";
     case "reviewing": return "只编辑本次提供的玩家正文与抉择背景，不调用历史补写内容，不改变结构化结果。";
     case "rendering": return "依据回合计划、人物当前状态和可用材料写本轮实际发生的故事。";
     case "decision": return narrativeProseProfileInstruction(narrativeProseProfile("decision"));

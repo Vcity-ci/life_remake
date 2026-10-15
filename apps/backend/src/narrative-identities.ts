@@ -22,7 +22,7 @@ export function canonicalizeNarrativeReferences<T>(state: NarrativeRunState, val
 
 export function narrativeIdentityMergesSchema() {
   return {
-    type: "array", description: "本轮核对发现既有档案实际是同一人物或同一本领的进阶时，声明归并到保留的原 ID。不同人物、不同能力保持独立。",
+    type: "array", description: "本轮核对发现既有档案实际是同一人物或同一本领的进阶时，声明归并到保留的原 ID；综合后的当前状态通过 participants、relationshipUpdates 或 abilityUpdates 更新保留 ID。不同人物、不同能力保持独立。",
     items: { type: "object", additionalProperties: false, required: ["kind", "sourceRef", "targetRef"], properties: {
       kind: { type: "string", enum: ["character", "ability"] },
       sourceRef: { type: "string", description: "本局身份目录中重复的档案 ID。" },
@@ -62,24 +62,16 @@ export function applyNarrativeIdentityMerges(run: InternalRunState, changes: Nar
         target.introduced = { ...source.introduced };
         target.source = source.source;
       }
-      if (source.updated.age >= target.updated.age) {
-        target.description = source.description; target.mastery = source.mastery;
-        target.usage = source.usage ?? target.usage;
-        target.status = source.status; target.updated = { ...source.updated };
-      }
       for (const key of ["characterIds", "factionIds", "routeIds", "factIds"] as const) target[key] = union(target[key], source[key]);
       state.assets!.abilities = state.assets!.abilities.filter((entry) => entry.id !== sourceRef);
     } else {
       const source = state.dynamicCharacters.find((entry) => entry.id === sourceRef)!;
       const target = state.dynamicCharacters.find((entry) => entry.id === targetRef)!;
       target.introducedAge = Math.min(target.introducedAge, source.introducedAge);
-      if (source.lastSeenAge >= target.lastSeenAge) {
-        target.description = source.description; target.status = source.status;
-      }
       target.lastSeenAge = Math.max(target.lastSeenAge, source.lastSeenAge);
       target.relatedFactIds = union(target.relatedFactIds, source.relatedFactIds);
       target.relatedRouteIds = union(target.relatedRouteIds, source.relatedRouteIds);
-      const relationship = !target.relationship || (source.relationship?.lastChangedAge ?? -1) > target.relationship.lastChangedAge ? source.relationship : target.relationship;
+      const relationship = target.relationship ?? source.relationship;
       if (relationship) target.relationship = { ...relationship, relatedFactIds: union(target.relationship?.relatedFactIds, source.relationship?.relatedFactIds) };
       state.dynamicCharacters = state.dynamicCharacters.filter((entry) => entry.id !== sourceRef);
     }
@@ -87,7 +79,7 @@ export function applyNarrativeIdentityMerges(run: InternalRunState, changes: Nar
     state.identityAliases[sourceRef] = targetRef;
   }
   if (!changed) return;
-  for (const key of ["dynamicCharacters", "assets", "memoryEntries", "episodes", "memoryDigests", "horizonPlan", "sessionPremise", "actCanon", "lastBeatObservation", "activeCharacterIds", "activeScene", "scene", "endingBrief", "agentAttempts"] as const) {
+  for (const key of ["dynamicCharacters", "assets", "assetBuffer", "memoryEntries", "episodes", "memoryDigests", "horizonPlan", "sessionPremise", "actCanon", "lastBeatObservation", "activeCharacterIds", "activeScene", "scene", "endingBrief", "agentAttempts"] as const) {
     Object.assign(state, { [key]: canonicalizeNarrativeReferences(state, state[key]) });
   }
   const digests = new Map<string, NarrativeRunState["memoryDigests"][number]>();
@@ -116,10 +108,10 @@ export function narrativeCharacterDirectory(state: NarrativeRunState) {
   }));
 }
 
-export function formatNarrativeIdentityDirectory(state: NarrativeRunState, detailedIds: string[] = []): string {
+export function formatNarrativeIdentityDirectory(state: NarrativeRunState, detailedIds: string[] = [], compact = false): string {
   const selected = new Set(detailedIds);
   return [
-    `人物身份目录：${state.dynamicCharacters.map((entry) => `${entry.id}=${entry.name}（${entry.role}，${entry.status}）：${entry.description}${selected.has(entry.id) && entry.relationship ? `；关系=${entry.relationship.summary}` : ""}`).join("；") || "无"}`,
+    `人物身份目录：${state.dynamicCharacters.map((entry) => `${entry.id}=${entry.name}（${entry.role}，${entry.status}${entry.factionId ? `，阵营=${entry.factionId}` : ""}）${!compact ? `：${entry.description}` : ""}${!compact && selected.has(entry.id) && entry.relationship ? `；关系=${entry.relationship.summary}` : ""}`).join("；") || "无"}`,
     `地点身份目录：${(state.assets?.locations ?? []).map((entry) => `${entry.id}=${entry.name}${selected.has(entry.id) && entry.spatialDescription ? `：${entry.spatialDescription}` : ""}`).join("；") || "无"}`,
     `本领身份目录：${(state.assets?.abilities ?? []).map((entry) => `${entry.id}=${entry.name}（${entry.status}）${entry.usage ? `：${entry.usage}` : ""}`).join("；") || "无"}`
   ].join("\n");

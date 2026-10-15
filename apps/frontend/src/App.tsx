@@ -296,7 +296,7 @@ export default function App(): React.JSX.Element {
     model: "deepseek-v4-flash",
     apiPath: "/chat/completions",
     temperature: 0.9,
-    maxTokens: 1824,
+    maxTokens: 18240,
     timeoutMs: 45000,
     reasoningEffort: "minimal",
     directorMode: "auto"
@@ -888,6 +888,7 @@ export default function App(): React.JSX.Element {
       }
       await runStepGeneration();
     } catch (error) {
+      setAutoAdvance(false);
       if (isServerBusyError(error)) {
         setAutoAdvance(false);
         setShowBusyModal(true);

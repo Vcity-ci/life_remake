@@ -20,7 +20,7 @@
   <path class="accent" d="M248 184 L260 190 L248 196 Z M446 184 L458 190 L446 196 Z M644 184 L656 190 L644 196 Z M842 184 L854 190 L842 196 Z M1040 184 L1052 190 L1040 196 Z"/>
   <g transform="translate(54 118)">
     <rect class="panel" width="170" height="144" rx="8"/><circle class="accent" cx="24" cy="25" r="6"/>
-    <text class="light" x="39" y="31">Context</text><text class="muted" x="20" y="62">人物与世界幕</text><text class="muted" x="20" y="84">事实、资产、Digest</text><text class="muted" x="20" y="106">近期真实叙事</text><text class="small" x="20" y="130">去重 · 预算 · Manifest</text>
+    <text class="light" x="39" y="31">Context</text><text class="muted" x="20" y="62">人物与世界幕</text><text class="muted" x="20" y="84">事实、资产、Digest</text><text class="muted" x="20" y="106">近期真实叙事</text><text class="small" x="20" y="130">投影 · 去重 · Manifest</text>
   </g>
   <g transform="translate(252 118)">
     <rect class="panel" width="170" height="144" rx="8"/><circle class="accent" cx="24" cy="25" r="6"/>

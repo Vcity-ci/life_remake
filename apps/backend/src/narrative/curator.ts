@@ -7,7 +7,9 @@ import type { ChatConversationState } from "../conversation.js";
 import type { InternalRunState } from "../engine.js";
 import { canonicalNarrativeIdentity } from "../narrative-identities.js";
 import { estimateNarrativeTokens } from "./context/fragments.js";
-import { narrativeTaskContextProfile } from "./context/task-profiles.js";
+
+/** Compression cadence is independent of request composition and input size. */
+export const NARRATIVE_COMPRESSION_PROGRESS_TOKENS = 1_638;
 
 export interface NarrativeMemoryCurationScope {
   id: string;
@@ -34,7 +36,6 @@ export interface NarrativeMemoryCurationEpisode {
   characterIds: string[];
   locationIds: string[];
   abilityIds: string[];
-  text: string;
   storyDelta: string;
 }
 
@@ -131,11 +132,9 @@ function compressionWindow(run: InternalRunState, uncovered: NarrativeEpisodeRec
   const availableEnd = Math.max(protectedStart - 1, completedEnd);
   if (availableEnd < 0) return [];
   let end = completedEnd;
-  const profile = narrativeTaskContextProfile("planning");
-  const progressBudget = profile.budget.maxEstimatedTokens * profile.budget.layerRatios.task;
   const eligible = uncovered.filter((episode) => episodes.indexOf(episode) <= availableEnd);
   const progressTokens = eligible.reduce((sum, episode) => sum + estimateNarrativeTokens(episode.storyDelta ?? ""), 0);
-  if (end < 0 && progressTokens >= progressBudget) {
+  if (end < 0 && progressTokens >= NARRATIVE_COMPRESSION_PROGRESS_TOKENS) {
     const resolvedSources = new Set((run.story.factLedger?.facts ?? []).filter((fact) => fact.status === "resolved")
       .map((fact) => fact.lastSourceEventId ?? fact.sourceEventId));
     const closedEnd = episodes.reduce((last, episode, index) => index <= availableEnd && fresh.has(episode.id) && resolvedSources.has(episode.sourceEventId) ? index : last, -1);
@@ -163,7 +162,6 @@ export function prepareNarrativeMemoryCuration(run: InternalRunState, retryEpiso
   const selectedIds = new Set(selected.map((episode) => episode.id));
   const scopes = availableScopes.map((scope) => ({ ...scope, episodeIds: scope.episodeIds.filter((id) => selectedIds.has(id)) }))
     .filter((scope) => scope.episodeIds.length > 0);
-  const memoryById = new Map(run.narrative.memoryEntries.map((memory) => [memory.id, memory]));
   const facts = run.story.factLedger?.facts ?? [];
   const factIds = new Set(facts.map((fact) => fact.id));
   const characterIds = new Set(run.narrative.dynamicCharacters.map((character) => character.id));
@@ -193,7 +191,6 @@ export function prepareNarrativeMemoryCuration(run: InternalRunState, retryEpiso
       characterIds: episode.characterIds.filter((id) => characterIds.has(id)),
       locationIds: episode.locationIds,
       abilityIds: episode.abilityIds,
-      text: episode.memoryIds.map((id) => memoryById.get(id)?.text ?? "").filter(Boolean).join("\n"),
       storyDelta: episode.storyDelta ?? ""
     })),
     scopes,

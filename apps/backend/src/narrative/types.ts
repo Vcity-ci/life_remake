@@ -1,5 +1,4 @@
 export type {
-  NarrativeContextBudgetProfile,
   NarrativeContextComposeInput,
   NarrativeContextComposition,
   NarrativeContextFragment,

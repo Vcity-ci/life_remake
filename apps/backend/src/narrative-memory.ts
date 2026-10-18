@@ -1,4 +1,5 @@
 import type { NarrativeMemoryEntry, NarrativeRunState } from "@reroll/shared";
+import { NARRATIVE_HISTORY_LIMIT } from "./narrative/history.js";
 
 export function narrativeTextOverlap(left: string, right: string): number {
   const tokens = (value: string) => {
@@ -21,5 +22,5 @@ export function commitNarrativeMemory(state: NarrativeRunState, entry: Narrative
   for (const key of ["characterIds", "factionIds", "factIds", "locationIds", "abilityIds"] as const) {
     merged[key] = Array.from(new Set([...(previous?.[key] ?? []), ...(entry[key] ?? [])]));
   }
-  state.memoryEntries = [...state.memoryEntries.filter((item) => item.id !== entry.id), merged].slice(-80);
+  state.memoryEntries = [...state.memoryEntries.filter((item) => item.id !== entry.id), merged].slice(-NARRATIVE_HISTORY_LIMIT);
 }

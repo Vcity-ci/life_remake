@@ -22,7 +22,7 @@ import {
   type NarrativeContext
 } from "../ai.js";
 import { applyNarrativeRelationshipUpdates, resolveNarrativeStatLabels, type InternalRunState } from "../engine.js";
-import { buildNarrativePromptPlan, type NarrativePromptPlan } from "../narrative.js";
+import { buildNarrativePromptPlan, narrativeDefaultAssetFocusIds, type NarrativePromptPlan } from "../narrative.js";
 import { narrativeProseProfile } from "../narrative-prompts.js";
 import { narrativeStoryPackNextAct } from "../narrative-experience.js";
 import { narrativeTurnPlanFocusIds, resolveNarrativeTurnTime, type NarrativeTurnTime, type NarrativeTurnEnvelope, type NarrativeTurnPlan } from "./turn.js";
@@ -34,6 +34,7 @@ import { acknowledgeNarrativeAssetBatch, narrativeAssetBatchReady, stageNarrativ
 import { applyNarrativeAssetUpdates, commitNarrativeAssets } from "../narrative-assets.js";
 import { registerNarrativeParticipants } from "../narrative-characters.js";
 import { hasNarrativeFactCompletion, narrativeActProgress, narrativeFactProgressForCommit, narrativeObservationFacts } from "./observation.js";
+import { committedNarrativeSequence } from "./history.js";
 
 export interface NarrativeAgentTurnInput {
   run: InternalRunState;
@@ -50,6 +51,7 @@ export interface NarrativeAgentTurnResult {
   attemptId: string;
   plan: NarrativeTurnPlan;
   scene: DynamicNarrativeSceneResult;
+  worldCardIds: string[];
 }
 
 interface NarrativeTurnBrief {
@@ -124,6 +126,7 @@ export async function runNarrativeAgentTurn(input: NarrativeAgentTurnInput): Pro
   });
 
   const backgroundOnly = envelope.capabilities.length === 1 && envelope.capabilities[0] === "background";
+  const worldCardCandidates = context.narrativePlan?.activeWorldCardSources;
   const plan: NarrativeTurnPlan = backgroundOnly
     ? {
         callId: envelope.callId,
@@ -155,13 +158,17 @@ export async function runNarrativeAgentTurn(input: NarrativeAgentTurnInput): Pro
 
   const renderTask = plan.turnKind === "background" ? "background" : "rendering";
   const time = resolveNarrativeTurnTime(envelope, plan);
-  await prepareNarrativeAssetUses(run, world, context, narrativeTurnPlanFocusIds(plan));
+  const assetFocusIds = backgroundOnly
+    ? narrativeDefaultAssetFocusIds(run.narrative, renderTask)
+    : narrativeTurnPlanFocusIds(plan);
+  await prepareNarrativeAssetUses(run, world, context, assetFocusIds);
   const promptPlan = buildNarrativePromptPlan(run, narrativeWorld, null, renderTask, {
     backgroundAllowed: plan.turnKind === "background",
     factionIds: plan.forceIds,
     patternIds: plan.patternIds,
-    focusIds: backgroundOnly ? run.narrative.activeCharacterIds : narrativeTurnPlanFocusIds(plan),
-    semanticQuery: [plan.sceneGoal, ...(plan.assetNeeds ?? []).map((need) => need.purpose)].join("；")
+    focusIds: assetFocusIds,
+    semanticQuery: [plan.sceneGoal, ...(plan.assetNeeds ?? []).map((need) => need.purpose)].join("；"),
+    worldCardCandidates: backgroundOnly ? undefined : worldCardCandidates
   });
   if (!promptPlan) throw new Error("narrative_agent_prompt_plan_missing");
   const sourceEventId = plan.turnKind === "background"
@@ -199,7 +206,6 @@ export async function runNarrativeAgentTurn(input: NarrativeAgentTurnInput): Pro
       changes: scene,
       socialForces: narrativeWorld.socialForces,
       handoff: scene.handoff,
-      materials: brief.plan.materials,
       callId: envelope.callId,
       task: scene.turnKind === "background" ? "background" as const : scene.createsDecision ? "choice" as const : "scene" as const,
       ageLabel: scene.turnKind === "background"
@@ -260,7 +266,7 @@ export async function runNarrativeAgentTurn(input: NarrativeAgentTurnInput): Pro
     scene = await settleDynamicNarrativeScene(run, world, renderInput, scene, context);
   }
   // Annual survival may shorten a background interval before its assets can be registered.
-  if (scene.turnKind === "background") return { attemptId, plan, scene, time };
+  if (scene.turnKind === "background") return { attemptId, plan, scene, time, worldCardIds: brief.worldCardIds };
   const synchronized = await synchronizeNarrativeAgentScene({ ...input, scene, plan, promptPlan, callId: envelope.callId, age: time.sceneAge });
   scene = synchronized.scene;
   const { writeSet, continuityStatus } = synchronized;
@@ -315,7 +321,7 @@ export async function runNarrativeAgentTurn(input: NarrativeAgentTurnInput): Pro
     continuityStatus,
     contextFragmentIds: contextFragmentIds(context)
   });
-  return { attemptId, plan, scene, time };
+  return { attemptId, plan, scene, time, worldCardIds: brief.worldCardIds };
 }
 
 export async function synchronizeNarrativeAgentScene(input: {
@@ -391,9 +397,9 @@ export function commitNarrativeAgentTurn(run: InternalRunState, attemptId: strin
     worldCardIds: previous.worldCardIds,
     episodeId
   });
-  const sequence = run.narrative.episodes.length;
+  const sequence = committedNarrativeSequence(run.narrative);
   const cardRefs = run.narrative.agentAttempts
-    .filter((entry) => entry.attemptId === attemptId)
+    .filter((entry) => entry.attemptId === attemptId && (entry.stage === "render" || entry.stage === "review"))
     .flatMap((entry) => entry.contextFragmentIds ?? [])
     .filter((id) => id.startsWith("recall:world-card:"));
   if (cardRefs.length) {
@@ -466,6 +472,12 @@ export async function runNarrativeAgentDecision(input: {
   });
   await input.onProgress?.("rendering");
   let rendered = await renderDirectedDecisionNarrative(input.run, input.world, { ...input.decision, socialForces: input.narrativeWorld.socialForces }, input.context);
+  appendAttempt(input.run, {
+    callId: input.callId, attemptId, task: "decision", source: "decision", stage: "render",
+    actId: input.run.narrative.actRuntime?.actId, beat: input.run.narrative.actRuntime?.beat,
+    briefId, focusIds: briefFocusIds, worldCardIds: briefWorldCardIds,
+    contextFragmentIds: contextFragmentIds(input.context)
+  });
   const decisionWritableSet = narrativeContinuityWritableSet(input.run, input.context.narrativePlan);
   const proseProfile = narrativeProseProfile("decision", input.run.narrative.actRuntime?.beat);
   const reviewInput = {

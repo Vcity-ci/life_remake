@@ -8,22 +8,20 @@ export interface NarrativeContextDedupeResult {
 
 export function dedupeNarrativeContextFragments(fragments: NarrativeContextFragment[]): NarrativeContextDedupeResult {
   const kept: NarrativeContextFragment[] = [];
-  const ids = new Set<string>();
   const contents = new Set<string>();
   const sourceIds = new Set<string>();
   const droppedFragmentIds: string[] = [];
   const duplicateSourceIds = new Set<string>();
   for (const fragment of [...fragments].sort((a, b) => a.order - b.order)) {
-    const contentKey = fragment.content.replace(/\s+/g, " ").trim();
+    const contentKey = JSON.stringify([fragment.layer, fragment.section, fragment.content]);
     const history = fragment.placement === "message_history";
     const repeatedSources = history ? [] : fragment.sourceIds.filter((id) => sourceIds.has(id));
-    if (ids.has(fragment.id) || (!history && contents.has(contentKey)) || repeatedSources.length > 0) {
+    repeatedSources.forEach((id) => duplicateSourceIds.add(id));
+    if (!history && contents.has(contentKey)) {
       droppedFragmentIds.push(fragment.id);
-      repeatedSources.forEach((id) => duplicateSourceIds.add(id));
       continue;
     }
     kept.push(fragment);
-    ids.add(fragment.id);
     contents.add(contentKey);
     fragment.sourceIds.forEach((id) => sourceIds.add(id));
   }

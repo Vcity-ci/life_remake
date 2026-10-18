@@ -1,5 +1,4 @@
 import { buildConversationPromptMessages } from "../../conversation.js";
-import { applyNarrativeContextBudget } from "./budgets.js";
 import { collectNarrativePlanFragments, defaultNarrativeContextProviders } from "./collectors.js";
 import { dedupeNarrativeContextFragments } from "./dedupe.js";
 import { narrativeContentId, narrativeContextFragment } from "./fragments.js";
@@ -30,18 +29,18 @@ export function composeNarrativeContext(input: NarrativeContextComposeInput): Na
     order: planFragments.length + index
   })).filter((entry): entry is NarrativeContextFragment => Boolean(entry));
   const deduped = dedupeNarrativeContextFragments([...planFragments, ...historyFragments]);
-  const budgeted = applyNarrativeContextBudget(deduped.fragments, profile);
+  const fragments = deduped.fragments;
   const layerEstimatedTokens = Object.fromEntries(LAYERS.map((layer) => [
     layer,
-    budgeted.fragments.filter((entry) => entry.layer === layer).reduce((sum, entry) => sum + entry.estimatedTokens, 0)
+    fragments.filter((entry) => entry.layer === layer).reduce((sum, entry) => sum + entry.estimatedTokens, 0)
   ])) as Record<NarrativeContextLayer, number>;
-  const selectedHistoryIds = new Set(budgeted.fragments.filter((entry) => entry.placement === "message_history").map((entry) => entry.id));
+  const selectedHistoryIds = new Set(fragments.filter((entry) => entry.placement === "message_history").map((entry) => entry.id));
   const selectedHistoryMessages = historyMessages.filter((message, index) => selectedHistoryIds.has(narrativeContentId(`history:${index}:${message.role}`, message.content)));
-  const droppedFragmentIds = Array.from(new Set([...deduped.droppedFragmentIds, ...budgeted.droppedFragmentIds]));
-  const stableContext = formatNarrativeContextFragments(budgeted.fragments, new Set(["stable"]));
-  const runtimeContext = formatNarrativeContextFragments(budgeted.fragments, new Set(["runtime"]));
-  const activeContext = formatNarrativeContextFragments(budgeted.fragments, new Set(["active", "recall"]));
-  const taskContext = formatNarrativeContextFragments(budgeted.fragments, new Set(["task"]));
+  const droppedFragmentIds = deduped.droppedFragmentIds;
+  const stableContext = formatNarrativeContextFragments(fragments, new Set(["stable"]));
+  const runtimeContext = formatNarrativeContextFragments(fragments, new Set(["runtime"]));
+  const activeContext = formatNarrativeContextFragments(fragments, new Set(["active", "recall"]));
+  const taskContext = formatNarrativeContextFragments(fragments, new Set(["task"]));
   return {
     renderedContext: [stableContext, runtimeContext, activeContext, taskContext].filter(Boolean).join("\n"),
     stableContext,
@@ -55,7 +54,7 @@ export function composeNarrativeContext(input: NarrativeContextComposeInput): Na
       worldId: input.worldId,
       focusIds: input.focusIds,
       task: input.task,
-      fragments: budgeted.fragments,
+      fragments,
       totalEstimatedTokens: Object.values(layerEstimatedTokens).reduce((sum, value) => sum + value, 0),
       layerEstimatedTokens,
       droppedFragmentIds,

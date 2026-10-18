@@ -46,7 +46,7 @@ export interface NarrativeContextFragment {
   required: boolean;
   expiresAfterTurn?: boolean;
   order: number;
-  /** A semantic unit (normally one user/assistant round) that is budgeted atomically. */
+  /** Identifies a complete semantic exchange in request history. */
   groupId?: string;
   /** Debug-only explanation for conditional recall. Never rendered to the model. */
   activationReason?: string;
@@ -61,14 +61,8 @@ export interface NarrativeContextFragment {
   worldCardRemainingCooldownTurns?: number;
 }
 
-export interface NarrativeContextBudgetProfile {
-  maxEstimatedTokens: number;
-  layerRatios: Record<NarrativeContextLayer, number>;
-}
-
 export interface NarrativeTaskContextProfile {
   task: NarrativeTask;
-  budget: NarrativeContextBudgetProfile;
   allowedSections: NarrativeContextSection[];
   history: ConversationProjectionPolicy;
 }

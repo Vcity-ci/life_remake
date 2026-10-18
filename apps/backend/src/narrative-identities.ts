@@ -103,7 +103,7 @@ export function applyNarrativeIdentityMerges(run: InternalRunState, changes: Nar
 /** Identity lookup is independent of which records need detailed story recall. */
 export function narrativeCharacterDirectory(state: NarrativeRunState) {
   return state.dynamicCharacters.map((entry) => ({
-    id: entry.id, name: entry.name, factionId: entry.factionId, role: entry.role,
+    id: entry.id, name: entry.name, factionId: entry.factionId, role: entry.role, relationship: entry.relationship?.summary,
     description: `${entry.status === "gone" ? "已离场。" : entry.status === "resolved" ? "此前交往已告一段落。" : ""}${entry.description}`
   }));
 }
@@ -112,7 +112,7 @@ export function formatNarrativeIdentityDirectory(state: NarrativeRunState, detai
   const selected = new Set(detailedIds);
   return [
     `人物身份目录：${state.dynamicCharacters.map((entry) => `${entry.id}=${entry.name}（${entry.role}，${entry.status}${entry.factionId ? `，阵营=${entry.factionId}` : ""}）${!compact ? `：${entry.description}` : ""}${!compact && selected.has(entry.id) && entry.relationship ? `；关系=${entry.relationship.summary}` : ""}`).join("；") || "无"}`,
-    `地点身份目录：${(state.assets?.locations ?? []).map((entry) => `${entry.id}=${entry.name}${selected.has(entry.id) && entry.spatialDescription ? `：${entry.spatialDescription}` : ""}`).join("；") || "无"}`,
-    `本领身份目录：${(state.assets?.abilities ?? []).map((entry) => `${entry.id}=${entry.name}（${entry.status}）${entry.usage ? `：${entry.usage}` : ""}`).join("；") || "无"}`
+    `地点身份目录：${(state.assets?.locations ?? []).map((entry) => `${entry.id}=${entry.name}${!compact && entry.spatialDescription ? `：${entry.spatialDescription}` : ""}`).join("；") || "无"}`,
+    `本领身份目录：${(state.assets?.abilities ?? []).map((entry) => `${entry.id}=${entry.name}（${entry.status}）${!compact && entry.usage ? `：${entry.usage}` : ""}`).join("；") || "无"}`
   ].join("\n");
 }

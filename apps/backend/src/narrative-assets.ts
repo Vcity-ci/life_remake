@@ -127,10 +127,10 @@ export function narrativeAssetUpdatesSchema(_assets?: NarrativeAssets): Record<s
           ],
           description: "新增可辨认的实际空间或更新真实的空间变化。仅抵达已有地点由 assetActivity 记录。已有地点用 ref 引用，新地点另需 name 和空间描述；其发生的事件保存在经历中。",
           properties: {
-            ref: { type: "string", description: "完整复制目录中的已有地点 ID，包含 location: 前缀；新建地点使用 new。" },
+            ref: { type: "string", description: "完整复制本局地点身份目录中的已有地点 ID，包含 location: 前缀；新建地点使用 new。" },
             name: { ...string, description: "新地点的稳定名称；更新已有地点保留原名称。" }, description: string,
-            spatialDescription: { type: "string", description: "供后续叙事使用的当前空间与稳定环境条件；新地点填写，空间实质变化时更新。事件经过留在 description 与经历记录中。" },
-            current: { type: "boolean", description: "本段结束时主角实际所在的地点为 true；仅提及或曾经路过为 false。" }
+            spatialDescription: { ...string, description: "供后续叙事使用的当前空间与稳定环境条件；新地点填写，空间实质变化时更新；无变化时省略。事件经过留在 description 与经历记录中。" },
+            current: { type: "boolean", description: "本段结束时主角实际所在的地点为 true；结束于新地点时，在该 ref=new 条目填写 true，由引擎分配真实 ID 并更新当前位置。仅提及或曾经路过为 false。" }
           }
         }
       },
@@ -144,10 +144,10 @@ export function narrativeAssetUpdatesSchema(_assets?: NarrativeAssets): Record<s
           ],
           description: "本领是游戏技能：主角学会后能主动选择使用，改变解决困难的方式或效果的具体技艺、战法、秘法。填写使用方式、效果与限制。同一技法进阶更新原 ID；不同机制新建。普通行走、生理成长、身份职位分别由生活、属性、人物表达。",
           properties: {
-            ref: { type: "string", description: "完整复制目录中的已有本领 ID，包含 ability: 前缀；新建本领使用 new。" },
+            ref: { type: "string", description: "完整复制本局本领身份目录中的已有本领 ID，包含 ability: 前缀；新建本领使用 new。" },
             name: { type: "string", minLength: 1, description: "新本领的稳定、简短名称，也是档案标题；已有本领沿用原名称。" },
             description: { type: "string", minLength: 1, description: "供玩家查看的能力说明与实际获得、使用经历。" },
-            usage: { type: "string", description: "当前能怎样主动使用这项能力、实际效果、掌握程度与限制；新本领填写，能力实质变化时更新。只写当前可用状态。" },
+            usage: { ...string, description: "当前能怎样主动使用这项能力、实际效果、掌握程度与限制；新本领填写，能力实质变化时更新；无变化时省略。只写当前可用状态。" },
             source: { type: "string", minLength: 1, description: "已经发生的获得来历；更新时保留原来历。" },
             mastery: { type: "string", minLength: 1, description: "当前掌握状态的简短称谓，不写经历、来历或整段能力说明。" },
             status: { type: "string", enum: ["available", "unavailable"] }

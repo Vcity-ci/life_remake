@@ -29,12 +29,31 @@ export interface AnonymousSession {
   expiresAt: number;
 }
 
+export interface RunGenerationFailureInput {
+  requestId?: string;
+  callId?: string;
+  responseId?: string;
+  toolCallId?: string;
+  task: string;
+  source?: string;
+  toolName?: string;
+  attempt: number;
+  age: number;
+  ageRange?: { fromAge: number; toAge: number };
+  actId?: string;
+  beat?: string;
+  reason: string;
+  validation?: { rule: string; path?: string; expected?: unknown; received?: unknown };
+  originalToolArguments?: unknown;
+}
+
 interface StoredRunRecord {
   sessionId: string;
   run: InternalRunState;
   createdAt: number;
   updatedAt: number;
   expiresAt: number;
+  generationFailures?: Array<RunGenerationFailureInput & { id: string; createdAt: number; committedAge: number }>;
 }
 
 interface StoredSaveSlot extends SaveSlotSummary {
@@ -351,12 +370,27 @@ export async function resolveAnonymousSession(rawToken?: string): Promise<{
 export async function saveRun(run: InternalRunState, sessionId: string): Promise<void> {
   await ensureStoreReady();
   const now = Date.now();
+  const previous = runs.get(run.runId);
   runs.set(run.runId, {
     sessionId,
     run,
-    createdAt: runs.get(run.runId)?.createdAt ?? now,
+    createdAt: previous?.createdAt ?? now,
     updatedAt: now,
-    expiresAt: now + RUN_TTL_MS
+    expiresAt: now + RUN_TTL_MS,
+    generationFailures: previous?.generationFailures
+  });
+  await queuePersist();
+}
+
+export async function recordRunGenerationFailure(
+  runId: string, sessionId: string, failure: RunGenerationFailureInput
+): Promise<void> {
+  await ensureStoreReady();
+  const record = runs.get(runId);
+  if (!record || record.sessionId !== sessionId || record.expiresAt <= Date.now()) return;
+  // Keep diagnostics outside the working story transaction, which may be discarded.
+  (record.generationFailures ??= []).push({
+    ...structuredClone(failure), id: `failure:${randomUUID()}`, createdAt: Date.now(), committedAge: record.run.age
   });
   await queuePersist();
 }

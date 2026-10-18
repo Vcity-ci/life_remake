@@ -1,5 +1,6 @@
 import type { NarrativeActHandoff, NarrativeActCanon, NarrativeEpisodeRecord } from "@reroll/shared";
 import type { InternalRunState } from "../engine.js";
+import { committedNarrativeSequence, NARRATIVE_HISTORY_LIMIT } from "./history.js";
 
 export interface NarrativeCommitDraft {
   turnId?: string;
@@ -47,7 +48,9 @@ export function commitNarrativeEpisode(run: InternalRunState, draft: NarrativeCo
     storyDelta: draft.storyDelta?.trim() || undefined,
     createdAt: Date.now()
   };
-  run.narrative.episodes = [...run.narrative.episodes.filter((entry) => entry.id !== record.id), record].slice(-120);
+  const exists = run.narrative.episodes.some((entry) => entry.id === record.id);
+  run.narrative.committedEpisodeSequence = committedNarrativeSequence(run.narrative) + (exists ? 0 : 1);
+  run.narrative.episodes = [...run.narrative.episodes.filter((entry) => entry.id !== record.id), record].slice(-NARRATIVE_HISTORY_LIMIT);
   return record;
 }
 

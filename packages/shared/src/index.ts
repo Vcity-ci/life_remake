@@ -1117,6 +1117,8 @@ export interface NarrativeRunState {
   };
   memoryEntries: NarrativeMemoryEntry[];
   episodes: NarrativeEpisodeRecord[];
+  /** Monotonic committed progress, independent of the retained episode window. */
+  committedEpisodeSequence?: number;
   actCanon: NarrativeActCanon[];
   memoryRevision: number;
   memoryDigests: NarrativeMemoryDigest[];

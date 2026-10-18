@@ -30,10 +30,12 @@ export function stageNarrativeAssetRound(
   buffer.abilities = upsert(buffer.abilities, application.assets.abilities.filter((entry) => application.abilityIds.includes(entry.id)));
   buffer.characters = upsert(buffer.characters, characters.map(({ character }) => character));
   if (!buffer.rounds.some((entry) => entry.sourceEventId === round.sourceEventId)) buffer.rounds.push({ ...round });
+  const currentLocationId = changes.assetUpdates?.locations.some((entry) => entry.current === true)
+    ? application.assets.currentLocationId : undefined;
   // Commit paths still add fact/character links via their original API, but never replay
   // stale field values over a batch's newer revision or allocate a second identity.
   return changes.assetUpdates ? {
-    locations: application.locationIds.map((ref) => ({ ref })),
+    locations: application.locationIds.map((ref) => ({ ref, ...(ref === currentLocationId ? { current: true } : {}) })),
     abilities: application.abilityIds.map((ref) => ({ ref }))
   } : undefined;
 }

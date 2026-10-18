@@ -44,7 +44,7 @@ export function narrativeActProgress(run: InternalRunState, actId: string): Narr
   };
 }
 
-/** Actual round references are mandatory; the detail allowance applies only to extra facts. */
+/** The observer receives open matters for this act and the round's completion evidence. */
 export function narrativeObservationFacts(
   run: InternalRunState,
   actId: string,
@@ -67,9 +67,7 @@ export function narrativeObservationFacts(
       introducedAge: run.age, lastTouchedAge: run.age, sourceEventId: "" });
   }
   const mandatory = facts.filter((fact) => involved.has(fact.id));
-  const supplementary = facts.filter((fact) => !involved.has(fact.id))
-    .sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0) || b.lastTouchedAge - a.lastTouchedAge)
-    .slice(0, Math.max(0, 12 - mandatory.length));
+  const supplementary = facts.filter((fact) => !involved.has(fact.id));
   return [...mandatory, ...supplementary].map((fact) => {
     const completion = updates?.resolutions?.find((entry) => entry.factId === fact.id)?.summary;
     const progress = updates?.progress?.find((entry) => entry.factId === fact.id)?.summary;

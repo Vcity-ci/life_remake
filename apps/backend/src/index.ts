@@ -69,7 +69,7 @@ import {
   readContentBundle,
   writeContentBundle
 } from "./content.js";
-import { buildNarrativePromptPlan, narrativeRouteBeatGuidance, narrativeStoryPackWorldCardDirectory, ensureNarrativeActRuntime, isNarrativeEarlyLife, isNarrativeMainlineActEntryReady, isNarrativeWorldStageReady, selectNarrativeGrowthFocus } from "./narrative.js";
+import { buildNarrativePromptPlan, narrativeRouteBeatGuidance, ensureNarrativeActRuntime, isNarrativeEarlyLife, isNarrativeMainlineActEntryReady, isNarrativeWorldStageReady, selectNarrativeGrowthFocus } from "./narrative.js";
 import { resolveNarrativeExperience } from "./narrative-experience.js";
 import { loadNarrativeStoryPack, loadNarrativeStoryPacksForWorld, toPublicStoryPackOption } from "./story-packs.js";
 import {
@@ -1027,6 +1027,7 @@ async function generateApprovedDirectedEnding(
 
 interface DirectedSegmentOptions {
   run: InternalRunState;
+  requestId?: string;
   world: WorldConfig;
   difficulty: DifficultyConfig;
   sessionId: string;
@@ -1043,6 +1044,7 @@ interface DirectedSegmentOptions {
 
 interface OpeningGenerationOptions {
   run: InternalRunState;
+  requestId?: string;
   world: WorldConfig;
   narrativeWorld?: NarrativeWorldDefinition | null;
   sessionId: string;
@@ -1083,6 +1085,7 @@ async function generateOpeningForRun(options: OpeningGenerationOptions): Promise
     eventPoolSummary,
     talentHookSummary,
     narrativePlan: buildNarrativePromptPlan(run, narrativeWorld, null, "origin"),
+    requestId: options.requestId,
     conversation: run.aiConversation?.year
   };
   let opening: Awaited<ReturnType<typeof generateNarrativeOrigin>>;
@@ -1162,6 +1165,7 @@ async function generateDirectedSegmentForRunUnsafe(options: DirectedSegmentOptio
     eventPoolSummary,
     talentHookSummary,
     narrativePlan: buildNarrativePromptPlan(run, narrativeWorld, null, "planning"),
+    requestId: options.requestId,
     conversation: run.aiConversation?.year
   };
   const closureRequestEligible = canRequestDirectedClosure(run, narrativeWorld);
@@ -1254,13 +1258,12 @@ async function generateDirectedSegmentForRunUnsafe(options: DirectedSegmentOptio
     tensions: force.tensions
   }));
   const planningRecall = narrativeCtx.narrativePlan!.recall!;
-  const storyPackWorldCardDirectory = narrativeStoryPackWorldCardDirectory(narrativeWorld, act.id);
   const focusReferences: NarrativeTurnEnvelope["focusReferences"] = [
     ...planningRecall.facts.map((fact) => ({ id: fact.id, kind: "fact" as const, label: fact.label })),
-    ...narrativeCharacterDirectory(run.narrative).map((entry) => ({ id: entry.id, kind: "character" as const, label: entry.name })),
+    ...narrativeCharacterDirectory(run.narrative).map((entry) => ({ id: entry.id, kind: "character" as const,
+      label: `${entry.name}（${entry.role}，${entry.factionId ?? "无阵营"}）：${entry.description}${entry.relationship ? `；关系=${entry.relationship}` : ""}` })),
     ...narrativeLocationDirectory(run.narrative.assets).map((entry) => ({ id: entry.id, kind: "location" as const, label: entry.label })),
     ...narrativeAbilityDirectory(run.narrative.assets).map((entry) => ({ id: entry.id, kind: "ability" as const, label: entry.label })),
-    ...storyPackWorldCardDirectory,
     ...(narrativeCtx.narrativePlan!.activeWorldCardSources ?? []).map((entry) => ({
       id: entry.id,
       kind: "world_card" as const,
@@ -1487,6 +1490,7 @@ async function generateDirectedSegmentForRunUnsafe(options: DirectedSegmentOptio
   if (run.pendingDynamicScene) {
     run.pendingDynamicScene.locationIds = sceneLocationIds;
     run.pendingDynamicScene.abilityIds = sceneAbilityIds;
+    run.pendingDynamicScene.worldCardIds = agentTurn.worldCardIds;
   }
   recordDirectedStoryTurnOutcome(narrativeCtx, run, {
     kind: scene.createsDecision ? "milestone" : "normal",
@@ -1539,7 +1543,8 @@ async function generateSegmentForRun(
   talentHookSummary: string,
   milestoneEventPool: string[],
   narrativeWorld?: NarrativeWorldDefinition | null,
-  onProgress?: (stage: StepProgressStage) => Promise<void> | void
+  onProgress?: (stage: StepProgressStage) => Promise<void> | void,
+  requestId?: string
 ): Promise<GenerationOutput> {
   if (run.ended) {
     markRunPhase(run, "ended");
@@ -1589,6 +1594,7 @@ async function generateSegmentForRun(
     // currently legal.
     if (run.story.mainlineCompleted && run.story.closureState === "open") {
       return generateDirectedSegmentForRun({
+        requestId,
         run,
         world,
         difficulty,
@@ -1607,6 +1613,7 @@ async function generateSegmentForRun(
   }
   if (useDirectedTurn) {
     return generateDirectedSegmentForRun({
+      requestId,
       run,
       world,
       difficulty,
@@ -1896,6 +1903,7 @@ async function runStepFlowUnlocked(
     let openingRecord: TurnRecord | undefined;
     try {
       const openingTransaction = await runNarrativeTurnTransaction(run, (working) => generateOpeningForRun({
+        requestId: body.requestId,
         run: working,
         world,
         narrativeWorld,
@@ -2075,6 +2083,7 @@ async function runStepFlowUnlocked(
       const selectedLocationRef = selectedOption?.locationDirective?.locationRef;
       directedDecisionContext = {
         callId: decisionCallId,
+        requestId: body.requestId,
         providerConfig,
         apiKey,
         usageScope: { sessionId, runId: run.runId, worldId: run.worldId },
@@ -2243,7 +2252,8 @@ async function runStepFlowUnlocked(
       talentHookSummary,
       milestoneEventPool,
       narrativeWorld,
-      reportProgress
+      reportProgress,
+      body.requestId
     );
     generatedChunk = generated.generatedChunk;
     fromAge = generated.fromAge;

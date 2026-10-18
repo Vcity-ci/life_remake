@@ -215,6 +215,7 @@ export interface InternalRunState extends RunState {
     factIds?: string[];
     locationIds?: string[];
     abilityIds?: string[];
+    worldCardIds?: string[];
     decisionBrief?: NarrativeDecisionBrief;
   };
   narrativeReservoir: NarrativeReservoirState;

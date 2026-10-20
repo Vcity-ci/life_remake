@@ -46,8 +46,11 @@ import { createDefaultGameplayTuning } from "@reroll/shared";
 import { formatNarrativeAssets, normalizeNarrativeAssets, selectNarrativeAssets } from "./narrative-assets.js";
 import { selectNarrativeEpisodeRecall } from "./narrative/episodes.js";
 import { normalizeNarrativeStageTask } from "./narrative/stage-task.js";
+import { narrativeStageTaskForOutline, normalizeNarrativeActOutline } from "./narrative/act-outline.js";
 import { narrativeStoryPackNextAct } from "./narrative-experience.js";
 import { committedNarrativeSequence, NARRATIVE_HISTORY_LIMIT } from "./narrative/history.js";
+import { buildNarrativeStoryHistory, type NarrativeStoryHistory } from "./narrative/story-history.js";
+import { formatNarrativeActOutline } from "./narrative/act-outline.js";
 
 export interface NarrativePromptSource {
   aiConversation?: AiConversationState;
@@ -94,6 +97,7 @@ export interface NarrativePromptPlan {
   actCanon?: Array<{ actId: string; sourceEventId: string; text: string; factIds: string[] }>;
   memoryDigests?: Array<{ id: string; text: string; sourceIds: string[] }>;
   effectiveBackground?: string;
+  storyHistory?: NarrativeStoryHistory;
   styleRules: string[];
   endingGuide?: string;
   activeLore: string[];
@@ -801,6 +805,7 @@ export function ensureNarrativeRunState(
         }))
       }
     : undefined;
+  const actOutline = normalizeNarrativeActOutline(state.actRuntime?.outline, state.actRuntime?.actId);
   const actRuntime = state.actRuntime && typeof state.actRuntime.actId === "string" && validBeats.includes(state.actRuntime.beat)
     ? {
       actId: compactText(state.actRuntime.actId, 120),
@@ -811,7 +816,9 @@ export function ensureNarrativeRunState(
       decisionCount: Math.max(0, Math.min(32, Number(state.actRuntime.decisionCount) || 0)),
       growthFocusId: state.actRuntime.growthFocusId?.trim() || undefined,
       growthFocusOptions: normalizeGrowthFocuses(state.actRuntime.growthFocusOptions),
-      stageTask: normalizeNarrativeStageTask(state.actRuntime.stageTask)
+      outline: actOutline,
+      outlineNeedsRevision: actOutline ? state.actRuntime.outlineNeedsRevision === true : undefined,
+      stageTask: narrativeStageTaskForOutline(actOutline, state.actRuntime.beat) ?? normalizeNarrativeStageTask(state.actRuntime.stageTask)
     } satisfies NarrativeActRuntime
     : undefined;
   const rawClock = state.sceneClock;
@@ -975,7 +982,7 @@ export function advanceNarrativeActBeat(
     next.actRuntime = {
       ...runtime,
       beat: actBeats[Math.min(actBeats.length - 1, currentIndex + 1)],
-      stageTask: undefined,
+      stageTask: narrativeStageTaskForOutline(runtime.outline, actBeats[Math.min(actBeats.length - 1, currentIndex + 1)]),
       lastAdvancedAge: age,
       selectedRouteIds,
       decisionCount: runtime.decisionCount + (options?.decision ? 1 : 0)
@@ -2000,20 +2007,29 @@ function buildTaskNarrativePlan(
         : task === "closure" || task === "ending"
         ? [premiseAnchor[0], world.mainlineSkeleton?.payoff].filter(Boolean).join("\n")
         : undefined;
-  const routeGuidance = !storyPack ? undefined : task === "planning"
+  const activeOutline = source.narrative.actRuntime?.actId === act?.id ? source.narrative.actRuntime?.outline : undefined;
+  const routeGuidance = task === "planning"
       ? [
           ...premiseAnchor,
-          `${storyPack.name}：${storyPack.routePromise}；人物轨迹=${storyPack.protagonistTrajectory}；持续对抗=${storyPack.coreOpposition}`,
-          `路线核心矛盾=${storyPack.centralConflict}`,
-          `风险升级=${storyPack.stakesProgression}；终局问题=${storyPack.endingQuestion}`,
+          storyPack ? `${storyPack.name}：${storyPack.routePromise}；人物轨迹=${storyPack.protagonistTrajectory}；持续对抗=${storyPack.coreOpposition}` : "",
+          storyPack ? `路线核心矛盾=${storyPack.centralConflict}` : "",
+          storyPack ? `风险升级=${storyPack.stakesProgression}；终局问题=${storyPack.endingQuestion}` : "",
           storyPackAct ? `当前阶段“${storyPackAct.label}”：目标=${storyPackAct.objective}；核心问题=${storyPackAct.dramaticQuestion}；阶段成果=${storyPackAct.payoffMeaning}` : "",
           storyPackAct ? `本幕完整发展大纲：${(["setup", "escalation", "pressure", "climax", "payoff"] as const).map((step) => `${step}：${storyPackAct.beatOutline[step]}`).join("；")}` : "",
-          beat ? `本轮只发展当前节拍“${beat}”。` : "",
+          activeOutline && beat ? formatNarrativeActOutline(activeOutline, beat) : "",
+          beat ? `本轮选材与执行交接针对当前节拍“${beat}”；本幕故事规划仍覆盖完整五节拍，修订仅涉及未结束节点。` : "",
           beat === "payoff" ? nextStoryPackAct
             ? `收束交接方向：下一幕“${nextStoryPackAct.label}”的目标=${nextStoryPackAct.objective}。以本幕实际结果形成进入该处境的因果条件。`
             : "本幕是所选路线的最后一幕，收束形成最终处境与余波。" : ""
         ].filter(Boolean).join("\n")
-      : undefined;
+      : ["rendering", "dynamic", "decision"].includes(task) && activeOutline && beat
+        ? [
+            storyPack ? `所选路线“${storyPack.name}”：${storyPack.routePromise}` : "",
+            storyPackAct ? `本幕主线职责：${storyPackAct.objective}` : "",
+            storyPackAct ? `当前 IF 节拍职责（${beat}）：${storyPackAct.beatOutline[beat]}` : "",
+            formatNarrativeActOutline(activeOutline, beat)
+          ].filter(Boolean).join("\n")
+        : undefined;
   return {
     task, recall: { ...recall, resolvedFacts: recall.resolvedFacts?.filter((fact) => !handoff.some((entry) => entry.id === fact.id)) },
     mainlineSkeleton,
@@ -2021,7 +2037,7 @@ function buildTaskNarrativePlan(
     actHandoff: handoff.map((fact) => fact.resolutionSummary ?? fact.progressSummary ?? fact.label),
     actCanon: episodeRecall.canon,
     memoryDigests: episodeRecall.digests,
-    effectiveBackground: ["planning", "background", "rendering", "dynamic", "decision"].includes(task) ? source.narrative.memoryDigests.find((digest) => digest.id === "run" && digest.format === "effective_facts")?.summary : undefined,
+    storyHistory: ["planning", "background", "rendering", "dynamic", "decision"].includes(task) ? buildNarrativeStoryHistory(source.narrative) : undefined,
     persona: source.personaPrompt,
     talents: source.cards.map((card) => [
       `${card.name}：${card.narrative?.bias ?? card.description ?? ""}`,

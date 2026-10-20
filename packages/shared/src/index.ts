@@ -757,11 +757,18 @@ export interface NarrativeRouteProgress {
   lastEventId?: string;
 }
 
-/** A planner-owned task retained until the engine advances the current beat. */
+/** The current beat's task, projected from the planner's act outline. */
 export interface NarrativeStageTask {
   goal: string;
   completionMeaning: string;
   fork?: NarrativeDecisionBrief & { openingSituation: string };
+}
+
+/** Planned story development. These nodes describe intentions, never committed facts. */
+export interface NarrativeActOutline {
+  actId: string;
+  revision: number;
+  beats: Record<Exclude<NarrativeBeat, "ending">, NarrativeStageTask & { story: string }>;
 }
 
 /** The only dramatic beat currently owned by the engine for a world act. */
@@ -774,6 +781,8 @@ export interface NarrativeActRuntime {
   decisionCount: number;
   growthFocusId?: string;
   growthFocusOptions?: NarrativeGrowthFocusDefinition[];
+  outline?: NarrativeActOutline;
+  outlineNeedsRevision?: boolean;
   stageTask?: NarrativeStageTask;
 }
 

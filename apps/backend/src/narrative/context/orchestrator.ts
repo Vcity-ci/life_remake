@@ -13,7 +13,7 @@ export function composeNarrativeContext(input: NarrativeContextComposeInput): Na
   const historyMessages = input.conversation ? buildConversationPromptMessages(input.conversation, profile.history) : [];
   const providers = input.providers ?? defaultNarrativeContextProviders;
   const allowedSections = new Set(profile.allowedSections);
-  const planFragments = collectNarrativePlanFragments({ plan: input.plan, taskPrompt: input.taskPrompt, task: input.task }, providers)
+  const planFragments = collectNarrativePlanFragments({ plan: input.plan, taskPrompt: input.taskPrompt, task: input.task, historyMessages }, providers)
     .filter((fragment) => allowedSections.has(fragment.section));
   const historyFragments = historyMessages.map((message, index) => narrativeContextFragment({
     id: narrativeContentId(`history:${index}:${message.role}`, message.content),

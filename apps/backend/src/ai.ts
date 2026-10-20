@@ -18,7 +18,7 @@ import type { NarrativeAssetActivity, NarrativeAssets, NarrativeAssetUpdates } f
 import { narrativeAbilityDirectory, narrativeAssetUpdatesSchema, narrativeContinuityAssetContract, narrativeLocationDirectory, normalizeNarrativeAssetActivity, parseNarrativeAssetUpdates, parseNarrativeContinuityAssetUpdates } from "./narrative-assets.js";
 import { narrativeTurnPlanFocusIds, recentCommittedNarrativeChanges, type NarrativeHorizonInput, type NarrativeSocialForceReference, type NarrativeTurnEnvelope, type NarrativeTurnPlan } from "./narrative/turn.js";
 import type { NarrativeObservationFact } from "./narrative/observation.js";
-import { normalizeNarrativeStageTask } from "./narrative/stage-task.js";
+import { applyNarrativeActOutlineUpdate, narrativeStageTaskForOutline } from "./narrative/act-outline.js";
 import { committedNarrativeSequence } from "./narrative/history.js";
 import {
   prepareNarrativeMemoryCuration,
@@ -590,6 +590,7 @@ export interface DynamicNarrativeSceneResult {
   participants: NarrativeParticipant[];
   milestoneCopy?: DirectedNarrativeResult["milestoneCopy"];
   createsDecision?: boolean;
+  decisionBrief?: NarrativeDecisionBrief;
   attributeEffects?: NarrativeAttributeEffect[];
   actHandoff?: NarrativeActHandoff;
   /** One engine-approved growth intent, applied across this fixed background span. */
@@ -986,22 +987,39 @@ function narrativeTurnReferenceCatalog(input: NarrativeTurnEnvelope) {
 }
 
 export function narrativeTurnPlanTools(input: NarrativeTurnEnvelope): Record<string, unknown>[] {
+  if (!input.capabilities.includes("scene")) return [];
   const commonProperties: Record<string, unknown> = {
-    stageTask: {
-      type: "object", additionalProperties: false, required: ["goal", "completionMeaning"],
-      description: "将 IF 当前拍的发展职责具体化为阶段任务；已有任务适用时省略。实际处境改变、任务偏离当前拍，或观察反馈显示任务不足以兑现当前拍时提交更新任务。",
-      properties: {
-        goal: { type: "string", minLength: 1, description: "IF 当前拍在本局矛盾中要实现的具体发展，可由多个回合共同完成。" },
-        completionMeaning: { type: "string", minLength: 1, description: "兑现 IF 当前拍职责的实际结果；成功、受损或失败均可完成该拍。" },
-        fork: {
-          type: "object", additionalProperties: false, required: ["question", "stakes", "openingSituation"],
-          properties: {
-            question: { type: "string", minLength: 1 },
-            stakes: { type: "string", minLength: 1 },
-            openingSituation: { type: "string", minLength: 1, description: "在什么具体处境形成后，解决方式才存在值得玩家决定的实质分歧。" }
-          }
-        }
-      }
+    outlineUpdate: {
+      description: !input.actOutline
+        ? "首次进入本幕剧情，提交覆盖本幕完整发展的五节拍故事。"
+        : input.outlineNeedsRevision
+          ? "玩家选择结果已提交，仅修订当前及尚未结束的节点；不得改写已结束节点。"
+          : "本次只安排已有故事的选材与时间，明确填 null，沿用当前大纲。",
+      anyOf: input.actOutline && !input.outlineNeedsRevision ? [{ type: "null" }] : [
+        { type: "object", additionalProperties: false, required: ["beats"], properties: {
+          beats: { type: "object", additionalProperties: false, minProperties: 1,
+            ...(!input.actOutline ? { required: ["setup", "escalation", "pressure", "climax", "payoff"] } : {}), properties: Object.fromEntries(
+            ["setup", "escalation", "pressure", "climax", "payoff"]
+              .filter((_, index, beats) => !input.actOutline || index >= beats.indexOf(input.beat))
+              .map((beat) => [beat, {
+              type: "object", additionalProperties: false, required: ["story", "goal", "completionMeaning", "fork"],
+              properties: {
+                story: { type: "string", minLength: 1, description: "这一节点预计发生的具体剧情及其与前后节点的因果关系；是可修订的未来故事，不是已发生事实。" },
+                goal: { type: "string", minLength: 1, description: "本节点要实现的发展。" },
+                completionMeaning: { type: "string", minLength: 1, description: "成功、受损或失败何种实际结果表明本节点已完成。" },
+                fork: { anyOf: [ { type: "null" }, {
+                  type: "object", additionalProperties: false, required: ["question", "stakes", "openingSituation"],
+                  properties: {
+                    question: { type: "string", minLength: 1 },
+                    stakes: { type: "string", minLength: 1 },
+                    openingSituation: { type: "string", minLength: 1, description: "什么处境下可能形成实质分歧；没有必要抉择时整个 fork 填 null，不要求每拍提问。" }
+                  }
+                } ] }
+              }
+            }])
+          ) }
+        } }
+      ]
     },
     conflictRefs: {
       type: "array",
@@ -1033,57 +1051,40 @@ export function narrativeTurnPlanTools(input: NarrativeTurnEnvelope): Record<str
         purpose: { type: "string", minLength: 1, description: "为何留在、返回或前往该处；move 时必须明确。" }
       }
     },
-    sceneGoal: { type: "string", minLength: 1, description: "本回合唯一需要完成的一项可观察行动、变化或过渡；不要写完整事件链。" },
+    sceneGoal: { type: "string", minLength: 1, description: "在既定本幕故事中，本轮给定年龄或时间范围实际发展到哪里；交接执行方向，不重写阶段剧情，不预替玩家作答。" },
     clockRequest: { type: "string", enum: ["advance", "hold"] }
   };
-  const tool = (name: string, description: string, scene: boolean): Record<string, unknown> => {
-    const choice = name === "plan_choice_turn";
-    const properties = scene
-      ? {
-          ...commonProperties,
-          ...(choice ? { decisionBrief: {
-            type: "object",
-            additionalProperties: false,
-            required: ["question", "stakes"],
-            properties: {
-              question: { type: "string", minLength: 1, description: "眼前尚未由玩家决定、需要选择解决方式的问题。" },
-              stakes: { type: "string", minLength: 1, description: "这次选择会实际改变的后续处境，如关系、去向、能力或承诺；简述其意义。" }
-            }
-          } } : {}),
-          forceIds: {
-            type: "array", maxItems: 2,
-            items: { type: "string", description: "从 forceIds 目录的 id 字段原样复制社会力量引用，提供势力背景；无合适对象时返回 []。" }
-          }
-        }
-      : commonProperties;
-    return {
+  return [{
       type: "function",
       function: {
-        name,
-        description,
+        name: "plan_scene_turn",
+        description: "依据本次大纲任务安排剧情选材与时间；实际写到分歧时由正文提出抉择。",
         parameters: {
           type: "object",
           additionalProperties: false,
-          required: ["conflictRefs", "abilityRefs", "locationDirective", "sceneGoal", "clockRequest", ...(scene ? ["forceIds"] : []), ...(scene && !input.stageTask ? ["stageTask"] : []), ...(choice ? ["decisionBrief"] : [])],
-          properties
+          required: ["outlineUpdate", "conflictRefs", "abilityRefs", "locationDirective", "sceneGoal", "clockRequest", "forceIds"],
+          properties: {
+            ...commonProperties,
+            forceIds: {
+              type: "array", maxItems: 2,
+              items: { type: "string", description: "从 forceIds 目录的 id 字段原样复制社会力量引用，提供势力背景；无合适对象时返回 []。" }
+            }
+          }
         }
       }
-    };
-  };
-  return input.capabilities.map((capability) => capability === "background"
-    ? tool("plan_background_turn", "规划一段普通人生背景。只提出目标，不写正文或改变游戏状态。", false)
-    : capability === "choice"
-      ? tool("plan_choice_turn", "规划一个真正需要玩家取舍的场景。只提出目标，不写正文或改变游戏状态。", true)
-      : tool("plan_scene_turn", "规划一个无需玩家选择、直接展开并形成结果的场景。只提出目标，不写正文或改变游戏状态。", true));
+  }];
 }
 
 export function narrativeTurnPlanningPrompt(input: NarrativeTurnEnvelope): string {
   const catalog = narrativeTurnReferenceCatalog(input);
   return [
-    `回合=${input.callId}；当前年龄=${input.currentAge}岁；同年场景=${input.currentAge}岁；跨年场景=${input.currentAge + 1}岁；背景年龄=${input.backgroundAgeRange.fromAge}-${input.backgroundAgeRange.toAge}岁。`,
-    `当前世界幕：${input.act.label}。`,
-    `当前节拍=${input.beat}；本轮可用形式=${input.capabilities.join("、")}。`,
-    input.stageTask ? `当前阶段任务：${JSON.stringify(input.stageTask)}` : "当前节拍尚未建立阶段任务。",
+    `回合=${input.callId}；当前世界幕：${input.act.label}。`,
+    "本幕创作范围：依据 IF 本幕职责组织完整的因果发展，五个节点可以跨越成长时段和多个回合。本轮年龄只限制眼前能展开的经历，不把整幕改成当前年龄附近的五段生活；未来节点仍须发展到本幕要求的实际冲突与结果。",
+    `当前节拍=${input.beat}；本轮已通过剧情准入，使用 plan_scene_turn 安排执行。实际是否遇到抉择由正文在展开故事时判断。`,
+    !input.actOutline ? "本幕尚无具体故事，请以 IF 本幕职责组织完整五节拍故事，提交 outlineUpdate.beats 的五个节点。" : input.outlineNeedsRevision
+      ? "玩家选择结果已提交。请依据已发生的实际后果修订当前及未结束的剧情，outlineUpdate.beats 只返回需要更新的当前及未来节点；已结束节点不返回，不复制整份大纲。"
+      : "已有本幕具体故事仍在执行。outlineUpdate 明确填 null，沿用剧情，只交接本轮选材、执行方向和时间，不改写整幕故事。",
+    `本轮执行时间：当前年龄=${input.currentAge}岁；hold 在${input.currentAge}岁继续；advance 进入${input.currentAge + 1}岁。sceneGoal 只安排这一时间内符合人物状态的行动或准备，不提前兑现未来节点。`,
     input.progressGap ? `本拍观察反馈：${input.progressGap}` : "",
     `forceIds 目录（社会力量背景）：${JSON.stringify(catalog.forceIds)}`,
     `conflictRefs 目录（事实、人物、世界素材）：${JSON.stringify(catalog.conflictRefs)}`,
@@ -1091,9 +1092,6 @@ export function narrativeTurnPlanningPrompt(input: NarrativeTurnEnvelope): strin
     `locationDirective / assetNeeds 地点目录：${JSON.stringify(catalog.locations.map((entry) => ({ ...entry, current: entry.id === input.currentLocationId })))}`,
     input.growthFocus ? `人物当前成长侧重：${input.growthFocus.label}。${input.growthFocus.description}` : "",
     input.previousActResult ? `上一幕留下的当前处境：${input.previousActResult}` : "",
-    input.actSummary ? `当前幕已发生的累计进展：${input.actSummary}` : "",
-    input.actProgress ? `摘要之外已经发生的变化：${input.actProgress.filter((entry) => entry.changes.length).map((entry) => `${entry.beat}：${entry.changes.join("；")}`).join("\n")}` :
-      input.recentChanges?.length ? `最近已发生的变化：${input.recentChanges.join("；")}。已发生结果优先于此前提出的短程意图。` : "",
     `人物当前状态：${Object.entries(input.statTierLabels ?? input.statTiers).map(([key, value]) => `${labelStat(key as StatKey)}=${value}`).join("；")}`,
   ].filter(Boolean).join("\n");
 }
@@ -1133,15 +1131,9 @@ export async function generateNarrativeTurnPlan(
 
 export function parseNarrativeTurnPlan(raw: Record<string, unknown>, toolName: string, input: NarrativeTurnEnvelope): NarrativeTurnPlan {
   const catalog = narrativeTurnReferenceCatalog(input);
-  const presentation = toolName === "plan_background_turn"
-    ? "summary"
-    : toolName === "plan_scene_turn"
-      ? "scene"
-      : toolName === "plan_choice_turn"
-        ? "choice"
-        : undefined;
-  const turnKind = presentation === "summary" ? "background" : presentation ? "scene" : undefined;
-  if (!turnKind || !presentation) throw invalidNarrativeOutcome("narrative_turn_plan_kind_invalid");
+  if (toolName !== "plan_scene_turn" || !input.capabilities.includes("scene")) throw invalidNarrativeOutcome("narrative_turn_plan_kind_invalid");
+  const turnKind = "scene";
+  const presentation = "scene";
   const parseRefs = (field: "conflictRefs" | "abilityRefs"): string[] => {
     const value = raw[field];
     if (value === undefined) throw invalidNarrativeOutcome("narrative_turn_plan_material_invalid", { rule: "required", path: field });
@@ -1199,24 +1191,18 @@ export function parseNarrativeTurnPlan(raw: Record<string, unknown>, toolName: s
   if (!sceneGoal || !clockRequest) throw invalidNarrativeOutcome("narrative_turn_plan_content_invalid", {
     rule: "invalid_value", path: !sceneGoal ? "sceneGoal" : "clockRequest", received: !sceneGoal ? raw.sceneGoal : raw.clockRequest
   });
-  const rawBrief = raw.decisionBrief && typeof raw.decisionBrief === "object" && !Array.isArray(raw.decisionBrief)
-    ? raw.decisionBrief as Record<string, unknown> : {};
-  const question = normalizeNarrativeText(rawBrief.question);
-  const stakes = normalizeNarrativeText(rawBrief.stakes);
-  if (presentation === "choice" && (!question || !stakes)) throw invalidNarrativeOutcome("narrative_turn_plan_content_invalid", {
-    rule: "required", path: !question ? "decisionBrief.question" : "decisionBrief.stakes", received: raw.decisionBrief
-  });
-  const decisionBrief = presentation === "choice" ? { question, stakes } : undefined;
-  let stageTask = raw.stageTask === undefined ? input.stageTask : normalizeNarrativeStageTask(raw.stageTask);
-  if ((raw.stageTask !== undefined && !stageTask) || (turnKind === "scene" && !stageTask)) {
-    throw invalidNarrativeOutcome("narrative_turn_plan_stage_task_invalid", { rule: "invalid_value", path: "stageTask", received: raw.stageTask });
+  let actOutline;
+  try {
+    if (!("outlineUpdate" in raw)) throw new Error("outlineUpdate_required");
+    actOutline = applyNarrativeActOutlineUpdate(input.actOutline, raw.outlineUpdate, {
+      actId: input.act.id, beat: input.beat, requiresRevision: input.outlineNeedsRevision
+    });
+  } catch (error) {
+    throw invalidNarrativeOutcome("narrative_turn_plan_outline_invalid", {
+      rule: error instanceof Error ? error.message : "invalid_value", path: "outlineUpdate", received: raw.outlineUpdate
+    });
   }
-  if (decisionBrief && stageTask) {
-    stageTask = { ...stageTask, fork: { ...decisionBrief, openingSituation: stageTask.fork?.openingSituation ?? sceneGoal } };
-  }
-  if (turnKind === "background") {
-    return { callId: input.callId, turnKind, patternIds: [], forceIds: [], conflictRefs, abilityRefs, assetNeeds, locationDirective, sceneGoal, presentation, stageTask, clockRequest: "advance" };
-  }
+  const stageTask = narrativeStageTaskForOutline(actOutline, input.beat);
   const directoryRefs = (field: "patternIds" | "forceIds", directory: Array<{ id: string }>, optional = false): string[] => {
     const value = raw[field];
     if (value === undefined && optional) return [];
@@ -1230,7 +1216,7 @@ export function parseNarrativeTurnPlan(raw: Record<string, unknown>, toolName: s
   };
   const patternIds = directoryRefs("patternIds", input.storyPatterns, true);
   const forceIds = directoryRefs("forceIds", catalog.forceIds);
-  return { callId: input.callId, turnKind, patternIds, forceIds, conflictRefs, abilityRefs, assetNeeds, locationDirective, sceneGoal, presentation, decisionBrief, stageTask, clockRequest };
+  return { callId: input.callId, turnKind, patternIds, forceIds, conflictRefs, abilityRefs, assetNeeds, locationDirective, sceneGoal, presentation, stageTask, actOutline, clockRequest };
 }
 
 export class DirectedStoryTurnError extends Error {
@@ -3017,7 +3003,7 @@ function narrativeActHandoffSchema() {
 
 export function dynamicNarrativeSceneTools(input: DynamicNarrativeSceneInput): DynamicNarrativeToolSet {
   const background = input.presentation === "summary" && input.allowedTurnKinds.includes("background");
-  const scene = input.presentation === "scene" && input.allowedTurnKinds.includes("scene") && input.attributePolicy;
+  const scene = input.presentation !== "summary" && input.allowedTurnKinds.includes("scene") && input.attributePolicy;
   if (!background && !scene) return { tools: [], names: [] };
   const name = background ? "resolve_background_outcome" : "resolve_scene_outcome";
   return {
@@ -3032,7 +3018,7 @@ export function dynamicNarrativeSceneTools(input: DynamicNarrativeSceneInput): D
   };
 }
 
-function dynamicNarrativeRenderTool(input: DynamicNarrativeSceneInput): { tool: Record<string, unknown>; name: DynamicNarrativeRenderToolName } {
+export function dynamicNarrativeRenderTools(input: DynamicNarrativeSceneInput): { tools: Record<string, unknown>[]; names: DynamicNarrativeRenderToolName[] } {
   const optionOverrides = {
     type: "array", minItems: 3, maxItems: 3,
     description: "safe、balanced、risky各对应一个选项，分别表达稳健、权衡和冒险；每个ID只出现一次。",
@@ -3062,31 +3048,37 @@ function dynamicNarrativeRenderTool(input: DynamicNarrativeSceneInput): { tool: 
       }
     }
   };
-  const name: DynamicNarrativeRenderToolName = input.presentation === "summary"
-    ? "render_background_prose"
-    : input.presentation === "choice"
-      ? "render_choice_prose"
-      : "render_scene_prose";
-  const choice = input.presentation === "choice";
-  return {
-    name,
-    tool: {
+  const names: DynamicNarrativeRenderToolName[] = input.presentation === "summary"
+    ? ["render_background_prose"] : ["render_scene_prose", "render_choice_prose"];
+  return { names, tools: names.map((name) => {
+    const choice = name === "render_choice_prose";
+    return {
       type: "function",
       function: {
         name,
-        description: choice ? "依据本轮规划写抉择前的处境与三个解决方式，等待玩家选择。" : "依据本轮规划、人物状态与材料用途写实际经历。",
+        description: choice ? "实际展开到会改变后续处境的重要分歧时，写待选处境与三个解决方式，停在玩家行动之前。分歧可以来自本幕大纲，也可以在本轮实际展开中形成。" : "依据本幕发展、人物状态与材料用途写实际经历，交代已经形成的结果；尚需玩家决定的重要行动交给抉择正文工具。",
         parameters: {
           type: "object", additionalProperties: false,
-          required: ["narrative", "storyDelta", ...(choice ? ["background", "optionOverrides"] : [])],
+          required: ["narrative", "storyDelta", ...(choice ? ["decisionBrief", "background", "optionOverrides"] : [])],
           properties: {
             narrative: { type: "string", minLength: 1 },
             storyDelta: { type: "string", minLength: 1, description: "只概括本轮已经发生的剧情变化，不列举档案或规则。" },
-            ...(choice ? { background: { type: "string", minLength: 1 }, optionOverrides } : {})
+            ...(choice ? {
+              decisionBrief: {
+                type: "object", additionalProperties: false, required: ["question", "stakes"],
+                description: "本轮实际形成、尚未由玩家回答的问题与后续影响。",
+                properties: {
+                  question: { type: "string", minLength: 1 },
+                  stakes: { type: "string", minLength: 1 }
+                }
+              },
+              background: { type: "string", minLength: 1 }, optionOverrides
+            } : {})
           }
         }
       }
-    }
-  };
+    };
+  }) };
 }
 
 function responseTool(tool: Record<string, unknown>): Record<string, unknown> {
@@ -4463,7 +4455,6 @@ export async function renderDirectedDecisionNarrative(
   const proseProfile = narrativeProseProfile("decision");
   const prompt = [
     `人物在${run.age}岁选择了“${normalizeNarrativeText(input.label)}”：${normalizeNarrativeText(input.description)}。`,
-    input.stageTask ? `这次行动所处的阶段任务：${input.stageTask.goal}。承接玩家选择造成的实际结果。` : "",
     input.decisionBrief ? `本次选择所回答的问题：${input.decisionBrief.question}；涉及的后续处境：${input.decisionBrief.stakes}。写清已选行动对这一问题形成的实际结果。` : "",
     input.abilityRefs?.length ? `这项行动实际依仗本领：${input.abilityRefs.join("、")}；正文需要表现它怎样参与解决问题。` : "",
     input.locationDirective ? `这项行动的空间结果：${input.locationDirective.mode}${input.locationDirective.locationRef ? `:${input.locationDirective.locationRef}` : ""}${input.locationDirective.purpose ? `（${input.locationDirective.purpose}）` : ""}。` : "",
@@ -4713,15 +4704,21 @@ export function dynamicNarrativeRenderPrompt(input: DynamicNarrativeSceneInput):
   const age = input.presentation === "summary"
     ? `${input.backgroundAgeRange.fromAge}-${input.backgroundAgeRange.toAge}岁` : `${input.sceneAge}岁`;
   return [
+    input.presentation !== "summary"
+      ? "沿用上下文提供的本幕五节拍具体故事，理解当前节点在整幕中的作用；尚未发生的节点是发展计划，不是已经发生的经历。"
+      : "",
     `本轮执行目标：${input.plan?.sceneGoal ?? "承接人物当下生活"}；年龄=${age}。`,
     input.plan?.assetNeeds?.length ? `本轮材料用途：${JSON.stringify(input.plan.assetNeeds)}` : "",
-    input.presentation !== "summary" && input.plan?.stageTask ? `当前阶段任务：${input.plan.stageTask.goal}` : "",
-    input.plan?.decisionBrief ? `本次待选问题：${input.plan.decisionBrief.question}；影响：${input.plan.decisionBrief.stakes}` : "",
+    input.presentation !== "summary" ? `当前执行节拍=${input.beat}；以大纲中标注的当前节点为准。` : "",
+    input.plan?.decisionBrief ? `规划提示的潜在分歧：${input.plan.decisionBrief.question}；影响：${input.plan.decisionBrief.stakes}。是否已经到达，由本轮实际展开决定。` : "",
     input.plan?.abilityRefs.length ? `本轮可依仗的本领：${input.plan.abilityRefs.join("、")}` : "",
     input.plan?.locationDirective ? `本轮地点动作：${JSON.stringify(input.plan.locationDirective)}` : "",
     `人物当前状态：${Object.entries(input.statTierLabels ?? input.statTiers).map(([stat, label]) => `${labelStat(stat as StatKey)}=${label}`).join("；")}`,
     input.lifeStage ? `当前处于${input.lifeStage.label}，从照料、家庭、感官和生活环境表现成长。` : "",
-    narrativeProseProfileInstruction(narrativeProseProfile(input.presentation, input.beat))
+    narrativeProseProfileInstruction(narrativeProseProfile(input.presentation === "summary" ? "summary" : "scene", input.beat)),
+    input.presentation !== "summary"
+      ? "在给定年龄和当前任务范围内叙事。已有自然结果时提交普通正文；遇到尚待玩家决定、且解决方式会改变后续处境的重要分歧时，提交抉择正文并停在行动发生之前，不替玩家作答或预写选择结果。大纲未预列的实质分歧也可提出；规划提示了分歧而本轮尚未到达时继续普通叙事。"
+      : ""
   ].filter(Boolean).join("\n");
 }
 
@@ -4776,9 +4773,9 @@ export async function generateDynamicNarrativeScene(
   run: InternalRunState, world: WorldConfig, input: DynamicNarrativeSceneInput, ctx: NarrativeContext
 ): Promise<DynamicNarrativeSceneResult> {
   const handoff = input.handoff ?? { sourceEventId: `dynamic:${input.act.id}:${input.beat}:${input.sceneAge}:${run.history.length + 1}`, characters: [] };
-  const render = dynamicNarrativeRenderTool(input);
+  const render = dynamicNarrativeRenderTools(input);
   const knownLocationIds = (run.narrative.assets?.locations ?? []).map((entry) => entry.id);
-  const rendered = await requestNarrativeOutcomeTool(run, world, ctx, render.tool, dynamicNarrativeRenderPrompt(input), {
+  const rendered = await requestNarrativeOutcomeTool(run, world, ctx, render.tools, dynamicNarrativeRenderPrompt(input), {
     task: input.presentation === "summary" ? "background" : "rendering",
     callId: `${input.plan?.callId ?? `turn:${run.runId}:${run.age}`}:render`,
     source: input.presentation === "summary" ? "background" : "scene",
@@ -4787,15 +4784,16 @@ export async function generateDynamicNarrativeScene(
     actId: input.act.id, beat: input.beat,
     focusIds: input.plan ? narrativeTurnPlanFocusIds(input.plan) : undefined,
     handoff, contracts: { references: true, assets: true, facts: true },
-    parseResult: (raw) => parseDynamicNarrativeParticipants(raw.participants, input.socialForces, roundCharacterDirectory(run, handoff))!
+    parseResult: (raw, toolName) => ({
+      ...parseDynamicNarrativeProse(raw, toolName as DynamicNarrativeRenderToolName, input.plan, knownLocationIds),
+      participants: parseDynamicNarrativeParticipants(raw.participants, input.socialForces, roundCharacterDirectory(run, handoff))!
+    })
   });
-  const narrative = normalizeNarrativeText(rendered.raw.narrative);
-  const storyDelta = normalizeNarrativeText(rendered.raw.storyDelta);
-  if (!isSafePlayerNarrative(narrative) || !storyDelta) throw invalidNarrativeOutcome("dynamic_scene_narrative_unsafe", { rule: "narrative_text_invalid", path: !storyDelta ? "storyDelta" : "narrative" });
+  const { narrative, storyDelta, createsDecision, decisionBrief, milestoneCopy, participants } = rendered.parsed!;
   const result: DynamicNarrativeSceneResult = {
     turnKind: input.presentation === "summary" ? "background" : "scene",
     patternIds: input.plan?.patternIds ?? [], forceIds: input.plan?.forceIds ?? [],
-    ...generationChanges(run, rendered, rendered.parsed!, handoff),
+    ...generationChanges(run, rendered, participants, handoff),
     narrative, storyDelta,
     assetActivity: rendered.assetActivity!,
     continuityRefs: rendered.continuityRefs!,
@@ -4803,14 +4801,36 @@ export async function generateDynamicNarrativeScene(
   };
   if (result.turnKind === "background") return result;
   result.scenePacing = input.plan?.clockRequest === "hold" ? "continuous" : "spanning";
-  result.createsDecision = input.presentation === "choice";
-  if (result.createsDecision) {
-    const background = normalizeNarrativeText(rendered.raw.background);
-    const optionOverrides = normalizeMilestoneOptionOverrides(rendered.raw.optionOverrides, true, input.plan, knownLocationIds);
-    if (!isSafePlayerNarrative(background) || !optionOverrides) throw invalidNarrativeOutcome("dynamic_choice_presentation_invalid");
-    result.milestoneCopy = { background, optionOverrides };
-  }
+  result.createsDecision = createsDecision;
+  result.decisionBrief = decisionBrief;
+  result.milestoneCopy = milestoneCopy;
   return result;
+}
+
+/** Interpret the tool actually selected by the writer, independently of the planner's suggested form. */
+export function parseDynamicNarrativeProse(
+  raw: Record<string, unknown>, toolName: DynamicNarrativeRenderToolName,
+  plan?: NarrativeTurnPlan, knownLocationIds: readonly string[] = []
+): Pick<DynamicNarrativeSceneResult, "narrative" | "storyDelta" | "createsDecision" | "decisionBrief" | "milestoneCopy"> {
+  const narrative = normalizeNarrativeText(raw.narrative);
+  const storyDelta = normalizeNarrativeText(raw.storyDelta);
+  if (!isSafePlayerNarrative(narrative) || !storyDelta) throw invalidNarrativeOutcome("dynamic_scene_narrative_unsafe", {
+    rule: "narrative_text_invalid", path: !storyDelta ? "storyDelta" : "narrative"
+  });
+  if (toolName !== "render_choice_prose") return { narrative, storyDelta, createsDecision: false };
+  const brief = raw.decisionBrief && typeof raw.decisionBrief === "object" && !Array.isArray(raw.decisionBrief)
+    ? raw.decisionBrief as Record<string, unknown> : {};
+  const question = normalizeNarrativeText(brief.question);
+  const stakes = normalizeNarrativeText(brief.stakes);
+  if (!isSafePlayerText(question, 1) || !isSafePlayerText(stakes, 1)) throw invalidNarrativeOutcome("dynamic_choice_presentation_invalid", {
+    rule: "decision_brief_required", path: !isSafePlayerText(question, 1) ? "decisionBrief.question" : "decisionBrief.stakes"
+  });
+  const background = normalizeNarrativeText(raw.background);
+  const optionOverrides = normalizeMilestoneOptionOverrides(raw.optionOverrides, true, plan, knownLocationIds);
+  if (!isSafePlayerNarrative(background) || !optionOverrides) throw invalidNarrativeOutcome("dynamic_choice_presentation_invalid", {
+    rule: "choice_background_invalid", path: "background"
+  });
+  return { narrative, storyDelta, createsDecision: true, decisionBrief: { question, stakes }, milestoneCopy: { background, optionOverrides } };
 }
 
 export async function settleDynamicNarrativeScene(

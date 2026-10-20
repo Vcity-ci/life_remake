@@ -35,6 +35,7 @@ import { applyNarrativeAssetUpdates, commitNarrativeAssets } from "../narrative-
 import { registerNarrativeParticipants } from "../narrative-characters.js";
 import { hasNarrativeFactCompletion, narrativeActProgress, narrativeFactProgressForCommit, narrativeObservationFacts } from "./observation.js";
 import { committedNarrativeSequence } from "./history.js";
+import { commitNarrativeActOutline } from "./act-outline.js";
 
 export interface NarrativeAgentTurnInput {
   run: InternalRunState;
@@ -137,10 +138,14 @@ export async function runNarrativeAgentTurn(input: NarrativeAgentTurnInput): Pro
         abilityRefs: [],
         sceneGoal: `叙述${envelope.backgroundAgeRange.fromAge}岁至${envelope.backgroundAgeRange.toAge}岁在当前住处的日常生活、成长与身边关系`,
         presentation: "summary",
-        stageTask: envelope.stageTask,
         clockRequest: "advance"
       }
     : await generateNarrativeTurnPlan(run, world, envelope, context);
+  // This state is still inside the existing round transaction. The writer and
+  // observer read the same concrete outline; failure discards the transaction.
+  if (plan.actOutline && plan.actOutline.revision !== envelope.actOutline?.revision) {
+    commitNarrativeActOutline(run.narrative, plan.actOutline);
+  }
   appendAttempt(run, {
     callId: envelope.callId,
     attemptId,
@@ -201,7 +206,7 @@ export async function runNarrativeAgentTurn(input: NarrativeAgentTurnInput): Pro
   });
 
   {
-    const proseProfile = narrativeProseProfile(plan.presentation, envelope.beat);
+    const proseProfile = narrativeProseProfile(scene.turnKind === "background" ? "summary" : scene.createsDecision ? "choice" : "scene", envelope.beat);
     const reviewInput = {
       changes: scene,
       socialForces: narrativeWorld.socialForces,
@@ -283,7 +288,10 @@ export async function runNarrativeAgentTurn(input: NarrativeAgentTurnInput): Pro
       stageTask: plan.stageTask,
       actObjective: storyPackAct?.objective,
       payoffMeaning: storyPackAct?.payoffMeaning,
-      beatOutline: storyPackAct?.beatOutline,
+      beatOutline: plan.actOutline
+        ? Object.fromEntries(Object.entries(plan.actOutline.beats).map(([beat, node]) => [beat,
+            `${storyPackAct?.beatOutline[beat as keyof typeof plan.actOutline.beats] ?? ""}；本局具体发展：${node.story}`]))
+        : storyPackAct?.beatOutline,
       actProgress: progress.changes,
       actSummary: progress.summary,
       currentDelta: scene.storyDelta,
@@ -547,7 +555,10 @@ export async function runNarrativeAgentDecision(input: {
     stageTask: runtime.stageTask,
     actObjective: storyPackAct?.objective,
     payoffMeaning: storyPackAct?.payoffMeaning,
-    beatOutline: storyPackAct?.beatOutline,
+    beatOutline: runtime.outline
+      ? Object.fromEntries(Object.entries(runtime.outline.beats).map(([beat, node]) => [beat,
+          `${storyPackAct?.beatOutline[beat as keyof typeof runtime.outline.beats] ?? ""}；本局具体发展：${node.story}`]))
+      : storyPackAct?.beatOutline,
     actProgress: progress.changes,
     actSummary: progress.summary,
     currentDelta: rendered.storyDelta,

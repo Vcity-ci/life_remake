@@ -5,7 +5,7 @@ const ALL_SECTIONS: NarrativeContextSection[] = [
   "persona", "talents", "seedHints", "origin", "world", "palette", "mainline", "route", "handoff", "lore",
   "styleExamples", "authorNote",
   "characters", "factDirectory", "facts", "resolvedFacts", "locations", "abilities", "assets",
-  "memories", "digests", "ending", "history", "raw", "task"
+  "memories", "digests", "ending", "history", "storyHistory", "raw", "task"
 ];
 
 const TASK_SECTIONS: Record<NarrativeTask, NarrativeContextSection[]> = {
@@ -14,13 +14,13 @@ const TASK_SECTIONS: Record<NarrativeTask, NarrativeContextSection[]> = {
   horizon: ["persona", "origin", "world", "mainline", "route", "handoff", "lore", "characters", "facts", "history", "task"],
   settlement: ["task"],
   continuity: ["task"],
-  planning: ["persona", "talents", "origin", "world", "palette", "mainline", "route", "lore", "facts", "history", "authorNote", "task"],
+  planning: ["persona", "talents", "origin", "world", "palette", "mainline", "route", "lore", "history", "storyHistory", "authorNote", "task"],
   observation: ["task"],
-  background: ["persona", "talents", "origin", "world", "palette", "route", "lore", "characters", "factDirectory", "facts", "locations", "abilities", "styleExamples", "history", "authorNote", "task"],
-  rendering: ["persona", "talents", "origin", "world", "palette", "route", "lore", "characters", "factDirectory", "facts", "locations", "abilities", "styleExamples", "history", "authorNote", "task"],
-  dynamic: ["persona", "talents", "origin", "world", "palette", "route", "lore", "characters", "factDirectory", "facts", "locations", "abilities", "styleExamples", "history", "authorNote", "task"],
+  background: ["persona", "talents", "origin", "world", "palette", "route", "lore", "characters", "factDirectory", "facts", "locations", "abilities", "styleExamples", "history", "storyHistory", "authorNote", "task"],
+  rendering: ["persona", "talents", "origin", "world", "palette", "route", "lore", "characters", "factDirectory", "facts", "locations", "abilities", "styleExamples", "history", "storyHistory", "authorNote", "task"],
+  dynamic: ["persona", "talents", "origin", "world", "palette", "route", "lore", "characters", "factDirectory", "facts", "locations", "abilities", "styleExamples", "history", "storyHistory", "authorNote", "task"],
   reviewing: ["task"],
-  decision: ["persona", "talents", "origin", "world", "palette", "route", "lore", "characters", "facts", "locations", "abilities", "styleExamples", "history", "authorNote", "task"],
+  decision: ["persona", "talents", "origin", "world", "palette", "route", "lore", "characters", "facts", "locations", "abilities", "styleExamples", "history", "storyHistory", "authorNote", "task"],
   closure: ["persona", "origin", "mainline", "handoff", "facts", "digests", "task"],
   ending: ["persona", "talents", "origin", "world", "ending", "task"]
 };

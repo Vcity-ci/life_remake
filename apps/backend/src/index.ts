@@ -52,10 +52,10 @@ import {
 } from "./ai.js";
 import { generateNarrativeRender, generateNarrativeTurn } from "./narrative-provider.js";
 import { commitNarrativeEpisode, runNarrativeTurnTransaction } from "./narrative/commit.js";
-import { narrativePreviousActResult, narrativeTurnCapabilities, recentCommittedNarrativeChanges, type NarrativeTurnEnvelope } from "./narrative/turn.js";
+import { narrativePreviousActResult, narrativeTurnCapabilities, narrativeTurnKindsForReadiness, recentCommittedNarrativeChanges, type NarrativeTurnEnvelope } from "./narrative/turn.js";
 import { commitNarrativeAgentTurn, runNarrativeAgentDecision, runNarrativeAgentEnding, runNarrativeAgentTurn, synchronizeNarrativeAgentScene, synchronizeNarrativeAssetBatch } from "./narrative/runtime.js";
 import { hasNarrativeFactCompletion, narrativeActProgress, narrativeFactProgressForCommit, narrativeObservationFacts, narrativeStageProgressGap } from "./narrative/observation.js";
-import { commitNarrativeStageTask } from "./narrative/stage-task.js";
+import { markNarrativeActOutlineForRevision } from "./narrative/act-outline.js";
 import { approveStoryClosure, approveStoryIntent } from "./tool-gateway.js";
 import { providerLimits } from "./constants.js";
 import { getCloudApiKey, getDeployMode, readRuntimeConfig, writeRuntimeConfig, upgradeProviderOutputBudget } from "./config.js";
@@ -1221,7 +1221,7 @@ async function generateDirectedSegmentForRunUnsafe(options: DirectedSegmentOptio
       : runtime.beat === "climax"
         ? "climax"
         : undefined;
-  const canAdvanceBeat = runtime.beat === "setup"
+  const currentBeatReady = runtime.beat === "setup"
     ? canEnterAct
     : runtime.beat === "payoff" || !gateStage || isNarrativeWorldStageReady(narrativeSource, narrativeWorld, gateStage);
   const backgroundPacing = narrativeWorld.progression?.backgroundPacing ?? { minYears: 1, maxYears: 1 };
@@ -1236,13 +1236,10 @@ async function generateDirectedSegmentForRunUnsafe(options: DirectedSegmentOptio
     min: Math.min(backgroundMinYears, backgroundMaxYears),
     max: backgroundMaxYears
   });
-  const allowedTurnKinds: Array<"scene" | "background"> = earlyLife
-    ? ["background"]
-    : runtime.beat === "setup"
-      ? canEnterAct ? ["scene"] : ["background"]
-      : canAdvanceBeat ? ["background", "scene"] : ["background"];
+  const allowedTurnKinds = narrativeTurnKindsForReadiness(earlyLife, currentBeatReady);
   const capabilities = narrativeTurnCapabilities(earlyLife, runtime.beat, allowedTurnKinds);
-  narrativeCtx.narrativePlan = buildNarrativePromptPlan(run, narrativeWorld, null, allowedTurnKinds.length === 1 && allowedTurnKinds[0] === "background" ? "background" : "planning", {
+  const backgroundOnly = allowedTurnKinds.length === 1 && allowedTurnKinds[0] === "background";
+  narrativeCtx.narrativePlan = buildNarrativePromptPlan(run, narrativeWorld, null, backgroundOnly ? "background" : "planning", {
     backgroundAllowed: allowedTurnKinds.includes("background")
   });
   const storyPatterns = (narrativeWorld.storyPatterns ?? []).map((pattern) => ({
@@ -1283,6 +1280,8 @@ async function generateDirectedSegmentForRunUnsafe(options: DirectedSegmentOptio
     act: { id: act.id, label: act.label, prompt: actPrompt },
     beat: runtime.beat,
     stageTask: runtime.stageTask,
+    actOutline: runtime.outline,
+    outlineNeedsRevision: runtime.outlineNeedsRevision,
     progressGap: narrativeStageProgressGap(run, { actId: act.id, beat: runtime.beat }),
     capabilities,
     storyPatterns,
@@ -1315,7 +1314,7 @@ async function generateDirectedSegmentForRunUnsafe(options: DirectedSegmentOptio
       socialForces,
       knownCharacters: narrativeCharacterDirectory(run.narrative),
       knownFactIds: promptPlan.recall!.facts.map((entry) => entry.id),
-      attributePolicy: turnPlan.presentation === "scene" ? dynamicSceneAttributePolicy() : undefined,
+      attributePolicy: turnPlan.turnKind === "scene" ? dynamicSceneAttributePolicy() : undefined,
       backgroundAttributePolicy,
       growthFocus,
       statTiers: envelope.statTiers,
@@ -1328,7 +1327,6 @@ async function generateDirectedSegmentForRunUnsafe(options: DirectedSegmentOptio
   let turnPlan = agentTurn.plan;
   let scene = agentTurn.scene;
   const committedAges = agentTurn.time;
-  commitNarrativeStageTask(run.narrative, { actId: act.id, beat: runtime.beat }, turnPlan.stageTask);
   if (scene.turnKind === "background") {
     if (!scene.backgroundAttributeEffects) throw new Error("dynamic_background_outcome_missing");
     const backgroundYears = committedAges.backgroundAgeRange.toAge - run.age;
@@ -1459,12 +1457,12 @@ async function generateDirectedSegmentForRunUnsafe(options: DirectedSegmentOptio
     narrative: scene.narrative,
     participants: scene.participants,
     attributeOutcome: scene.attributeEffects ? { effects: scene.attributeEffects } : undefined,
-    attributePolicy: turnPlan.presentation === "scene" ? dynamicSceneAttributePolicy() : undefined,
+    attributePolicy: !scene.createsDecision ? dynamicSceneAttributePolicy() : undefined,
     actHandoff: scene.actHandoff,
     sceneClockMode: scene.scenePacing === "continuous" ? "hold" : scene.scenePacing === "spanning" ? "advance" : undefined,
     sceneAge: committedAges.sceneAge,
     createsDecision: scene.createsDecision,
-    decisionBrief: turnPlan.decisionBrief,
+    decisionBrief: scene.decisionBrief,
     factUpdates: scene.factUpdates,
     observerResolvedFactIds: scene.observerResolvedFactIds,
     observerResolutions: scene.observerResolutions,
@@ -2210,6 +2208,9 @@ async function runStepFlowUnlocked(
         abilityIds: Array.from(new Set([...(assetActivity?.abilityIds ?? []), ...committedDecisionAssets.abilityIds]))
       });
       if (decisionAgentAttemptId) commitNarrativeAgentTurn(stepped.updated, decisionAgentAttemptId, decisionEpisode.id);
+      if (decisionPendingScene?.mainlineActId) {
+        markNarrativeActOutlineForRevision(stepped.updated.narrative, decisionPendingScene.mainlineActId);
+      }
       committedEpisodeId = decisionEpisode.id;
       generatedChunk = publishTimelineChunk(stepped.updated, world, stepped.chunk);
       fromAge = stepped.fromAge;

@@ -57,15 +57,15 @@ const assetHandoffInstruction = "正文及工具字段描述同一次已发生�
 const continuityToolInstruction = "地点和本领新增或发生实质变化时，description 保留玩家查看的说明与经历，spatialDescription 提供当前空间条件，usage 提供当前能够主动使用的能力、效果与限制。辨认身份时同时核对已有目录（含暂不可用本领）和本轮新增条目：原能力恢复或进阶沿用原 ID，同一新能力的获得与使用合为一条新增记录。sync_narrative_continuity 的全部字段放在同一个工具参数对象内：已有对象使用目录 ID，仅提交变化字段，新对象使用 ref=new 并填写建立对象所需字段；无变化的操作数组填 []。只登记最终正文已经发生的变化。";
 const referenceInstruction = "引用已有对象时，逐字复制本次目录给出的 ID 原值及全部字符；对象类型与名称仅用于辨认。新建对象按当前工具字段声明提交。";
 const planningReferenceInstruction = "规划目录中，id 的字符串原值是引用值，保留全部字符；kind、label 和其他说明用于理解对象。新建对象按当前工具字段声明提交。";
-const planningDispatchInstruction = "在本次开放工具中选择：生活成长过渡使用 plan_background_turn；行动及已作选择的后果使用 plan_scene_turn；眼前处境已形成或本轮自然展开到实质分歧，且不同解决方式会改变后续处境时使用 plan_choice_turn，decisionBrief 交接问题与影响。五个节拍均可跨多个回合展开，payoff 中仍需玩家取舍时继续等待，实际阶段结果由观察器判断。场景时钟 hold 使用当前年龄，advance 使用下一年龄；连续行动及即时结果可同年展开，sameAgeTurnCount 提供节奏信息。普通人生使用给定年龄区间。";
+const planningDispatchInstruction = "回合执行形式由引擎按准入条件确定，按本次开放的工具安排执行。涉及本幕大纲时：首次进入剧情以 outlineUpdate 提交完整五节拍具体故事；正常执行明确填 null，只交接本轮材料、执行方向和时间；本次要求修订时，依据已提交的玩家选择结果仅更新当前及未结束节点，已发生的历史不改写。分歧窗口由大纲交代，正文写到实际分歧时决定是否停下提问，包括大纲没有预列的新分歧。五节拍均可跨多个回合，payoff 仍需选择时继续等待，实际阶段完成由观察器判断。场景时钟 hold 使用当前年龄，advance 使用下一年龄；连续行动及即时结果可同年展开，sameAgeTurnCount 提供节奏信息。";
 
 export function narrativeTaskContract(task: NarrativeTask): NarrativeTaskContract {
   const identity = identityByTask[task];
   const taskInstruction = task === "background" || task === "rendering" || task === "decision" || task === "reviewing"
-    ? [assetHandoffInstruction, task === "background" ? "这段岁月以当前居住环境中的日常生活、成长和身边关系为中心，承接人物实际的生活状态。" : task === "rendering" ? "场景组织重点用于安排当前叙事；选项本领依据本轮可用材料目录选择，返回已有地点时引用本局地点身份目录中的完整 ID。玩家选中后召回目的地详情并叙述实际行动。" : ""].filter(Boolean).join("\n")
+    ? [assetHandoffInstruction, task === "background" ? "这段岁月以当前居住环境中的日常生活、成长和身边关系为中心，承接人物实际的生活状态。" : task === "rendering" ? "沿本幕具体故事和当前节点，在给定年龄或时间范围展开本轮经历。大纲是发展意图，未写出的节点不是事实，不提前兑现后续剧情。遇到尚未由玩家决定且会改变后续处境的实质分歧，使用 render_choice_prose，正文停在作答之前，返回实际 decisionBrief 和三档选项；包括大纲未预列的重要分歧。否则使用 render_scene_prose 展开行动及实际结果，不为每拍强行提问。选项本领依据本轮可用材料目录选择，返回已有地点时引用本局地点身份目录中的完整 ID。玩家选中后召回目的地详情并叙述实际行动。" : ""].filter(Boolean).join("\n")
     : task === "continuity" ? continuityToolInstruction
     : task === "planning"
-      ? "IF 本幕大纲规定各节拍应兑现的发展，stageTask 将当前拍具体化为本局人物的阶段目标与完成含义，sceneGoal 交接本轮执行的一步。assetNeeds 表达当前任务所需人物、地点、本领的用途，已有合适对象时使用 ref，没有时省略 ref；后续召回与场景生成据此复用或建立资产。阶段任务跨回合沿用；实际选择或变化使任务不再适用、任务偏离 IF 当前拍职责，或观察反馈指出任务不足以兑现该职责时，更新阶段任务。成功、妥协或失败均按实际结果承接。fork 只在解决方式存在实质分歧时设计，openingSituation 表明其出现条件；未形成分歧可直接叙事并进入下一阶段。已经回答的问题承接其后果；新问题应来自变化后的处境。普通人生过渡保留阶段任务。"
+      ? "所选 IF 线规定本幕必须发展的矛盾和主线方向，你将它组织成具体人物与势力参与、前后因果相连的五节拍故事。story 写简要剧情，goal 和 completionMeaning 表达节点的发展与完成含义，fork 只描述可能出现的实质分歧窗口，无必要分歧填 null。正常执行沿用已有大纲，仅在本次明确要求修订时更新未结束节点；stageTask 由引擎从当前节点投影，不另写一份目标，sceneGoal 仅交接给定时间内如何沿此故事展开。assetNeeds 表达所需人物、地点、本领的用途，合适已有对象用 ref，没有时省略 ref；需求不是已经获得的事实。成功、妥协或失败均承接实际结果；已回答的问题发展其后果，不重新催答。"
       : "";
   return {
     task,

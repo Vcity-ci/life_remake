@@ -86,7 +86,7 @@ export function narrativeTaskRule(task: NarrativeTask, pack: PromptPackResolved)
   switch (task) {
     case "origin": return "写一段180-320字的身世，交代出生前家族历史与出生时的人物来处，停在出生时。";
     case "background": return pack.yearNormalRule;
-    case "planning": return "只规划下一回合的叙事任务，通过工具提交选择，不写玩家正文。";
+    case "planning": return "首次进入剧情时以所选 IF 线组织完整五节拍故事，正常执行只交接选材与时间；玩家选择结果提交后，按本次任务修订未结束剧情。通过工具提交，不写玩家正文。";
     case "observation": return "只判断已经发生的故事是否完成当前意图、节拍与事实生命周期，通过工具提交裁决。";
     case "curation": return "压缩选定的已提交历史区间，维护人物的重要人生背景与本幕进展。";
     case "horizon": return "为当前世界幕提出短程叙事意图，不选择或排除路线，不写玩家正文。";

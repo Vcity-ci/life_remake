@@ -28,6 +28,7 @@ export type NarrativeContextSection =
   | "digests"
   | "ending"
   | "history"
+  | "storyHistory"
   | "raw"
   | "task";
 
@@ -99,6 +100,7 @@ export interface NarrativeContextProviderInput {
   plan?: NarrativePromptPlan;
   task: NarrativeTask;
   taskPrompt: string;
+  historyMessages?: ConversationPromptMessage[];
 }
 
 export interface NarrativeContextProvider {

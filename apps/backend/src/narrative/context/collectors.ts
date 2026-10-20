@@ -1,5 +1,6 @@
 import { narrativeContentId, narrativeContextFragment } from "./fragments.js";
 import { legacyNarrativePlanFragment } from "./legacy-adapter.js";
+import { projectNarrativeStoryHistory } from "../story-history.js";
 import type {
   NarrativeContextFragment,
   NarrativeContextLayer,
@@ -152,14 +153,37 @@ const characterProvider: NarrativeContextProvider = {
   }
 };
 
+const storyHistoryProvider: NarrativeContextProvider = {
+  id: "story-history",
+  collect: ({ plan, historyMessages = [] }) => {
+    if (!plan?.task) return [];
+    if (!plan.storyHistory) return plan.effectiveBackground ? fragment({
+      id: "runtime:effective-background", layer: "runtime", section: "storyHistory", sourceType: "effective-background", priority: 92,
+      content: `人物重要经历（已发生的历史背景）：${plan.effectiveBackground}`, required: true
+    }) : [];
+    const projected = projectNarrativeStoryHistory(plan.storyHistory, historyMessages);
+    return [
+      ...(projected.summary ? fragment({
+        id: `runtime:story-summary:${projected.summary.id}`, layer: "runtime", section: "storyHistory", sourceType: "story-summary",
+        sourceIds: projected.summary.coveredEpisodeIds, priority: 92,
+        content: `人物重要经历（已压缩背景）：${projected.summary.text}`, required: true
+      }) : []),
+      ...projected.changes.flatMap((episode) => fragment({
+        id: `runtime:story-change:${episode.id}`, layer: "runtime", section: "storyHistory", sourceType: "story-change",
+        sourceIds: [episode.id], priority: 92,
+        content: `${episode.ageFrom !== undefined && episode.ageFrom !== episode.age ? `${episode.ageFrom}—${episode.age}` : episode.age}岁：${episode.storyDelta}`,
+        required: true
+      }))
+    ];
+  }
+};
+
 const factProvider: NarrativeContextProvider = {
   id: "facts",
   collect: ({ plan }) => {
     if (!plan?.task) return [];
     const detailed = new Set([...(plan.recall?.facts ?? []).map((entry) => entry.id), ...(plan.recall?.resolvedFacts ?? []).map((entry) => entry.id)]);
     return [
-      ...(plan.effectiveBackground ? fragment({ id: "runtime:effective-background", layer: "runtime", section: "facts", sourceType: "effective-background", priority: 92,
-        content: `人物重要经历（已发生的历史背景）：${plan.effectiveBackground}`, required: true }) : []),
       ...(plan.factDirectory ?? []).filter((fact) => !detailed.has(fact.id)).flatMap((fact) => fragment({ id: `active:fact-directory:${fact.id}`, layer: "active", section: "factDirectory", sourceType: "fact-directory", sourceIds: [`fact:${fact.id}`], priority: 55, content: `${fact.id}=${fact.label}` })),
       ...(plan.recall?.facts ?? []).flatMap((fact) => fragment({ id: `active:fact:${fact.id}`, layer: "active", section: "facts", sourceType: "fact", sourceIds: [`fact:${fact.id}`], priority: 95,
         content: plan.task === "planning" ? JSON.stringify({ id: fact.id, kind: "fact", label: fact.label }) : `${fact.id}：${fact.label}` })),
@@ -229,6 +253,7 @@ export const defaultNarrativeContextProviders: NarrativeContextProvider[] = [
   worldCardProvider,
   loreProvider,
   characterProvider,
+  storyHistoryProvider,
   factProvider,
   assetProvider,
   memoryProvider,

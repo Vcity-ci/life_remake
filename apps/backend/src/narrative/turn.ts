@@ -1,9 +1,13 @@
-import type { NarrativeActCanon, NarrativeBeat, NarrativeDecisionBrief, NarrativeEpisodeRecord, NarrativeStageTask, NarrativeStatTier, StatKey } from "@reroll/shared";
+import type { NarrativeActCanon, NarrativeActOutline, NarrativeBeat, NarrativeDecisionBrief, NarrativeEpisodeRecord, NarrativeStageTask, NarrativeStatTier, StatKey } from "@reroll/shared";
 
 export type NarrativeTurnKind = "background" | "scene";
 export type NarrativeTurnCapability = "background" | "scene" | "choice";
 export type NarrativeTurnSource = "background" | "scene" | "closure";
 export type NarrativeFocusKind = "fact" | "character" | "location" | "ability" | "world_card";
+
+export function narrativeTurnKindsForReadiness(earlyLife: boolean, currentBeatReady: boolean): NarrativeTurnKind[] {
+  return !earlyLife && currentBeatReady ? ["scene"] : ["background"];
+}
 
 export interface NarrativeSocialForceReference {
   id: string;
@@ -30,6 +34,8 @@ export interface NarrativeTurnEnvelope {
   act: { id: string; label: string; prompt: string };
   beat: Exclude<NarrativeBeat, "ending">;
   stageTask?: NarrativeStageTask;
+  actOutline?: NarrativeActOutline;
+  outlineNeedsRevision?: boolean;
   progressGap?: string;
   capabilities: NarrativeTurnCapability[];
   storyPatterns: Array<{ id: string; label: string; summary: string }>;
@@ -81,6 +87,7 @@ export interface NarrativeTurnPlan {
   presentation: "summary" | "scene" | "choice";
   decisionBrief?: NarrativeDecisionBrief;
   stageTask?: NarrativeStageTask;
+  actOutline?: NarrativeActOutline;
   clockRequest: "advance" | "hold";
 }
 

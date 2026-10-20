@@ -6,7 +6,7 @@ export function normalizeNarrativeStageTask(value: unknown): NarrativeStageTask 
   const goal = typeof raw.goal === "string" ? raw.goal.trim() : "";
   const completionMeaning = typeof raw.completionMeaning === "string" ? raw.completionMeaning.trim() : "";
   if (!goal || !completionMeaning) return undefined;
-  if (raw.fork === undefined) return { goal, completionMeaning };
+  if (raw.fork === undefined || raw.fork === null) return { goal, completionMeaning };
   if (!raw.fork || typeof raw.fork !== "object" || Array.isArray(raw.fork)) return undefined;
   const fork = raw.fork as Record<string, unknown>;
   const question = typeof fork.question === "string" ? fork.question.trim() : "";
@@ -25,15 +25,27 @@ export function commitNarrativeStageTask(
 ): void {
   const runtime = state.actRuntime;
   if (task && runtime?.actId === scope.actId && runtime.beat === scope.beat) {
-    runtime.stageTask = structuredClone(task);
+    const node = runtime.outline?.beats[runtime.beat];
+    runtime.stageTask = structuredClone(node
+      ? { goal: node.goal, completionMeaning: node.completionMeaning, ...(node.fork ? { fork: node.fork } : {}) }
+      : task);
   }
 }
 
 /** An answered fork is consumed even when its consequences keep the beat on hold. */
 export function consumeNarrativeStageFork(state: NarrativeRunState, scope: { actId?: string; beat: string }): void {
   const runtime = state.actRuntime;
-  if (runtime && runtime.actId === scope.actId && runtime.beat === scope.beat && runtime.stageTask?.fork) {
-    const { fork: _fork, ...task } = runtime.stageTask;
-    runtime.stageTask = task;
+  if (runtime && runtime.actId === scope.actId && runtime.beat === scope.beat) {
+    // The task is a projection, so consuming only that copy would resurrect the
+    // answered window when save/context normalization projects the outline again.
+    const node = runtime.outline?.beats[runtime.beat];
+    if (node?.fork) {
+      const { fork: _fork, ...remaining } = node;
+      runtime.outline!.beats[runtime.beat] = remaining;
+    }
+    if (runtime.stageTask?.fork) {
+      const { fork: _fork, ...task } = runtime.stageTask;
+      runtime.stageTask = task;
+    }
   }
 }

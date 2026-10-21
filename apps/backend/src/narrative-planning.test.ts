@@ -13,6 +13,7 @@ import {
   formatNarrativeActOutline, NARRATIVE_ACT_OUTLINE_BEATS
 } from "./narrative/act-outline.js";
 import { commitNarrativeEpisode } from "./narrative/commit.js";
+import { commitNarrativeMemory } from "./narrative-memory.js";
 import { narrativeTurnKindsForReadiness, type NarrativeTurnEnvelope } from "./narrative/turn.js";
 
 function envelope(): NarrativeTurnEnvelope {
@@ -68,13 +69,13 @@ test("完整幕间故事首次建立、普通回合沿用、选择落地后只�
   assert.equal(initial.actOutline?.revision, 1);
   assert.equal(initial.stageTask?.goal, initial.actOutline?.beats.setup.goal);
   const nextEnvelope = { ...initialEnvelope, beat: "pressure" as const, actOutline: initial.actOutline };
-  assert.deepEqual(outlineSchema(nextEnvelope).anyOf, [{ type: "null" }]);
+  assert.equal(outlineSchema(nextEnvelope), undefined);
   assert.equal(outlineSchema({ ...nextEnvelope, outlineNeedsRevision: true }).anyOf.some((entry) => entry.type === "null"), false);
   const reused = parseNarrativeTurnPlan({ ...rawPlan(null), abilityRefs: ["ability:scouting"], sceneGoal: "探明追兵位置后归营", clockRequest: "advance" }, "plan_scene_turn", nextEnvelope);
   assert.deepEqual(reused.actOutline, initial.actOutline);
   assert.deepEqual(reused.abilityRefs, ["ability:scouting"]);
   assert.equal(reused.clockRequest, "advance");
-  assert.equal(reused.sceneGoal, "探明追兵位置后归营");
+  assert.equal(reused.sceneGoal, initial.actOutline!.beats.pressure.story);
   assert.deepEqual(reused.stageTask, {
     goal: "节点目标-pressure", completionMeaning: "实际结果-pressure",
     fork: { question: "先救同袍还是追击？", stakes: "同袍和军情的去向不同", openingSituation: "追击途中发现同袍被困" }
@@ -109,6 +110,22 @@ test("准入结果唯一决定正文形式，早年或属性未达标时不开�
   assert.deepEqual(narrativeTurnKindsForReadiness(true, false), ["background"]);
 });
 
+test("规划工具的可修订年龄安排经解析传入正文，沿用执行不重写时间", () => {
+  const input = envelope();
+  const schema = beatsSchema(input).properties.setup as { required: string[]; properties: Record<string, unknown> };
+  assert.ok(schema.required.includes("timeframe"));
+  assert.ok(schema.properties.timeframe);
+  const beats = nodes();
+  beats.setup = { ...beats.setup, timeframe: { fromAge: 20, toAge: 24 } } as typeof beats.setup;
+  const parsed = parseNarrativeTurnPlan(rawPlan({ beats }), "plan_scene_turn", input);
+  assert.deepEqual(parsed.stageTask?.timeframe, { fromAge: 20, toAge: 24 });
+  assert.ok(formatNarrativeActOutline(parsed.actOutline, "setup").includes("计划年龄：20—24岁"));
+  const later = { ...input, currentAge: 26, actOutline: parsed.actOutline };
+  const execution = parseNarrativeTurnPlan(rawPlan(null), "plan_scene_turn", later);
+  assert.deepEqual(execution.actOutline, parsed.actOutline);
+  assert.deepEqual(execution.stageTask?.timeframe, { fromAge: 20, toAge: 24 });
+});
+
 test("真实边将路线经规划大纲、正文和结果请求传递，未来故事与实际历史分开且不重复", async () => {
   const base = await loadNarrativeWorldDefinition("ancient");
   assert.ok(base);
@@ -139,8 +156,10 @@ test("真实边将路线经规划大纲、正文和结果请求传递，未来�
   commitNarrativeActOutline(run.narrative, parsed.actOutline!);
   run.narrative.actRuntime!.beat = "pressure";
   const delta = "选择救援使同袍生还，敌军已脱离追踪，军中开始追问延误的责任。";
-  commitNarrativeEpisode(run, { callId: "chosen", sourceEventId: "choice:rescue", turnKind: "scene", age: run.age,
-    actId: act.id, beat: "pressure", storyDelta: delta });
+  commitNarrativeMemory(run.narrative, { id: "memory:choice:rescue", age: run.age, text: delta, factionIds: [], characterIds: [], factIds: [] });
+  commitNarrativeEpisode(run, { callId: "chosen", sourceEventId: "choice:rescue", turnKind: "decision", age: run.age,
+    actId: act.id, beat: "pressure" });
+  markNarrativeActOutlineForRevision(run.narrative, act.id);
   const outlineText = formatNarrativeActOutline(parsed.actOutline, "pressure");
   for (const task of ["planning", "rendering", "decision"] as const) {
     const plan = buildNarrativePromptPlan(run, experience, null, task);
@@ -151,12 +170,33 @@ test("真实边将路线经规划大纲、正文和结果请求传递，未来�
     assert.equal(request.manifest.fragments.filter((entry) => entry.section === "route").length, 1);
     assert.ok(plan.routeGuidance?.includes("均为规划意图，不是已发生事实"));
     assert.ok(plan.routeGuidance?.includes("climax【未发生阶段】"));
+    assert.ok(!plan.routeGuidance?.includes(parsed.actOutline!.beats.setup.story));
+    assert.ok(!plan.routeGuidance?.includes(parsed.actOutline!.beats.escalation.story));
     assert.ok(request.manifest.fragments.some((entry) => entry.section === "storyHistory" && entry.content.includes(delta)), "实际历史不靠未来大纲代替");
     if (task !== "planning") {
       assert.equal(request.renderedContext.split(pack.acts[0].objective).length - 1, 1, "正文能看到一次原 IF 本幕职责");
       assert.ok(request.renderedContext.includes(`当前 IF 节拍职责（pressure）：${pack.acts[0].beatOutline.pressure}`));
+    } else {
+      assert.ok(request.renderedContext.includes("本次修订依据：玩家选择已产生的实际结果"));
+      assert.ok(request.renderedContext.includes("最新已提交处境"));
+      assert.ok(plan.routeGuidance?.includes("未结束阶段的 IF 职责"));
+      assert.ok(!plan.routeGuidance?.includes("本幕完整发展大纲"));
     }
   }
+  const revisedEnvelope = { ...firstEnvelope, beat: "pressure" as const, actOutline: parsed.actOutline, outlineNeedsRevision: true };
+  const revised = parseNarrativeTurnPlan(rawPlan({ beats: { pressure: {
+    story: "面对延误追击的军令后果，依救援实际战果争取新的任用。", goal: "落实军中任用或处分", completionMeaning: "救援之后的军中位置已落定", fork: null
+  } } }), "plan_scene_turn", revisedEnvelope);
+  commitNarrativeActOutline(run.narrative, revised.actOutline!);
+  const executionEnvelope = { ...revisedEnvelope, actOutline: revised.actOutline, outlineNeedsRevision: false };
+  const executionPlan = buildNarrativePromptPlan(run, experience, null, "planning");
+  const executionRequest = composeNarrativeContext({ plan: executionPlan, task: "planning", taskPrompt: narrativeTurnPlanningPrompt(executionEnvelope) });
+  assert.equal(outlineSchema(executionEnvelope), undefined);
+  assert.ok(executionRequest.renderedContext.includes(revised.actOutline!.beats.pressure.story));
+  assert.ok(!executionPlan?.routeGuidance?.includes("未结束阶段的 IF 职责"));
+  assert.ok(!executionPlan?.routeGuidance?.includes(pack.acts[0].beatOutline.climax));
+  assert.equal(executionPlan?.storyHistory?.revisionOutcomeId, undefined);
+  assert.equal(executionRequest.renderedContext.split(delta).length - 1, 1);
   const background = buildNarrativePromptPlan(run, experience, null, "background");
   assert.equal(background?.routeGuidance, undefined);
   const backgroundRequest = composeNarrativeContext({ plan: background, task: "background", taskPrompt: "叙述日常生活与成长" });

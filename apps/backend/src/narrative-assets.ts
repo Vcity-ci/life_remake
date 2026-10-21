@@ -5,9 +5,9 @@ import type { NarrativeAbility, NarrativeLocation, NarrativeAssetActivity, Narra
 
 const text = z.string().trim().min(1);
 const moment = z.object({ ageFrom: z.number().nonnegative().optional(), age: z.number().nonnegative() });
-const location = z.object({ id: text, name: text, description: text, spatialDescription: text.optional(), introduced: moment, lastSeen: moment });
+const location = z.object({ id: text, name: text, description: text.optional(), pendingDetails: z.boolean().optional(), spatialDescription: text.optional(), introduced: moment, lastSeen: moment });
 const ability = z.object({
-  id: text, name: text, description: text, usage: text.optional(), source: text, mastery: text,
+  id: text, name: text, description: text.optional(), pendingDetails: z.boolean().optional(), usage: text.optional(), source: text.optional(), mastery: text.optional(),
   status: z.enum(["available", "unavailable"]), introduced: moment, updated: moment
 });
 const updates = z.object({
@@ -86,20 +86,21 @@ export function applyNarrativeAssetActivity(
   return assets;
 }
 
-export function parseNarrativeAssetUpdates(raw: unknown, assets?: NarrativeAssets): NarrativeAssetUpdates | undefined {
+export function parseNarrativeAssetUpdates(raw: unknown, assets?: NarrativeAssets, declarations = false): NarrativeAssetUpdates | undefined {
   if (raw === undefined) return undefined;
   const result = updates.parse(raw);
   return {
     locations: result.locations.map((entry) => {
       const known = assets?.locations.find((item) => item.id === entry.ref);
       if (entry.ref !== "new" && !known) throw new Error("location_reference_invalid");
-      if (!known) { text.parse(entry.name); text.parse(entry.description); text.parse(entry.spatialDescription); }
+      if (!known) { text.parse(entry.name); if (!declarations) { text.parse(entry.description); text.parse(entry.spatialDescription); } }
       return entry;
     }),
     abilities: result.abilities.map((entry) => {
       const known = assets?.abilities.find((item) => item.id === entry.ref);
       if (entry.ref !== "new" && !known) throw new Error("ability_reference_invalid");
-      if (!known) {
+      if (!known && declarations) text.parse(entry.name);
+      if (!known && !declarations) {
         text.parse(entry.name); text.parse(entry.description); text.parse(entry.source); text.parse(entry.mastery);
         text.parse(entry.usage);
         z.enum(["available", "unavailable"]).parse(entry.status);
@@ -107,6 +108,21 @@ export function parseNarrativeAssetUpdates(raw: unknown, assets?: NarrativeAsset
       return entry;
     })
   };
+}
+
+export function narrativeAssetDeclarationsSchema(): Record<string, unknown> {
+  const entries = (kind: string, current = false) => ({ type: "array", items: {
+    type: "object", additionalProperties: false, required: ["ref"],
+    anyOf: [{ properties: { ref: { const: "new" } }, required: ["name"] }, { properties: { ref: { not: { const: "new" } } } }],
+    properties: {
+      ref: { type: "string", description: `已有${kind}完整 ID；新对象填 new，由引擎分配正式 ID。` },
+      name: { type: "string", minLength: 1, description: "新对象的名称。详细信息由连续性同步从正文提炼。" },
+      ...(current ? { current: { type: "boolean", description: "本段结束时实际所在地点。" } } : {})
+    }
+  } });
+  return { type: "object", additionalProperties: false, required: ["locations", "abilities"], properties: {
+    locations: entries("地点", true), abilities: entries("本领")
+  } };
 }
 
 export function narrativeAssetUpdatesSchema(_assets?: NarrativeAssets): Record<string, unknown> {
@@ -195,17 +211,19 @@ export interface NarrativeAssetApplication {
 export function applyNarrativeAssetUpdates(
   previous: NarrativeAssets | undefined,
   changes: NarrativeAssetUpdates | undefined,
-  when: NarrativeAssetMoment
+  when: NarrativeAssetMoment,
+  declarations = false
 ): NarrativeAssetApplication {
   const assets = structuredClone(normalizeNarrativeAssets(previous));
   const applied: NarrativeAssetApplication = { assets, locationIds: [], abilityIds: [] };
   if (!changes) return applied;
-  const normalized = parseNarrativeAssetUpdates(changes, assets)!;
+  const normalized = parseNarrativeAssetUpdates(changes, assets, declarations)!;
   for (const entry of normalized.locations) {
     const known = assets.locations.find((item) => item.id === entry.ref);
-    const record: NarrativeLocation = known ?? { id: `location:${randomUUID()}`, name: text.parse(entry.name), description: text.parse(entry.description), introduced: { ...when }, lastSeen: { ...when } };
+    const record: NarrativeLocation = known ?? { id: `location:${randomUUID()}`, name: text.parse(entry.name), pendingDetails: declarations, introduced: { ...when }, lastSeen: { ...when } };
     if (entry.description !== undefined) record.description = entry.description;
     if (entry.spatialDescription !== undefined) record.spatialDescription = entry.spatialDescription;
+    if (record.description && record.spatialDescription) delete record.pendingDetails;
     record.lastSeen = { ...when };
     if (!known) assets.locations.push(record);
     applied.locationIds.push(record.id);
@@ -213,10 +231,12 @@ export function applyNarrativeAssetUpdates(
   }
   for (const entry of normalized.abilities) {
     const known = assets.abilities.find((item) => item.id === entry.ref);
-    const record: NarrativeAbility = known ?? { id: `ability:${randomUUID()}`, name: text.parse(entry.name), description: text.parse(entry.description), source: text.parse(entry.source), mastery: text.parse(entry.mastery), status: z.enum(["available", "unavailable"]).parse(entry.status), introduced: { ...when }, updated: { ...when } };
+    const record: NarrativeAbility = known ?? { id: `ability:${randomUUID()}`, name: text.parse(entry.name), source: entry.source, pendingDetails: declarations, status: entry.status ?? "available", introduced: { ...when }, updated: { ...when } };
+    if (!record.source && entry.source !== undefined) record.source = entry.source;
     for (const key of ["description", "usage", "mastery", "status"] as const) {
       if (entry[key] !== undefined) Object.assign(record, { [key]: entry[key] });
     }
+    if (record.description && record.usage && record.source && record.mastery) delete record.pendingDetails;
     record.updated = { ...when };
     if (!known) assets.abilities.push(record);
     applied.abilityIds.push(record.id);
@@ -277,20 +297,17 @@ export function commitNarrativeAssets(
     locationIds: locations.map((entry) => entry.id),
     abilityIds: abilities.map((entry) => entry.id)
   };
-  if (!locations.length && !abilities.length) return committed;
-  const memoryId = `memory:${sourceEventId ?? randomUUID()}`;
+  if ((!locations.length && !abilities.length) || !sourceEventId) return committed;
+  const memoryId = `memory:${sourceEventId}`;
   const existing = state.memoryEntries.find((entry) => entry.id === memoryId);
+  if (!existing) return committed;
   commitNarrativeMemory(state, {
     id: memoryId,
     age: when.age,
     routeId: links.routeIds?.[0],
     factionIds: links.factionIds ?? [], characterIds: links.characterIds ?? [], factIds: links.factIds ?? [],
     locationIds: committed.locationIds, abilityIds: committed.abilityIds,
-    text: existing?.text ?? [
-      when.ageFrom !== undefined ? `${when.ageFrom}-${when.age}岁间` : `${when.age}岁`,
-      ...locations.map((entry) => `${entry.name}：${entry.description}`),
-      ...abilities.map((entry) => `${entry.name}：${entry.mastery}，${entry.description}`)
-    ].join("；")
+    text: existing.text
   });
   return committed;
 }

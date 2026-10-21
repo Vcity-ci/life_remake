@@ -671,7 +671,9 @@ button.danger:hover { background: #8a4b41; }
 .stat-list dd { display: flex; align-items: center; gap: 8px; }
 .stat-tier { display: inline-flex; align-items: center; min-height: 18px; padding: 0 6px; border: 1px solid; border-radius: 4px; font-size: 10px; font-weight: 600; line-height: 1; white-space: nowrap; }
 .stat-tier-low { color: #d6a69b; border-color: #704b43; background: #2b1d1b; }
+.stat-tier-developing { color: #c5bca4; border-color: #605846; background: #25221c; }
 .stat-tier-steady { color: #d7c28a; border-color: #65583e; background: #28251d; }
+.stat-tier-advanced { color: #acc6a3; border-color: #52674b; background: #20281d; }
 .stat-tier-high { color: #9ecbbc; border-color: #42675d; background: #172622; }
 
 .rail-meta { display: grid; gap: 8px; color: #9f9685; font-size: 13px; }

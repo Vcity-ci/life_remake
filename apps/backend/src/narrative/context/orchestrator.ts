@@ -9,7 +9,7 @@ import type { NarrativeContextComposeInput, NarrativeContextComposition, Narrati
 const LAYERS: NarrativeContextLayer[] = ["stable", "runtime", "active", "recall", "history", "task"];
 
 export function composeNarrativeContext(input: NarrativeContextComposeInput): NarrativeContextComposition {
-  const profile = narrativeTaskContextProfile(input.task);
+  const profile = narrativeTaskContextProfile(input.task, input.planningPurpose);
   const historyMessages = input.conversation ? buildConversationPromptMessages(input.conversation, profile.history) : [];
   const providers = input.providers ?? defaultNarrativeContextProviders;
   const allowedSections = new Set(profile.allowedSections);

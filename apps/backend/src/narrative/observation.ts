@@ -1,6 +1,7 @@
 import type { NarrativeBeat, NarrativeFactUpdates } from "@reroll/shared";
 import type { InternalRunState } from "../engine.js";
 import { normalizeNarrativeHandoffFact } from "../narrative-continuity.js";
+import { narrativeExperienceText, formatNarrativeExperience } from "../narrative-memory.js";
 
 export interface NarrativeObservationFact {
   id: string;
@@ -38,7 +39,10 @@ export function narrativeActProgress(run: InternalRunState, actId: string): Narr
       beat,
       changes: Array.from(new Set(episodes
         .filter((episode) => episode.beat === beat && !covered.has(episode.id))
-        .map((episode) => episode.storyDelta?.trim())
+        .flatMap((episode) => {
+          const prose = narrativeExperienceText(run.narrative, episode);
+          return prose ? [formatNarrativeExperience(episode, prose)] : [];
+        })
         .filter((delta): delta is string => Boolean(delta))))
     }))
   };

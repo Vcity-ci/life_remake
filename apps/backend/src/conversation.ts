@@ -149,7 +149,8 @@ export function buildConversationPromptMessages(
   const recentRoundLimit = Math.max(0, Math.trunc(policy.recentRoundLimit ?? Number.MAX_SAFE_INTEGER));
   const requiredRecentRounds = Math.max(0, Math.trunc(policy.requiredRecentRounds ?? recentRoundLimit));
   const memory = conversation.headMemory.trim() ? `已发生经历的摘要：${conversation.headMemory.trim()}` : "";
-  const archived = (includeArchive ? conversation.archive : []).flatMap((round, index) => {
+  const summarized = new Set(conversation.summarizedMemoryIds ?? []);
+  const archived = (includeArchive ? conversation.archive : []).filter((round) => !round.id || !summarized.has(round.id)).flatMap((round, index) => {
     const groupId = `archive:${round.id ?? index}`;
     return [
       { role: "user" as const, content: projectConversationUserPrompt(round.user), groupId, sourceId: round.id, required: false },
@@ -158,7 +159,7 @@ export function buildConversationPromptMessages(
   });
   const recent = recentRoundLimit === 0
     ? []
-    : collectConversationRounds(conversation.history).slice(-recentRoundLimit);
+    : collectConversationRounds(conversation.history).filter((round) => !round.id || !summarized.has(round.id)).slice(-recentRoundLimit);
   const requiredFrom = Math.max(0, recent.length - requiredRecentRounds);
   return [
     ...(includeHeadMemory && memory ? [{ role: "user" as const, content: memory, groupId: "summary", sourceId: conversation.summaryThroughMemoryId, required: true }] : []),

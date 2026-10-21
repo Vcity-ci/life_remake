@@ -19,7 +19,7 @@ export function stageNarrativeAssetRound(
   when: NarrativeAssetMoment
 ): NarrativeAssetUpdates | undefined {
   const buffer = run.narrative.assetBuffer ??= { locations: [], abilities: [], characters: [], rounds: [] };
-  const application = applyNarrativeAssetUpdates(run.narrative.assets, changes.assetUpdates, when);
+  const application = applyNarrativeAssetUpdates(run.narrative.assets, changes.assetUpdates, when, true);
   // IDs are allocated here once. All later links refer to these exact records.
   commitNarrativeAssets(run.narrative, application, when, {}, round.sourceEventId);
   const characters = registerNarrativeParticipants({ ...run, age: when.age }, changes.participants, round.sourceEventId, [], changes.handoff?.characters);

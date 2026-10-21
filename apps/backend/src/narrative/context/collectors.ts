@@ -46,7 +46,7 @@ const stableProvider: NarrativeContextProvider = {
     return [
       ...(plan.talents ?? []).flatMap((talent) => fragment({ id: narrativeContentId("talent", talent), layer: "stable", section: "talents", sourceType: "talent", priority: 90, content: talent })),
       ...(plan.seedHints ?? []).flatMap((hint) => fragment({ id: narrativeContentId("seed-hint", hint), layer: "stable", section: "seedHints", sourceType: "seed-hint", priority: 35, content: hint })),
-      ...(plan.origin ? fragment({ id: "stable:origin", layer: "stable", section: "origin", sourceType: "origin", priority: 85, content: plan.origin }) : []),
+      ...(plan.origin && !plan.protagonist && !plan.storyHistory?.summary?.originCovered ? fragment({ id: "stable:origin", layer: "stable", section: "origin", sourceType: "origin", priority: 85, content: plan.origin }) : []),
       ...(plan.worldCoreContext ? fragment({ id: "stable:world-core", layer: "stable", section: "world", sourceType: "world-core", priority: 98, content: plan.worldCoreContext, required: true }) : []),
       ...(plan.storyBible ? fragment({ id: "stable:world-snapshot", layer: "stable", section: "world", sourceType: "world-snapshot", priority: 96, content: plan.storyBible, required: true }) : []),
       ...(plan.narrativePaletteContext ? fragment({
@@ -141,7 +141,7 @@ const characterProvider: NarrativeContextProvider = {
     const values: NarrativeContextFragment[] = [];
     for (const character of plan.recall?.characters ?? []) {
       const rendered = plan.activeCharacters.find((entry) => entry.startsWith(`${character.id}=`))
-        ?? `${character.id}=${character.name}（${character.factionId ?? "无阵营"}，${character.role}）${character.description ? "：" + character.description : ""}${character.relationship ? "；关系：" + character.relationship : ""}`;
+        ?? `${character.id}=${character.name}（${character.factionId ?? "无阵营"}${character.role ? `，${character.role}` : ""}）${character.description ? "：" + character.description : ""}${character.relationship ? "；关系：" + character.relationship : ""}`;
       values.push(...fragment({ id: `active:character:${character.id}`, layer: "active", section: "characters", sourceType: "character", sourceIds: [`character:${character.id}`], priority: 88, content: rendered,
         required: ["background", "rendering", "dynamic", "decision"].includes(plan.task) }));
     }
@@ -157,13 +157,13 @@ const storyHistoryProvider: NarrativeContextProvider = {
   id: "story-history",
   collect: ({ plan, historyMessages = [] }) => {
     if (!plan?.task) return [];
-    if (!plan.storyHistory) return plan.effectiveBackground ? fragment({
+    if (!plan.storyHistory) return !plan.protagonist && plan.effectiveBackground ? fragment({
       id: "runtime:effective-background", layer: "runtime", section: "storyHistory", sourceType: "effective-background", priority: 92,
       content: `人物重要经历（已发生的历史背景）：${plan.effectiveBackground}`, required: true
     }) : [];
     const projected = projectNarrativeStoryHistory(plan.storyHistory, historyMessages);
     return [
-      ...(projected.summary ? fragment({
+      ...(projected.summary && !plan.protagonist ? fragment({
         id: `runtime:story-summary:${projected.summary.id}`, layer: "runtime", section: "storyHistory", sourceType: "story-summary",
         sourceIds: projected.summary.coveredEpisodeIds, priority: 92,
         content: `人物重要经历（已压缩背景）：${projected.summary.text}`, required: true
@@ -171,10 +171,26 @@ const storyHistoryProvider: NarrativeContextProvider = {
       ...projected.changes.flatMap((episode) => fragment({
         id: `runtime:story-change:${episode.id}`, layer: "runtime", section: "storyHistory", sourceType: "story-change",
         sourceIds: [episode.id], priority: 92,
-        content: `${episode.ageFrom !== undefined && episode.ageFrom !== episode.age ? `${episode.ageFrom}—${episode.age}` : episode.age}岁：${episode.storyDelta}`,
+        content: `${episode.id === plan.storyHistory!.revisionOutcomeId ? "【本次修订依据：玩家选择已产生的实际结果】" : ""}${episode.id === plan.storyHistory!.latestSituationId ? "【最新已提交处境】" : ""}${episode.ageFrom !== undefined && episode.ageFrom !== episode.age ? `${episode.ageFrom}—${episode.age}` : episode.age}岁：${episode.narrative}`,
         required: true
       }))
     ];
+  }
+};
+
+const protagonistProvider: NarrativeContextProvider = {
+  id: "current-protagonist",
+  collect: ({ plan }) => {
+    if (!plan?.protagonist) return [];
+    const summary = plan.storyHistory?.summary;
+    return fragment({
+      id: "runtime:protagonist", layer: "runtime", section: "protagonist", sourceType: "protagonist",
+      sourceIds: summary?.coveredEpisodeIds ?? [], priority: 100, required: true,
+      content: [plan.protagonist,
+        plan.origin && !summary?.originCovered ? `人物来处：${plan.origin}` : "",
+        summary?.text ? `迄今为止的重要经历与持续影响：${summary.text}` : !plan.storyHistory && plan.effectiveBackground ? `已有经历：${plan.effectiveBackground}` : ""
+      ].filter(Boolean).join("\n")
+    });
   }
 };
 
@@ -253,6 +269,7 @@ export const defaultNarrativeContextProviders: NarrativeContextProvider[] = [
   worldCardProvider,
   loreProvider,
   characterProvider,
+  protagonistProvider,
   storyHistoryProvider,
   factProvider,
   assetProvider,

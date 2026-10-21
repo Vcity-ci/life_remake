@@ -6,14 +6,21 @@ export function normalizeNarrativeStageTask(value: unknown): NarrativeStageTask 
   const goal = typeof raw.goal === "string" ? raw.goal.trim() : "";
   const completionMeaning = typeof raw.completionMeaning === "string" ? raw.completionMeaning.trim() : "";
   if (!goal || !completionMeaning) return undefined;
-  if (raw.fork === undefined || raw.fork === null) return { goal, completionMeaning };
+  const task: NarrativeStageTask = { goal, completionMeaning };
+  if (raw.timeframe !== undefined && raw.timeframe !== null) {
+    const range = raw.timeframe as { fromAge?: unknown; toAge?: unknown };
+    if (typeof range !== "object" || Array.isArray(range) || !Number.isInteger(range.fromAge) || !Number.isInteger(range.toAge) ||
+        Number(range.fromAge) < 0 || Number(range.toAge) < Number(range.fromAge)) return undefined;
+    task.timeframe = { fromAge: Number(range.fromAge), toAge: Number(range.toAge) };
+  }
+  if (raw.fork === undefined || raw.fork === null) return task;
   if (!raw.fork || typeof raw.fork !== "object" || Array.isArray(raw.fork)) return undefined;
   const fork = raw.fork as Record<string, unknown>;
   const question = typeof fork.question === "string" ? fork.question.trim() : "";
   const stakes = typeof fork.stakes === "string" ? fork.stakes.trim() : "";
   const openingSituation = typeof fork.openingSituation === "string" ? fork.openingSituation.trim() : "";
   return question && stakes && openingSituation
-    ? { goal, completionMeaning, fork: { question, stakes, openingSituation } }
+    ? { ...task, fork: { question, stakes, openingSituation } }
     : undefined;
 }
 
@@ -27,7 +34,7 @@ export function commitNarrativeStageTask(
   if (task && runtime?.actId === scope.actId && runtime.beat === scope.beat) {
     const node = runtime.outline?.beats[runtime.beat];
     runtime.stageTask = structuredClone(node
-      ? { goal: node.goal, completionMeaning: node.completionMeaning, ...(node.fork ? { fork: node.fork } : {}) }
+      ? normalizeNarrativeStageTask(node)!
       : task);
   }
 }

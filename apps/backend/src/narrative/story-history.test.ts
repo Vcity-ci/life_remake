@@ -102,3 +102,21 @@ test("摘要覆盖按准确 episode 集合判断，观察器不接入新的叙�
   assert.equal(observation.renderedContext, "判断当前阶段");
   assert.equal(observation.manifest.fragments.some((entry) => entry.section === "storyHistory"), false);
 });
+
+test("待修订大纲取得已提交选择结果，近期正文已有同一结果时不再重传", () => {
+  const chosen = { ...episode(1), turnKind: "decision" as const, actId: "act.one", storyDelta: "你救回同袍，失去追踪敌军的机会。" };
+  const current = { ...episode(2), actId: "act.one", storyDelta: "同袍归营作证，军中正等待对延误的裁断。" };
+  const state = {
+    episodes: [chosen, current], memoryDigests: [digest([chosen.id])],
+    actRuntime: { actId: "act.one", beat: "pressure" as const, enteredAge: 1, lastAdvancedAge: 1, selectedRouteIds: [], decisionCount: 1, outlineNeedsRevision: true }
+  };
+  const history = buildNarrativeStoryHistory(state);
+  const planning = composeNarrativeContext({ plan: { ...plan(history), task: "planning" }, task: "planning", taskPrompt: "修订剩余发展" });
+  assert.equal(planning.renderedContext.split(chosen.storyDelta).length - 1, 1);
+  assert.ok(planning.renderedContext.includes("本次修订依据：玩家选择已产生的实际结果"));
+  assert.ok(planning.renderedContext.includes(`【最新已提交处境】2岁：${current.storyDelta}`));
+  const recent: ConversationPromptMessage[] = [{ role: "assistant", content: "救援结果正文", sourceId: chosen.memoryIds[0] }];
+  assert.deepEqual(projectNarrativeStoryHistory(history, recent).changes.map((entry) => entry.id), [current.id]);
+  state.actRuntime.outlineNeedsRevision = false;
+  assert.deepEqual(buildNarrativeStoryHistory(state).episodes.map((entry) => entry.id), [current.id]);
+});

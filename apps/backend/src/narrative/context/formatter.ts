@@ -1,7 +1,7 @@
 import type { NarrativeContextFragment, NarrativeContextSection } from "./types.js";
 
 const SECTION_ORDER: NarrativeContextSection[] = [
-  "raw", "persona", "talents", "seedHints", "origin", "world", "palette", "mainline", "route", "handoff",
+  "raw", "persona", "talents", "seedHints", "origin", "world", "protagonist", "palette", "mainline", "route", "handoff",
   "lore", "characters", "storyHistory", "factDirectory", "facts", "resolvedFacts", "locations", "abilities",
   "assets", "digests", "memories", "styleExamples", "ending", "authorNote", "task"
 ];
@@ -13,6 +13,7 @@ function renderSection(section: NarrativeContextSection, values: string[]): stri
     case "assets":
     case "task": return values.join("\n");
     case "persona": return `人物设定：${values[0]}`;
+    case "protagonist": return `当前主角（行动与应对困难的依据）：\n${values.join("\n")}`;
     case "talents": return `本局天赋：${values.join("；")}`;
     case "seedHints": return `可选身世线索（尚非已发生事实）：${values.join("；")}`;
     case "origin": return `人物来处：${values[0]}`;

@@ -6,6 +6,7 @@ export type NarrativeContextLayer = "stable" | "runtime" | "active" | "recall" |
 
 export type NarrativeContextSection =
   | "persona"
+  | "protagonist"
   | "talents"
   | "seedHints"
   | "origin"
@@ -109,12 +110,13 @@ export interface NarrativeContextProvider {
 }
 
 export interface NarrativeContextComposeInput {
+  planningPurpose?: "initial" | "revise" | "execute";
   plan?: NarrativePromptPlan;
   task: NarrativeTask;
   taskPrompt: string;
   conversation?: ChatConversationState;
   callId?: string;
-  source?: "opening" | "background" | "scene" | "decision" | "closure" | "ending";
+  source?: "origin" | "opening" | "background" | "scene" | "decision" | "closure" | "ending";
   worldId?: string;
   focusIds?: string[];
   providers?: NarrativeContextProvider[];

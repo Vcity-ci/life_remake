@@ -6,8 +6,8 @@ export interface NarrativeParticipant {
   characterRef: string;
   name: string;
   factionId?: string;
-  role: string;
-  description: string;
+  role?: string;
+  description?: string;
   recurring: boolean;
   relationship?: Pick<NarrativeCharacterRelationship, "stance" | "summary">;
 }
@@ -32,6 +32,7 @@ export function registerNarrativeParticipants(
     const character: NarrativeDynamicCharacter = existing ?? {
       id: candidate?.characterRef ?? `character:${randomUUID()}`,
       name: participant.name, factionId: participant.factionId, role: participant.role, description: participant.description,
+      pendingDetails: !participant.role || !participant.description,
       relatedFactIds: [], relatedRouteIds: [], introducedAge: run.age, lastSeenAge: run.age, importance: "recurring", status: "active"
     };
     character.lastSeenAge = run.age;
@@ -40,6 +41,7 @@ export function registerNarrativeParticipants(
       if (participant.role) character.role = participant.role;
       if (participant.description) character.description = participant.description;
       if (participant.factionId !== undefined) character.factionId = participant.factionId || undefined;
+      if (character.role && character.description) delete character.pendingDetails;
     }
     character.relatedFactIds = Array.from(new Set([...character.relatedFactIds, ...factIds])).slice(-8);
     if (updateState && participant.relationship) character.relationship = {

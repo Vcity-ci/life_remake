@@ -57,6 +57,8 @@ export function describeNarrativeAttributePolicy(policy: NarrativeAttributePolic
     policy.preferredStats?.length && (policy.minPreferredEffects ?? 0) > 0
       ? `成长以${policy.preferredStats.join("、")}为侧重，至少${policy.minPreferredEffects}项体现该方向；其余属性可按经历搭配。` : "",
     policy.requirePositive ? "至少一项为正向成长（up）。" : "",
+    policy.minEffects === 0 ? "仅运用已有能力、处理事务而未形成新成长或损失时，effects 明确返回 []，不用奖励属性来证明行动有效。" : "",
+    policy.positiveMagnitudeByBand ? `正向成长由引擎按幅度换算：${Object.entries(policy.positiveMagnitudeByBand).map(([band, value]) => `${band}=${value}`).join("、")}；按实际成长选择标签，不按篇幅或行动次数奖励。` : "",
     policy.forbidNegativeStats?.length ? `${policy.forbidNegativeStats.join("、")}只采用正向变化。` : "",
     ...Object.entries(policy.maxNegativeBandByStat ?? {}).map(([stat, band]) => `${stat}负向变化最高为${band}档。`)
   ].filter(Boolean).join(" ");

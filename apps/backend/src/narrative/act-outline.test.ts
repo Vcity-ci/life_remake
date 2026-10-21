@@ -97,7 +97,33 @@ test("进入新幕时不继承旧幕规划，提示文本明确区分规划与�
   assert.equal(next.actRuntime?.stageTask, undefined);
   const text = formatNarrativeActOutline(outline, "pressure");
   assert.match(text, /规划意图，不是已发生事实/);
-  assert.match(text, /已过阶段，仅供理解因果；实际经过以历史为准/);
+  assert.ok(!text.includes(outline.beats.setup.story));
+  assert.ok(!text.includes(outline.beats.escalation.story));
   assert.match(text, /pressure【当前阶段】/);
   assert.match(text, /climax【未发生阶段】/);
+});
+
+test("年龄安排经保存恢复与阶段任务投影完整保留，选择后只改未完成节点", () => {
+  const outline = firstOutline();
+  outline.beats.setup.timeframe = { fromAge: 16, toAge: 20 };
+  outline.beats.pressure.timeframe = { fromAge: 24, toAge: 28 };
+  const state = ensureNarrativeActRuntime(createNarrativeRunState(true), world, 16);
+  commitNarrativeActOutline(state, outline);
+  commitNarrativeStageTask(state, { actId: "frontier", beat: "setup" }, outline.beats.setup);
+  const restored = ensureNarrativeRunState(JSON.parse(JSON.stringify(state)), true, 16);
+  assert.deepEqual(restored.actRuntime?.stageTask?.timeframe, { fromAge: 16, toAge: 20 });
+  const muchLater = ensureNarrativeActRuntime(restored, world, 40);
+  assert.equal(muchLater.actRuntime?.beat, "setup", "超过计划年龄也不自动完成阶段");
+  muchLater.actRuntime!.beat = "pressure";
+  commitNarrativeStageTask(muchLater, { actId: "frontier", beat: "pressure" }, outline.beats.pressure);
+  consumeNarrativeStageFork(muchLater, { actId: "frontier", beat: "pressure" });
+  assert.deepEqual(muchLater.actRuntime?.stageTask?.timeframe, { fromAge: 24, toAge: 28 });
+  const revised = applyNarrativeActOutlineUpdate(muchLater.actRuntime!.outline, { beats: {
+    pressure: { ...outline.beats.pressure, timeframe: { fromAge: 40, toAge: 41 }, fork: null },
+    payoff: { ...outline.beats.payoff, timeframe: { fromAge: 42, toAge: 45 } }
+  } }, { actId: "frontier", beat: "pressure", requiresRevision: true });
+  commitNarrativeActOutline(muchLater, revised);
+  assert.deepEqual(revised.beats.setup, outline.beats.setup);
+  assert.deepEqual(muchLater.actRuntime?.stageTask?.timeframe, { fromAge: 40, toAge: 41 });
+  assert.ok(formatNarrativeActOutline(revised, "pressure").includes("计划年龄：42—45岁"));
 });

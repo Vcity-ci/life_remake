@@ -23,38 +23,85 @@
     },
     "statTiers": {
       "lowMax": 8,
-      "highMin": 22,
+      "developingMax": 18,
+      "steadyMax": 32,
+      "highMin": 48,
       "overrides": {
-        "physique": { "lowMax": 4, "highMin": 22 }
+        "physique": {
+          "lowMax": 4,
+          "developingMax": 18,
+          "steadyMax": 32,
+          "highMin": 48
+        }
+      },
+      "survival": {
+        "lowMax": 8,
+        "highMin": 22,
+        "overrides": {
+          "physique": {
+            "lowMax": 4,
+            "highMin": 22
+          }
+        }
       }
     },
     "statTierPresentation": {
       "intelligence": {
         "low": "学思未定",
+        "developing": "初具见识",
         "steady": "明察善断",
+        "advanced": "通达世务",
         "high": "洞见如炬"
       },
       "charisma": {
         "low": "未谙人情",
+        "developing": "相处有方",
         "steady": "善解人意",
+        "advanced": "善聚人心",
         "high": "长袖善舞"
       },
       "family": {
         "low": "根基未稳",
+        "developing": "薄有依靠",
         "steady": "家道可凭",
+        "advanced": "根基深厚",
         "high": "门庭煊赫"
       },
       "fortune": {
         "low": "时运未至",
+        "developing": "偶得机缘",
         "steady": "逢凶化吉",
+        "advanced": "顺势多助",
         "high": "天眷所归"
       },
       "physique": {
         "low": "体弱未成",
+        "developing": "身健耐劳",
         "steady": "筋骨康健",
+        "advanced": "精力充沛",
         "high": "龙精虎健"
       }
     },
+    "actGateThresholds": [
+      {
+        "opening": 12,
+        "escalation": 14,
+        "pressure": 16,
+        "climax": 18
+      },
+      {
+        "opening": 23,
+        "escalation": 24,
+        "pressure": 25,
+        "climax": 26
+      },
+      {
+        "opening": 32,
+        "escalation": 33,
+        "pressure": 34,
+        "climax": 35
+      }
+    ],
     "survival": {
       "startAge": 4,
       "graceYears": 3,

@@ -1,5 +1,20 @@
-import type { NarrativeMemoryEntry, NarrativeRunState } from "@reroll/shared";
+import type { NarrativeEpisodeRecord, NarrativeMemoryEntry, NarrativeRunState } from "@reroll/shared";
 import { NARRATIVE_HISTORY_LIMIT } from "./narrative/history.js";
+
+export function narrativeExperienceText(
+  state: Pick<NarrativeRunState, "memoryEntries">,
+  episode: NarrativeEpisodeRecord
+): string {
+  const ids = new Set([...episode.memoryIds, `memory:${episode.sourceEventId}`]);
+  const prose = state.memoryEntries.find((entry) => ids.has(entry.id))?.text;
+  // Old saves may retain only the former delta; new turns read committed prose.
+  return prose?.trim() || episode.storyDelta?.trim() || "";
+}
+
+export function formatNarrativeExperience(when: { age: number; ageFrom?: number }, narrative: string): string {
+  const age = when.ageFrom !== undefined && when.ageFrom !== when.age ? `${when.ageFrom}—${when.age}` : `${when.age}`;
+  return `${age}岁：\n${narrative}`;
+}
 
 export function narrativeTextOverlap(left: string, right: string): number {
   const tokens = (value: string) => {

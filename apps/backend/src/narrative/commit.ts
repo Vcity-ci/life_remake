@@ -17,7 +17,6 @@ export interface NarrativeCommitDraft {
   characterIds?: string[];
   locationIds?: string[];
   abilityIds?: string[];
-  storyDelta?: string;
 }
 
 function unique(values: Array<string | undefined>): string[] {
@@ -45,7 +44,6 @@ export function commitNarrativeEpisode(run: InternalRunState, draft: NarrativeCo
     characterIds: unique([...(draft.characterIds ?? []), ...(memory?.characterIds ?? [])]),
     locationIds: unique([...(draft.locationIds ?? []), ...(memory?.locationIds ?? [])]),
     abilityIds: unique([...(draft.abilityIds ?? []), ...(memory?.abilityIds ?? [])]),
-    storyDelta: draft.storyDelta?.trim() || undefined,
     createdAt: Date.now()
   };
   const exists = run.narrative.episodes.some((entry) => entry.id === record.id);

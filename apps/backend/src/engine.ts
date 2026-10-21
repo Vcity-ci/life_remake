@@ -1,4 +1,6 @@
 import { validateNarrativeEffects } from "./narrative-attributes.js";
+import { resolveNarrativeStatTiers, resolveNarrativeStatLabels, resolveNarrativeSurvivalTier, resolveNarrativeSurvivalTierBounds } from "./narrative-stats.js";
+export { resolveNarrativeStatTierBounds, resolveNarrativeStatTiers, resolveNarrativeStatLabels } from "./narrative-stats.js";
 import seedrandom from "seedrandom";
 import { commitNarrativeMemory } from "./narrative-memory.js";
 import { consumeNarrativeStageFork } from "./narrative/stage-task.js";
@@ -30,7 +32,7 @@ import type {
   NarrativeSceneArchetype,
   MilestoneChoice,
   NarrativeRunState,
-  NarrativeStatTier,
+  NarrativeSurvivalStatTier,
   NarrativeStoryPackSnapshot,
   NarrativeSurvivalRule,
   NarrativeThreadState,
@@ -509,6 +511,7 @@ function narrativePromptSourceForRun(run: InternalRunState) {
   return {
     worldId: run.worldId,
     age: run.age,
+    ageStage: run.ageStage,
     personaPrompt: run.personaPrompt,
     stats: run.stats,
     fame: run.fame,
@@ -712,7 +715,7 @@ function findSurvivalStage(
 }
 
 function pickWeightedDelta(
-  outcomes: NarrativeSurvivalRule["familyPhysiqueSupport"][NarrativeStatTier]["outcomes"],
+  outcomes: NarrativeSurvivalRule["familyPhysiqueSupport"][NarrativeSurvivalStatTier]["outcomes"],
   rng: Rng
 ): number {
   const totalWeight = outcomes.reduce((sum, item) => sum + Math.max(0, item.weight), 0);
@@ -734,7 +737,7 @@ function applyAnnualFamilyPhysiqueSupport(
 ): Partial<Record<StatKey, number>> {
   const rule = getSurvivalRule(narrativeWorld);
   if (!rule) return changes;
-  const tier = resolveNarrativeStatTiers(run.stats, run.narrative.statTierConfig).family;
+  const tier = resolveNarrativeSurvivalTier(run.stats, "family", run.narrative.statTierConfig);
   const support = rule.familyPhysiqueSupport[tier];
   if (!support) return changes;
   const delta = pickWeightedDelta(support.outcomes, rng);
@@ -746,14 +749,14 @@ function applyAnnualFamilyPhysiqueSupport(
 }
 
 function survivalCause(run: InternalRunState, stageLabel: string): string {
-  const familyTier = resolveNarrativeStatTiers(run.stats, run.narrative.statTierConfig).family;
+  const familyTier = resolveNarrativeSurvivalTier(run.stats, "family", run.narrative.statTierConfig);
   if (familyTier === "low") return `${stageLabel}困顿失养，体魄日渐不支`;
   if (run.stats.physique <= 0) return `${stageLabel}旧伤与劳顿一并发作`;
   return `${stageLabel}久病难支`;
 }
 
 function resetRecoveredSurvivalStreak(run: InternalRunState): void {
-  if (resolveNarrativeStatTiers(run.stats, run.narrative.statTierConfig).physique !== "low") {
+  if (resolveNarrativeSurvivalTier(run.stats, "physique", run.narrative.statTierConfig) !== "low") {
     ensureSurvivalState(run).lowPhysiqueYears = 0;
   }
 }
@@ -778,7 +781,7 @@ function updateAnnualSurvivalRisk(
     return;
   }
   state.stageId = stage.id;
-  if (resolveNarrativeStatTiers(run.stats, run.narrative.statTierConfig).physique !== "low") {
+  if (resolveNarrativeSurvivalTier(run.stats, "physique", run.narrative.statTierConfig) !== "low") {
     state.lowPhysiqueYears = 0;
     return;
   }
@@ -794,7 +797,7 @@ function updateAnnualSurvivalRisk(
     age: run.age,
     stageId: stage.id,
     stageLabel: stage.label,
-    lowPhysiqueMax: resolveNarrativeStatTierBounds("physique", run.narrative.statTierConfig).lowMax,
+    lowPhysiqueMax: resolveNarrativeSurvivalTierBounds("physique", run.narrative.statTierConfig).lowMax,
     lowPhysiqueYears: state.lowPhysiqueYears,
     triggerRisk,
     cause: survivalCause(run, stage.label)
@@ -816,16 +819,15 @@ const survivalChoiceCopy: Record<SurvivalChoice, { label: string; description: s
 function toPublicSurvivalCrisis(run: InternalRunState): PublicSurvivalCrisis | undefined {
   const crisis = run.survivalCrisis;
   if (!crisis) return undefined;
-  const tiers = resolveNarrativeStatTiers(run.stats, run.narrative.statTierConfig);
   return {
     id: crisis.id,
     age: crisis.age,
     stageLabel: crisis.stageLabel,
     summary: `${crisis.cause}。此刻只能在有限的选择中求一线生机。`,
-    lowPhysiqueMax: resolveNarrativeStatTierBounds("physique", run.narrative.statTierConfig).lowMax,
+    lowPhysiqueMax: resolveNarrativeSurvivalTierBounds("physique", run.narrative.statTierConfig).lowMax,
     choices: (["self_rescue", "seek_help", "trust_fate"] as SurvivalChoice[]).map((choice) => {
       const stat = survivalChoiceStat(choice);
-      const tier = tiers[stat];
+      const tier = resolveNarrativeSurvivalTier(run.stats, stat, run.narrative.statTierConfig);
       return {
         id: choice,
         label: survivalChoiceCopy[choice].label,
@@ -849,13 +851,13 @@ export function resolveSurvivalCrisis(
   if (!crisis || !rule) throw new Error("survival_crisis_unavailable");
   if (crisisId && crisis.id !== crisisId) throw new Error("survival_crisis_stale");
   const stat = survivalChoiceStat(choice);
-  const tier = resolveNarrativeStatTiers(run.stats, run.narrative.statTierConfig)[stat];
+  const tier = resolveNarrativeSurvivalTier(run.stats, stat, run.narrative.statTierConfig);
   const successRate = rule.recovery.successRateByTier[tier] ?? 0;
   const rng = seedrandom(`${run.seed}:survival-choice:${crisis.id}:${choice}:${run.history.length}`);
   const recovered = tier === "high" || rng() < successRate;
   const copy = survivalChoiceCopy[choice];
   if (recovered) {
-    const restoredTo = resolveNarrativeStatTierBounds("physique", run.narrative.statTierConfig).lowMax + rule.recovery.restoreBuffer;
+    const restoredTo = resolveNarrativeSurvivalTierBounds("physique", run.narrative.statTierConfig).lowMax + rule.recovery.restoreBuffer;
     const changes = { physique: Math.max(0, restoredTo - run.stats.physique) };
     run.stats = applyChanges(run.stats, changes);
     resetRecoveredSurvivalStreak(run);
@@ -1174,7 +1176,9 @@ function resolveNarrativeAttributeChanges(
   if (!validation.effects.length) return {};
   const changes: Partial<Record<StatKey, number>> = {};
   for (const effect of validation.effects) {
-    changes[effect.stat] = (effect.direction === "up" ? 1 : -1) * attributeBandMagnitude(effect.band);
+    changes[effect.stat] = effect.direction === "up"
+      ? policy?.positiveMagnitudeByBand?.[effect.band] ?? attributeBandMagnitude(effect.band)
+      : -attributeBandMagnitude(effect.band);
   }
   const stageCap = resolveStageDeltaCap(resolveAgeStage(run.age, world).id, run.tuningSnapshot);
   return reduceNegativeChanges(run, clampYearlyChangesByStage(changes, stageCap));
@@ -3431,8 +3435,8 @@ export interface DynamicNarrativeScenePayload {
     characterRef?: string;
     name: string;
     factionId?: string;
-    role: string;
-    description: string;
+    role?: string;
+    description?: string;
     recurring: boolean;
     relationship?: Pick<NarrativeCharacterRelationship, "stance" | "summary">;
   }>;
@@ -3739,13 +3743,13 @@ export function advanceWithDynamicNarrativeScene(
 function dynamicDecisionPolicies(): Record<DecisionType, PendingDirectedDecisionPolicy> {
   return {
     safe: { allowedStats: allStatKeys, allowedBands: ["light"], allowedDirections: ["up"], minEffects: 1, maxEffects: 1 },
-    balanced: { allowedStats: allStatKeys, allowedBands: ["light", "medium"], allowedDirections: ["up", "down"], minEffects: 1, maxEffects: 2, requirePositive: true, maxNegativeBandByStat: { physique: "light" } },
-    risky: { allowedStats: allStatKeys, allowedBands: ["light", "medium", "heavy"], allowedDirections: ["up", "down"], minEffects: 1, maxEffects: 2 }
+    balanced: { allowedStats: allStatKeys, allowedBands: ["light", "medium"], allowedDirections: ["up", "down"], minEffects: 1, maxEffects: 2, requirePositive: true, maxNegativeBandByStat: { physique: "light" }, positiveMagnitudeByBand: { light: 1, medium: 1 } },
+    risky: { allowedStats: allStatKeys, allowedBands: ["light", "medium", "heavy"], allowedDirections: ["up", "down"], minEffects: 1, maxEffects: 2, positiveMagnitudeByBand: { light: 1, medium: 1, heavy: 2 } }
   };
 }
 
 export function dynamicSceneAttributePolicy(): NarrativeAttributePolicy {
-  return { allowedStats: allStatKeys, allowedBands: ["light", "medium"], allowedDirections: ["up", "down"], minEffects: 1, maxEffects: 2, requirePositive: true, forbidNegativeStats: ["physique"] };
+  return { allowedStats: allStatKeys, allowedBands: ["light", "medium"], allowedDirections: ["up", "down"], minEffects: 0, maxEffects: 2, forbidNegativeStats: ["physique"], positiveMagnitudeByBand: { light: 1, medium: 1 } };
 }
 
 export function dynamicBackgroundAttributePolicy(run: InternalRunState): NarrativeAttributePolicy {
@@ -3762,6 +3766,7 @@ export function dynamicBackgroundAttributePolicy(run: InternalRunState): Narrati
     minEffects: 1,
     maxEffects: 2,
     requirePositive: true,
+    positiveMagnitudeByBand: { light: 1, medium: 1 },
     preferredStats,
     minPreferredEffects: preferredStats.length ? 1 : 0
   };
@@ -4075,37 +4080,6 @@ export function applyMilestoneDecisionAndAdvance(
     factIds: narrativeFactIds,
     sourceEventId
   };
-}
-
-export function resolveNarrativeStatTierBounds(
-  stat: StatKey,
-  config?: InternalRunState["narrative"]["statTierConfig"]
-): { lowMax: number; highMin: number } {
-  return config?.overrides?.[stat] ?? { lowMax: config?.lowMax ?? 8, highMin: config?.highMin ?? 22 };
-}
-
-export function resolveNarrativeStatTiers(
-  stats: Stats,
-  config?: InternalRunState["narrative"]["statTierConfig"]
-): Record<StatKey, NarrativeStatTier> {
-  return allStatKeys.reduce<Record<StatKey, NarrativeStatTier>>((tiers, stat) => {
-    const { lowMax, highMin } = resolveNarrativeStatTierBounds(stat, config);
-    tiers[stat] = stats[stat] <= lowMax ? "low" : stats[stat] >= highMin ? "high" : "steady";
-    return tiers;
-  }, {} as Record<StatKey, NarrativeStatTier>);
-}
-
-export function resolveNarrativeStatLabels(
-  stats: Stats,
-  config?: InternalRunState["narrative"]["statTierConfig"],
-  presentation?: InternalRunState["narrative"]["statTierPresentation"]
-): Record<StatKey, string> {
-  const tiers = resolveNarrativeStatTiers(stats, config);
-  const defaults: Record<NarrativeStatTier, string> = { low: "积累中", steady: "可用", high: "出众" };
-  return allStatKeys.reduce<Record<StatKey, string>>((labels, stat) => {
-    labels[stat] = presentation?.[stat]?.[tiers[stat]] ?? defaults[tiers[stat]];
-    return labels;
-  }, {} as Record<StatKey, string>);
 }
 
 export function toClientRun(run: InternalRunState): PublicRunState {

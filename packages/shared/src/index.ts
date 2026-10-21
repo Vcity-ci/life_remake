@@ -61,7 +61,8 @@ export interface Stats {
 /** Semantic attribute consequences proposed by the narrator and settled by the engine. */
 export type NarrativeAttributeBand = "light" | "medium" | "heavy";
 export type NarrativeAttributeDirection = "up" | "down";
-export type NarrativeStatTier = "low" | "steady" | "high";
+export type NarrativeSurvivalStatTier = "low" | "steady" | "high";
+export type NarrativeStatTier = NarrativeSurvivalStatTier | "developing" | "advanced";
 export type SurvivalChoice = "self_rescue" | "seek_help" | "trust_fate";
 export type NarrativeProgressGateStage = "opening" | "escalation" | "pressure" | "climax";
 export interface NarrativeAttributeEffect {
@@ -88,6 +89,8 @@ export interface NarrativeAttributePolicy {
   forbidNegativeStats?: StatKey[];
   /** The engine accepts at most this negative semantic band for a specific stat. */
   maxNegativeBandByStat?: Partial<Record<StatKey, NarrativeAttributeBand>>;
+  /** Numeric growth is settled here; a semantic band is not an automatic large gain. */
+  positiveMagnitudeByBand?: Partial<Record<NarrativeAttributeBand, number>>;
 }
 
 export interface BackgroundCard {
@@ -576,14 +579,21 @@ export interface NarrativeGrowthFocusDefinition {
 }
 
 /** World-owned thresholds used by public attribute pills and model context. */
-export interface NarrativeStatTierConfig {
+export interface NarrativeStatTierBounds {
   lowMax: number;
   highMin: number;
-  overrides?: Partial<Record<StatKey, { lowMax: number; highMin: number }>>;
+  developingMax?: number;
+  steadyMax?: number;
+}
+
+export interface NarrativeStatTierConfig extends NarrativeStatTierBounds {
+  overrides?: Partial<Record<StatKey, NarrativeStatTierBounds>>;
+  /** Survival keeps its own established thresholds when presentation expands to five tiers. */
+  survival?: { lowMax: number; highMin: number; overrides?: Partial<Record<StatKey, { lowMax: number; highMin: number }>> };
 }
 
 /** Player-facing wording for a world's internal low / steady / high stat tiers. */
-export type NarrativeStatTierPresentation = Record<StatKey, Record<NarrativeStatTier, string>>;
+export type NarrativeStatTierPresentation = Record<StatKey, Record<NarrativeSurvivalStatTier, string> & Partial<Record<"developing" | "advanced", string>>>;
 
 export interface NarrativeRouteProgression {
   directionId: string;
@@ -642,16 +652,18 @@ export interface NarrativeSurvivalRule {
   graceYears: number;
   stages: NarrativeSurvivalStage[];
   recovery: {
-    successRateByTier: Record<NarrativeStatTier, number>;
+    successRateByTier: Record<NarrativeSurvivalStatTier, number>;
     restoreBuffer: number;
   };
-  familyPhysiqueSupport: Record<NarrativeStatTier, NarrativeFamilyPhysiqueSupport>;
+  familyPhysiqueSupport: Record<NarrativeSurvivalStatTier, NarrativeFamilyPhysiqueSupport>;
 }
 
 export interface NarrativeWorldProgression {
   backgroundPacing: NarrativeBackgroundPacing;
   /** World-wide capability gates; they pace story beats without selecting a plot route. */
   gates?: Partial<Record<NarrativeProgressGateStage, NarrativeStatGate>>;
+  /** Act order follows the selected IF story; weights still come from the world gates. */
+  actGateThresholds?: Array<Record<NarrativeProgressGateStage, number>>;
   routes?: NarrativeRouteProgression[];
   completion: NarrativeCompletionRule;
   growthFocuses?: NarrativeGrowthFocusDefinition[];
@@ -761,6 +773,8 @@ export interface NarrativeRouteProgress {
 export interface NarrativeStageTask {
   goal: string;
   completionMeaning: string;
+  /** Revisable life scheduling, never admission or automatic beat completion. */
+  timeframe?: { fromAge: number; toAge: number };
   fork?: NarrativeDecisionBrief & { openingSituation: string };
 }
 
@@ -801,8 +815,9 @@ export interface NarrativeDynamicCharacter {
   id: string;
   name: string;
   factionId?: string;
-  role: string;
-  description: string;
+  role?: string;
+  description?: string;
+  pendingDetails?: boolean;
   relatedFactIds: string[];
   relatedRouteIds: string[];
   relationship?: NarrativeCharacterRelationship;
@@ -827,7 +842,8 @@ export interface NarrativeAssetLinks {
 export interface NarrativeLocation extends NarrativeAssetLinks {
   id: string;
   name: string;
-  description: string;
+  description?: string;
+  pendingDetails?: boolean;
   spatialDescription?: string;
   introduced: NarrativeAssetMoment;
   lastSeen: NarrativeAssetMoment;
@@ -836,10 +852,11 @@ export interface NarrativeLocation extends NarrativeAssetLinks {
 export interface NarrativeAbility extends NarrativeAssetLinks {
   id: string;
   name: string;
-  description: string;
+  description?: string;
+  pendingDetails?: boolean;
   usage?: string;
-  source: string;
-  mastery: string;
+  source?: string;
+  mastery?: string;
   status: "available" | "unavailable";
   introduced: NarrativeAssetMoment;
   updated: NarrativeAssetMoment;
@@ -865,7 +882,7 @@ export interface NarrativeAssetUpdates {
 
 /** Explicit semantic identity decisions proposed by continuity, scoped to one run. */
 export interface NarrativeIdentityMerge {
-  kind: "character" | "ability";
+  kind: "character" | "location" | "ability";
   sourceRef: string;
   targetRef: string;
 }
@@ -959,6 +976,8 @@ export interface NarrativeMemoryDigest {
   revision: number;
   throughEpisodeId: string;
   coveredEpisodeIds: string[];
+  /** The origin profile was supplied when this run summary was authored. */
+  originCovered?: boolean;
   summary: string;
   activeFactIds: string[];
   historicalFactIds: string[];
@@ -1118,8 +1137,9 @@ export interface NarrativeRunState {
     characters: NarrativeDynamicCharacter[];
     rounds: Array<{
       sourceEventId: string;
-      source: "background" | "scene" | "decision";
+      source: "origin" | "background" | "scene" | "decision";
       age: number;
+      ageFrom?: number;
       subject: string;
       narrative: string;
     }>;
@@ -1650,8 +1670,8 @@ export interface PublicNarrativeCharacter {
   id: string;
   name: string;
   factionId?: string;
-  role: string;
-  description: string;
+  role?: string;
+  description?: string;
   introducedAge: number;
 }
 
@@ -1666,7 +1686,7 @@ export interface PublicSurvivalCrisis {
     label: string;
     description: string;
     stat: StatKey;
-    tier: NarrativeStatTier;
+    tier: NarrativeSurvivalStatTier;
     guaranteed: boolean;
   }>;
 }

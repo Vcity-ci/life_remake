@@ -4,6 +4,10 @@ import { normalizeNarrativeStageTask } from "./stage-task.js";
 export type NarrativeActBeat = Exclude<NarrativeBeat, "ending">;
 export const NARRATIVE_ACT_OUTLINE_BEATS: NarrativeActBeat[] = ["setup", "escalation", "pressure", "climax", "payoff"];
 
+export function narrativeOutlinePurpose(outline: NarrativeActOutline | undefined, needsRevision?: boolean): "initial" | "revise" | "execute" {
+  return !outline ? "initial" : needsRevision ? "revise" : "execute";
+}
+
 type OutlineNode = NarrativeActOutline["beats"][NarrativeActBeat];
 
 function record(value: unknown): Record<string, unknown> | undefined {
@@ -69,7 +73,7 @@ export function applyNarrativeActOutlineUpdate(
 
 export function narrativeStageTaskForOutline(outline: NarrativeActOutline | undefined, beat: NarrativeActBeat): NarrativeStageTask | undefined {
   const node = outline?.beats[beat];
-  return node ? structuredClone({ goal: node.goal, completionMeaning: node.completionMeaning, ...(node.fork ? { fork: node.fork } : {}) }) : undefined;
+  return node ? normalizeNarrativeStageTask(node) : undefined;
 }
 
 /** Called in the existing successful-turn transaction, before observed beat advancement. */
@@ -92,10 +96,11 @@ export function formatNarrativeActOutline(outline: NarrativeActOutline | undefin
   const current = NARRATIVE_ACT_OUTLINE_BEATS.indexOf(currentBeat);
   return [
     `本幕具体故事大纲（第${outline.revision}版；均为规划意图，不是已发生事实）：`,
-    ...NARRATIVE_ACT_OUTLINE_BEATS.map((beat, index) => {
+    ...NARRATIVE_ACT_OUTLINE_BEATS.slice(current).map((beat, index) => {
       const node = outline.beats[beat];
-      const status = index < current ? "已过阶段，仅供理解因果；实际经过以历史为准" : index === current ? "当前阶段" : "未发生阶段";
-      return `${beat}【${status}】剧情：${node.story}\n阶段目标：${node.goal}\n完成含义：${node.completionMeaning}${node.fork ? `\n潜在分歧窗口：${node.fork.openingSituation}；${node.fork.question}；取舍影响：${node.fork.stakes}` : "\n未预设分歧，不要求强行提问"}`;
+      const status = index === 0 ? "当前阶段" : "未发生阶段";
+      const timeframe = node.timeframe ? `\n计划年龄：${node.timeframe.fromAge}—${node.timeframe.toAge}岁（随实际成长与选择结果修订，不是准入期限）` : "";
+      return `${beat}【${status}】剧情：${node.story}${timeframe}\n阶段目标：${node.goal}\n完成含义：${node.completionMeaning}${node.fork ? `\n潜在分歧窗口：${node.fork.openingSituation}；${node.fork.question}；取舍影响：${node.fork.stakes}` : "\n未预设分歧，不要求强行提问"}`;
     })
   ].join("\n");
 }

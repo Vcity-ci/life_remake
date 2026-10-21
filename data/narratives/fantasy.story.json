@@ -23,38 +23,85 @@
     },
     "statTiers": {
       "lowMax": 8,
-      "highMin": 22,
+      "developingMax": 18,
+      "steadyMax": 32,
+      "highMin": 48,
       "overrides": {
-        "physique": { "lowMax": 4, "highMin": 22 }
+        "physique": {
+          "lowMax": 4,
+          "developingMax": 18,
+          "steadyMax": 32,
+          "highMin": 48
+        }
+      },
+      "survival": {
+        "lowMax": 8,
+        "highMin": 22,
+        "overrides": {
+          "physique": {
+            "lowMax": 4,
+            "highMin": 22
+          }
+        }
       }
     },
     "statTierPresentation": {
       "intelligence": {
         "low": "灵识未开",
+        "developing": "初具见识",
         "steady": "明悟法理",
+        "advanced": "通达世务",
         "high": "神识通明"
       },
       "charisma": {
         "low": "孤行少援",
+        "developing": "相处有方",
         "steady": "得人相助",
+        "advanced": "善聚人心",
         "high": "众望所归"
       },
       "family": {
         "low": "根基薄弱",
+        "developing": "薄有依靠",
         "steady": "道途可凭",
+        "advanced": "根基深厚",
         "high": "福缘深厚"
       },
       "fortune": {
         "low": "气数未显",
+        "developing": "偶得机缘",
         "steady": "机缘在握",
+        "advanced": "顺势多助",
         "high": "天命所眷"
       },
       "physique": {
         "low": "气血未固",
+        "developing": "身健耐劳",
         "steady": "筋骨强健",
+        "advanced": "精力充沛",
         "high": "体魄如炉"
       }
     },
+    "actGateThresholds": [
+      {
+        "opening": 12,
+        "escalation": 14,
+        "pressure": 16,
+        "climax": 18
+      },
+      {
+        "opening": 23,
+        "escalation": 24,
+        "pressure": 25,
+        "climax": 26
+      },
+      {
+        "opening": 32,
+        "escalation": 33,
+        "pressure": 34,
+        "climax": 35
+      }
+    ],
     "survival": {
       "startAge": 4,
       "graceYears": 3,

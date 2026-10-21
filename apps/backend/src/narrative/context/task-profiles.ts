@@ -2,7 +2,7 @@ import type { NarrativeTask } from "../../narrative-prompts.js";
 import type { NarrativeContextSection, NarrativeTaskContextProfile } from "./types.js";
 
 const ALL_SECTIONS: NarrativeContextSection[] = [
-  "persona", "talents", "seedHints", "origin", "world", "palette", "mainline", "route", "handoff", "lore",
+  "persona", "protagonist", "talents", "seedHints", "origin", "world", "palette", "mainline", "route", "handoff", "lore",
   "styleExamples", "authorNote",
   "characters", "factDirectory", "facts", "resolvedFacts", "locations", "abilities", "assets",
   "memories", "digests", "ending", "history", "storyHistory", "raw", "task"
@@ -42,10 +42,12 @@ const TASK_HISTORY: Record<NarrativeTask, NarrativeTaskContextProfile["history"]
   ending: { includeHeadMemory: false, includeArchive: false, recentRoundLimit: 0, requiredRecentRounds: 0 }
 };
 
-export function narrativeTaskContextProfile(task: NarrativeTask): NarrativeTaskContextProfile {
+export function narrativeTaskContextProfile(task: NarrativeTask, planningPurpose?: "initial" | "revise" | "execute"): NarrativeTaskContextProfile {
   return {
     task,
-    allowedSections: [...(TASK_SECTIONS[task] ?? ALL_SECTIONS)],
+    allowedSections: task === "planning" && planningPurpose
+      ? planningPurpose === "initial" ? ["persona", "talents", "origin", "protagonist", "world", "mainline", "route", "lore", "storyHistory", "task"] : ["task"]
+      : [...(TASK_SECTIONS[task] ?? ALL_SECTIONS), ...(["planning", "background", "rendering", "dynamic", "decision"].includes(task) ? ["protagonist" as const] : [])],
     history: { ...TASK_HISTORY[task] }
   };
 }

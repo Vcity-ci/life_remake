@@ -68,7 +68,7 @@ const defaultStats: Stats = {
   physique: 0
 };
 const statKeys: StatKey[] = ["intelligence", "charisma", "family", "fortune", "physique"];
-const statTierLabels = { low: "积累中", steady: "可用", high: "出众" } as const;
+const statTierLabels = { low: "积累中", developing: "已有基础", steady: "运用自如", advanced: "颇有造诣", high: "出众" } as const;
 
 function rarityClass(r: PublicBackgroundCard["rarity"]): string {
   return `rarity-${r}`;

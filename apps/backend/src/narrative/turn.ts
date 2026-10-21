@@ -1,4 +1,5 @@
-import type { NarrativeActCanon, NarrativeActOutline, NarrativeBeat, NarrativeDecisionBrief, NarrativeEpisodeRecord, NarrativeStageTask, NarrativeStatTier, StatKey } from "@reroll/shared";
+import type { NarrativeActCanon, NarrativeActOutline, NarrativeBeat, NarrativeDecisionBrief, NarrativeEpisodeRecord, NarrativeRunState, NarrativeStageTask, NarrativeStatTier, StatKey } from "@reroll/shared";
+import { formatNarrativeExperience, narrativeExperienceText } from "../narrative-memory.js";
 
 export type NarrativeTurnKind = "background" | "scene";
 export type NarrativeTurnCapability = "background" | "scene" | "choice";
@@ -113,9 +114,11 @@ export function narrativeTurnPlanFocusIds(plan: NarrativeTurnPlan): string[] {
   ]));
 }
 
-export function recentCommittedNarrativeChanges(episodes: NarrativeEpisodeRecord[], limit = 3): string[] {
-  return episodes.filter((episode) => episode.storyDelta?.trim()).slice(-limit)
-    .map((episode) => `${episode.age}岁：${episode.storyDelta!.trim()}`);
+export function recentCommittedNarrativeChanges(state: NarrativeEpisodeRecord[] | Pick<NarrativeRunState, "episodes" | "memoryEntries">, limit = 3): string[] {
+  const source = Array.isArray(state) ? { episodes: state, memoryEntries: [] } : state;
+  return source.episodes.map((episode) => ({ episode, narrative: narrativeExperienceText(source, episode) }))
+    .filter((entry) => entry.narrative).slice(-limit)
+    .map(({ episode, narrative }) => formatNarrativeExperience(episode, narrative));
 }
 
 export function narrativePreviousActResult(canon: NarrativeActCanon | undefined): string | undefined {

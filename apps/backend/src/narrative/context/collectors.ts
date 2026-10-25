@@ -1,6 +1,8 @@
 import { narrativeContentId, narrativeContextFragment } from "./fragments.js";
 import { legacyNarrativePlanFragment } from "./legacy-adapter.js";
 import { projectNarrativeStoryHistory } from "../story-history.js";
+import { formatNarrativeProtagonistParts } from "./formatter.js";
+import { formatNarrativeDialogue, formatNarrativeExperience } from "../../narrative-memory.js";
 import type {
   NarrativeContextFragment,
   NarrativeContextLayer,
@@ -48,15 +50,8 @@ const stableProvider: NarrativeContextProvider = {
       ...(plan.seedHints ?? []).flatMap((hint) => fragment({ id: narrativeContentId("seed-hint", hint), layer: "stable", section: "seedHints", sourceType: "seed-hint", priority: 35, content: hint })),
       ...(plan.origin && !plan.protagonist && !plan.storyHistory?.summary?.originCovered ? fragment({ id: "stable:origin", layer: "stable", section: "origin", sourceType: "origin", priority: 85, content: plan.origin }) : []),
       ...(plan.worldCoreContext ? fragment({ id: "stable:world-core", layer: "stable", section: "world", sourceType: "world-core", priority: 98, content: plan.worldCoreContext, required: true }) : []),
-      ...(plan.storyBible ? fragment({ id: "stable:world-snapshot", layer: "stable", section: "world", sourceType: "world-snapshot", priority: 96, content: plan.storyBible, required: true }) : []),
-      ...(plan.narrativePaletteContext ? fragment({
-        id: `active:narrative-palette:${plan.task === "background" ? "background" : "scene"}`,
-        layer: "active",
-        section: "palette",
-        sourceType: "narrative-palette",
-        priority: 76,
-        content: plan.task === "background" ? plan.narrativePaletteContext.background : plan.narrativePaletteContext.scene
-      }) : [])
+      ...(plan.storyBible ? fragment({ id: "stable:world-snapshot", layer: "stable", section: "worldSituation", sourceType: "world-snapshot", priority: 96, content: plan.storyBible, required: true }) : []),
+      ...(plan.actBackground ? fragment({ id: "stable:act-world", layer: "stable", section: "actWorld", sourceType: "act-world", priority: 100, content: plan.actBackground, required: true }) : [])
     ];
   }
 };
@@ -68,16 +63,6 @@ const storyProvider: NarrativeContextProvider = {
     return [
       ...(plan.mainlineSkeleton ? fragment({ id: "runtime:mainline", layer: "runtime", section: "mainline", sourceType: "mainline", priority: 100, content: plan.mainlineSkeleton, required: true }) : []),
       ...(plan.routeGuidance ? fragment({ id: "active:route", layer: "active", section: "route", sourceType: "route", priority: 100, content: plan.routeGuidance, required: true }) : []),
-      ...(plan.actHandoff ?? []).flatMap((handoff) => fragment({ id: narrativeContentId("act-handoff", handoff), layer: "active", section: "handoff", sourceType: "act-handoff", priority: 92, content: handoff })),
-      ...(plan.actCanon ?? []).flatMap((canon) => fragment({
-        id: `active:act-canon:${canon.actId}`,
-        layer: "active",
-        section: "handoff",
-        sourceType: "act-canon",
-        sourceIds: [`event:${canon.sourceEventId}`, ...canon.factIds.map((id) => `fact:${id}`)],
-        priority: 94,
-        content: canon.text
-      })),
       ...(plan.authorNote ? fragment({
         id: "active:author-note",
         layer: "active",
@@ -98,22 +83,29 @@ const loreProvider: NarrativeContextProvider = {
     const sources = plan.activeLoreSources?.length
       ? plan.activeLoreSources
       : plan.activeLore.map((text) => ({ id: narrativeContentId("lore", text), text }));
-    return sources.flatMap((lore) => fragment({ id: `recall:lore:${lore.id}`, layer: "recall", section: "lore", sourceType: "lore", sourceIds: [`lore:${lore.id}`], priority: 72, content: lore.text }));
+    return [
+      ...sources.flatMap((lore) => fragment({ id: `recall:lore:${lore.id}`, layer: "recall", section: "lore", sourceType: "lore", sourceIds: [`lore:${lore.id}`], priority: 72, content: lore.text })),
+      ...(plan.activeSocialForces ?? []).flatMap((force) => fragment({
+        id: `recall:force:${force.id}`, layer: "recall", section: "lore", sourceType: "social-force",
+        sourceIds: [`force:${force.id}`], priority: 80,
+        content: [`相关势力：${force.label}。${force.summary}`, force.methods.length ? `行动方式：${force.methods.join("、")}` : ""].filter(Boolean).join("；")
+      }))
+    ];
   }
 };
 
 const worldCardProvider: NarrativeContextProvider = {
   id: "world-cards",
   collect: ({ plan }) => !plan?.task ? [] : (plan.activeWorldCardSources ?? []).flatMap((card) => {
-    const cacheStableWorldCard = card.placement === "world" && card.activationReason === "constant" &&
-      card.stickyTurns === 0 && card.cooldownTurns === 0;
-    const target = cacheStableWorldCard
-      ? { layer: "stable" as const, section: "lore" as const, priority: 86 }
-      : card.placement === "example"
+    const role = card.contextRole ?? (card.placement === "example" ? "style" :
+      card.placement === "world" && card.activationReason === "constant" && card.stickyTurns === 0 && card.cooldownTurns === 0 ? "foundation" : "knowledge");
+    const target = role === "foundation"
+      ? { layer: "stable" as const, section: "world" as const, priority: 86 }
+      : role === "situation"
+        ? { layer: "stable" as const, section: "worldSituation" as const, priority: 84 }
+      : role === "style"
         ? { layer: "recall" as const, section: "styleExamples" as const, priority: 78 }
-        : card.placement === "author_note"
-          ? { layer: "active" as const, section: "authorNote" as const, priority: 92 }
-          : { layer: "recall" as const, section: "lore" as const, priority: 80 };
+        : { layer: "recall" as const, section: "lore" as const, priority: 80 };
     return fragment({
       id: `recall:world-card:${card.id}|${card.stickyTurns}|${card.cooldownTurns}|${card.activationKind}`,
       layer: target.layer,
@@ -121,7 +113,7 @@ const worldCardProvider: NarrativeContextProvider = {
       sourceType: "world-card",
       sourceIds: [`world-card:${card.id}`],
       priority: target.priority,
-      content: card.text,
+      content: card.title ? `${card.title}：${card.text}` : card.text,
       activationReason: card.activationReason,
       injectionPosition: card.placement,
       worldCardActivationKind: card.activationKind,
@@ -141,7 +133,7 @@ const characterProvider: NarrativeContextProvider = {
     const values: NarrativeContextFragment[] = [];
     for (const character of plan.recall?.characters ?? []) {
       const rendered = plan.activeCharacters.find((entry) => entry.startsWith(`${character.id}=`))
-        ?? `${character.id}=${character.name}（${character.factionId ?? "无阵营"}${character.role ? `，${character.role}` : ""}）${character.description ? "：" + character.description : ""}${character.relationship ? "；关系：" + character.relationship : ""}`;
+        ?? `${character.id}=${character.name}${character.role ? `（${character.role}）` : ""}${character.description ? "：" + character.description : ""}${character.condition ? "；处境：" + character.condition : ""}${character.relationship ? "；关系：" + character.relationship : ""}`;
       values.push(...fragment({ id: `active:character:${character.id}`, layer: "active", section: "characters", sourceType: "character", sourceIds: [`character:${character.id}`], priority: 88, content: rendered,
         required: ["background", "rendering", "dynamic", "decision"].includes(plan.task) }));
     }
@@ -171,9 +163,13 @@ const storyHistoryProvider: NarrativeContextProvider = {
       ...projected.changes.flatMap((episode) => fragment({
         id: `runtime:story-change:${episode.id}`, layer: "runtime", section: "storyHistory", sourceType: "story-change",
         sourceIds: [episode.id], priority: 92,
-        content: `${episode.id === plan.storyHistory!.revisionOutcomeId ? "【本次修订依据：玩家选择已产生的实际结果】" : ""}${episode.id === plan.storyHistory!.latestSituationId ? "【最新已提交处境】" : ""}${episode.ageFrom !== undefined && episode.ageFrom !== episode.age ? `${episode.ageFrom}—${episode.age}` : episode.age}岁：${episode.narrative}`,
+        content: formatNarrativeExperience(episode, formatNarrativeDialogue({ ...episode, narrative: episode.narrative ?? "" })),
         required: true
-      }))
+      })),
+      ...(projected.changes.some((episode) => episode.id === plan.storyHistory!.latestSituationId) ? fragment({
+        id: "runtime:latest-situation", layer: "runtime", section: "storyHistory", sourceType: "latest-situation",
+        priority: 92, content: "【最新已提交处境】见以上最后一段。", required: true
+      }) : [])
     ];
   }
 };
@@ -183,14 +179,15 @@ const protagonistProvider: NarrativeContextProvider = {
   collect: ({ plan }) => {
     if (!plan?.protagonist) return [];
     const summary = plan.storyHistory?.summary;
-    return fragment({
-      id: "runtime:protagonist", layer: "runtime", section: "protagonist", sourceType: "protagonist",
-      sourceIds: summary?.coveredEpisodeIds ?? [], priority: 100, required: true,
-      content: [plan.protagonist,
-        plan.origin && !summary?.originCovered ? `人物来处：${plan.origin}` : "",
-        summary?.text ? `迄今为止的重要经历与持续影响：${summary.text}` : !plan.storyHistory && plan.effectiveBackground ? `已有经历：${plan.effectiveBackground}` : ""
-      ].filter(Boolean).join("\n")
-    });
+    const parts = formatNarrativeProtagonistParts(plan);
+    return [
+      ...fragment({ id: "stable:protagonist", layer: "stable", section: "protagonist", sourceType: "protagonist-identity",
+        priority: 100, required: true, content: parts.identity }),
+      ...fragment({ id: "stable:protagonist-experience", layer: "stable", section: "protagonist", sourceType: "story-summary",
+        sourceIds: summary?.coveredEpisodeIds ?? [], priority: 100, required: true, content: parts.experience }),
+      ...fragment({ id: "active:protagonist", layer: "active", section: "protagonist", sourceType: "protagonist",
+        priority: 100, required: true, content: parts.currentState })
+    ];
   }
 };
 
@@ -203,7 +200,7 @@ const factProvider: NarrativeContextProvider = {
       ...(plan.factDirectory ?? []).filter((fact) => !detailed.has(fact.id)).flatMap((fact) => fragment({ id: `active:fact-directory:${fact.id}`, layer: "active", section: "factDirectory", sourceType: "fact-directory", sourceIds: [`fact:${fact.id}`], priority: 55, content: `${fact.id}=${fact.label}` })),
       ...(plan.recall?.facts ?? []).flatMap((fact) => fragment({ id: `active:fact:${fact.id}`, layer: "active", section: "facts", sourceType: "fact", sourceIds: [`fact:${fact.id}`], priority: 95,
         content: plan.task === "planning" ? JSON.stringify({ id: fact.id, kind: "fact", label: fact.label }) : `${fact.id}：${fact.label}` })),
-      ...(plan.recall?.resolvedFacts ?? []).flatMap((fact) => fragment({ id: `recall:resolved-fact:${fact.id}`, layer: "recall", section: "resolvedFacts", sourceType: "resolved-fact", sourceIds: [`fact:${fact.id}`], priority: plan.task === "ending" ? 90 : 45, content: fact.label }))
+      ...(plan.recall?.resolvedFacts ?? []).flatMap((fact) => fragment({ id: `recall:resolved-fact:${fact.id}`, layer: "recall", section: "resolvedFacts", sourceType: "resolved-fact", sourceIds: [`fact:${fact.id}`], priority: plan.task === "ending" ? 90 : 45, content: `${fact.id}：${fact.label}` }))
     ];
   }
 };

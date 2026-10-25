@@ -29,6 +29,8 @@ interface Props {
     setWorldId: (id: string) => void;
     difficultyId: string;
     setDifficultyId: (id: string) => void;
+    debugMode: boolean;
+    setDebugMode: (enabled: boolean) => void;
 }
 export declare function AdminPanel(props: Props): React.JSX.Element;
 export {};

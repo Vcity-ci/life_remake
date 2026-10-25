@@ -207,7 +207,6 @@ const gameplayTuningSchema = z.object({
   decision: z.object({
     profiles: z.object({
       safe: z.object({
-        successRate: z.number().min(0).max(1),
         gain: z.number().int().min(1).max(20),
         loss: z.number().int().min(-20).max(-1),
         deathBonus: z.number().min(0).max(1),
@@ -215,7 +214,6 @@ const gameplayTuningSchema = z.object({
         reward: z.number().min(0).max(1)
       }),
       balanced: z.object({
-        successRate: z.number().min(0).max(1),
         gain: z.number().int().min(1).max(20),
         loss: z.number().int().min(-20).max(-1),
         deathBonus: z.number().min(0).max(1),
@@ -223,7 +221,6 @@ const gameplayTuningSchema = z.object({
         reward: z.number().min(0).max(1)
       }),
       risky: z.object({
-        successRate: z.number().min(0).max(1),
         gain: z.number().int().min(1).max(20),
         loss: z.number().int().min(-20).max(-1),
         deathBonus: z.number().min(0).max(1),
@@ -231,9 +228,6 @@ const gameplayTuningSchema = z.object({
         reward: z.number().min(0).max(1)
       })
     }),
-    successRateVolatilityFactor: z.number().min(0).max(2),
-    successRateClampMin: z.number().min(0).max(1),
-    successRateClampMax: z.number().min(0).max(1),
     gainClampMin: z.number().int().min(1).max(30),
     gainClampMax: z.number().int().min(1).max(30),
     lossClampMin: z.number().int().min(-30).max(-1),
@@ -307,9 +301,6 @@ const gameplayTuningSchema = z.object({
   }
   if (value.growth.decayChanceClampMax < value.growth.decayChanceClampMin) {
     ctx.addIssue({ code: "custom", message: "growth.decayChanceClampMax 必须 >= decayChanceClampMin" });
-  }
-  if (value.decision.successRateClampMax < value.decision.successRateClampMin) {
-    ctx.addIssue({ code: "custom", message: "decision.successRateClampMax 必须 >= successRateClampMin" });
   }
   if (value.decision.gainClampMax < value.decision.gainClampMin) {
     ctx.addIssue({ code: "custom", message: "decision.gainClampMax 必须 >= gainClampMin" });

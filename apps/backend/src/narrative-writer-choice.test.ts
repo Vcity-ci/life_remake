@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { narrativeTaskContract } from "./narrative/task-contracts.js";
 import OpenAI from "openai";
 import { createDefaultGameplayTuning, type DifficultyConfig, type WorldConfig } from "@reroll/shared";
 import {
@@ -23,9 +24,8 @@ function sceneInput(presentation: "scene" | "choice" | "summary" = "scene"): Dyn
 function plan(presentation: "scene" | "choice" = "scene"): NarrativeTurnPlan {
   return {
     callId: "writer-test", turnKind: "scene", presentation, patternIds: [], forceIds: [], conflictRefs: [],
-    abilityRefs: ["ability:horsemanship"], locationDirective: { mode: "stay" }, sceneGoal: "将同袍送到渡口", clockRequest: "hold",
+    abilityRefs: ["ability:horsemanship"], locationDirective: { mode: "stay" },  clockRequest: "hold",
     decisionBrief: { question: "旧规划中的问题", stakes: "旧规划中的影响" },
-    stageTask: { goal: "护送同袍归营", completionMeaning: "同袍的去向已经落定" },
     materials: [{ id: "ability:horsemanship", kind: "ability", label: "骑术" }]
   };
 }
@@ -54,12 +54,16 @@ test("场景工具同时开放自然结果与实际抉择，普通年份保持�
     assert.ok(dynamicNarrativeSceneTools(sceneInput(presentation)).names.includes("resolve_scene_outcome"), "实际普通正文可以结算，不受原规划形式阻断");
   }
   assert.deepEqual(dynamicNarrativeRenderTools(sceneInput("summary")).names, ["render_background_prose"]);
-  const prompt = dynamicNarrativeRenderPrompt({ ...sceneInput(), plan: plan() });
-  assert.match(prompt, /本幕五节拍具体故事/);
-  assert.match(prompt, /尚未发生的节点是发展计划/);
-  assert.match(prompt, /大纲未预列的实质分歧也可提出/);
-  assert.match(prompt, /行动发生之前/);
-  const backgroundPrompt = dynamicNarrativeRenderPrompt(sceneInput("summary"));
+  const prompt = dynamicNarrativeRenderPrompt({ ...sceneInput(), plan: plan() }, 20);
+  assert.match(prompt, /本次叙述年龄：20岁/);
+  assert.match(prompt, /本段与上段同年/);
+  const nextYear = dynamicNarrativeRenderPrompt({ ...sceneInput(), sceneAge: 21 }, 20);
+  assert.match(nextYear, /本段已进入下一岁/);
+  assert.match(nextYear, /交代上段处境经过这段时间如何延续或变化/);
+  const backgroundPrompt = dynamicNarrativeRenderPrompt(sceneInput("summary"), 19);
+  assert.match(backgroundPrompt, /20-21岁/);
+  assert.match(backgroundPrompt, /日常生活与积累，允许平静/);
+  assert.match(backgroundPrompt, /已有处境怎样随时间延续或变化/);
   assert.doesNotMatch(backgroundPrompt, /五节拍具体故事|当前执行节拍/);
 });
 

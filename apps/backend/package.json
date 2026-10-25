@@ -7,7 +7,7 @@
     "dev": "tsx watch src/index.ts",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/apps/backend/src/index.js",
-    "test": "tsx --test src/engine.test.ts src/narrative-planning.test.ts src/narrative-writer-choice.test.ts src/narrative/act-outline.test.ts src/narrative/story-history.test.ts"
+    "test": "tsx --test src/engine.test.ts src/choice-lifecycle.test.ts src/narrative-asset-maintenance.test.ts src/narrative-planning.test.ts src/narrative-writer-choice.test.ts src/narrative/act-outline.test.ts src/narrative/story-history.test.ts"
   },
   "dependencies": {
     "@reroll/shared": "0.1.0",

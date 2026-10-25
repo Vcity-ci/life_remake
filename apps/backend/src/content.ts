@@ -511,6 +511,7 @@ export function validateNarrativeWorldFactContract(
     if (!card.id?.trim() || cardIds.has(card.id) || card.id.includes("|") || !card.content?.trim() ||
         !Number.isFinite(card.priority) || card.priority < 0 || card.priority > 100 || !cardKinds.has(card.kind) ||
         (card.placement !== undefined && !cardPlacements.has(card.placement)) ||
+        (card.contextRole !== undefined && !["foundation", "situation", "knowledge", "style"].includes(card.contextRole)) ||
         (card.order !== undefined && !Number.isFinite(card.order)) ||
         (card.stickyTurns !== undefined && (!Number.isInteger(card.stickyTurns) || card.stickyTurns < 0 || card.stickyTurns > 8)) ||
         (card.cooldownTurns !== undefined && (!Number.isInteger(card.cooldownTurns) || card.cooldownTurns < 0 || card.cooldownTurns > 16)) ||

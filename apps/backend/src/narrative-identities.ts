@@ -1,5 +1,6 @@
 import type { NarrativeIdentityMerge, NarrativeRunState } from "@reroll/shared";
 import type { InternalRunState } from "./engine.js";
+import { formatNarrativeRelationship } from "./narrative-characters.js";
 
 export function canonicalNarrativeIdentity(state: NarrativeRunState, ref: string): string {
   return state.identityAliases?.[ref] ?? ref;
@@ -62,14 +63,12 @@ export function applyNarrativeIdentityMerges(run: InternalRunState, changes: Nar
         target.introduced = { ...source.introduced };
         target.source = source.source;
       }
-      for (const key of ["characterIds", "factionIds", "routeIds", "factIds"] as const) target[key] = union(target[key], source[key]);
       state.assets!.abilities = state.assets!.abilities.filter((entry) => entry.id !== sourceRef);
     } else if (merge.kind === "location") {
       const source = state.assets!.locations.find((entry) => entry.id === sourceRef)!;
       const target = state.assets!.locations.find((entry) => entry.id === targetRef)!;
       if (source.introduced.age < target.introduced.age) target.introduced = { ...source.introduced };
       if (source.lastSeen.age > target.lastSeen.age) target.lastSeen = { ...source.lastSeen };
-      for (const key of ["characterIds", "factionIds", "routeIds", "factIds"] as const) target[key] = union(target[key], source[key]);
       state.assets!.locations = state.assets!.locations.filter((entry) => entry.id !== sourceRef);
     } else {
       const source = state.dynamicCharacters.find((entry) => entry.id === sourceRef)!;
@@ -86,8 +85,19 @@ export function applyNarrativeIdentityMerges(run: InternalRunState, changes: Nar
     state.identityAliases[sourceRef] = targetRef;
   }
   if (!changed) return;
-  for (const key of ["dynamicCharacters", "assets", "assetBuffer", "memoryEntries", "episodes", "memoryDigests", "horizonPlan", "sessionPremise", "actCanon", "lastBeatObservation", "activeCharacterIds", "activeScene", "scene", "endingBrief", "agentAttempts"] as const) {
+  for (const key of ["dynamicCharacters", "assets", "assetBuffer", "memoryEntries", "episodes", "memoryDigests", "horizonPlan", "actCanon", "lastBeatObservation", "activeCharacterIds", "activeScene", "scene", "endingBrief", "agentAttempts"] as const) {
     Object.assign(state, { [key]: canonicalizeNarrativeReferences(state, state[key]) });
+  }
+  // Buffered objects are references to the current records, not saved revisions
+  // that may recreate a deleted source identity after a merge or restore.
+  if (state.assetBuffer) {
+    const current = <T extends { id: string }>(buffered: T[], records: T[]): T[] => {
+      const ids = new Set(buffered.map((entry) => entry.id));
+      return records.filter((entry) => ids.has(entry.id)).map((entry) => structuredClone(entry));
+    };
+    state.assetBuffer.characters = current(state.assetBuffer.characters, state.dynamicCharacters);
+    state.assetBuffer.locations = current(state.assetBuffer.locations, state.assets?.locations ?? []);
+    state.assetBuffer.abilities = current(state.assetBuffer.abilities, state.assets?.abilities ?? []);
   }
   const digests = new Map<string, NarrativeRunState["memoryDigests"][number]>();
   for (const digest of state.memoryDigests) {
@@ -105,21 +115,27 @@ export function applyNarrativeIdentityMerges(run: InternalRunState, changes: Nar
   state.memoryRevision += 1;
   run.story = canonicalizeNarrativeReferences(state, run.story);
   if (run.pendingDynamicScene) run.pendingDynamicScene = canonicalizeNarrativeReferences(state, run.pendingDynamicScene);
+  if (run.choiceExecution) run.choiceExecution = canonicalizeNarrativeReferences(state, run.choiceExecution);
+  if (run.nextMilestoneChoice) run.nextMilestoneChoice = canonicalizeNarrativeReferences(state, run.nextMilestoneChoice);
 }
 
 /** Identity lookup is independent of which records need detailed story recall. */
 export function narrativeCharacterDirectory(state: NarrativeRunState) {
   return state.dynamicCharacters.map((entry) => ({
-    id: entry.id, name: entry.name, factionId: entry.factionId, role: entry.role, relationship: entry.relationship?.summary,
-    description: `${entry.status === "gone" ? "已离场。" : entry.status === "resolved" ? "此前交往已告一段落。" : ""}${entry.description ?? ""}`
+    id: entry.id, name: entry.name, factionId: entry.factionId, role: entry.role, relationship: formatNarrativeRelationship(entry.relationship),
+    status: entry.status, condition: entry.condition
   }));
 }
 
-export function formatNarrativeIdentityDirectory(state: NarrativeRunState, detailedIds: string[] = [], compact = false): string {
-  const selected = new Set(detailedIds);
+export function formatNarrativeIdentityDirectory(state: NarrativeRunState, compact = false): string {
+  if (!compact) return [
+    "人物资产：" + JSON.stringify(state.dynamicCharacters.map(({ id, name, factionId, role, description, condition, status, relationship, pendingDetails }) => ({ id, name, factionId, role, description, condition, status, relationship, pendingDetails }))),
+    "地点资产：" + JSON.stringify((state.assets?.locations ?? []).map(({ id, name, description, spatialDescription, parentLocationId, features, actors, pendingDetails }) => ({ id, name, description, spatialDescription, parentLocationId, features, actors, pendingDetails }))),
+    "本领资产：" + JSON.stringify((state.assets?.abilities ?? []).map(({ id, name, description, usage, source, mastery, pendingDetails }) => ({ id, name, description, usage, source, mastery, pendingDetails })))
+  ].join("\n");
   return [
-    `人物身份目录：${state.dynamicCharacters.map((entry) => `${entry.id}=${entry.name}${entry.role ? `（${entry.role}）` : ""}${entry.factionId ? `，阵营=${entry.factionId}` : ""}${!compact && entry.pendingDetails ? "（待从正文整理身份与说明）" : ""}${!compact && entry.description ? `：${entry.description}` : ""}${!compact && selected.has(entry.id) && entry.relationship ? `；关系=${entry.relationship.summary}` : ""}`).join("；") || "无"}`,
-    `地点身份目录：${(state.assets?.locations ?? []).map((entry) => `${entry.id}=${entry.name}${!compact && entry.pendingDetails ? "（待整理说明与空间条件）" : ""}${!compact && entry.spatialDescription ? `：${entry.spatialDescription}` : ""}`).join("；") || "无"}`,
-    `本领身份目录：${(state.assets?.abilities ?? []).map((entry) => `${entry.id}=${entry.name}（${entry.status}）${!compact && entry.pendingDetails ? "（待整理说明、来由、掌握与用法）" : ""}${!compact && entry.usage ? `：${entry.usage}` : ""}`).join("；") || "无"}`
+    "人物身份目录：" + state.dynamicCharacters.map(({ id, name }) => id + "=" + name).join("；"),
+    "地点身份目录：" + (state.assets?.locations ?? []).map(({ id, name }) => id + "=" + name).join("；"),
+    "本领身份目录：" + (state.assets?.abilities ?? []).map(({ id, name }) => id + "=" + name).join("；")
   ].join("\n");
 }

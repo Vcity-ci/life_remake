@@ -1,5 +1,6 @@
-import type { NarrativeActCanon, NarrativeActOutline, NarrativeBeat, NarrativeDecisionBrief, NarrativeEpisodeRecord, NarrativeRunState, NarrativeStageTask, NarrativeStatTier, StatKey } from "@reroll/shared";
-import { formatNarrativeExperience, narrativeExperienceText } from "../narrative-memory.js";
+import type { NarrativeActOutline, NarrativeBeat, NarrativeDecisionBrief, NarrativeEpisodeRecord, NarrativeRunState, NarrativeStatTier, ChoiceCheck, StatKey, TurnRecord } from "@reroll/shared";
+import { formatNarrativeDialogue, formatNarrativeExperience } from "../narrative-memory.js";
+import { buildNarrativeStoryHistory } from "./story-history.js";
 
 export type NarrativeTurnKind = "background" | "scene";
 export type NarrativeTurnCapability = "background" | "scene" | "choice";
@@ -30,14 +31,10 @@ export interface NarrativeTurnEnvelope {
   source: NarrativeTurnSource;
   worldId: string;
   currentAge: number;
-  sceneAge: number;
   backgroundAgeRange: { fromAge: number; toAge: number };
   act: { id: string; label: string; prompt: string };
   beat: Exclude<NarrativeBeat, "ending">;
-  stageTask?: NarrativeStageTask;
   actOutline?: NarrativeActOutline;
-  outlineNeedsRevision?: boolean;
-  progressGap?: string;
   capabilities: NarrativeTurnCapability[];
   storyPatterns: Array<{ id: string; label: string; summary: string }>;
   socialForces: NarrativeSocialForceReference[];
@@ -46,9 +43,8 @@ export interface NarrativeTurnEnvelope {
   statTiers: Record<StatKey, NarrativeStatTier>;
   statTierLabels?: Record<StatKey, string>;
   recentChanges?: string[];
-  actSummary?: string;
-  actProgress?: Array<{ beat: Exclude<NarrativeBeat, "ending">; changes: string[] }>;
-  previousActResult?: string;
+  choiceCheck?: ChoiceCheck;
+  progressGap?: string;
   growthFocus?: { id: string; label: string; description: string };
   clock: { mode: "advance" | "hold"; sameAgeTurnCount: number; maxSameAgeTurns: number };
 }
@@ -76,6 +72,11 @@ export interface NarrativeTurnPlan {
   forceIds: string[];
   conflictRefs: string[];
   abilityRefs: string[];
+  beatChange?: string;
+  timeScope?: string;
+  note?: string;
+  /** Uses parsed from model reference entries; ID arrays above are derived for lookup only. */
+  recallUses?: Array<{ ref: string; label: string; purpose: string }>;
   assetNeeds?: Array<{ kind: "character" | "location" | "ability"; purpose: string; ref?: string }>;
   /** Planner-selected objects, with their current narrative uses. */
   materials?: Array<{ id: string; kind: "character" | "location" | "ability"; label: string; description?: string }>;
@@ -84,15 +85,14 @@ export interface NarrativeTurnPlan {
     locationRef?: string;
     purpose?: string;
   };
-  sceneGoal: string;
   presentation: "summary" | "scene" | "choice";
   decisionBrief?: NarrativeDecisionBrief;
-  stageTask?: NarrativeStageTask;
   actOutline?: NarrativeActOutline;
   clockRequest: "advance" | "hold";
 }
 
 export interface NarrativeTurnTime {
+  previousAge: number;
   sceneAge: number;
   backgroundAgeRange: NarrativeTurnEnvelope["backgroundAgeRange"];
 }
@@ -100,6 +100,7 @@ export interface NarrativeTurnTime {
 /** Resolve the current turn once, after planning and before any prose is written. */
 export function resolveNarrativeTurnTime(envelope: NarrativeTurnEnvelope, plan: NarrativeTurnPlan): NarrativeTurnTime {
   return {
+    previousAge: envelope.currentAge,
     sceneAge: plan.clockRequest === "hold" ? envelope.currentAge : envelope.currentAge + 1,
     backgroundAgeRange: { ...envelope.backgroundAgeRange }
   };
@@ -114,15 +115,15 @@ export function narrativeTurnPlanFocusIds(plan: NarrativeTurnPlan): string[] {
   ]));
 }
 
-export function recentCommittedNarrativeChanges(state: NarrativeEpisodeRecord[] | Pick<NarrativeRunState, "episodes" | "memoryEntries">, limit = 3): string[] {
-  const source = Array.isArray(state) ? { episodes: state, memoryEntries: [] } : state;
-  return source.episodes.map((episode) => ({ episode, narrative: narrativeExperienceText(source, episode) }))
-    .filter((entry) => entry.narrative).slice(-limit)
-    .map(({ episode, narrative }) => formatNarrativeExperience(episode, narrative));
-}
-
-export function narrativePreviousActResult(canon: NarrativeActCanon | undefined): string | undefined {
-  return canon ? `已结束的矛盾：${canon.resolvedTension}；持续得失：${canon.lastingConsequence}；由此形成的处境：${canon.continuation}` : undefined;
+export function recentCommittedNarrativeChanges(
+  state: NarrativeEpisodeRecord[] | (Pick<NarrativeRunState, "episodes" | "memoryEntries"> & Partial<Pick<NarrativeRunState, "memoryDigests">>),
+  limit = 3,
+  turnRecords: readonly TurnRecord[] = []
+): string[] {
+  const source = Array.isArray(state) ? { episodes: state, memoryEntries: [], memoryDigests: [] } : state;
+  return buildNarrativeStoryHistory({ ...source, memoryDigests: source.memoryDigests ?? [] }, turnRecords)
+    .episodes.slice(-limit)
+    .map((episode) => formatNarrativeExperience(episode, formatNarrativeDialogue({ ...episode, narrative: episode.narrative ?? "" })));
 }
 
 export function narrativeTurnCapabilities(

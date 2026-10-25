@@ -417,6 +417,16 @@ button.selected,
 .admin-modal { width: min(1120px, 100%); }
 .ending-modal { width: min(640px, 100%); }
 .admin-tabs { margin-bottom: 12px; }
+.debug-mode-setting { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 0; }
+.debug-mode-setting strong { color: var(--ink); }
+.debug-mode-setting p { margin: 6px 0 0; color: var(--ink-soft); font-size: 13px; line-height: 1.5; }
+.debug-mode-switch { position: relative; flex: 0 0 72px; width: 72px; height: 32px; padding: 0; border: 1px solid var(--line); border-radius: 999px; background: #282c2d; color: var(--ink-soft); }
+.debug-mode-switch.is-on { border-color: var(--accent); background: #51452b; color: #f0e5cb; }
+.debug-mode-switch:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.debug-mode-switch-state { position: absolute; right: 9px; top: 50%; transform: translateY(-50%); font-size: 11px; font-weight: 700; line-height: 1; }
+.debug-mode-switch.is-on .debug-mode-switch-state { right: auto; left: 9px; }
+.debug-mode-switch-thumb { position: absolute; left: 3px; top: 3px; width: 24px; height: 24px; border-radius: 50%; background: #c6bdac; transition: transform 0.15s ease; }
+.debug-mode-switch.is-on .debug-mode-switch-thumb { transform: translateX(40px); background: #e5d3a2; }
 .between { justify-content: space-between; }
 
 .editor-card {
@@ -710,6 +720,9 @@ details[open] > .archive-section-summary::before { transform: rotate(90deg); }
 .archive-entry > summary { display: flex; min-height: 40px; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 1px; cursor: pointer; list-style: none; }
 .archive-entry > summary > span { min-width: 0; overflow: hidden; color: #d8d0bd; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
 .archive-entry > summary > small { flex: 0 0 auto; color: #969d91; font-size: 10px; }
+.ability-entry > summary { align-items: flex-start; flex-wrap: wrap; }
+.ability-entry > summary > span { flex: 1 1 100%; white-space: normal; overflow-wrap: anywhere; }
+.ability-entry > summary > small { flex: 0 1 auto; white-space: normal; }
 .archive-entry[open] > summary > span { color: #ecd69f; }
 .archive-entry-content { padding: 0 2px 11px; }
 .archive-entry-content p { margin: 0 0 7px; color: #b7b0a3; font-size: 12px; line-height: 1.65; overflow-wrap: anywhere; }
@@ -952,4 +965,5 @@ details[open] > .archive-section-summary::before { transform: rotate(90deg); }
 
 @media (prefers-reduced-motion: reduce) {
   .archive-section-summary::before { transition: none; }
+  .debug-mode-switch-thumb { transition: none; }
 }

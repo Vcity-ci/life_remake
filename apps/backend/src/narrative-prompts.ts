@@ -1,3 +1,5 @@
+export const NARRATIVE_ABILITY_DEFINITION = "本领档案记录主角已掌握、能影响行动的具体技艺或能力，也记录主角已取得、能用于行动的宝物；普通物件作为人物或地点条件。";
+
 export const defaultPromptPack = {
   "systemCore": "你是中文人生故事的旁白，以第二人称叙述人物的经历。",
   "immersionRules": "用具体而简洁的生活细节、人物感受与行动呈现故事，分段使用换行。",
@@ -35,7 +37,7 @@ export function narrativeProseProfile(
   };
   if (presentation === "decision") return {
     purpose: "decision", targetMinLength: 120, targetMaxLength: 200,
-    instruction: "承接玩家已经选定的行动，写清行动的直接结果、代价或收获，以及人物由此形成的新处境。在本次结果自然结束的位置收笔。"
+    instruction: "先明确玩家选定的目标是否实现，再写实际代价与改变后的处境。失败不能把原目标照常实现。结果自然结束即可，不强留下一次待答压力。"
   };
   if (presentation === "choice") return {
     purpose: "choice", targetMinLength: 110, targetMaxLength: beat === "climax" ? 240 : 190,
@@ -44,15 +46,15 @@ export function narrativeProseProfile(
   };
   if (beat === "climax") return {
     purpose: "climax", targetMinLength: 180, targetMaxLength: 320,
-    instruction: "展开本轮决定性行动及即时反应；高潮可以同年分成多轮，本轮只完成当前计划要求的动作，不包办整场高潮。"
+    instruction: "展开当前年龄的决定性事件；需要玩家决定的行动或取舍，调用 render_choice_prose 并停在作答前。"
   };
   if (beat === "payoff") return {
     purpose: "payoff", targetMinLength: 160, targetMaxLength: 280,
-    instruction: "交代当前矛盾已经形成的结果、代价与人物的新处境；完成本段收束，不重新开启另一段主线。"
+    instruction: "交代当前矛盾形成的结果与人物的新处境；收束中若仍需玩家决定，调用 render_choice_prose，不替玩家作答。"
   };
   return {
     purpose: "scene", targetMinLength: 120, targetMaxLength: 220,
-    instruction: "从上一段已经形成的处境自然进入本轮，展开一个可观察的行动、相遇或变化；写清它怎样改变人物眼前的处境，再在自然承接点停下。"
+    instruction: "按给定时间尺度写当前年龄的具体经历。遇到需要玩家决定的行动或取舍，调用 render_choice_prose；否则写出实际进展。"
   };
 }
 
@@ -69,7 +71,6 @@ export type NarrativeTask =
   | "horizon"
   | "settlement"
   | "continuity"
-  | "reviewing"
   | "rendering"
   | "dynamic"
   | "decision"
@@ -84,15 +85,14 @@ export function resolvePromptPack(source: Record<string, string> = {}): PromptPa
 
 export function narrativeTaskRule(task: NarrativeTask, pack: PromptPackResolved): string {
   switch (task) {
-    case "origin": return "写一段180-320字的身世，交代出生前家族历史与出生时的人物来处，停在出生时。";
+    case "origin": return "写出生时的 IF 路线入口，家庭身份与生计须通向本线第一幕。";
     case "background": return pack.yearNormalRule;
-    case "planning": return "首次进入剧情时以所选 IF 线组织完整五节拍故事，正常执行只交接选材与时间；玩家选择结果提交后，按本次任务修订未结束剧情。通过工具提交，不写玩家正文。";
-    case "observation": return "只判断已经发生的故事是否完成当前意图、节拍与事实生命周期，通过工具提交裁决。";
-    case "curation": return "压缩已结束幕间的正文，维护人物的重要经历背景，替代对应的完整历史上下文。";
+    case "planning": return "幕初组织本幕世界卡；幕内通过工具召回有关资产与知识并交接时间。";
+    case "observation": return "依据本幕大纲与近期实际正文判断当前节拍是否完成，通过工具提交 hold 或 advance。";
+    case "curation": return "整合旧长期记忆与本次已发生的经历，维护人物的重要经历和持续处境，替代对应的完整历史上下文。";
     case "horizon": return "为当前世界幕提出短程叙事意图，不选择或排除路线，不写玩家正文。";
     case "settlement": return "只通过指定工具提交本轮已经形成的结构化变化，不写玩家正文。";
     case "continuity": return "依据本批最终正文与已有资产目录，整理实际新增及变化，选中 ID 后只更新该项的变化字段，其他对象与字段保留。";
-    case "reviewing": return "只编辑本次提供的玩家正文与抉择背景，不调用历史补写内容，不改变结构化结果。";
     case "rendering": return "依据回合计划、人物当前状态和可用材料写本轮实际发生的故事。";
     case "decision": return narrativeProseProfileInstruction(narrativeProseProfile("decision"));
     case "closure": return "主线完成后只提交结局申请，不写结局正文。";
@@ -103,15 +103,15 @@ export function narrativeTaskRule(task: NarrativeTask, pack: PromptPackResolved)
 
 export function narrativeToolRule(name: string, pack: PromptPackResolved): string {
   switch (name) {
-    case "render_origin": return narrativeTaskRule("origin", pack);
+    case "render_origin": return "出生时的身世正文。";
     case "render_background_prose":
-    case "render_background_segment": return narrativeTaskRule("background", pack);
+    case "render_background_segment": return "给定年龄或区间的日常生活正文。";
     case "render_scene_prose":
-    case "render_scene": return "写当前节拍的一项具体经历、人物行动与处境变化；在自然承接点停下。";
+    case "render_scene": return "本轮实际行动及形成的新处境。";
     case "render_choice_prose":
-    case "render_choice_scene": return pack.milestoneRule;
-    case "render_decision_outcome": return narrativeTaskRule("decision", pack);
-    default: return narrativeTaskRule("dynamic", pack);
+    case "render_choice_scene": return "截至待选行动之前的正文，不包含主角已作答或行动结果。";
+    case "render_decision_outcome": return "玩家已选行动的实际结果正文。";
+    default: return "本次请求的成稿正文。";
   }
 }
 

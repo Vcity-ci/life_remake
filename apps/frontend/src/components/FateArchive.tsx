@@ -55,7 +55,7 @@ function CharacterArchive({ characters }: { characters: PublicNarrativeCharacter
     <div className="archive-index">
       {characters.length ? characters.map((character) => <details className="archive-entry character-entry" key={character.id}>
         <summary><span>{character.name}</span></summary>
-        <div className="archive-entry-content"><p className="character-role">{character.role}</p><p>{character.description}</p><small>{character.introducedAge}岁初见</small></div>
+        <div className="archive-entry-content">{character.role ? <p className="character-role">{character.role}</p> : null}{character.description ? <p>{character.description}</p> : null}{character.condition ? <p>当前处境：{character.condition}</p> : null}{character.relationship ? <p>{character.relationship}</p> : null}<small>{character.introducedAge}岁初见</small></div>
       </details>) : <p className="archive-empty">尚无常驻人物。</p>}
     </div>
   </details>;
@@ -98,7 +98,7 @@ export function FateArchiveContent({
     <header className="fate-archive-heading"><small>此生所留</small><h2 id={headingId}>命运档案</h2></header>
     <div className="fate-archive-sections">
       <CharacterArchive characters={characters} />
-      <NarrativeAssetsArchive assets={assets} />
+      <NarrativeAssetsArchive assets={assets} characters={characters} />
       <DecisionArchive groups={decisions} />
     </div>
   </>;

@@ -11,10 +11,10 @@ export type NarrativeContextSection =
   | "seedHints"
   | "origin"
   | "world"
-  | "palette"
+  | "worldSituation"
+  | "actWorld"
   | "mainline"
   | "route"
-  | "handoff"
   | "lore"
   | "styleExamples"
   | "authorNote"
@@ -88,6 +88,8 @@ export interface NarrativeContextManifest {
 }
 
 export interface NarrativeContextComposition {
+  /** Canonical message order shared by model requests and context diagnostics. */
+  messages: ConversationPromptMessage[];
   renderedContext: string;
   stableContext: string;
   runtimeContext: string;
@@ -110,7 +112,7 @@ export interface NarrativeContextProvider {
 }
 
 export interface NarrativeContextComposeInput {
-  planningPurpose?: "initial" | "revise" | "execute";
+  planningPurpose?: "initial" | "execute";
   plan?: NarrativePromptPlan;
   task: NarrativeTask;
   taskPrompt: string;

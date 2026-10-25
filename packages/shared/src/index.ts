@@ -32,7 +32,7 @@ export interface NarrativeEndingBrief {
   createdAt: number;
 }
 export type PassiveEffectType = "candidate_weight" | "negative_reduce" | "death_risk_reduce" | "reward_bonus" | "unlock_event";
-export type StoryFactKind = "open_question" | "stake" | "commitment" | "cost" | "relationship_change";
+export type StoryFactKind = "open_question" | "stake" | "commitment" | "cost" | "relationship_change" | "experience";
 export type StoryFactStatus = "open" | "resolved" | "blocked";
 export type NarrativeFactResolution = "exposed" | "concealed" | "compromised" | "sacrificed";
 export type NarrativeCharacterImportance = "momentary" | "recurring" | "core";
@@ -284,17 +284,7 @@ export interface NarrativeMainlineActDefinition {
   resolutionModes?: NarrativeFactResolution[];
 }
 
-/**
- * Compact model-authored continuity from one world act to the next. The engine
- * persists it in the existing fact ledger, never as a player-facing label.
- */
-export interface NarrativeActHandoff {
-  resolvedTension: string;
-  lastingConsequence: string;
-  continuation: string;
-  /** A small explicit set of unresolved facts that remain active in the next act. */
-  carryFactIds?: string[];
-}
+
 
 /**
  * A reusable dramatic situation. It gives the director usable material even
@@ -498,6 +488,8 @@ export interface NarrativeWorldCardDefinition {
   /** Author-facing memo. It is never projected to the model. */
   title?: string;
   kind: NarrativeWorldCardKind;
+  /** Authored use in context assembly; omitted entries are domain knowledge. */
+  contextRole?: "foundation" | "situation" | "knowledge" | "style";
   content: string;
   priority: number;
   /** Controls prompt proximity without changing activation. */
@@ -769,20 +761,22 @@ export interface NarrativeRouteProgress {
   lastEventId?: string;
 }
 
-/** The current beat's task, projected from the planner's act outline. */
-export interface NarrativeStageTask {
-  goal: string;
-  completionMeaning: string;
+/** A concrete planned chapter, not an additional per-turn instruction. */
+export interface NarrativeActOutlineNode {
+  change: string;
+  /** Objects needed for this change; descriptions are needs, not newly registered assets. */
+  props: string[];
   /** Revisable life scheduling, never admission or automatic beat completion. */
   timeframe?: { fromAge: number; toAge: number };
-  fork?: NarrativeDecisionBrief & { openingSituation: string };
 }
 
 /** Planned story development. These nodes describe intentions, never committed facts. */
 export interface NarrativeActOutline {
   actId: string;
   revision: number;
-  beats: Record<Exclude<NarrativeBeat, "ending">, NarrativeStageTask & { story: string }>;
+  /** The act's playable world background, composed once from setting and route material. */
+  background: string;
+  beats: Record<Exclude<NarrativeBeat, "ending">, NarrativeActOutlineNode>;
 }
 
 /** The only dramatic beat currently owned by the engine for a world act. */
@@ -796,8 +790,6 @@ export interface NarrativeActRuntime {
   growthFocusId?: string;
   growthFocusOptions?: NarrativeGrowthFocusDefinition[];
   outline?: NarrativeActOutline;
-  outlineNeedsRevision?: boolean;
-  stageTask?: NarrativeStageTask;
 }
 
 /** A player-visible recurring person generated during this particular life. */
@@ -805,8 +797,8 @@ export type NarrativeRelationshipStance = "friendly" | "guarded" | "hostile" | "
 
 /** The durable, player-relative state of a generated recurring character. */
 export interface NarrativeCharacterRelationship {
-  stance: NarrativeRelationshipStance;
-  summary: string;
+  stance?: NarrativeRelationshipStance;
+  summary?: string;
   relatedFactIds: string[];
   lastChangedAge: number;
 }
@@ -817,6 +809,7 @@ export interface NarrativeDynamicCharacter {
   factionId?: string;
   role?: string;
   description?: string;
+  condition?: string;
   pendingDetails?: boolean;
   relatedFactIds: string[];
   relatedRouteIds: string[];
@@ -845,6 +838,9 @@ export interface NarrativeLocation extends NarrativeAssetLinks {
   description?: string;
   pendingDetails?: boolean;
   spatialDescription?: string;
+  parentLocationId?: string;
+  features?: Array<{ name: string; state: string }>;
+  actors?: Array<{ characterIds?: string[]; factionId?: string; organizationName?: string; relation: string }>;
   introduced: NarrativeAssetMoment;
   lastSeen: NarrativeAssetMoment;
 }
@@ -857,7 +853,6 @@ export interface NarrativeAbility extends NarrativeAssetLinks {
   usage?: string;
   source?: string;
   mastery?: string;
-  status: "available" | "unavailable";
   introduced: NarrativeAssetMoment;
   updated: NarrativeAssetMoment;
 }
@@ -876,8 +871,8 @@ export interface PublicNarrativeAssets {
 
 /** Changes describe accomplished events, never the unselected consequences of a choice. */
 export interface NarrativeAssetUpdates {
-  locations: Array<{ ref: string; name?: string; description?: string; spatialDescription?: string; current?: boolean }>;
-  abilities: Array<{ ref: string; name?: string; description?: string; usage?: string; source?: string; mastery?: string; status?: NarrativeAbility["status"] }>;
+  locations: Array<{ ref: string; name?: string; pendingDetails?: boolean; description?: string; spatialDescription?: string; parentLocationId?: string; features?: NarrativeLocation["features"]; actors?: NarrativeLocation["actors"]; current?: boolean }>;
+  abilities: Array<{ ref: string; name?: string; pendingDetails?: boolean; description?: string; usage?: string; source?: string; mastery?: string }>;
 }
 
 /** Explicit semantic identity decisions proposed by continuity, scoped to one run. */
@@ -895,19 +890,28 @@ export interface NarrativeAssetActivity {
 }
 
 /**
- * Optional continuity proposed by the narrator. The engine assigns IDs for
- * newly introduced facts and only accepts references already in this run.
+ * Events maintained by continuity synchronization. The engine assigns IDs for
+ * newly introduced events and only accepts references already in this run.
  */
 export interface NarrativeFactUpdates {
-  introduce: Array<Pick<StoryFactDefinition, "kind" | "label" | "priority"> & { status?: "open" | "resolved"; /** Engine-assigned before observation. Not a model tool field. */ id?: string }>;
+  introduce: Array<Pick<StoryFactDefinition, "kind" | "label" | "priority"> & NarrativeEventSource & NarrativeEventLinks & { status?: "open" | "resolved"; /** Engine-assigned, not a model tool field. */ id?: string }>;
   touchFactIds: string[];
   resolveFactIds: string[];
-  progress?: Array<{ factId: string; summary: string }>;
-  resolutions?: Array<{ factId: string; summary: string }>;
+  progress?: Array<{ factId: string; summary: string } & NarrativeEventSource & NarrativeEventLinks>;
+  resolutions?: Array<{ factId: string; summary: string } & NarrativeEventSource & NarrativeEventLinks>;
+}
+
+export type NarrativeEventLinks = Pick<StoryFactDefinition, "characterIds" | "locationIds" | "abilityIds" | "factionIds">;
+
+export interface NarrativeEventSource {
+  sourceEventId?: string;
+  age?: number;
+  actId?: string;
 }
 
 export interface NarrativeRelationshipUpdate {
   characterRef: string;
+  pendingDetails?: boolean;
   /** Omitted keeps current affiliation; an empty string explicitly leaves it. */
   factionId?: string;
   stance?: NarrativeRelationshipStance;
@@ -915,6 +919,7 @@ export interface NarrativeRelationshipUpdate {
   role?: string;
   status?: NarrativeDynamicCharacter["status"];
   description?: string;
+  condition?: string;
 }
 
 /** Compact, deterministic local memory. Retrieval never changes engine state. */
@@ -953,16 +958,12 @@ export interface NarrativeEpisodeRecord {
   createdAt: number;
 }
 
-/** Durable outcome of a completed world act, derived from the payoff handoff. */
+/** Completion anchor for compression and ending; narrative lives in committed prose. */
 export interface NarrativeActCanon {
   actId: string;
   sourceEventId: string;
   resolvedAge: number;
   routeId?: string;
-  resolvedTension: string;
-  lastingConsequence: string;
-  continuation: string;
-  factIds: string[];
 }
 
 export type NarrativeMemoryDigestScope = "run" | "act" | "route" | "character" | "faction" | "location" | "ability";
@@ -976,6 +977,8 @@ export interface NarrativeMemoryDigest {
   revision: number;
   throughEpisodeId: string;
   coveredEpisodeIds: string[];
+  /** Story age covered by this summary; independent of retained raw episodes. */
+  throughAge?: number;
   /** The origin profile was supplied when this run summary was authored. */
   originCovered?: boolean;
   summary: string;
@@ -1069,30 +1072,10 @@ export interface NarrativeOriginProfile {
   seedHints: string[];
 }
 
-export interface NarrativePremiseArc {
-  actId: string;
-  dramaticQuestion: string;
-  pressureSource: string;
-  payoffPossibility: string;
-}
-
-/** Stable, run-specific story promise generated once from persona, talents, origin and world truths. */
-export interface NarrativeSessionPremise {
-  protagonistAnchor: string;
-  centralTension: string;
-  storyPromise: string;
-  keywords: string[];
-  arcs: NarrativePremiseArc[];
-}
-
 export interface NarrativeBeatObservation {
   decision: "hold" | "advance";
-  /** A current-beat shortfall for the next planner, present only on hold. */
-  progressGap?: string;
-  resolvedFactIds: string[];
-  resolutions?: Array<{ factId: string; summary: string }>;
-  actHandoff?: NarrativeActHandoff;
-  carryFactIds: string[];
+  evidence?: string;
+  missing?: string;
   actId: string;
   beat: Exclude<NarrativeBeat, "ending">;
   observedEpisodeId?: string;
@@ -1119,7 +1102,6 @@ export interface NarrativeRunState {
   version: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
   enabled: boolean;
   opening?: NarrativeOpeningState;
-  sessionPremise?: NarrativeSessionPremise;
   arcPhase: NarrativeArcPhase;
   climaxCount: number;
   payoffCount: number;
@@ -1140,6 +1122,7 @@ export interface NarrativeRunState {
       source: "origin" | "background" | "scene" | "decision";
       age: number;
       ageFrom?: number;
+      actId?: string;
       subject: string;
       narrative: string;
     }>;
@@ -1301,7 +1284,6 @@ export interface GameplayTuning {
     profiles: Record<
       DecisionType,
       {
-        successRate: number;
         gain: number;
         loss: number;
         deathBonus: number;
@@ -1309,9 +1291,6 @@ export interface GameplayTuning {
         reward: number;
       }
     >;
-    successRateVolatilityFactor: number;
-    successRateClampMin: number;
-    successRateClampMax: number;
     gainClampMin: number;
     gainClampMax: number;
     lossClampMin: number;
@@ -1430,7 +1409,6 @@ export function createDefaultGameplayTuning(): GameplayTuning {
     decision: {
       profiles: {
         safe: {
-          successRate: 0.86,
           gain: 2,
           loss: -1,
           deathBonus: 0,
@@ -1438,7 +1416,6 @@ export function createDefaultGameplayTuning(): GameplayTuning {
           reward: 0.4
         },
         balanced: {
-          successRate: 0.66,
           gain: 4,
           loss: -2,
           deathBonus: 0.05,
@@ -1446,7 +1423,6 @@ export function createDefaultGameplayTuning(): GameplayTuning {
           reward: 0.65
         },
         risky: {
-          successRate: 0.48,
           gain: 7,
           loss: -4,
           deathBonus: 0.12,
@@ -1454,9 +1430,6 @@ export function createDefaultGameplayTuning(): GameplayTuning {
           reward: 0.95
         }
       },
-      successRateVolatilityFactor: 0.2,
-      successRateClampMin: 0.2,
-      successRateClampMax: 0.9,
       gainClampMin: 1,
       gainClampMax: 4,
       lossClampMin: -4,
@@ -1561,7 +1534,28 @@ export interface YearEvent {
   tags: string[];
 }
 
+export interface ChoiceCheck {
+  id: string;
+  stat: Exclude<StatKey, "physique">;
+  value: number;
+  threshold: number;
+  actId?: string;
+  beat?: Exclude<NarrativeBeat, "ending">;
+  probabilities: Record<DecisionType, number>;
+}
+
+export interface ChoiceRoll {
+  decision: DecisionType;
+  probability: number;
+  /** Uniform roll in [0, 1); success means roll < probability. */
+  roll: number;
+  success: boolean;
+}
+
 export interface MilestoneChoice {
+  check?: ChoiceCheck;
+  revision?: number;
+  publicIdentity?: string;
   age: number;
   background?: string;
   options: Array<{
@@ -1650,7 +1644,10 @@ export interface TurnRecord {
     optionId: string;
     label: string;
     description: string;
+    status?: "selected" | "rendered" | "settled";
+    roll?: ChoiceRoll;
   };
+  decisionResult?: { sceneId: string; revision: number; roll: ChoiceRoll; status: "rendered" | "settled" };
   createdAt: number;
 }
 
@@ -1659,10 +1656,12 @@ export interface PublicMilestoneChoice {
   revision: number;
   age: number;
   background?: string;
+  check?: ChoiceCheck;
   options: Array<{
     id: string;
     label: string;
     description: string;
+    probability?: number;
   }>;
 }
 
@@ -1672,6 +1671,9 @@ export interface PublicNarrativeCharacter {
   factionId?: string;
   role?: string;
   description?: string;
+  condition?: string;
+  relationship?: string;
+  status?: NarrativeDynamicCharacter["status"];
   introducedAge: number;
 }
 
@@ -1715,6 +1717,7 @@ export interface PublicRunState {
   narrativeAssets?: PublicNarrativeAssets;
   /** Compatibility projection of the latest unresolved TurnRecord choice. */
   nextMilestoneChoice?: PublicMilestoneChoice;
+  pendingChoice?: { choice: PublicMilestoneChoice; optionId: string; status: "selected" | "rendered" | "settled" };
   survivalCrisis?: PublicSurvivalCrisis;
   ended: boolean;
   endingSummary?: string;

@@ -12,9 +12,15 @@ export interface NarrativeParticipant {
   relationship?: Pick<NarrativeCharacterRelationship, "stance" | "summary">;
 }
 
+export function formatNarrativeRelationship(relationship?: Pick<NarrativeCharacterRelationship, "stance" | "summary">): string | undefined {
+  if (!relationship) return undefined;
+  const labels = { friendly: "友善", guarded: "戒备", hostile: "敌对", indebted: "承情", dependent: "依赖", competitive: "竞争" };
+  return [relationship.stance ? labels[relationship.stance] : undefined, relationship.summary].filter(Boolean).join("：") || undefined;
+}
+
 /** The player lives in the run; this projection distinguishes them from NPCs. */
 export function narrativeProtagonistAnchor(run: InternalRunState): string {
-  return run.narrative.sessionPremise?.protagonistAnchor || run.personaPrompt || run.narrative.opening?.profile?.summary || "本局玩家人物";
+  return run.personaPrompt || run.narrative.opening?.profile?.summary || "本局玩家人物";
 }
 
 export function registerNarrativeParticipants(
@@ -32,19 +38,18 @@ export function registerNarrativeParticipants(
     const character: NarrativeDynamicCharacter = existing ?? {
       id: candidate?.characterRef ?? `character:${randomUUID()}`,
       name: participant.name, factionId: participant.factionId, role: participant.role, description: participant.description,
-      pendingDetails: !participant.role || !participant.description,
+      pendingDetails: !participant.role && !participant.description,
       relatedFactIds: [], relatedRouteIds: [], introducedAge: run.age, lastSeenAge: run.age, importance: "recurring", status: "active"
     };
     character.lastSeenAge = run.age;
     if (updateState) {
-      character.status = "active";
       if (participant.role) character.role = participant.role;
       if (participant.description) character.description = participant.description;
       if (participant.factionId !== undefined) character.factionId = participant.factionId || undefined;
-      if (character.role && character.description) delete character.pendingDetails;
     }
     character.relatedFactIds = Array.from(new Set([...character.relatedFactIds, ...factIds])).slice(-8);
     if (updateState && participant.relationship) character.relationship = {
+      ...character.relationship,
       ...participant.relationship,
       relatedFactIds: Array.from(new Set([...(character.relationship?.relatedFactIds ?? []), ...factIds])).slice(-8),
       lastChangedAge: run.age
@@ -52,6 +57,7 @@ export function registerNarrativeParticipants(
     if (!existing) run.narrative.dynamicCharacters.push(character);
     stored.push({ character, relationship: updateState ? participant.relationship : undefined });
   }
-  run.narrative.activeCharacterIds = Array.from(new Set([...run.narrative.activeCharacterIds, ...stored.map(({ character }) => character.id)])).slice(-12);
+  run.narrative.activeCharacterIds = Array.from(new Set([...run.narrative.activeCharacterIds, ...stored.map(({ character }) => character.id)]))
+    .filter((id) => !run.narrative.dynamicCharacters.some((character) => character.id === id && character.status !== "active"));
   return stored;
 }

@@ -1,4 +1,4 @@
-import type { NarrativeEpisodeRecord, NarrativeMemoryEntry, NarrativeRunState } from "@reroll/shared";
+import type { NarrativeEpisodeRecord, NarrativeMemoryEntry, NarrativeRunState, TurnRecord } from "@reroll/shared";
 import { NARRATIVE_HISTORY_LIMIT } from "./narrative/history.js";
 
 export function narrativeExperienceText(
@@ -9,6 +9,40 @@ export function narrativeExperienceText(
   const prose = state.memoryEntries.find((entry) => ids.has(entry.id))?.text;
   // Old saves may retain only the former delta; new turns read committed prose.
   return prose?.trim() || episode.storyDelta?.trim() || "";
+}
+
+export interface NarrativeExperienceContent {
+  narrative: string;
+  choiceBackground?: string;
+  selectedAction?: string;
+  decisionResult?: "success" | "failure";
+}
+
+/** Project an actual exchange from the existing public record, without its unchosen options. */
+export function narrativeExperienceContent(
+  state: Pick<NarrativeRunState, "memoryEntries">,
+  episode: NarrativeEpisodeRecord,
+  turnRecords: readonly TurnRecord[] = []
+): NarrativeExperienceContent {
+  const record = episode.turnId ? turnRecords.find((entry) => entry.turnId === episode.turnId) : undefined;
+  const narrative = record?.narrative.trim() || narrativeExperienceText(state, episode);
+  const background = record?.choice?.background?.trim();
+  const selected = record?.choiceOutcome;
+  return {
+    narrative,
+    ...(background && background !== narrative ? { choiceBackground: background } : {}),
+    ...(selected ? { selectedAction: `${selected.label}：${selected.description}` } : {}),
+    ...(record?.decisionResult ? { decisionResult: record.decisionResult.roll.success ? "success" as const : "failure" as const } : {})
+  };
+}
+
+export function formatNarrativeDialogue(content: NarrativeExperienceContent): string {
+  return [
+    content.narrative,
+    content.choiceBackground ? `当时的抉择情景：${content.choiceBackground}` : "",
+    content.selectedAction ? `玩家已选行动：${content.selectedAction}` : "",
+    content.decisionResult ? `本次行动检定：${content.decisionResult === "success" ? "成功" : "失败"}；具体后果见结果正文。` : ""
+  ].filter(Boolean).join("\n");
 }
 
 export function formatNarrativeExperience(when: { age: number; ageFrom?: number }, narrative: string): string {

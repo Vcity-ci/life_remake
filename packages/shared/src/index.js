@@ -49,7 +49,6 @@ export function createDefaultGameplayTuning() {
         decision: {
             profiles: {
                 safe: {
-                    successRate: 0.86,
                     gain: 2,
                     loss: -1,
                     deathBonus: 0,
@@ -57,7 +56,6 @@ export function createDefaultGameplayTuning() {
                     reward: 0.4
                 },
                 balanced: {
-                    successRate: 0.66,
                     gain: 4,
                     loss: -2,
                     deathBonus: 0.05,
@@ -65,7 +63,6 @@ export function createDefaultGameplayTuning() {
                     reward: 0.65
                 },
                 risky: {
-                    successRate: 0.48,
                     gain: 7,
                     loss: -4,
                     deathBonus: 0.12,
@@ -73,9 +70,6 @@ export function createDefaultGameplayTuning() {
                     reward: 0.95
                 }
             },
-            successRateVolatilityFactor: 0.2,
-            successRateClampMin: 0.2,
-            successRateClampMax: 0.9,
             gainClampMin: 1,
             gainClampMax: 4,
             lossClampMin: -4,

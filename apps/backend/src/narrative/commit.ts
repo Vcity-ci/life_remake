@@ -1,4 +1,4 @@
-import type { NarrativeActHandoff, NarrativeActCanon, NarrativeEpisodeRecord } from "@reroll/shared";
+import type { NarrativeActCanon, NarrativeEpisodeRecord } from "@reroll/shared";
 import type { InternalRunState } from "../engine.js";
 import { committedNarrativeSequence, NARRATIVE_HISTORY_LIMIT } from "./history.js";
 
@@ -54,17 +54,13 @@ export function commitNarrativeEpisode(run: InternalRunState, draft: NarrativeCo
 
 export function commitNarrativeActCanon(
   run: InternalRunState,
-  input: { actId: string; sourceEventId: string; resolvedAge: number; routeId?: string; handoff: NarrativeActHandoff; factIds?: string[] }
+  input: { actId: string; sourceEventId: string; resolvedAge: number; routeId?: string }
 ): NarrativeActCanon {
   const canon: NarrativeActCanon = {
     actId: input.actId,
     sourceEventId: input.sourceEventId,
     resolvedAge: input.resolvedAge,
-    routeId: input.routeId,
-    resolvedTension: input.handoff.resolvedTension,
-    lastingConsequence: input.handoff.lastingConsequence,
-    continuation: input.handoff.continuation,
-    factIds: unique(input.factIds ?? [])
+    routeId: input.routeId
   };
   run.narrative.actCanon = [...run.narrative.actCanon.filter((entry) => entry.actId !== canon.actId), canon].slice(-12);
   return canon;

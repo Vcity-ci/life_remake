@@ -174,6 +174,7 @@ export default function App(): React.JSX.Element {
   const [isStreaming, setIsStreaming] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [autoAdvance, setAutoAdvance] = useState(false);
+  const [debugMode, setDebugMode] = useState(false);
   const [showGrowthFocus, setShowGrowthFocus] = useState(false);
   const [showFateArchive, setShowFateArchive] = useState(false);
   const [expandedOriginIds, setExpandedOriginIds] = useState<Set<string>>(() => new Set());
@@ -199,8 +200,8 @@ export default function App(): React.JSX.Element {
   );
   const visibleAssets = turns.length ? turns[turns.length - 1].narrativeAssetsSnapshot : run?.narrativeAssets;
   const activeDecision = useMemo<MilestoneChoice | undefined>(() => (
-    [...turns].reverse().find((turn) => turn.choice && !turn.choiceOutcome)?.choice ?? run?.nextMilestoneChoice
-  ), [turns, run?.nextMilestoneChoice]);
+    run?.pendingChoice ? undefined : [...turns].reverse().find((turn) => turn.choice && !turn.choiceOutcome)?.choice ?? run?.nextMilestoneChoice
+  ), [turns, run?.nextMilestoneChoice, run?.pendingChoice]);
   const showActiveDecision = Boolean(activeDecision && (phaseOf(run) === "waiting_decision" || isGenerating));
   const activeSurvivalCrisis: SurvivalCrisis | undefined = run?.survivalCrisis;
   const decisionHistory = useMemo<DecisionHistoryGroup[]>(() => {
@@ -498,6 +499,7 @@ export default function App(): React.JSX.Element {
 
   function canAdvance(runState: PublicRunState | null): boolean {
     if (!runState) return false;
+    if (runState.pendingChoice) return true;
     if (runState.opening?.status === "pending") return false;
     if (runState.growthFocus && !runState.growthFocus.selectedId) return false;
     const runPhase = phaseOf(runState);
@@ -578,7 +580,7 @@ export default function App(): React.JSX.Element {
           }
           if (event.type === "turn") {
             appendTurn(event.data.record);
-            setStatus(`人生推进中...(${event.data.index + 1}/${event.data.total})`);
+            setStatus(event.data.record.decisionResult?.status === "rendered" ? "结果已写就，正在结算变化..." : `人生推进中...(${event.data.index + 1}/${event.data.total})`);
             return;
           }
           if (event.type === "done") {
@@ -881,7 +883,7 @@ export default function App(): React.JSX.Element {
       return;
     }
     try {
-      setStatus("推进年份中...");
+      setStatus(run.pendingChoice ? "继续完成上次抉择..." : "推进年份中...");
       if (isGeneratingRef.current) {
         setStatus("等待命运流转中...");
         return;
@@ -904,26 +906,35 @@ export default function App(): React.JSX.Element {
     if (isStreaming || isGeneratingRef.current) return;
     const currentRun = run;
     const decisionAge = activeDecision?.age ?? currentRun.age;
+    const choice = activeDecision;
+    const option = choice?.options.find((option) => option.id === decision);
+    if (!choice || !option) return;
     try {
       resetPendingFlowState();
+      setTurns((previous) => previous.map((record) => record.choice && milestoneChoiceKey(record.choice) === milestoneChoiceKey(choice)
+        ? { ...record, choiceOutcome: { optionId: option.id, label: option.label, description: option.description, status: "selected" } }
+        : record));
       const optimisticRun: PublicRunState = {
         ...currentRun,
         nextMilestoneChoice: undefined,
-        phase: "generating"
+        phase: "generating",
+        pendingChoice: { choice, optionId: option.id, status: "selected" }
       };
       setRun(optimisticRun);
       runRef.current = optimisticRun;
       setStatus("命运流转中...");
       await runStepGeneration(decision, decisionAge);
     } catch (error) {
-      setRun(currentRun);
-      runRef.current = currentRun;
+      // The server may already have saved the roll or prose. Restore that progress,
+      // rather than reverting a committed selection to an unanswered question.
+      try { restoreCurrentRun(await fetchCurrentRun()); } catch { /* Keep the visible selected action for retry. */ }
+      if (debugMode) setAutoAdvance(false);
       if (isServerBusyError(error)) {
         setAutoAdvance(false);
         setShowBusyModal(true);
         setStatus("服务器繁忙，请稍后重试。");
       } else {
-        setStatus("暂时无法完成抉择，请稍后重试。");
+        setStatus("暂时无法完成结算，点击继续推进可从已保存处继续。");
       }
     }
   }
@@ -945,6 +956,7 @@ export default function App(): React.JSX.Element {
     } catch (error) {
       setRun(currentRun);
       runRef.current = currentRun;
+      if (debugMode) setAutoAdvance(false);
       if (isServerBusyError(error)) {
         setAutoAdvance(false);
         setShowBusyModal(true);
@@ -978,6 +990,7 @@ export default function App(): React.JSX.Element {
         if (event.type === "error") throw new Error(event.data.message);
       });
     } catch {
+      if (debugMode) setAutoAdvance(false);
       setStatus("暂时无法确认成长方向，请稍后重试。");
     } finally {
       isGeneratingRef.current = false;
@@ -1094,19 +1107,47 @@ export default function App(): React.JSX.Element {
       return;
     }
     if (isStreaming || isGenerating) return;
-    if ((activeDecision || activeSurvivalCrisis) && phaseOf(run) === "waiting_decision") {
-      setStatus("自动流转已暂停，等待抉择。");
-      return;
-    }
-    if (!canAdvance(run)) {
+
+    let action: (() => Promise<void>) | undefined;
+    if (debugMode && needsGrowthFocus(run)) {
+      const option = run.growthFocus?.options[1];
+      if (option) action = () => onSelectGrowthFocus(option.id);
+    } else if ((activeDecision || activeSurvivalCrisis) && phaseOf(run) === "waiting_decision") {
+      if (!debugMode) {
+        setStatus("自动流转已暂停，等待抉择。");
+        return;
+      }
+      if (activeSurvivalCrisis) {
+        const option = activeSurvivalCrisis.choices[1];
+        if (option) action = () => onSurvivalChoice(option.id);
+      } else {
+        const option = activeDecision?.options[1];
+        if (option) action = () => onDecision(option.id);
+      }
+    } else if (canAdvance(run)) {
+      action = onAdvance;
+    } else {
       setAutoAdvance(false);
       return;
     }
+
+    if (!action) {
+      setAutoAdvance(false);
+      setStatus("没有第二个选项，自动流转已暂停。");
+      return;
+    }
     const timer = window.setTimeout(() => {
-      void onAdvance();
+      void action();
     }, 350);
     return () => window.clearTimeout(timer);
-  }, [autoAdvance, run, timeline.length, activeDecision, activeSurvivalCrisis, isStreaming, isGenerating]);
+  }, [autoAdvance, debugMode, run, timeline.length, activeDecision, activeSurvivalCrisis, isStreaming, isGenerating]);
+
+  const canEnableAutoAdvance = !run || canAdvance(run) || (
+    debugMode && !run.ended && (
+      needsGrowthFocus(run) ||
+      (phaseOf(run) === "waiting_decision" && Boolean(activeDecision || activeSurvivalCrisis))
+    )
+  );
 
   if (!bootstrap) {
     return <main className="app"><p>{status}</p></main>;
@@ -1122,7 +1163,7 @@ export default function App(): React.JSX.Element {
             <input
               type="checkbox"
               checked={autoAdvance}
-              disabled={Boolean(run && !canAdvance(run))}
+              disabled={!autoAdvance && !canEnableAutoAdvance}
               onChange={(e) => setAutoAdvance(e.target.checked)}
             />
             自动流转
@@ -1280,12 +1321,17 @@ export default function App(): React.JSX.Element {
                       ) : null}
                       {!isOrigin ? <div className="delta-row">{extractDeltaLabels(item).map((label, idx) => <small key={`${timelineKey(item)}-${idx}`}>{label}</small>)}</div> : null}
                       {item.choiceOutcome ? (
-                        <section className="decision-commit" aria-label="已完成的抉择">
-                          <small>命运抉择</small>
+                        <section className="decision-commit" aria-label="已选行动">
+                          <small>命运抉择{item.choiceOutcome.status === "selected" ? " · 等待结果" : ""}</small>
+                          {item.choice?.background && item.choice.background !== item.narrative ? <p>{item.choice.background}</p> : null}
                           <strong>{item.choiceOutcome.label}</strong>
                           <p>{item.choiceOutcome.description}</p>
                         </section>
                       ) : null}
+                      {item.decisionResult ? <small className="decision-roll">
+                        检定{item.decisionResult.roll.success ? "成功" : "失败"} · 成功率{(item.decisionResult.roll.probability * 100).toFixed(1)}% · 掷点{(item.decisionResult.roll.roll * 100).toFixed(2)}/100
+                        {item.decisionResult.status === "rendered" ? " · 变化结算中" : ""}
+                      </small> : null}
                       {(!isOrigin || originExpanded) ? <NarrativeAssetChanges current={item.narrativeAssetsSnapshot} previous={timeline[index - 1]?.narrativeAssetsSnapshot} /> : null}
                     </article>
                   );
@@ -1306,9 +1352,10 @@ export default function App(): React.JSX.Element {
                     {isGenerating ? <span>正在结算...</span> : null}
                   </div>
                   <p>{activeDecision.background ?? "你来到抉择时刻："}</p>
+                  {activeDecision.check ? <small>检定依据：{statLabels[activeDecision.check.stat]} {activeDecision.check.value} ／ 本节拍门槛 {activeDecision.check.threshold}</small> : null}
                   <div className="decision-options">
                     {activeDecision.options.map((opt) => (
-                      <button key={opt.id} disabled={isStreaming || isGenerating} onClick={() => void onDecision(opt.id)}><strong>{opt.label}</strong><small>{opt.description}</small></button>
+                      <button key={opt.id} disabled={isStreaming || isGenerating} onClick={() => void onDecision(opt.id)}><strong>{opt.label}</strong><small>{opt.description}</small>{opt.probability !== undefined ? <small>成功率 {(opt.probability * 100).toFixed(1)}%</small> : null}</button>
                     ))}
                   </div>
                 </section>
@@ -1396,6 +1443,8 @@ export default function App(): React.JSX.Element {
           }}
           difficultyId={difficultyId}
           setDifficultyId={setDifficultyId}
+          debugMode={debugMode}
+          setDebugMode={setDebugMode}
         />
       ) : null}
 

@@ -15,7 +15,7 @@ type Buffer = NonNullable<NarrativeRunState["assetBuffer"]>;
 export function stageNarrativeAssetRound(
   run: InternalRunState,
   round: Buffer["rounds"][number],
-  changes: { assetUpdates?: NarrativeAssetUpdates; participants?: NarrativeParticipant[]; handoff?: NarrativeRoundHandoff },
+  changes: { assetUpdates?: NarrativeAssetUpdates; participants?: NarrativeParticipant[]; handoff?: NarrativeRoundHandoff; pendingChoice?: boolean },
   when: NarrativeAssetMoment
 ): NarrativeAssetUpdates | undefined {
   const buffer = run.narrative.assetBuffer ??= { locations: [], abilities: [], characters: [], rounds: [] };
@@ -29,11 +29,11 @@ export function stageNarrativeAssetRound(
   buffer.locations = upsert(buffer.locations, application.assets.locations.filter((entry) => application.locationIds.includes(entry.id)));
   buffer.abilities = upsert(buffer.abilities, application.assets.abilities.filter((entry) => application.abilityIds.includes(entry.id)));
   buffer.characters = upsert(buffer.characters, characters.map(({ character }) => character));
-  if (!buffer.rounds.some((entry) => entry.sourceEventId === round.sourceEventId)) buffer.rounds.push({ ...round });
+  if (!changes.pendingChoice && !buffer.rounds.some((entry) => entry.sourceEventId === round.sourceEventId)) buffer.rounds.push({ ...round });
   const currentLocationId = changes.assetUpdates?.locations.some((entry) => entry.current === true)
     ? application.assets.currentLocationId : undefined;
-  // Commit paths still add fact/character links via their original API, but never replay
-  // stale field values over a batch's newer revision or allocate a second identity.
+  // Later commit paths link the source experience, without replaying stale profile
+  // fields over a newer revision or allocating a second identity.
   return changes.assetUpdates ? {
     locations: application.locationIds.map((ref) => ({ ref, ...(ref === currentLocationId ? { current: true } : {}) })),
     abilities: application.abilityIds.map((ref) => ({ ref }))

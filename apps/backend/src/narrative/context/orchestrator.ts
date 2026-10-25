@@ -1,4 +1,5 @@
 import { buildConversationPromptMessages } from "../../conversation.js";
+import type { ConversationPromptMessage } from "../../conversation.js";
 import { collectNarrativePlanFragments, defaultNarrativeContextProviders } from "./collectors.js";
 import { dedupeNarrativeContextFragments } from "./dedupe.js";
 import { narrativeContentId, narrativeContextFragment } from "./fragments.js";
@@ -41,8 +42,16 @@ export function composeNarrativeContext(input: NarrativeContextComposeInput): Na
   const runtimeContext = formatNarrativeContextFragments(fragments, new Set(["runtime"]));
   const activeContext = formatNarrativeContextFragments(fragments, new Set(["active", "recall"]));
   const taskContext = formatNarrativeContextFragments(fragments, new Set(["task"]));
+  const messages: ConversationPromptMessage[] = [
+    ...(stableContext ? [{ role: "user" as const, content: `【长期设定】\n${stableContext}` }] : []),
+    ...(runtimeContext ? [{ role: "user" as const, content: `【当前状态】\n${runtimeContext}` }] : []),
+    ...selectedHistoryMessages,
+    ...(activeContext ? [{ role: "user" as const, content: `【本轮召回】\n${activeContext}` }] : []),
+    ...(taskContext ? [{ role: "user" as const, content: `【当前任务】\n${taskContext}` }] : [])
+  ];
   return {
-    renderedContext: [stableContext, runtimeContext, activeContext, taskContext].filter(Boolean).join("\n"),
+    messages,
+    renderedContext: messages.map((message) => message.content).join("\n"),
     stableContext,
     runtimeContext,
     activeContext,

@@ -32,6 +32,8 @@ interface Props {
   setWorldId: (id: string) => void;
   difficultyId: string;
   setDifficultyId: (id: string) => void;
+  debugMode: boolean;
+  setDebugMode: (enabled: boolean) => void;
 }
 
 const defaultProvider: ProviderConfig = {
@@ -110,7 +112,9 @@ export function AdminPanel(props: Props): React.JSX.Element {
     canConfirmEnv,
     envReady,
     worldId,
-    setWorldId
+    setWorldId,
+    debugMode,
+    setDebugMode
   } = props;
 
   const [tab, setTab] = useState<"session" | "model" | "content">("session");
@@ -369,6 +373,25 @@ export function AdminPanel(props: Props): React.JSX.Element {
               <button disabled={!canConfirmEnv} onClick={() => void onConfirmEnvironment()}>确认本局环境</button>
               <small>{envReady ? "已确认" : "未确认"}</small>
             </div>
+
+            <section className="debug-mode-setting">
+              <div>
+                <strong>调试模式</strong>
+                <p id="debug-mode-description">自动推进时，成长方向、剧情抉择和求生抉择自动选择第二项。刷新页面后关闭。</p>
+              </div>
+              <button
+                className={`debug-mode-switch${debugMode ? " is-on" : ""}`}
+                type="button"
+                role="switch"
+                aria-label="调试模式"
+                aria-checked={debugMode}
+                aria-describedby="debug-mode-description"
+                onClick={() => setDebugMode(!debugMode)}
+              >
+                <span className="debug-mode-switch-state">{debugMode ? "ON" : "OFF"}</span>
+                <span className="debug-mode-switch-thumb" aria-hidden="true" />
+              </button>
+            </section>
 
             <section className="model-usage-panel" aria-live="polite">
               <div className="row between model-usage-heading">

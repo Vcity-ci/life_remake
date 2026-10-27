@@ -1,7 +1,7 @@
 {
   "version": 1,
   "id": "modern.scholar-road",
-  "revision": "1.0.0",
+  "revision": "1.3.0",
   "worldId": "modern",
   "name": "学途成章",
   "tagline": "从求知与选择出发，让所学真正进入现实生活。",
@@ -37,8 +37,6 @@
       "id": "modern.scholar-road.apprenticeship",
       "label": "求知",
       "objective": "形成一项可持续投入的学习方向，并获得真实的训练、作品或认可。",
-      "dramaticQuestion": "人物愿意为什么而学，又能否找到适合自己的方法？",
-      "pressureDirection": "成绩、资源、家庭期待与个人兴趣开始发生冲突。",
       "payoffMeaning": "人物拥有了可以继续深造或投入现实的能力基础。",
       "beatOutline": {
         "setup": "让学校、家庭或一次发现显露人物真正愿意投入的方向。",
@@ -53,14 +51,26 @@
         "modern.domain.education.learning_direction",
         "modern.domain.education.exam_project",
         "modern.domain.education.path_choice"
-      ]
+      ],
+      "adventureSeeds": [
+        {
+          "opposition": "导师资源有限，竞赛团队有人挪用他人成果",
+          "crisis": "研究或课程项目遇到可复现性失败，提交在即",
+          "entry": "从家庭教育与学校机会进入具体学习项目",
+          "allies": "同学掌实验、老师给方法，协作须有真实贡献",
+          "escalation": "升学名额与诚实报告冲突，成果被质疑",
+          "stakes": "掌握方法、完成作品与建立可信师友比排名更持久；失败失去机会并需补课"
+        }
+      ],
+      "entryRequirements": {
+        "intelligence": 9,
+        "physique": 8
+      }
     },
     {
       "id": "modern.scholar-road.choice",
       "label": "择业",
       "objective": "在升学、专业、工作与生活条件之间作出会长期影响人生的选择。",
-      "dramaticQuestion": "所学应当服从安全、热爱，还是现实责任？",
-      "pressureDirection": "机会成本、制度门槛和重要关系要求人物承担选择后果。",
       "payoffMeaning": "人物确立了知识进入现实的道路，也失去了一部分可能。",
       "beatOutline": {
         "setup": "让升学、专业与工作机会要求人物选择现实道路。",
@@ -75,14 +85,26 @@
         "modern.domain.education.path_choice",
         "modern.domain.career.entry_work",
         "modern.domain.city.departure_foothold"
-      ]
+      ],
+      "adventureSeeds": [
+        {
+          "opposition": "雇主追求短期指标，项目负责人隐瞒安全问题",
+          "crisis": "专业方案将影响实际使用者，试行发现缺陷",
+          "entry": "用已有训练进入真实岗位，职责受经验限制",
+          "allies": "同事、用户和前辈分别掌执行、反馈与专业支持",
+          "escalation": "截止期与公开披露冲突，团队可能失去资助",
+          "stakes": "可交付成果带来专业资格与合作；失败留下修复责任、职业损失和受害者"
+        }
+      ],
+      "entryRequirements": {
+        "intelligence": 16,
+        "physique": 14
+      }
     },
     {
       "id": "modern.scholar-road.practice",
       "label": "成章",
       "objective": "以专业能力回应一个足够重要的现实问题，并形成可被他人承接的成果。",
-      "dramaticQuestion": "人物的知识最终改变了什么？",
-      "pressureDirection": "职业伦理、公共影响、个人生活与长期投入集中接受检验。",
       "payoffMeaning": "人物以研究、教育、技术、作品或专业实践留下了明确结果。",
       "beatOutline": {
         "setup": "让一个重要现实问题检验人物多年的专业积累。",
@@ -97,7 +119,21 @@
         "modern.domain.education.public_practice",
         "modern.domain.career.project_team",
         "modern.domain.public.concern_evidence"
-      ]
+      ],
+      "adventureSeeds": [
+        {
+          "opposition": "机构利益压制研究结论，商业方争夺成果控制权",
+          "crisis": "长期项目面临应用或封存的最后决定",
+          "entry": "以真实作品与专业网络承担公共影响",
+          "allies": "学生、实践者和同行提供推广或纠错能力",
+          "escalation": "资助终止与现实需求并至，必须决定成果归属",
+          "stakes": "应用成效、学术传承或失败改道须以实际受益和代价回答"
+        }
+      ],
+      "entryRequirements": {
+        "intelligence": 24,
+        "physique": 21
+      }
     }
   ],
   "endingDirections": {

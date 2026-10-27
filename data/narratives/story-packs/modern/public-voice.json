@@ -1,7 +1,7 @@
 {
   "version": 1,
   "id": "modern.public-voice",
-  "revision": "1.0.0",
+  "revision": "1.3.0",
   "worldId": "modern",
   "name": "众声之间",
   "tagline": "从身边问题走向公共生活，在表达与行动中承担影响。",
@@ -37,8 +37,6 @@
       "id": "modern.public-voice.concern",
       "label": "发声",
       "objective": "围绕一个切身问题完成第一次有效表达或集体行动。",
-      "dramaticQuestion": "人物愿意为谁发声，又是否理解问题全貌？",
-      "pressureDirection": "冷漠、误解、程序与私人关系让简单立场变得复杂。",
       "payoffMeaning": "人物获得了真实回应，也进入了需要持续承担的公共关系。",
       "beatOutline": {
         "setup": "让一项切身问题使人物意识到私人忍耐已无法解决。",
@@ -53,14 +51,26 @@
         "modern.domain.public.concern_evidence",
         "modern.domain.public.organize_negotiate",
         "modern.domain.public.reputation_backlash"
-      ]
+      ],
+      "adventureSeeds": [
+        {
+          "opposition": "物业或企业掩盖公共隐患，居民意见分裂",
+          "crisis": "校园或社区发生一桩可查证的伤害事件",
+          "entry": "主角以受影响者、志愿者或学生身份参与",
+          "allies": "当事人掌证据，专业人士能核实，邻里可组织",
+          "escalation": "投诉限期与信息失真并至，公开会牵连他人",
+          "stakes": "纠正一项实际问题与建立互信；失败可能伤害当事人并失去公信"
+        }
+      ],
+      "entryRequirements": {
+        "charisma": 9,
+        "intelligence": 8
+      }
     },
     {
       "id": "modern.public-voice.organize",
       "label": "共事",
       "objective": "与不同立场的人建立协作，使诉求转化为可执行的改变。",
-      "dramaticQuestion": "影响现实需要怎样的妥协，又有哪些底线不能交换？",
-      "pressureDirection": "组织分歧、资源、舆论和制度边界同时施压。",
       "payoffMeaning": "人物不再只是表达者，而成为能推动现实进程的人。",
       "beatOutline": {
         "setup": "让初次回应暴露更复杂的利益与执行难题。",
@@ -75,14 +85,26 @@
         "modern.domain.public.organize_negotiate",
         "modern.domain.public.reputation_backlash",
         "modern.domain.public.accountability"
-      ]
+      ],
+      "adventureSeeds": [
+        {
+          "opposition": "机构口头支持却拖延执行，组织内部争夺话语权",
+          "crisis": "议题进入实施，预算与照护人手不足",
+          "entry": "凭已有可信行动承担一项具体公共项目",
+          "allies": "基层执行者、专家和居民各担分工",
+          "escalation": "资源被削减，妥协对象提出交换条件",
+          "stakes": "可持续服务与明确责任形成真实成果；失败导致项目停摆、分裂与受益者损失"
+        }
+      ],
+      "entryRequirements": {
+        "charisma": 16,
+        "intelligence": 14
+      }
     },
     {
       "id": "modern.public-voice.consequence",
       "label": "担责",
       "objective": "让公共影响面对一次重大争议、危机或权力检验。",
-      "dramaticQuestion": "当声音真正有力量时，人物如何为后果负责？",
-      "pressureDirection": "名望、事实、群体利益与个人代价集中冲突。",
       "payoffMeaning": "人物的公共角色及其实际影响获得长期评价。",
       "beatOutline": {
         "setup": "让重大争议或危机检验人物多年积累的公共信用。",
@@ -97,7 +119,21 @@
         "modern.domain.public.reputation_backlash",
         "modern.domain.public.accountability",
         "modern.domain.enterprise.crisis_transform"
-      ]
+      ],
+      "adventureSeeds": [
+        {
+          "opposition": "利益集团操纵争议，旧同伴要求牺牲少数人换胜利",
+          "crisis": "重大方案即将表决或实施，后果不可回避",
+          "entry": "以已有公共信用与实际责任参与决策",
+          "allies": "受影响群体与专业团队提供证据和纠错能力",
+          "escalation": "舆论、资源与私人生活冲突加深",
+          "stakes": "政策真实改变、有限改善或失败须交代受影响者，不以发声本身作结束"
+        }
+      ],
+      "entryRequirements": {
+        "charisma": 24,
+        "intelligence": 21
+      }
     }
   ],
   "endingDirections": {

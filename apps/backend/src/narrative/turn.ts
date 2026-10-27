@@ -46,6 +46,7 @@ export interface NarrativeTurnEnvelope {
   choiceCheck?: ChoiceCheck;
   progressGap?: string;
   growthFocus?: { id: string; label: string; description: string };
+  preparation?: { mode: "transition" | "prepare"; deficits: Array<{ stat: StatKey; label: string; value: number; target: number }> };
   clock: { mode: "advance" | "hold"; sameAgeTurnCount: number; maxSameAgeTurns: number };
 }
 

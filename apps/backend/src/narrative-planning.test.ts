@@ -87,14 +87,14 @@ test("三个世界的幕初材料实际包含 IF 压力方向，后续召回不�
     const act = experience.mainlineActs![0];
     const input = { ...envelope(), worldId, act, currentAge: run.age };
     const initial = composeNarrativeContext({ plan: buildNarrativePromptPlan(run, experience, null, "planning"), task: "planning", taskPrompt: narrativeTurnPlanningPrompt(input) });
-    assert.ok(initial.renderedContext.includes(pack.acts[0].pressureDirection));
+    assert.ok(initial.renderedContext.includes(pack.acts[0].adventureSeeds[0].opposition));
     for (const beat of NARRATIVE_ACT_OUTLINE_BEATS) assert.ok(initial.renderedContext.includes(pack.acts[0].beatOutline[beat]));
     const outline = parseNarrativeActWorldCard({ background: "本局已经选定的具体冲突", beats: nodes() }, act.id);
     commitNarrativeActOutline(run.narrative, outline);
     const plan = buildNarrativePromptPlan(run, experience, null, "planning");
     const recall = composeNarrativeContext({ plan, task: "planning", planningPurpose: "execute", taskPrompt: narrativeTurnPlanningPrompt({ ...input, actOutline: outline }, plan) });
     assert.equal(recall.renderedContext.split(outline.background).length - 1, 1);
-    assert.equal(recall.renderedContext.includes(pack.acts[0].pressureDirection), false);
+    assert.equal(recall.renderedContext.includes(pack.acts[0].adventureSeeds[0].opposition), false);
   });
 });
 
@@ -123,7 +123,7 @@ test("真实边将路线经规划大纲、正文和结果请求传递，未来�
   const initialPlan = buildNarrativePromptPlan(run, experience, null, "planning");
   const initialRequest = composeNarrativeContext({ plan: initialPlan, task: "planning", taskPrompt: narrativeTurnPlanningPrompt(firstEnvelope) });
   assert.ok(initialRequest.renderedContext.includes(pack.routePromise));
-  assert.ok(initialRequest.renderedContext.includes(pack.acts[0].pressureDirection), "IF 压力方向进入幕初材料");
+  assert.ok(initialRequest.renderedContext.includes(pack.acts[0].adventureSeeds[0].opposition), "IF 具体对手进入幕初材料");
   for (const beat of NARRATIVE_ACT_OUTLINE_BEATS) assert.ok(initialRequest.renderedContext.includes(pack.acts[0].beatOutline[beat]), `规划器看到原IF的${beat}要求`);
   const parsed = { actOutline: parseNarrativeActWorldCard({ background: "边军立足之后将卷入军中阵营与外敌的战争。", beats: nodes() }, act.id) };
   const beforeAssets = structuredClone(run.narrative.assets);

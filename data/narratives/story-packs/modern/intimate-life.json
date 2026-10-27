@@ -1,7 +1,7 @@
 {
   "version": 1,
   "id": "modern.intimate-life",
-  "revision": "1.0.0",
+  "revision": "1.3.0",
   "worldId": "modern",
   "name": "相伴此生",
   "tagline": "在相遇、共同生活与漫长照料中，回答爱如何成为选择。",
@@ -37,8 +37,6 @@
       "id": "modern.intimate-life.encounter",
       "label": "相知",
       "objective": "建立一段足以改变人物生活安排的重要关系。",
-      "dramaticQuestion": "人物能否真实地看见他人，也让自己被看见？",
-      "pressureDirection": "家庭经验、性格防御与现实距离考验最初信任。",
       "payoffMeaning": "双方形成了愿意继续投入的关系与共同记忆。",
       "beatOutline": {
         "setup": "让一段相遇或既有关系显露改变人物生活的可能。",
@@ -53,14 +51,26 @@
         "modern.domain.intimacy.encounter_trust",
         "modern.domain.intimacy.shared_life",
         "modern.domain.city.network_belonging"
-      ]
+      ],
+      "adventureSeeds": [
+        {
+          "opposition": "家庭期待与对方自己的生活计划冲突",
+          "crisis": "一次离别、搬迁或照护需求迫近",
+          "entry": "在真实学校、邻里或工作关系中相识，不能凭好感跳过相处",
+          "allies": "共同朋友提供相识场合，彼此通过具体帮助认识",
+          "escalation": "时间与距离限制相处，误会需要实际沟通",
+          "stakes": "相互信任、边界或分开成为持续状态；拒绝也应形成清楚的新关系"
+        }
+      ],
+      "entryRequirements": {
+        "charisma": 9,
+        "physique": 8
+      }
     },
     {
       "id": "modern.intimate-life.commitment",
       "label": "相守",
       "objective": "在住处、工作、金钱、家庭和未来计划中实践承诺。",
-      "dramaticQuestion": "感情如何进入并承受具体生活？",
-      "pressureDirection": "个人成长与共同责任不再天然一致，冲突需要真实协商。",
       "payoffMeaning": "关系形成了可持续结构，或诚实地改变了原有形式。",
       "beatOutline": {
         "setup": "让住处、工作、金钱或家庭计划要求关系进入日常责任。",
@@ -75,14 +85,26 @@
         "modern.domain.intimacy.shared_life",
         "modern.domain.intimacy.care_change",
         "modern.domain.career.project_team"
-      ]
+      ],
+      "adventureSeeds": [
+        {
+          "opposition": "双方家人与雇主争夺时间，经济压力侵入共同生活",
+          "crisis": "住房、职业与照护无法同时满足",
+          "entry": "承接真实关系与承诺，协商共同生活的权责",
+          "allies": "亲友与社区提供有限支持，不能自动替代当事人承担",
+          "escalation": "疾病、失业或异地使旧分工失效",
+          "stakes": "形成可持续相处方式或真正分离；代价体现时间、资源与关系改变"
+        }
+      ],
+      "entryRequirements": {
+        "charisma": 16,
+        "physique": 14
+      }
     },
     {
       "id": "modern.intimate-life.seasons",
       "label": "相伴",
       "objective": "让关系面对疾病、照料、代际变化、远行或重大人生转折。",
-      "dramaticQuestion": "岁月改变一切之后，人物仍愿意怎样相待？",
-      "pressureDirection": "失去、责任与个人未竟愿望集中考验关系的本质。",
       "payoffMeaning": "人物最终形成了关于爱、家庭与陪伴的完整答案。",
       "beatOutline": {
         "setup": "让疾病、照料、代际变化或远行检验长期关系。",
@@ -97,7 +119,21 @@
         "modern.domain.intimacy.care_change",
         "modern.domain.intimacy.form_legacy",
         "modern.domain.city.long_home"
-      ]
+      ],
+      "adventureSeeds": [
+        {
+          "opposition": "长期照护与个人未竟愿望冲突，亲属对安排意见分裂",
+          "crisis": "衰老、病情或晚辈离家改变生活结构",
+          "entry": "以实际共同经历面对相伴的终局，不自动预设婚姻",
+          "allies": "老友、家人与专业照护各提供有限帮助",
+          "escalation": "健康与经济条件变化迫使重新兑现承诺",
+          "stakes": "和解、独立生活、告别或相守交代人的实际处境，不用人生感言代替结果"
+        }
+      ],
+      "entryRequirements": {
+        "charisma": 24,
+        "physique": 21
+      }
     }
   ],
   "endingDirections": {

@@ -1,7 +1,7 @@
 {
   "version": 1,
   "id": "ancient.sovereign-rise",
-  "revision": "1.0.0",
+  "revision": "1.3.0",
   "worldId": "ancient",
   "name": "布衣逐鹿",
   "tagline": "从乱世低处聚集人心与力量，最终回答天下归于何人。",
@@ -36,8 +36,6 @@
       "id": "ancient.sovereign-rise.foundation",
       "label": "立足",
       "objective": "取得第一批真实支持、资源或组织基础。",
-      "dramaticQuestion": "人物能否从被动求生转为主动影响局势？",
-      "pressureDirection": "旧秩序、地方力量与生存代价迫使人物表明立场。",
       "payoffMeaning": "人物成为一股能够持续行动的力量。",
       "beatOutline": {
         "setup": "让乱世危机直接威胁人物所在群体，并显露组织众人的机会。",
@@ -52,14 +50,26 @@
         "ancient.domain.sovereignty.mobilization",
         "ancient.domain.sovereignty.stronghold_campaign",
         "ancient.domain.sovereignty.absorb_forces"
-      ]
+      ],
+      "adventureSeeds": [
+        {
+          "opposition": "县尉与地方豪强争夺逃民，私兵强征粮户",
+          "crisis": "洪水冲垮渡口，逃民无处落脚，豪强以收编换取救济",
+          "entry": "主角家族或乡邻卷入迁徙，能凭熟人关系组织一小群互助者",
+          "allies": "船户掌握渡船，乡老能担保，伙伴愿跟随取决于救援与公平分配",
+          "escalation": "救济将断，豪强逼迫交人，县兵准备清场",
+          "stakes": "安顿一群人可取得据点和最初追随者；失败会散伙、欠债或失去亲近者"
+        }
+      ],
+      "entryRequirements": {
+        "charisma": 9,
+        "physique": 8
+      }
     },
     {
       "id": "ancient.sovereign-rise.contention",
       "label": "逐鹿",
       "objective": "进入军政角逐并形成自己的统治道路。",
-      "dramaticQuestion": "人物依靠什么获得并维持更大的支持？",
-      "pressureDirection": "效忠、自立、民心与武力逐渐发生冲突。",
       "payoffMeaning": "人物已经足以左右一方局势。",
       "beatOutline": {
         "setup": "让第一处据点卷入更大的军政竞争与联盟格局。",
@@ -74,14 +84,26 @@
         "ancient.domain.sovereignty.stronghold_campaign",
         "ancient.domain.sovereignty.absorb_forces",
         "ancient.domain.sovereignty.legitimacy_enthronement"
-      ]
+      ],
+      "adventureSeeds": [
+        {
+          "opposition": "邻郡军头兼并村寨，旧盟友要求以人质换援军",
+          "crisis": "初建据点被封锁，春耕和防守无法兼顾",
+          "entry": "承接实际追随者和地盘，须让部众知道为何作战、听谁调度",
+          "allies": "农户供给、工匠修寨、旧友联系援军，权责须通过实际协作建立",
+          "escalation": "敌方夺取渡口，盟友趁机索地，胜负将改变地方归属",
+          "stakes": "争得可守的领地与盟军才能扩大号令；失败会失地、失民或被迫投靠"
+        }
+      ],
+      "entryRequirements": {
+        "charisma": 16,
+        "physique": 14
+      }
     },
     {
       "id": "ancient.sovereign-rise.order",
       "label": "定鼎",
       "objective": "争夺或重塑最高秩序，并承担胜利后的治理问题。",
-      "dramaticQuestion": "人物建立的秩序是否值得延续？",
-      "pressureDirection": "功臣、士族、外患和继承问题集中出现。",
       "payoffMeaning": "天下归属与人物留下的制度得到不可逆的回答。",
       "beatOutline": {
         "setup": "让天下归属与新秩序合法性成为最后必须回答的问题。",
@@ -96,7 +118,21 @@
         "ancient.domain.sovereignty.legitimacy_enthronement",
         "ancient.domain.sovereignty.postwar_order",
         "ancient.domain.sovereignty.absorb_forces"
-      ]
+      ],
+      "adventureSeeds": [
+        {
+          "opposition": "最后竞争者占据京畿，旧功臣企图独揽新朝权柄",
+          "crisis": "都城粮道中断，军队等封赏，百姓担心新主只是另一军阀",
+          "entry": "主角凭已有联盟与疆土参与最后角逐，实际实力不足时须另求秩序",
+          "allies": "地方代表、掌兵同伴与文臣分别支持安民、军功和制度",
+          "escalation": "决战、谈判与内部夺权相互牵动，旧盟约必须兑现",
+          "stakes": "统一或形成稳定分治要落实军队归属与民生；强夺帝位亦可能失去伙伴、民心和新秩序"
+        }
+      ],
+      "entryRequirements": {
+        "charisma": 24,
+        "physique": 21
+      }
     }
   ],
   "endingDirections": {

@@ -1,7 +1,7 @@
 {
   "version": 1,
   "id": "ancient.merchant-house",
-  "revision": "1.0.0",
+  "revision": "1.3.0",
   "worldId": "ancient",
   "name": "商贾世家",
   "tagline": "以货物、信用与远路连接天下，让财富成为家业、地位或风暴。",
@@ -37,8 +37,6 @@
       "id": "ancient.merchant-house.credit",
       "label": "立信",
       "objective": "取得第一份能够持续经营的本钱、技艺和信用关系。",
-      "dramaticQuestion": "人物凭什么让别人愿意与其做下一次生意？",
-      "pressureDirection": "家道、关卡、货损、竞争和人情债考验初始积累。",
       "payoffMeaning": "人物拥有可延续的营生和第一条可靠网络。",
       "beatOutline": {
         "setup": "让人物从生活所需发现一项真实交易机会与风险。",
@@ -53,14 +51,26 @@
         "ancient.domain.commerce.capital_credit",
         "ancient.domain.commerce.transport_warehouse",
         "ancient.domain.commerce.guild_competition"
-      ]
+      ],
+      "adventureSeeds": [
+        {
+          "opposition": "行商抢占集市，牙人扣住新手货款",
+          "crisis": "首批货遇封路和交期，家中本钱不能再借",
+          "entry": "从家中铺面、手艺或担保接一笔可承担的小生意",
+          "allies": "工匠保证货质、老客愿作证、脚夫认路",
+          "escalation": "买方压价，货物损耗，信用与眼前现金冲突",
+          "stakes": "实际履约带来周转本钱与固定客户；失败留下债务、退货和担保责任"
+        }
+      ],
+      "entryRequirements": {
+        "family": 9,
+        "charisma": 8
+      }
     },
     {
       "id": "ancient.merchant-house.network",
       "label": "通衢",
       "objective": "把经营扩展为跨地域或跨行业网络，并处理官商与行会关系。",
-      "dramaticQuestion": "商业扩张能否不以失去自主和信用为代价？",
-      "pressureDirection": "垄断、走私、征税、权贵索取和伙伴分利放大风险。",
       "payoffMeaning": "人物成为能够调动资金、货物与消息的重要商人。",
       "beatOutline": {
         "setup": "让已有营生进入跨地商路、行会或官商关系。",
@@ -75,14 +85,26 @@
         "ancient.domain.commerce.transport_warehouse",
         "ancient.domain.commerce.guild_competition",
         "ancient.domain.commerce.state_gray_trade"
-      ]
+      ],
+      "adventureSeeds": [
+        {
+          "opposition": "商会垄断渡口，官吏临时加征过境税",
+          "crisis": "远地订单与车队受困，伙计要工钱",
+          "entry": "用已积累资金和客户建立商路，不能凭账面名望得到船队",
+          "allies": "船主、异地伙伴和掌柜提供运输、销路、管理，须谈分担风险",
+          "escalation": "封关与抢货并至，扩张需要抵押核心家业",
+          "stakes": "打通商路使利润、合伙权与雇员职责持久变化；失败会破产、拆伙或失去市场"
+        }
+      ],
+      "entryRequirements": {
+        "family": 16,
+        "charisma": 14
+      }
     },
     {
       "id": "ancient.merchant-house.legacy",
       "label": "成业",
       "objective": "决定财富如何转化为家族地位、公共影响或新的生活道路。",
-      "dramaticQuestion": "人物留下的是一笔财富、一个家族还是一种可持续的秩序？",
-      "pressureDirection": "官府清算、政治投资、继承和行业更替集中出现。",
       "payoffMeaning": "商业成果及其与权力、家族的关系得到最终回答。",
       "beatOutline": {
         "setup": "让家业传承或政局变化检验人物建立的商业秩序。",
@@ -97,7 +119,21 @@
         "ancient.domain.commerce.state_gray_trade",
         "ancient.domain.commerce.succession_public",
         "ancient.domain.commerce.capital_credit"
-      ]
+      ],
+      "adventureSeeds": [
+        {
+          "opposition": "官营专卖与大商号争夺民生产业",
+          "crisis": "战灾冲击供应，债主催款，民众缺必需品",
+          "entry": "以已有商号、家人与雇员面对财富的公共责任",
+          "allies": "旧客户、地方官和工匠能否协作取决于此前履约",
+          "escalation": "囤货暴利、救济与家族继承矛盾爆发",
+          "stakes": "保业、赈济、转让或倒闭都须交代财富与人去向；所得不只金钱，也有债务与声誉"
+        }
+      ],
+      "entryRequirements": {
+        "family": 24,
+        "charisma": 21
+      }
     }
   ],
   "endingDirections": {

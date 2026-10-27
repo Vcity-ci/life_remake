@@ -3,7 +3,7 @@ export type StatKey = "intelligence" | "charisma" | "family" | "fortune" | "phys
 export type DecisionType = "safe" | "balanced" | "risky";
 export type CardRarity = "common" | "rare" | "epic" | "legendary";
 export type AgeStageId = "child" | "youth" | "prime" | "middle" | "elder";
-export type StepAction = "consume" | "decide" | "select_growth_focus" | "generate_opening" | "resolve_survival";
+export type StepAction = "consume" | "decide" | "select_growth_focus" | "generate_opening" | "resolve_survival" | "prepare_act";
 export type RunPhase = "generating" | "ready" | "waiting_decision" | "ended";
 export type DirectorMode = "legacy" | "tool-fast" | "auto";
 export type EventKind = "normal" | "milestone" | "any";
@@ -82,9 +82,6 @@ export interface NarrativeAttributePolicy {
   minEffects: number;
   maxEffects: number;
   requirePositive?: boolean;
-  /** A local preference the engine verifies without exposing numeric rules to players. */
-  preferredStats?: StatKey[];
-  minPreferredEffects?: number;
   /** Negative effects on these stats are never accepted for this policy. */
   forbidNegativeStats?: StatKey[];
   /** The engine accepts at most this negative semantic band for a specific stat. */
@@ -272,6 +269,7 @@ export interface NarrativeEventBinding {
  * requirements; each world supplies its own dramatic meaning.
  */
 export interface NarrativeMainlineActDefinition {
+  entryRequirements?: Partial<Record<StatKey, number>>;
   id: string;
   label: string;
   prompt: string;
@@ -359,8 +357,16 @@ export interface NarrativeStoryPackActDefinition {
   id: string;
   label: string;
   objective: string;
-  dramaticQuestion: string;
-  pressureDirection: string;
+  /** Alternative playable situations. The act planner selects one coherent situation. */
+  adventureSeeds: Array<{
+    opposition: string;
+    crisis: string;
+    entry: string;
+    allies: string;
+    escalation: string;
+    stakes: string;
+  }>;
+  entryRequirements: Partial<Record<StatKey, number>>;
   payoffMeaning: string;
   /** Causal duties for the five engine beats. They guide progression without fixing events, ages, NPCs or places. */
   beatOutline: {
@@ -561,13 +567,11 @@ export interface NarrativeStatGate {
   threshold: number;
 }
 
-/** Player-selected emphasis for ordinary-year growth during one world act. */
+/** Player-selected way of learning and acting, independent of admission deficits. */
 export interface NarrativeGrowthFocusDefinition {
   id: string;
   label: string;
   description: string;
-  primaryStats: StatKey[];
-  secondaryStats?: StatKey[];
 }
 
 /** World-owned thresholds used by public attribute pills and model context. */
@@ -790,6 +794,12 @@ export interface NarrativeActRuntime {
   growthFocusId?: string;
   growthFocusOptions?: NarrativeGrowthFocusDefinition[];
   outline?: NarrativeActOutline;
+  admittedAtAge?: number;
+  preparation?: {
+    requestId: string;
+    status: "pending" | "failed";
+    bufferedTurns: number;
+  };
 }
 
 /** A player-visible recurring person generated during this particular life. */
@@ -1626,6 +1636,7 @@ export interface PublicTimelineEntry {
 
 /** The sole public record of a committed story turn. */
 export interface TurnRecord {
+  protagonistIntroductionSnapshot?: string;
   turnId: string;
   sequence: number;
   kind: TimelinePresentationKind;
@@ -1694,6 +1705,13 @@ export interface PublicSurvivalCrisis {
 }
 
 export interface PublicRunState {
+  protagonistIntroduction?: string;
+  actPlanning?: {
+    actId: string;
+    status: "pending" | "ready" | "failed";
+    bufferedTurns: number;
+    bufferLimit: number;
+  };
   runId: string;
   worldId: WorldId;
   storyPack?: Pick<PublicStoryPackOption, "id" | "revision" | "name" | "tagline">;

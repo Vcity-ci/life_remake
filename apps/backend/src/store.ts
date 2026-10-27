@@ -15,6 +15,8 @@ import type { InternalRunState } from "./engine.js";
 import { applyNarrativeMemoryCuration, type NarrativeMemoryCurationResult, type NarrativeMemoryCurationWork } from "./narrative/curator.js";
 import { resolveProjectRoot } from "./project-root.js";
 import { upgradeProviderOutputBudget } from "./config.js";
+import type { NarrativeActOutline } from "@reroll/shared";
+import { applyActPreparationResult } from "./narrative/act-preparation.js";
 
 interface StoredGameEnv {
   runtimeMode: "cloud" | "local";
@@ -444,6 +446,20 @@ export async function getRunSessionId(runId: string): Promise<string | undefined
   const record = runs.get(runId);
   if (!record || record.expiresAt <= Date.now()) return undefined;
   return record.sessionId;
+}
+
+export async function commitRunActPreparation(runId: string, sessionId: string, actId: string, requestId: string, outline?: NarrativeActOutline): Promise<boolean> {
+  return withSessionLock(sessionId, () => withRunLock(runId, async () => {
+    await ensureStoreReady();
+    const record = runs.get(runId);
+    if (!record || record.sessionId !== sessionId || record.expiresAt <= Date.now()) return false;
+    const updated = structuredClone(record.run);
+    if (!applyActPreparationResult(updated, actId, requestId, outline)) return false;
+    record.run = updated;
+    record.updatedAt = Date.now();
+    await queuePersist();
+    return true;
+  }));
 }
 
 export async function getLatestRun(sessionId: string): Promise<InternalRunState | undefined> {

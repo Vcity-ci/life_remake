@@ -1,7 +1,7 @@
 {
   "version": 1,
   "id": "ancient.mystic-order",
-  "revision": "1.0.0",
+  "revision": "1.3.0",
   "worldId": "ancient",
   "name": "方术教门",
   "tagline": "以医术、经典、仪式与灾异解释影响人心，也承受信仰进入权力后的代价。",
@@ -37,8 +37,6 @@
       "id": "ancient.mystic-order.inheritance",
       "label": "受法",
       "objective": "取得可以实际帮助他人或解释世界的传承与能力。",
-      "dramaticQuestion": "人物如何证明所学不只是虚名或幻术？",
-      "pressureDirection": "疾病、灾异、师门规矩和民间期待检验最初所学。",
       "payoffMeaning": "人物建立真实能力、声望与传承身份。",
       "beatOutline": {
         "setup": "让疾病、灾异或异常征兆把人物引向一门真实传承。",
@@ -53,14 +51,26 @@
         "ancient.domain.faith.disaster_healing",
         "ancient.domain.faith.rite_miracle",
         "ancient.domain.faith.seal_taboo"
-      ]
+      ],
+      "adventureSeeds": [
+        {
+          "opposition": "游方术士售假药，地方病患无人照看",
+          "crisis": "村中疫病扩散，师门药材不足",
+          "entry": "因家族医术、寺观照料或乡里关系接触救治，先验证一项真实方法",
+          "allies": "医者传授辨症，采药人识路，病家提供观察",
+          "escalation": "假药致死引发冲突，误诊也必须承担后果",
+          "stakes": "救治效果决定能否受传与获托；失败留下病亡、质疑与补救义务"
+        }
+      ],
+      "entryRequirements": {
+        "intelligence": 9,
+        "charisma": 8
+      }
     },
     {
       "id": "ancient.mystic-order.influence",
       "label": "入世",
       "objective": "让医术、仪式、预言或经典进入更广阔的社会与权力关系。",
-      "dramaticQuestion": "人物能否影响权力而不被权力塑造成工具？",
-      "pressureDirection": "宫廷需求、教派竞争、真假灾异和公共责任彼此冲突。",
       "payoffMeaning": "人物成为能够影响民间或朝局的精神与知识权威。",
       "beatOutline": {
         "setup": "让人物的声望进入更大的教门、地方或朝廷视野。",
@@ -75,14 +85,26 @@
         "ancient.domain.faith.rite_miracle",
         "ancient.domain.faith.court_debate",
         "ancient.domain.faith.popular_movement"
-      ]
+      ],
+      "adventureSeeds": [
+        {
+          "opposition": "地方教团借灾收徒，官府欲一概禁治",
+          "crisis": "瘟疫与谣言叠加，诊所或道场被围",
+          "entry": "用已有医术与信任进入公共救治，不把仪式当万能答案",
+          "allies": "药商、医者与基层差役能提供药、隔离和通行",
+          "escalation": "病情反复，教内争夺捐献，主角的承诺遭检验",
+          "stakes": "实际救治与组织形成可持续门徒和公共信任；失败导致禁令、伤亡或分裂"
+        }
+      ],
+      "entryRequirements": {
+        "intelligence": 16,
+        "charisma": 14
+      }
     },
     {
       "id": "ancient.mystic-order.legacy",
       "label": "定教",
       "objective": "决定传承、教门、著述与政治关系的最终去向。",
-      "dramaticQuestion": "人物留下的是可验证的学问、信仰秩序，还是被权力吞没的神话？",
-      "pressureDirection": "君主猜忌、教派分裂、预言成败和继承问题集中出现。",
       "payoffMeaning": "传承是否延续、人物如何被后世理解得到回答。",
       "beatOutline": {
         "setup": "让传承存亡与更大灾异或政治清算同时到来。",
@@ -97,7 +119,21 @@
         "ancient.domain.faith.court_debate",
         "ancient.domain.faith.seal_taboo",
         "ancient.domain.faith.popular_movement"
-      ]
+      ],
+      "adventureSeeds": [
+        {
+          "opposition": "权贵借教团动员民众，内部领袖企图神化主角",
+          "crisis": "旱灾和政争令信众走向暴力",
+          "entry": "以现有传承和信众决定其与政权关系",
+          "allies": "理性同道、地方居民、旧患者分别提供规约与信任",
+          "escalation": "镇压、起事与内部夺权迫近，信仰必须转成可承担的行动",
+          "stakes": "留下可延续的教法与秩序或解散组织；代价可为流放、失去信众和个人性命"
+        }
+      ],
+      "entryRequirements": {
+        "intelligence": 24,
+        "charisma": 21
+      }
     }
   ],
   "endingDirections": {

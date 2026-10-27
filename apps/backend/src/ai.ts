@@ -489,6 +489,7 @@ export interface DynamicNarrativeSceneInput {
   attributePolicy?: NarrativeAttributePolicy;
   backgroundAttributePolicy: NarrativeAttributePolicy;
   growthFocus?: { label: string; description: string };
+  preparation?: NarrativeTurnEnvelope["preparation"];
   statTiers: Record<StatKey, NarrativeStatTier>;
   statTierLabels?: Record<StatKey, string>;
   recentChanges?: string[];
@@ -759,7 +760,8 @@ export function narrativeTurnPlanTools(input: NarrativeTurnEnvelope): Record<str
 export function narrativeTurnPlanningPrompt(input: NarrativeTurnEnvelope, plan?: NarrativePromptPlan): string {
   if (!input.actOutline) return [
     `本幕：${input.act.label}。人物当前${input.currentAge}岁。`,
-    "从世界素材和 IF 路线中选定本幕实际成立的局势，形成可直接主持的世界卡。写清各方想得到什么、依靠什么、彼此为何冲突、什么变化正在逼近，以及主角如何进入其中；不罗列候选写法。",
+    "从 IF 冒险素材中选定一套实际成立的局势，结合世界规律组织可直接主持的世界卡。具体写出具名对手正采取的行动、会爆发的危机、主角的介入理由、可依靠的人和行动条件、冲突如何升级，以及值得争取的持久收获与无法抹掉的代价。不罗列候选写法。",
+    "主角的行动条件必须有因果：凭什么接触此事，关系、资源或职责从哪里获得，相关人物为何协作，行动结果如何改变其处境与权责。准备可以积累条件，五拍须实际处理本幕危机，不能停留在旁观或等待认可。未来安排并非已发生事实。",
     "世界规律是成立条件，起始局势是选材来源；人物的实际起点和此前结果决定当前现状。后续幕继承已经改变的关系和局势，不重置旧危机。",
     "五节拍围绕选定冲突组织变化 change 和所需对象 props。它们是冲突的发展节奏，不是五次抽象成长，也不是预写玩家正文；玩家如何应对、能否成功和最终所得由实际游戏产生。",
     "年龄安排适合本幕在人生中的发展，平静生活可以略写；不能把五拍都写成进入主线前的幼年准备。通过 actWorldCard 提交。"
@@ -769,7 +771,7 @@ export function narrativeTurnPlanningPrompt(input: NarrativeTurnEnvelope, plan?:
   return [
     "依据本幕选定的局势与实际进展，交接当前 change 尚未落实的哪一部分，以及使它发生的条件。beatChange 沿用或收窄本拍改变，每条引用用 purpose 写清它提供的条件、阻碍或有效后果；不因最近发生过就召回。",
     "从 props 和当前处境找到所需对象：已有对象复制完整 ID；尚未登记的对象通过 assetNeeds 写明名称与作用，不能拿目录里无关的旧事项替代。世界卡中的存在不代表主角已经结识或获得。note 只写尚缺的条件，没有则填空。实际选择已改变的条件不能复原，阶段结果允许是成功、失败或付出代价。",
-    "紧迫行动用 hold；适合经过生活、等待或准备进入下一岁用 advance，并以 timeScope 交代时间发展。领域知识只提供行动条件和方法，不另定冲突；不重写本幕故事，不预定玩家行动。",
+    "紧迫行动用 hold；适合经过生活、等待或准备进入下一岁用 advance，并以 timeScope 交代时间发展。能力不足时可以安排有实际意义的练习、求教或筹措，再继续面对原问题；保留敌情、后果与节拍，不另开故事也不假定对手停止行动。领域知识只提供行动条件和方法，不重写本幕故事，不预定玩家行动。",
     `本幕世界卡：\n${input.actOutline.background}`,
     protagonist.identity,
     protagonist.experience,
@@ -785,27 +787,32 @@ export function narrativeTurnPlanningPrompt(input: NarrativeTurnEnvelope, plan?:
   ].filter(Boolean).join("\n");
 }
 
+/** Used exclusively by the background act preparation job. */
+export async function generateNarrativeActWorldCard(
+  run: InternalRunState, world: WorldConfig, input: NarrativeTurnEnvelope, ctx: NarrativeContext
+): Promise<NarrativeActOutline> {
+  const result = await requestNarrativeOutcomeTool(run, world, ctx, narrativeTurnPlanTools(input),
+    narrativeTurnPlanningPrompt(input), {
+      task: "planning", planningPurpose: "initial", callId: `${input.callId}:outline`, source: input.source,
+      age: input.currentAge, actId: input.act.id, beat: "setup",
+      parseResult: (raw) => {
+        try { return parseNarrativeActWorldCard(raw.actWorldCard, input.act.id); }
+        catch { throw invalidNarrativeOutcome("narrative_act_outline_invalid", { rule: "background_and_five_beats_required", path: "actWorldCard" }); }
+      }
+    });
+  return result.parsed!;
+}
+
 export async function generateNarrativeTurnPlan(
   run: InternalRunState, world: WorldConfig, input: NarrativeTurnEnvelope, ctx: NarrativeContext
 ): Promise<NarrativeTurnPlan> {
   let returned: { toolName: string; fields: string[] } | undefined;
   try {
-    if (!input.actOutline) {
-      const result = await requestNarrativeOutcomeTool(run, world, ctx, narrativeTurnPlanTools(input),
-        narrativeTurnPlanningPrompt(input), {
-          task: "planning", planningPurpose: "initial", callId: `${input.callId}:outline`, source: input.source,
-          age: input.currentAge, actId: input.act.id, beat: input.beat,
-          parseResult: (raw) => {
-            try { return parseNarrativeActWorldCard(raw.actWorldCard, input.act.id); }
-            catch { throw invalidNarrativeOutcome("narrative_act_outline_invalid", { rule: "background_and_five_beats_required", path: "actWorldCard" }); }
-          }
-        });
-      input = { ...input, actOutline: result.parsed! };
-    }
     if (!input.capabilities.includes("scene")) return {
       callId: input.callId, turnKind: "background", patternIds: [], forceIds: [], conflictRefs: [], abilityRefs: [],
       presentation: "summary", clockRequest: "advance", actOutline: input.actOutline
     };
+    if (!input.actOutline) throw new Error("narrative_act_outline_not_ready");
     const result = await requestNarrativeOutcomeTool(run, world, ctx, narrativeTurnPlanTools(input),
       narrativeTurnPlanningPrompt(input, ctx.narrativePlan), {
         task: "planning", planningPurpose: "execute", callId: input.callId, source: input.source,
@@ -4273,6 +4280,8 @@ export function dynamicNarrativeRenderPrompt(input: DynamicNarrativeSceneInput, 
       : input.sceneAge === previousAge
         ? "本段与上段同年：承接紧迫行动，写到实际变化或需要玩家决定的位置，不反复停在同一个行动。"
         : "本段已进入下一岁：交代上段处境经过这段时间如何延续或变化，再展开当前经历；不要把上一分钟的行动直接换成年龄继续。",
+    input.preparation?.mode === "transition" ? "本幕局势尚在组织。本段只承接已发生的生活、所在地、关系与上一幕结果，写给定年段的生活、积累或恢复；不预演新幕危机，不推进五节拍。" : "",
+    input.preparation?.mode === "prepare" ? `本段是参与本幕危机前的准备。当前需要补强：${input.preparation.deficits.map((entry) => `${entry.label}（现有${entry.value}，所需${entry.target}）`).join("；")}。依本幕世界卡、人物已有本事与行事方式安排可积累的生活和练习，收益由实际经历结算，不每年制造主线事件。` : "",
     input.presentation !== "summary" ? "当前节拍：" + input.beat : "",
     input.plan?.recallUses?.length ? "召回对象与本轮用途（条件，不是需要介绍的题材）：\n" + input.plan.recallUses.map((use) => `${use.label}：${use.purpose}`).join("\n") : "",
     input.plan?.note ? `尚缺条件：${input.plan.note}` : "",

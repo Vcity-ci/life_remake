@@ -50,7 +50,8 @@ import { narrativeStoryPackNextAct } from "./narrative-experience.js";
 import { committedNarrativeSequence, NARRATIVE_HISTORY_LIMIT } from "./narrative/history.js";
 import { buildNarrativeStoryHistory, type NarrativeStoryHistory } from "./narrative/story-history.js";
 import { formatNarrativeActStory, NARRATIVE_ACT_OUTLINE_BEATS } from "./narrative/act-outline.js";
-import { normalizeNarrativeStatTierConfig, resolveNarrativeStatLabels } from "./narrative-stats.js";
+import { normalizeNarrativeStatTierConfig } from "./narrative-stats.js";
+import { protagonistParts } from "./narrative/protagonist.js";
 
 export interface NarrativePromptSource {
   aiConversation?: AiConversationState;
@@ -739,15 +740,12 @@ export function ensureNarrativeRunState(
       focus && typeof focus === "object" &&
       typeof (focus as NarrativeGrowthFocusDefinition).id === "string" &&
       typeof (focus as NarrativeGrowthFocusDefinition).label === "string" &&
-      typeof (focus as NarrativeGrowthFocusDefinition).description === "string" &&
-      Array.isArray((focus as NarrativeGrowthFocusDefinition).primaryStats)
+      typeof (focus as NarrativeGrowthFocusDefinition).description === "string"
     )).slice(0, 8).map((focus) => ({
       id: compactText(focus.id, 80),
       label: (focus.label).trim(),
-      description: (focus.description).trim(),
-      primaryStats: focus.primaryStats.filter((stat): stat is keyof Stats => ["intelligence", "charisma", "family", "fortune", "physique"].includes(stat)).slice(0, 3),
-      secondaryStats: focus.secondaryStats?.filter((stat): stat is keyof Stats => ["intelligence", "charisma", "family", "fortune", "physique"].includes(stat)).slice(0, 3)
-    })).filter((focus) => focus.id && focus.label && focus.description && focus.primaryStats.length > 0)
+      description: (focus.description).trim()
+    })).filter((focus) => focus.id && focus.label && focus.description)
     : [];
   const statKeys: Array<keyof Stats> = ["intelligence", "charisma", "family", "fortune", "physique"];
   const tierKeys: NarrativeStatTier[] = ["low", "developing", "steady", "advanced", "high"];
@@ -793,7 +791,9 @@ export function ensureNarrativeRunState(
       decisionCount: Math.max(0, Math.min(32, Number(state.actRuntime.decisionCount) || 0)),
       growthFocusId: state.actRuntime.growthFocusId?.trim() || undefined,
       growthFocusOptions: normalizeGrowthFocuses(state.actRuntime.growthFocusOptions),
-      outline: actOutline
+      outline: actOutline,
+      admittedAtAge: typeof state.actRuntime.admittedAtAge === "number" ? state.actRuntime.admittedAtAge : undefined,
+      preparation: state.actRuntime.preparation ? { ...state.actRuntime.preparation } : undefined
     } satisfies NarrativeActRuntime
     : undefined;
   const rawClock = state.sceneClock;
@@ -888,11 +888,7 @@ export function ensureNarrativeRunState(
 const actBeats: Array<Exclude<NarrativeBeat, "ending">> = ["setup", "escalation", "pressure", "climax", "payoff"];
 
 function growthFocusesForWorld(world: NarrativeWorldDefinition | null | undefined): NarrativeGrowthFocusDefinition[] {
-  return (world?.progression?.growthFocuses ?? []).map((focus) => ({
-    ...focus,
-    primaryStats: [...focus.primaryStats],
-    secondaryStats: focus.secondaryStats ? [...focus.secondaryStats] : undefined
-  }));
+  return (world?.progression?.growthFocuses ?? []).map((focus) => ({ ...focus }));
 }
 
 export function ensureNarrativeActRuntime(
@@ -988,7 +984,7 @@ export function advanceNarrativeActBeat(
   return { state: next, completedActId };
 }
 
-/** Records the player's ordinary-year growth emphasis without advancing time. */
+/** Records the player's learning and action style without advancing time. */
 export function selectNarrativeGrowthFocus(
   state: NarrativeRunState,
   world: NarrativeWorldDefinition | null | undefined,
@@ -1328,6 +1324,7 @@ export function isNarrativeStageReady(
   stage: NarrativeProgressGateStage,
   directionIdOverride?: string
 ): boolean {
+  if (source.narrative.actRuntime) return refreshNarrativeActAdmission(source, world);
   const gate = resolveNarrativeStageGate(source, world, stage, directionIdOverride);
   if (!gate || !source.stats) return true;
   return weightedStatScore(source.stats, gate.weights) >= gate.threshold;
@@ -1361,6 +1358,7 @@ export function isNarrativeWorldStageReady(
   world: NarrativeWorldDefinition | null | undefined,
   stage: NarrativeProgressGateStage
 ): boolean {
+  if (source.narrative.actRuntime) return refreshNarrativeActAdmission(source, world);
   if (world?.progression?.gates?.[stage]) return isNarrativeStageReady(source, world, stage);
   const routes = world?.progression?.routes ?? [];
   if (routes.length === 0) return isNarrativeStageReady(source, world, stage);
@@ -1376,11 +1374,31 @@ export function isNarrativeMainlineActEntryReady(
   source: NarrativePromptSource,
   world: NarrativeWorldDefinition | null | undefined
 ): boolean {
+  if (source.narrative.actRuntime) return refreshNarrativeActAdmission(source, world);
   const activeAct = source.narrative.activeMainlineActId
     ? world?.mainlineActs?.find((act) => act.id === source.narrative.activeMainlineActId)
     : undefined;
   const actIndex = world?.mainlineActs?.findIndex((act) => act.id === (source.narrative.actRuntime?.actId ?? activeAct?.id)) ?? -1;
   return isNarrativeWorldStageReady(source, world, world?.progression?.actGateThresholds?.[actIndex] ? "opening" : activeAct?.readinessStage ?? "opening");
+}
+
+export function narrativeActDeficits(source: Pick<NarrativePromptSource, "stats" | "narrative">, world: NarrativeWorldDefinition | null | undefined) {
+  const act = world?.mainlineActs?.find((entry) => entry.id === source.narrative.actRuntime?.actId);
+  return Object.entries(act?.entryRequirements ?? {}).flatMap(([stat, target]) => {
+    const key = stat as keyof Stats;
+    const value = source.stats?.[key] ?? 0;
+    return value < target! ? [{ stat: key, value, target: target! }] : [];
+  });
+}
+
+/** Admission is earned once; later loss affects actions, never removes participation. */
+export function refreshNarrativeActAdmission(source: Pick<NarrativePromptSource, "stats" | "narrative" | "age">, world: NarrativeWorldDefinition | null | undefined): boolean {
+  const runtime = source.narrative.actRuntime;
+  if (!runtime) return true;
+  if (runtime.admittedAtAge !== undefined) return true;
+  if (narrativeActDeficits(source, world).length) return false;
+  runtime.admittedAtAge = source.age;
+  return true;
 }
 
 /**
@@ -1798,23 +1816,9 @@ export function narrativeDefaultAssetFocusIds(state: NarrativeRunState, task: Na
 }
 
 export function narrativeCurrentProtagonist(source: NarrativePromptSource, world: NarrativeWorldDefinition): NonNullable<NarrativePromptPlan["protagonist"]> {
-  const act = world.mainlineActs?.find((entry) => entry.id === source.narrative.actRuntime?.actId);
-  const labels = source.stats ? resolveNarrativeStatLabels(source.stats, source.narrative.statTierConfig ?? world.progression?.statTiers,
-    source.narrative.statTierPresentation ?? world.progression?.statTierPresentation) : undefined;
-  const names: Record<keyof Stats, string> = { intelligence: "智力", charisma: "魅力", family: "家境", fortune: "气运", physique: "体魄" };
-  const location = source.narrative.assets?.locations.find((entry) => entry.id === source.narrative.assets?.currentLocationId);
-  return {
-    identity: [
-      source.personaPrompt ? `人物设定：${source.personaPrompt}` : "",
-      source.cards.length ? `天赋：${source.cards.map((card) => `${card.name}：${card.narrative?.bias ?? card.description ?? ""}`).join("；")}` : ""
-    ].filter(Boolean).join("\n"),
-    currentState: [
-      `当前年龄：${source.age}岁${source.ageStage ? `，${source.ageStage.label}` : ""}。`,
-      labels ? `当前能力基础：${Object.entries(labels).map(([stat, label]) => `${names[stat as keyof Stats]}=${label}`).join("；")}。` : "",
-      act ? `正在经历的人生阶段：${act.label}；当前实际身份与责任以已经发生的经历和近期结果为准。` : "",
-      location ? `当前生活或行动所在地：${location.name}。` : ""
-    ].filter(Boolean).join("\n")
-  };
+  return protagonistParts({ ...source, narrative: { ...source.narrative,
+    statTierConfig: source.narrative.statTierConfig ?? world.progression?.statTiers,
+    statTierPresentation: source.narrative.statTierPresentation ?? world.progression?.statTierPresentation } });
 }
 
 function buildTaskNarrativePlan(
@@ -1826,6 +1830,7 @@ function buildTaskNarrativePlan(
   const activeOutline = source.narrative.actRuntime?.actId === act?.id ? source.narrative.actRuntime?.outline : undefined;
   const initialPlanning = task === "planning" && !activeOutline;
   const initialWorld = initialPlanning || task === "origin";
+  const transitionLife = task === "background" && !activeOutline;
   const pending = (source as NarrativePromptSource & { pendingDynamicScene?: {
     patternIds: string[];
     forceIds: string[];
@@ -1927,7 +1932,7 @@ function buildTaskNarrativePlan(
   const worldCardDiagnostics: Array<{ id: string; reason: string }> = [];
   const storyPack = (world as NarrativeWorldDefinition & { storyPack?: NarrativeStoryPackSnapshot }).storyPack;
   const storyPackAct = storyPack?.acts.find((entry) => entry.id === act?.id);
-  const nextStoryPackAct = storyPackAct && beat === "payoff" ? narrativeStoryPackNextAct(storyPack, storyPackAct.id) : undefined;
+  const nextStoryPackAct = storyPackAct ? narrativeStoryPackNextAct(storyPack, storyPackAct.id) : undefined;
   const preferredWorldCardIds = Array.from(new Set([
     ...(storyPack?.worldCardRefs ?? []),
     ...(storyPackAct?.worldCardRefs ?? [])
@@ -1991,7 +1996,7 @@ function buildTaskNarrativePlan(
     !selectedWorldCardIds.has(entry.id) && all.findIndex((candidate) => candidate.id === entry.id && candidate.reason === entry.reason) === index);
   const mainlineSkeleton = initialPlanning ? world.mainlineSkeleton?.premise : undefined;
   const actDirection = storyPackAct
-    ? `当前阶段“${storyPackAct.label}”：目标=${storyPackAct.objective}；核心问题=${storyPackAct.dramaticQuestion}；压力方向=${storyPackAct.pressureDirection}；本幕需落定的结果=${storyPackAct.payoffMeaning}`
+    ? `当前阶段“${storyPackAct.label}”：目标=${storyPackAct.objective}；本幕需落定的结果=${storyPackAct.payoffMeaning}`
     : "";
   const routeGuidance = initialPlanning
       ? [
@@ -1999,6 +2004,7 @@ function buildTaskNarrativePlan(
           storyPack ? `路线核心矛盾=${storyPack.centralConflict}` : "",
           storyPack ? `人物轨迹=${storyPack.protagonistTrajectory}；风险升级=${storyPack.stakesProgression}；终局问题=${storyPack.endingQuestion}` : "",
           actDirection,
+          storyPackAct ? `本幕冒险素材（选定一套成立的局势，不并列候选）：${JSON.stringify(storyPackAct.adventureSeeds ?? [])}` : "",
           storyPackAct ? `本幕五节拍素材：${NARRATIVE_ACT_OUTLINE_BEATS.map((step) => `${step}：${storyPackAct.beatOutline[step]}`).join("；")}` : "",
           nextStoryPackAct ? `后续幕间方向：${nextStoryPackAct.label}；${nextStoryPackAct.objective}` : ""
         ].filter(Boolean).join("\n")
@@ -2024,7 +2030,7 @@ function buildTaskNarrativePlan(
     // both prompt and tool schemas with the lifetime of the save.
     factDirectory: [],
     storyBible: initialWorld ? world.storyBible : "",
-    worldCoreContext: initialWorld ? world.worldCore ? [
+    worldCoreContext: initialWorld || transitionLife ? world.worldCore ? [
       world.worldCore.identity,
       `世界规律：${world.worldCore.laws.join("；")}`,
       `力量结构：${world.worldCore.powerStructure}`,

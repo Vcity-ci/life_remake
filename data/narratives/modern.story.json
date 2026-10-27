@@ -206,39 +206,18 @@
     "growthFocuses": [
       {
         "id": "study",
-        "label": "学识与技艺",
-        "description": "将日常积累更多放在学习、专业能力与创造之上。",
-        "primaryStats": [
-          "intelligence",
-          "fortune"
-        ],
-        "secondaryStats": [
-          "charisma"
-        ]
+        "label": "研习实践",
+        "description": "通过学习、试验与复盘掌握方法，把知识用于实际问题。"
       },
       {
         "id": "bond",
-        "label": "关系与根基",
-        "description": "将日常积累更多放在人情、家庭与可依靠的关系之上。",
-        "primaryStats": [
-          "charisma",
-          "family"
-        ],
-        "secondaryStats": [
-          "fortune"
-        ]
+        "label": "协作互助",
+        "description": "通过沟通、合作与兑现承诺学习，善用彼此的专业与支持。"
       },
       {
         "id": "resolve",
-        "label": "行动与韧性",
-        "description": "将日常积累更多放在行动、体魄与承受现实的能力之上。",
-        "primaryStats": [
-          "physique",
-          "fortune"
-        ],
-        "secondaryStats": [
-          "intelligence"
-        ]
+        "label": "躬行试做",
+        "description": "从小任务开始亲手实践，逐步承担责任，兼顾恢复与可持续的生活。"
       }
     ],
     "completion": {

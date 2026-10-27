@@ -1,7 +1,7 @@
 {
   "version": 1,
   "id": "fantasy.otherkin-bond",
-  "revision": "1.0.0",
+  "revision": "1.3.0",
   "worldId": "fantasy",
   "name": "异族盟约",
   "tagline": "跨越血脉与文明边界，在敌意中重写彼此的关系。",
@@ -37,8 +37,6 @@
       "id": "fantasy.otherkin-bond.contact",
       "label": "相见",
       "objective": "在一次真实冲突或互助中建立跨族群的个人关系与共同事实。",
-      "dramaticQuestion": "人物相信 inherited 的敌意，还是眼前具体的人？",
-      "pressureDirection": "语言、习俗、身份暴露与双方恐惧使理解付出代价。",
       "payoffMeaning": "人物拥有了另一文明中的名字、关系和必须回应的承诺。",
       "beatOutline": {
         "setup": "让边境冲突或一次互助使人物真正遇见另一文明。",
@@ -53,14 +51,26 @@
         "fantasy.domain.civilization.first_contact",
         "fantasy.domain.civilization.trade_oath",
         "fantasy.domain.civilization.war_migration"
-      ]
+      ],
+      "adventureSeeds": [
+        {
+          "opposition": "捕妖猎户追捕幼兽，受伤异族不信任人类",
+          "crisis": "山火把双方逼入同一洞窟",
+          "entry": "主角因采集、家族边地生活与异族相遇，不能凭天赋自动获得信任",
+          "allies": "同行友人和异族幼者分别了解工具与山路",
+          "escalation": "猎队封山，救援必须跨越语言与旧怨",
+          "stakes": "互助形成可延续关系与沟通本领；失败带来被俘、误伤和追责"
+        }
+      ],
+      "entryRequirements": {
+        "charisma": 9,
+        "physique": 8
+      }
     },
     {
       "id": "fantasy.otherkin-bond.alliance",
       "label": "结盟",
       "objective": "围绕共同威胁或利益建立能够经受背叛风险的合作。",
-      "dramaticQuestion": "个人信任怎样成为群体可以接受的盟约？",
-      "pressureDirection": "各自内部的强硬者、旧仇和资源争端持续破坏合作。",
       "payoffMeaning": "人物成为双方都无法绕开的中介、代表或共同领袖。",
       "beatOutline": {
         "setup": "让共同威胁迫使私人信任升级为阵营合作。",
@@ -75,14 +85,26 @@
         "fantasy.domain.civilization.trade_oath",
         "fantasy.domain.civilization.war_migration",
         "fantasy.domain.civilization.shared_order"
-      ]
+      ],
+      "adventureSeeds": [
+        {
+          "opposition": "宗门与异族部落争夺灵泉，激进者破坏议约",
+          "crisis": "失控灵兽袭击共同聚落",
+          "entry": "承接真实盟友，主角能召集谁取决于往日兑现",
+          "allies": "族中长者、人类工匠与混居居民提供双方都需要的能力",
+          "escalation": "迁徙与防务冲突，双方要求主角表态",
+          "stakes": "共同救援或防守使联盟获得实际规约与地盘；失败造成离散、仇怨与失去庇护"
+        }
+      ],
+      "entryRequirements": {
+        "charisma": 16,
+        "physique": 14
+      }
     },
     {
       "id": "fantasy.otherkin-bond.new-order",
       "label": "共界",
       "objective": "在战争、迁徙或天地异变中决定多个文明的长期边界。",
-      "dramaticQuestion": "和平需要同化、分隔，还是共同创造新的秩序？",
-      "pressureDirection": "生存空间、牺牲、身份忠诚和古老誓约集中爆发。",
       "payoffMeaning": "族群关系因人物的选择形成战争、联盟或全新的共同生活方式。",
       "beatOutline": {
         "setup": "让战争、迁徙或天地异变把多个文明推向最终边界。",
@@ -97,7 +119,21 @@
         "fantasy.domain.civilization.war_migration",
         "fantasy.domain.civilization.shared_order",
         "fantasy.domain.civilization.trade_oath"
-      ]
+      ],
+      "adventureSeeds": [
+        {
+          "opposition": "人族大宗发动清剿，异族首领欲以血祭反击",
+          "crisis": "混居之地将成战场，旧伙伴分别受两边征召",
+          "entry": "以已有联盟与共居成果提出可执行的生存安排",
+          "allies": "旧盟、城守和第三方商路各提供谈判筹码",
+          "escalation": "战争与报复临界，必须兑现保护承诺",
+          "stakes": "共存秩序、分迁、臣服或覆灭以居民存亡和力量归属落定"
+        }
+      ],
+      "entryRequirements": {
+        "charisma": 24,
+        "physique": 21
+      }
     }
   ],
   "endingDirections": {

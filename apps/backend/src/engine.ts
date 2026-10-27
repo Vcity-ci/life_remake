@@ -8,6 +8,8 @@ import { registerNarrativeParticipants, formatNarrativeRelationship } from "./na
 import { factUpdateContract, parseFactUpdates, prepareNarrativeFactUpdates, narrativeFactResolutionModes, normalizeNarrativeHandoffFact, narrativeActFacts } from "./narrative-continuity.js";
 import { createHash } from "node:crypto";
 import { choiceProbability, rollChoice } from "./choice-check.js";
+import { protagonistIntroduction, statNames } from "./narrative/protagonist.js";
+import { ACT_TRANSITION_LIMIT } from "./narrative/act-preparation.js";
 import type { DirectedDecisionNarrativeOutcome } from "./ai.js";
 import type {
   AgeThreshold,
@@ -1771,6 +1773,7 @@ export function appendTurnRecords(
       narrativeCharactersSnapshot: publicNarrativeCharactersSnapshot(run),
       narrativeAssetsSnapshot: publicNarrativeAssetsSnapshot(run.narrative.assets),
       fameSnapshot: run.fame,
+      protagonistIntroductionSnapshot: protagonistIntroduction({ ...run, age: publicEntry.age, ageStage: publicEntry.ageStage }),
       choice: index === entries.length - 1 ? choice : undefined,
       choiceOutcome: index === entries.length - 1 ? choiceOutcome : undefined,
       createdAt
@@ -1801,6 +1804,7 @@ export function appendPublicTurnRecord(
     narrativeCharactersSnapshot: publicNarrativeCharactersSnapshot(run),
     narrativeAssetsSnapshot: publicNarrativeAssetsSnapshot(run.narrative.assets),
     fameSnapshot: run.fame,
+    protagonistIntroductionSnapshot: protagonistIntroduction({ ...run, age: publicEntry.age, ageStage: publicEntry.ageStage }),
     choice,
     choiceOutcome,
     createdAt: Date.now()
@@ -1836,6 +1840,7 @@ export function settleChoiceResultRecord(run: InternalRunState, record: TurnReco
   record.narrativeCharactersSnapshot = publicNarrativeCharactersSnapshot(run);
   record.narrativeAssetsSnapshot = publicNarrativeAssetsSnapshot(run.narrative.assets);
   record.fameSnapshot = run.fame;
+  record.protagonistIntroductionSnapshot = protagonistIntroduction({ ...run, age: record.age, ageStage: record.ageStage });
   if (record.decisionResult) record.decisionResult.status = "settled";
 }
 
@@ -1866,6 +1871,8 @@ export function ensureVisibleTurnRecords(run: InternalRunState, world: WorldConf
     entries,
     pendingChoice?.age === lastEntry?.age ? pendingChoice : undefined
   );
+  // Legacy visible records have no historical profile; never backfill today's identity/assets.
+  for (const record of records) delete record.protagonistIntroductionSnapshot;
   return records;
 }
 
@@ -1892,6 +1899,7 @@ export function appendDecisionTurnRecord(
     narrativeCharactersSnapshot: publicNarrativeCharactersSnapshot(run),
     narrativeAssetsSnapshot: publicNarrativeAssetsSnapshot(run.narrative.assets),
     fameSnapshot: run.fame,
+    protagonistIntroductionSnapshot: protagonistIntroduction({ ...run, age: publicEntry.age, ageStage: publicEntry.ageStage }),
     choice,
     choiceOutcome: resolvedOption ? {
       optionId: resolvedOption.id,
@@ -3650,22 +3658,14 @@ export function dynamicSceneAttributePolicy(): NarrativeAttributePolicy {
 }
 
 export function dynamicBackgroundAttributePolicy(run: InternalRunState): NarrativeAttributePolicy {
-  const runtime = run.narrative.actRuntime;
-  const focus = runtime?.growthFocusId
-    ? runtime.growthFocusOptions?.find((option) => option.id === runtime.growthFocusId)
-    : undefined;
-  const preferredStats = focus?.primaryStats ?? [];
   return {
-    // A focus anchors the segment without turning its attributes into a whitelist.
     allowedStats: allStatKeys,
     allowedBands: ["light", "medium"],
     allowedDirections: ["up"],
     minEffects: 1,
     maxEffects: 2,
     requirePositive: true,
-    positiveMagnitudeByBand: { light: 1, medium: 1 },
-    preferredStats,
-    minPreferredEffects: preferredStats.length ? 1 : 0
+    positiveMagnitudeByBand: { light: 1, medium: 1 }
   };
 }
 
@@ -4022,6 +4022,14 @@ export function toClientRun(run: InternalRunState): PublicRunState {
     stats: visibleStats,
     statTiers,
     statTierLabels,
+    protagonistIntroduction: visibleTurn ? visibleTurn.protagonistIntroductionSnapshot ?? [
+      `你目前${visibleTurn.age}岁，${visibleTurn.ageStage.label}。`,
+      `你的能力基础：${Object.entries(statTierLabels).map(([key, label]) => `${statNames[key as StatKey]}：${label}`).join("；")}。`,
+      visibleTurn.narrativeAssetsSnapshot?.locations.find((entry) => entry.id === visibleTurn.narrativeAssetsSnapshot?.currentLocationId)?.name
+        ? `你目前在${visibleTurn.narrativeAssetsSnapshot.locations.find((entry) => entry.id === visibleTurn.narrativeAssetsSnapshot?.currentLocationId)!.name}。` : ""
+    ].filter(Boolean).join("\n") : protagonistIntroduction(run),
+    actPlanning: runtime ? { actId: runtime.actId, status: runtime.outline ? "ready" : runtime.preparation?.status ?? "pending",
+      bufferedTurns: runtime.preparation?.bufferedTurns ?? 0, bufferLimit: ACT_TRANSITION_LIMIT } : undefined,
     growthFocus,
     opening: run.narrative.opening
       ? { status: run.narrative.opening.status }

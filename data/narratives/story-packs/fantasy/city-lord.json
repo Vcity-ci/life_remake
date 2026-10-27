@@ -1,7 +1,7 @@
 {
   "version": 1,
   "id": "fantasy.city-lord",
-  "revision": "1.0.0",
+  "revision": "1.3.0",
   "worldId": "fantasy",
   "name": "仙城争衡",
   "tagline": "在家族、城邦与修行资源之间，掌握一座城的命运。",
@@ -37,8 +37,6 @@
       "id": "fantasy.city-lord.foothold",
       "label": "立足",
       "objective": "解决一项影响坊市、家族或城防的现实难题并取得可信位置。",
-      "dramaticQuestion": "人物靠血脉、财富、本领还是众人信任进入权力结构？",
-      "pressureDirection": "资源短缺、家族利益与普通居民的安全要求不同答案。",
       "payoffMeaning": "人物获得了能够持续影响城邦事务的位置与盟友。",
       "beatOutline": {
         "setup": "让坊市、家族或城防中的现实难题触及人物生活。",
@@ -53,14 +51,26 @@
         "fantasy.domain.city.foothold_service",
         "fantasy.domain.city.resource_governance",
         "fantasy.domain.cultivation.foundation"
-      ]
+      ],
+      "adventureSeeds": [
+        {
+          "opposition": "帮派收保护费，城中官吏出售外来者居住资格",
+          "crisis": "一处街区断水，移民与原住民争夺水井",
+          "entry": "主角以手艺、家族或旧友在城中谋生，接一项公共修复",
+          "allies": "工匠懂水渠，街坊能出人，行动赢取互信",
+          "escalation": "帮派封锁修复现场，官府要求交人",
+          "stakes": "解决问题得到落脚地、伙伴与有限职务；失败失财、被逐或留下居民债务"
+        }
+      ],
+      "entryRequirements": {
+        "charisma": 9,
+        "intelligence": 8
+      }
     },
     {
       "id": "fantasy.city-lord.power",
       "label": "掌城",
       "objective": "在派系竞争和外部压力中形成自己的治理联盟。",
-      "dramaticQuestion": "掌握资源的人应当先保护谁？",
-      "pressureDirection": "宗门、家族、商路、异族和城内弱者争夺有限力量。",
       "payoffMeaning": "人物已经能够调动一城资源，也必须承担由此产生的敌意与责任。",
       "beatOutline": {
         "setup": "让已有位置卷入全城派系与外部压力。",
@@ -75,14 +85,26 @@
         "fantasy.domain.city.resource_governance",
         "fantasy.domain.city.long_order",
         "fantasy.domain.sect.faction_crisis"
-      ]
+      ],
+      "adventureSeeds": [
+        {
+          "opposition": "城主派系挪用防阵资源，外部商团操控物价",
+          "crisis": "城防失灵与兽潮同时威胁居民",
+          "entry": "凭已有街区支持接手实际治理，不凭名望自动掌城",
+          "allies": "守卫、行会和阵师提供兵力、供给与修复技术",
+          "escalation": "兽潮逼近，派系拒绝合作，资源只能保住部分城区",
+          "stakes": "实际组织改变防务与治理权；失败造成城破、失民和联盟瓦解"
+        }
+      ],
+      "entryRequirements": {
+        "charisma": 16,
+        "intelligence": 14
+      }
     },
     {
       "id": "fantasy.city-lord.siege",
       "label": "定城",
       "objective": "让城邦面对战争、禁区扩张或秩序崩溃，并决定其长期制度。",
-      "dramaticQuestion": "一座修行之城应成为少数强者的堡垒，还是众人共同生活的秩序？",
-      "pressureDirection": "守城代价、内部背叛、资源分配与个人突破集中冲突。",
       "payoffMeaning": "城邦存亡及其制度因人物的选择获得最终方向。",
       "beatOutline": {
         "setup": "让战争、禁区或秩序崩溃成为整座城的最终检验。",
@@ -97,7 +119,21 @@
         "fantasy.domain.city.siege_defense",
         "fantasy.domain.city.resource_governance",
         "fantasy.domain.city.long_order"
-      ]
+      ],
+      "adventureSeeds": [
+        {
+          "opposition": "邻城与上宗要求吞并，内部强人欲独占新权",
+          "crisis": "大战将临，城市长期供给与独立地位受威胁",
+          "entry": "以现有城区、盟友与制度承担全城选择",
+          "allies": "市民代表、军队和外部盟友各有支持条件",
+          "escalation": "围城与内部夺权交织，必须兑现此前保护责任",
+          "stakes": "守城、结盟、迁城或陷落均交代居民与权力去向，不能只授职便算治理完成"
+        }
+      ],
+      "entryRequirements": {
+        "charisma": 24,
+        "intelligence": 21
+      }
     }
   ],
   "endingDirections": {

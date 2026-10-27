@@ -206,39 +206,18 @@
     "growthFocuses": [
       {
         "id": "insight",
-        "label": "见识与谋断",
-        "description": "将日常积累更多放在判断、学习与把握机会之上。",
-        "primaryStats": [
-          "intelligence",
-          "fortune"
-        ],
-        "secondaryStats": [
-          "charisma"
-        ]
+        "label": "审势求解",
+        "description": "先观察局势、请教有经验的人，再用推理与准备寻找可行办法。"
       },
       {
         "id": "bond",
-        "label": "人情与根基",
-        "description": "将日常积累更多放在人情、家门与可依靠的关系之上。",
-        "primaryStats": [
-          "charisma",
-          "family"
-        ],
-        "secondaryStats": [
-          "fortune"
-        ]
+        "label": "结伴立信",
+        "description": "通过合作、互助与兑现承诺学习，借助同伴与乡里的长处。"
       },
       {
         "id": "resolve",
-        "label": "历练与韧性",
-        "description": "将日常积累更多放在行动、体魄与承受代价的能力之上。",
-        "primaryStats": [
-          "physique",
-          "fortune"
-        ],
-        "secondaryStats": [
-          "intelligence"
-        ]
+        "label": "躬行历练",
+        "description": "亲手练习、承担实际任务并从失误中学习，重视纪律与恢复。"
       }
     ],
     "completion": {

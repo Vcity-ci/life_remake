@@ -1,7 +1,7 @@
 {
   "version": 1,
   "id": "modern.city-drifter",
-  "revision": "1.0.0",
+  "revision": "1.3.0",
   "worldId": "modern",
   "name": "城中远行",
   "tagline": "离开熟悉的地方，在迁徙与重建中寻找归属。",
@@ -37,8 +37,6 @@
       "id": "modern.city-drifter.departure",
       "label": "离岸",
       "objective": "完成一次真正改变生活半径的迁移，并找到最初立足点。",
-      "dramaticQuestion": "人物为什么离开，又准备舍弃什么？",
-      "pressureDirection": "费用、资格、家庭牵挂和陌生环境压缩选择空间。",
       "payoffMeaning": "人物在新的地方获得了继续生活的实际位置。",
       "beatOutline": {
         "setup": "让迁移、失业或生活变化迫使人物跨出原有圈子。",
@@ -53,14 +51,26 @@
         "modern.domain.city.departure_foothold",
         "modern.domain.city.home_tension",
         "modern.domain.education.path_choice"
-      ]
+      ],
+      "adventureSeeds": [
+        {
+          "opposition": "中介隐瞒租房风险，雇主压低外来者工资",
+          "crisis": "初到城市遭遇工作与住处同时不稳",
+          "entry": "以家中积蓄、具体技能和一个联系人进城",
+          "allies": "同租者熟悉街区，老乡有临时工作线索",
+          "escalation": "房租到期与试工冲突，选择会影响立足方式",
+          "stakes": "稳定住处、可用手艺与新友谊构成立足；失败留下欠款、迁移和失信"
+        }
+      ],
+      "entryRequirements": {
+        "physique": 9,
+        "family": 8
+      }
     },
     {
       "id": "modern.city-drifter.belonging",
       "label": "扎根",
       "objective": "建立工作、住处与关系网络，使新城市不再只是暂住地。",
-      "dramaticQuestion": "适应一座城市是否意味着改变自己？",
-      "pressureDirection": "阶层差异、通勤、孤独与故乡责任同时拉扯人物。",
       "payoffMeaning": "人物建立了新的生活秩序，也明确了自己无法同时拥有的一切。",
       "beatOutline": {
         "setup": "让暂时落脚转变为是否长期扎根的现实问题。",
@@ -75,14 +85,26 @@
         "modern.domain.city.network_belonging",
         "modern.domain.city.home_tension",
         "modern.domain.career.entry_work"
-      ]
+      ],
+      "adventureSeeds": [
+        {
+          "opposition": "城市更新挤压小店与租户，社区意见分裂",
+          "crisis": "长期住所或事业面临拆迁转移",
+          "entry": "凭实际工作与邻里关系参与共同应对",
+          "allies": "房东、邻居与同事各能提供不同支持",
+          "escalation": "补偿期限逼近，个人机会与留下的责任冲突",
+          "stakes": "获得归属、公共参与或新去处；失败造成失业、离散与关系改变"
+        }
+      ],
+      "entryRequirements": {
+        "physique": 16,
+        "family": 14
+      }
     },
     {
       "id": "modern.city-drifter.home",
       "label": "归处",
       "objective": "在一次迁移、家庭事件或城市变化中决定长期归属。",
-      "dramaticQuestion": "家是地点、关系，还是人物选择的生活？",
-      "pressureDirection": "留下、返回或再次远行都要求付出不可逆的代价。",
       "payoffMeaning": "人物对归属和生活方式作出可以回望一生的决定。",
       "beatOutline": {
         "setup": "让家庭事件、城市变化或新的迁移机会检验已有归属。",
@@ -97,7 +119,21 @@
         "modern.domain.city.home_tension",
         "modern.domain.city.long_home",
         "modern.domain.intimacy.care_change"
-      ]
+      ],
+      "adventureSeeds": [
+        {
+          "opposition": "故乡照护责任与城市生活需求冲突",
+          "crisis": "亲人健康和城市机会同时发生变化",
+          "entry": "以已有家庭、工作与积蓄选择安顿方式",
+          "allies": "家人、伙伴和社区能否协力取决于真实关系",
+          "escalation": "往返成本与长期承诺不能再拖延",
+          "stakes": "定居、返乡或两地生活须具备实际安排，归属由日常关系落定"
+        }
+      ],
+      "entryRequirements": {
+        "physique": 24,
+        "family": 21
+      }
     }
   ],
   "endingDirections": {

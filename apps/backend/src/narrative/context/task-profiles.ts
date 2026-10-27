@@ -16,7 +16,7 @@ const TASK_SECTIONS: Record<NarrativeTask, NarrativeContextSection[]> = {
   continuity: ["task"],
   planning: ["protagonist", "world", "worldSituation", "mainline", "route", "lore", "storyHistory", "task"],
   observation: ["task"],
-  background: ["actWorld", "route", "protagonist", "lore", "characters", "facts", "locations", "abilities", "styleExamples", "storyHistory", "task"],
+  background: ["world", "actWorld", "route", "protagonist", "lore", "characters", "facts", "locations", "abilities", "styleExamples", "storyHistory", "task"],
   rendering: ["actWorld", "route", "protagonist", "lore", "characters", "facts", "locations", "abilities", "styleExamples", "storyHistory", "task"],
   dynamic: ["actWorld", "route", "protagonist", "lore", "characters", "facts", "locations", "abilities", "styleExamples", "storyHistory", "task"],
   decision: ["actWorld", "route", "protagonist", "lore", "characters", "facts", "locations", "abilities", "styleExamples", "storyHistory", "task"],

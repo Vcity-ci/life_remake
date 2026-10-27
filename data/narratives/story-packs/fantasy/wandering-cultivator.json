@@ -1,7 +1,7 @@
 {
   "version": 1,
   "id": "fantasy.wandering-cultivator",
-  "revision": "1.0.0",
+  "revision": "1.3.0",
   "worldId": "fantasy",
   "name": "散修天路",
   "tagline": "没有宗门替你决定道路，便用每一次交易、结盟与对决走出来。",
@@ -37,8 +37,6 @@
       "id": "fantasy.wandering-cultivator.survival",
       "label": "谋生",
       "objective": "凭一项真实本领完成危险委托或交易，建立最初信用与伙伴关系。",
-      "dramaticQuestion": "没有靠山时，人物愿意以什么换取力量？",
-      "pressureDirection": "资源稀缺、骗局、追杀与临时盟约不断检验判断。",
       "payoffMeaning": "人物获得了能够自由行动的基本实力和可再次合作的人。",
       "beatOutline": {
         "setup": "让生计、修炼资源或危险委托把人物推入一次真实行动。",
@@ -53,14 +51,26 @@
         "fantasy.domain.cultivation.foundation",
         "fantasy.domain.cultivation.spell_combat",
         "fantasy.domain.city.foothold_service"
-      ]
+      ],
+      "adventureSeeds": [
+        {
+          "opposition": "坊市帮派控制低阶委托，邪修抢劫散修",
+          "crisis": "护送灵草途中禁制失控，雇主失联",
+          "entry": "为获得修炼资源接小委托，身世提供一项技艺或引路关系",
+          "allies": "同行分工探路与护卫，药铺掌柜能提供周转",
+          "escalation": "报酬被扣，追兵逼近，必须决定保物还是保人",
+          "stakes": "实际完成带来资源、伙伴与落脚点；失败留下伤势、欠款或被通缉"
+        }
+      ],
+      "entryRequirements": {
+        "physique": 9,
+        "intelligence": 8
+      }
     },
     {
       "id": "fantasy.wandering-cultivator.network",
       "label": "结路",
       "objective": "建立连接据点、商路、异族或散修群体的长期网络。",
-      "dramaticQuestion": "个人自由能否与共同承诺同时存在？",
-      "pressureDirection": "宗门垄断、城邦规则、利益分配与同伴危机迫使人物承担组织责任。",
       "payoffMeaning": "人物成为一张关系网络的核心，而不再只是独行者。",
       "beatOutline": {
         "setup": "让既有信用连接多个据点、群体或长期需求。",
@@ -75,14 +85,26 @@
         "fantasy.domain.civilization.trade_oath",
         "fantasy.domain.city.resource_governance",
         "fantasy.domain.cultivation.own_path"
-      ]
+      ],
+      "adventureSeeds": [
+        {
+          "opposition": "宗门封锁秘境入口，黑市中人卖假地图",
+          "crisis": "散修队受困秘境，期限后出口消失",
+          "entry": "凭已知路线和旧交组织一支互助小队",
+          "allies": "阵师开路、驭兽者侦察，协力建立分配规约",
+          "escalation": "资源诱惑引发背叛，宗门追索所得",
+          "stakes": "可获得稳定商路、术法与伙伴网络；失败失去物资、成员或自由"
+        }
+      ],
+      "entryRequirements": {
+        "physique": 16,
+        "intelligence": 14
+      }
     },
     {
       "id": "fantasy.wandering-cultivator.own-dao",
       "label": "立道",
       "objective": "用自创本领和既有盟友应对一场足以吞没散修生存空间的危机。",
-      "dramaticQuestion": "人物的道路能否成为他人也能行走的道路？",
-      "pressureDirection": "个人突破、伙伴安全、资源秩序与强大势力的招揽集中碰撞。",
       "payoffMeaning": "人物建立传承、自由共同体或一条不受旧道统垄断的新路。",
       "beatOutline": {
         "setup": "让旧道统或世界危机威胁散修群体全部生存空间。",
@@ -97,7 +119,21 @@
         "fantasy.domain.cultivation.own_path",
         "fantasy.domain.civilization.shared_order",
         "fantasy.domain.city.long_order"
-      ]
+      ],
+      "adventureSeeds": [
+        {
+          "opposition": "大宗联合垄断渡劫资源，盟友被迫投靠",
+          "crisis": "散修聚落将被清场，退路受封",
+          "entry": "用已有修为、地盘与同盟争取独立道路",
+          "allies": "商队、异族和旧友提供代价不同的支援",
+          "escalation": "大敌围攻与劫期逼近，单凭境界不能解决组织存亡",
+          "stakes": "独立道场、迁徙、结盟或败亡须落实；宝物、伙伴和修炼条件持久改变"
+        }
+      ],
+      "entryRequirements": {
+        "physique": 24,
+        "intelligence": 21
+      }
     }
   ],
   "endingDirections": {

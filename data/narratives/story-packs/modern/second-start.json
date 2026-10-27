@@ -1,7 +1,7 @@
 {
   "version": 1,
   "id": "modern.second-start",
-  "revision": "1.0.0",
+  "revision": "1.3.0",
   "worldId": "modern",
   "name": "人生重启",
   "tagline": "当原来的答案失效，重新决定余生要怎样度过。",
@@ -37,8 +37,6 @@
       "id": "modern.second-start.first-life",
       "label": "旧路",
       "objective": "建立一条具体生活道路，并理解它给予和拿走了什么。",
-      "dramaticQuestion": "人物追求的是自己的愿望，还是熟悉的评价标准？",
-      "pressureDirection": "现实回报使人物继续投入，也逐渐暴露被忽略的需要。",
       "payoffMeaning": "人物拥有了一段真实积累，同时看见了它无法解决的问题。",
       "beatOutline": {
         "setup": "让人物进入一条看似可靠并值得投入的生活道路。",
@@ -53,14 +51,26 @@
         "modern.domain.career.entry_work",
         "modern.domain.intimacy.shared_life",
         "modern.domain.education.path_choice"
-      ]
+      ],
+      "adventureSeeds": [
+        {
+          "opposition": "旧行业依赖人情垄断，主角所在团队追求不可持续业绩",
+          "crisis": "关键项目暴露旧生活的脆弱基础",
+          "entry": "从既有家庭和学习条件建立真实职业与承诺",
+          "allies": "同事与家人各提供支持，也各有需求",
+          "escalation": "短期成功掩盖健康、债务或关系损耗",
+          "stakes": "建立一份具体旧生活及其脆弱点；不能为转折凭空编造已经拥有的成就"
+        }
+      ],
+      "entryRequirements": {
+        "intelligence": 9,
+        "physique": 8
+      }
     },
     {
       "id": "modern.second-start.break",
       "label": "失向",
       "objective": "面对原有道路的破裂、停滞或主动放弃，并保住重新选择的能力。",
-      "dramaticQuestion": "失去旧身份后，人物还剩下什么？",
-      "pressureDirection": "收入、家庭、年龄、羞耻与不确定性共同阻止转向。",
       "payoffMeaning": "人物承认旧答案已经失效，并作出真正改变生活结构的行动。",
       "beatOutline": {
         "setup": "让失去、停滞或主动怀疑打破旧生活的稳定。",
@@ -75,14 +85,26 @@
         "modern.domain.career.value_legacy",
         "modern.domain.city.home_tension",
         "modern.domain.intimacy.care_change"
-      ]
+      ],
+      "adventureSeeds": [
+        {
+          "opposition": "公司裁撤与债权追偿并至，旧伙伴不愿共同承担",
+          "crisis": "失业、事故或家庭变故击破旧安排",
+          "entry": "承接真实损失，先保住住所、健康和必要关系",
+          "allies": "旧友可帮求职，家人可分担生活但资源有限",
+          "escalation": "储蓄耗尽，沿用旧方法无法重新立足",
+          "stakes": "接受损失并取得新技能或试做机会；失败会失去更多资源，不能一句振作消除后果"
+        }
+      ],
+      "entryRequirements": {
+        "intelligence": 16,
+        "physique": 14
+      }
     },
     {
       "id": "modern.second-start.new-life",
       "label": "新生",
       "objective": "把过往能力和代价转化为一条可持续的新生活道路。",
-      "dramaticQuestion": "第二次选择能否比第一次更接近人物真正想要的人生？",
-      "pressureDirection": "旧责任与新机会发生最终碰撞，重启成果需要现实检验。",
       "payoffMeaning": "人物以新的关系、工作或生活方式完成对自我的重新定义。",
       "beatOutline": {
         "setup": "让新的方向面对能否长期维持的现实检验。",
@@ -97,7 +119,21 @@
         "modern.domain.career.entry_work",
         "modern.domain.city.long_home",
         "modern.domain.education.public_practice"
-      ]
+      ],
+      "adventureSeeds": [
+        {
+          "opposition": "新领域竞争者不信任转行者，旧责任仍须履行",
+          "crisis": "新工作或小事业首次面对不可回避的交付",
+          "entry": "以已学技能、实际关系与剩余资源开始新生活",
+          "allies": "新同伴提供方法，旧亲友提供理解，合作须兑现",
+          "escalation": "旧债与新机会撞期，必须找到可持续节奏",
+          "stakes": "建立能维持的生活与责任安排或再次改道，不能用名义成功覆盖真实损失"
+        }
+      ],
+      "entryRequirements": {
+        "intelligence": 24,
+        "physique": 21
+      }
     }
   ],
   "endingDirections": {

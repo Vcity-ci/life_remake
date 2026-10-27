@@ -1,7 +1,7 @@
 {
   "version": 1,
   "id": "fantasy.uncanny-survivor",
-  "revision": "1.0.0",
+  "revision": "1.3.0",
   "worldId": "fantasy",
   "name": "禁区行者",
   "tagline": "辨认诡异的规律，在污染与未知中带回活人的答案。",
@@ -37,8 +37,6 @@
       "id": "fantasy.uncanny-survivor.trace",
       "label": "识迹",
       "objective": "从一次具体异象中辨认可验证的规律，并带回第一项真实成果。",
-      "dramaticQuestion": "人物看到的是灾害、生命，还是某种正在回应的存在？",
-      "pressureDirection": "错误判断会直接伤害身体、同伴或故乡，知识必须由行动验证。",
       "payoffMeaning": "人物拥有了进入未知的本领、伙伴和必须继续追索的问题。",
       "beatOutline": {
         "setup": "让一项异象或失踪事件打破人物熟悉的生活规律。",
@@ -53,14 +51,26 @@
         "fantasy.domain.uncanny.trace",
         "fantasy.domain.uncanny.expedition",
         "fantasy.domain.uncanny.knowledge_cost"
-      ]
+      ],
+      "adventureSeeds": [
+        {
+          "opposition": "失踪者化作借声诱人的诡影，镇守隐瞒夜禁由来",
+          "crisis": "家人或邻里被困重复出现的渡口",
+          "entry": "日常关系使主角进入异常，须靠可验证线索发现禁忌",
+          "allies": "幸存船夫知道时辰，伙伴能交叉验证声音",
+          "escalation": "试错代价增加，诡影开始模仿熟人",
+          "stakes": "脱困取得真实规则与可用信物；失败丢失记忆、同伴或安全居所"
+        }
+      ],
+      "entryRequirements": {
+        "intelligence": 9,
+        "physique": 8
+      }
     },
     {
       "id": "fantasy.uncanny-survivor.expedition",
       "label": "涉险",
       "objective": "组织或加入一次深入禁区的行动，揭示污染与外部势力的真实联系。",
-      "dramaticQuestion": "危险知识应该被封锁、分享还是利用？",
-      "pressureDirection": "宗门、商旅、异族与个人愿望争夺探索成果，同伴关系经受消耗。",
       "payoffMeaning": "人物改变了人们进入禁区的方式，也承担了知识扩散的后果。",
       "beatOutline": {
         "setup": "让更深禁区与现实势力的联系要求一次有组织的探索。",
@@ -75,14 +85,26 @@
         "fantasy.domain.uncanny.expedition",
         "fantasy.domain.uncanny.seal_purify",
         "fantasy.domain.cultivation.spell_combat"
-      ]
+      ],
+      "adventureSeeds": [
+        {
+          "opposition": "寻宝队与地方修士争夺封印物，诡物随搬运扩散",
+          "crisis": "调查队深入旧城后无法原路返回",
+          "entry": "凭已掌握规则和线索加入探源行动",
+          "allies": "阵师、幸存者与异族各理解一部分规则",
+          "escalation": "错误解封使安全区缩小，队员互相怀疑",
+          "stakes": "找到源头路径、救出人质或封住扩散；所得伴随诅咒、失踪与信任代价"
+        }
+      ],
+      "entryRequirements": {
+        "intelligence": 16,
+        "physique": 14
+      }
     },
     {
       "id": "fantasy.uncanny-survivor.source",
       "label": "临渊",
       "objective": "面对足以扩散到现实世界的诡异源头，并决定它与众生的关系。",
-      "dramaticQuestion": "未知必须被毁灭，还是可以理解并重新划定边界？",
-      "pressureDirection": "污染、牺牲、力量诱惑和不同文明的生存需要集中冲突。",
       "payoffMeaning": "禁区的未来、人物自身变化与世界对未知的认知得到不可逆答案。",
       "beatOutline": {
         "setup": "让诡异源头开始影响现实秩序并召回历次探索代价。",
@@ -97,7 +119,21 @@
         "fantasy.domain.uncanny.seal_purify",
         "fantasy.domain.uncanny.knowledge_cost",
         "fantasy.domain.destiny.world_change"
-      ]
+      ],
+      "adventureSeeds": [
+        {
+          "opposition": "封印看守以活人续命，诡异源头利用救世承诺诱惑主角",
+          "crisis": "封印将崩，旧办法必然牺牲一地居民",
+          "entry": "以实际掌握规则、同伴与代价面对源头",
+          "allies": "受害者后人与昔日对手提供互斥方案的必要条件",
+          "escalation": "灾变扩散、旧契约追偿，最终行动有不可撤回成本",
+          "stakes": "封印、迁离、替代契约或失败都须交代受害者与后续规则，不以发现秘密当结束"
+        }
+      ],
+      "entryRequirements": {
+        "intelligence": 24,
+        "physique": 21
+      }
     }
   ],
   "endingDirections": {

@@ -34,8 +34,9 @@ export function resolveNarrativeExperience(
     return {
       id: act.id,
       label: act.label,
+      entryRequirements: { ...act.entryRequirements },
       prompt: [
-        `${act.objective} 核心问题：${act.dramaticQuestion} 压力方向：${act.pressureDirection} 本幕收束应体现：${act.payoffMeaning}`,
+        `${act.objective} 本幕收束应体现：${act.payoffMeaning}`,
         focus.length ? `可优先关联的世界力量：${focus.join("、")}。` : ""
       ].filter(Boolean).join(" "),
       readinessStage: readinessStages[index]

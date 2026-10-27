@@ -206,39 +206,18 @@
     "growthFocuses": [
       {
         "id": "insight",
-        "label": "悟道与术法",
-        "description": "将日常积累更多放在悟性、见识与把握机缘之上。",
-        "primaryStats": [
-          "intelligence",
-          "fortune"
-        ],
-        "secondaryStats": [
-          "charisma"
-        ]
+        "label": "悟理求证",
+        "description": "先理解规律、试验术法，再以准备充分的方法应对风险。"
       },
       {
         "id": "bond",
-        "label": "同道与根基",
-        "description": "将日常积累更多放在人情、师友、家门与可依靠的关系之上。",
-        "primaryStats": [
-          "charisma",
-          "family"
-        ],
-        "secondaryStats": [
-          "fortune"
-        ]
+        "label": "结伴互助",
+        "description": "通过请教、协作与兑现承诺学习，重视同道各自的长处。"
       },
       {
         "id": "resolve",
-        "label": "历练与韧性",
-        "description": "将日常积累更多放在行动、体魄与承受因果的能力之上。",
-        "primaryStats": [
-          "physique",
-          "fortune"
-        ],
-        "secondaryStats": [
-          "intelligence"
-        ]
+        "label": "躬行历练",
+        "description": "通过亲自练习、承担任务与复盘失误积累本事，留意身体的承受范围。"
       }
     ],
     "completion": {

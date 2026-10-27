@@ -1,7 +1,7 @@
 {
   "version": 1,
   "id": "ancient.jianghu-master",
-  "revision": "1.0.0",
+  "revision": "1.3.0",
   "worldId": "ancient",
   "name": "江湖宗师",
   "tagline": "以技艺、师承和恩仇行走秩序边缘，决定力量最终归于何处。",
@@ -37,8 +37,6 @@
       "id": "ancient.jianghu-master.apprenticeship",
       "label": "问艺",
       "objective": "取得真正可以立身的技艺、师承与第一段江湖关系。",
-      "dramaticQuestion": "人物愿意为力量承担怎样的规矩和人情？",
-      "pressureDirection": "生存、门规、护送、比试或恩仇让技艺第一次接受现实检验。",
       "payoffMeaning": "人物拥有独立行走江湖的能力和名号。",
       "beatOutline": {
         "setup": "以师承、挑战或求生契机让人物踏入真实江湖。",
@@ -53,14 +51,26 @@
         "ancient.domain.jianghu.mastery_rules",
         "ancient.domain.jianghu.challenge_duel",
         "ancient.domain.jianghu.escort_rescue"
-      ]
+      ],
+      "adventureSeeds": [
+        {
+          "opposition": "地方镖头收徒苛刻，劫道者抢走师门委托物",
+          "crisis": "一次送药或护送被截，初学者面对真实危险",
+          "entry": "师友或家庭手艺引入一门可实践的技艺，先承担力所能及的小任务",
+          "allies": "师兄教基本招式，同行了解路况，帮忙有代价",
+          "escalation": "委托期限逼近，敌人追索，主角必须以已学方法行动",
+          "stakes": "救人、交付或承认失败决定入门资格、器物与师友信任"
+        }
+      ],
+      "entryRequirements": {
+        "physique": 9,
+        "intelligence": 8
+      }
     },
     {
       "id": "ancient.jianghu-master.reputation",
       "label": "扬名",
       "objective": "在帮派、官府、商路和民间势力之间形成自己的声望与立场。",
-      "dramaticQuestion": "人物的名声来自侠义、胜负、恐惧还是可靠？",
-      "pressureDirection": "旧仇、组织责任、通缉和他人求助不断扩大行动后果。",
       "payoffMeaning": "人物成为能够影响江湖格局的一方人物。",
       "beatOutline": {
         "setup": "让既有名声招来帮派、官府和旧怨的共同关注。",
@@ -75,14 +85,26 @@
         "ancient.domain.jianghu.challenge_duel",
         "ancient.domain.jianghu.escort_rescue",
         "ancient.domain.jianghu.revenge_treasure"
-      ]
+      ],
+      "adventureSeeds": [
+        {
+          "opposition": "敌对门派争夺行会保护权，地方官借机拘人",
+          "crisis": "商旅被扣、人质待救，师门名声牵连平民",
+          "entry": "凭实际技艺与旧交接受一桩跨地委托",
+          "allies": "同道各有身手与门路，要以分工取得协力",
+          "escalation": "对手公开挑战又暗中逼供，单打独斗无法同时救人保物",
+          "stakes": "行动使人物获得同道、名望或传授资格；失败会伤残、失信或失去庇护"
+        }
+      ],
+      "entryRequirements": {
+        "physique": 16,
+        "intelligence": 14
+      }
     },
     {
       "id": "ancient.jianghu-master.legacy",
       "label": "立宗",
       "objective": "决定接受招安、开宗立派、辅佐一方、远走或归隐。",
-      "dramaticQuestion": "巅峰之后，人物要把力量传给谁、用在何处？",
-      "pressureDirection": "旧伤、旧部、弟子、官府和时代变局同时索要答案。",
       "payoffMeaning": "人物的技艺传承、组织归属和江湖评价得到收束。",
       "beatOutline": {
         "setup": "让武林秩序的最终危机触及人物全部传承与关系。",
@@ -97,7 +119,21 @@
         "ancient.domain.jianghu.revenge_treasure",
         "ancient.domain.jianghu.sect_legacy",
         "ancient.domain.jianghu.mastery_rules"
-      ]
+      ],
+      "adventureSeeds": [
+        {
+          "opposition": "大派与官府欲收编地方传承，叛徒出卖山门",
+          "crisis": "门下与百姓被迫选边，旧武学可能被用来镇压",
+          "entry": "以实际弟子、盟友和技艺维护传承，不凭名号自动立宗",
+          "allies": "旧友、弟子和受助者各自回应往日关系",
+          "escalation": "山门受围、盟友退缩，传承存亡取决于实际行动",
+          "stakes": "保住传授与生计、远迁或解散均须落地；胜利会留下门规与责任，失败可能断脉失人"
+        }
+      ],
+      "entryRequirements": {
+        "physique": 24,
+        "intelligence": 21
+      }
     }
   ],
   "endingDirections": {

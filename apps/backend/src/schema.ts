@@ -52,7 +52,7 @@ export const startRunSchema = z.object({
 
 export const stepRunSchema = z.object({
   runId: z.string().min(1),
-  action: z.enum(["consume", "decide", "select_growth_focus", "generate_opening", "resolve_survival"]).optional(),
+  action: z.enum(["consume", "decide", "select_growth_focus", "generate_opening", "resolve_survival", "prepare_act"]).optional(),
   growthFocusId: z.string().min(1).max(80).optional(),
   decision: z.string().min(8).max(128).optional(),
   decisionAge: z.number().int().min(0).max(160).optional(),

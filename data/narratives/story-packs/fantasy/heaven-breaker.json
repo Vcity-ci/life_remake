@@ -1,7 +1,7 @@
 {
   "version": 1,
   "id": "fantasy.heaven-breaker",
-  "revision": "1.0.0",
+  "revision": "1.3.0",
   "worldId": "fantasy",
   "name": "逆命改天",
   "tagline": "从夺舍、诅咒或天命中夺回自身，最终直面世界规则。",
@@ -37,8 +37,6 @@
       "id": "fantasy.heaven-breaker.self",
       "label": "夺身",
       "objective": "确认异常力量如何影响自身，并夺回第一次真正的自主行动。",
-      "dramaticQuestion": "人物的记忆、欲望和力量中，哪些真正属于自己？",
-      "pressureDirection": "夺舍意志、预言、亲近之人的恐惧与力量诱惑持续侵入选择。",
       "payoffMeaning": "人物建立了自我边界，并能主动使用或拒绝这份异常力量。",
       "beatOutline": {
         "setup": "让异常力量以可感知的方式侵入人物生活与身体。",
@@ -53,14 +51,26 @@
         "fantasy.domain.destiny.possession_identity",
         "fantasy.domain.destiny.hunters_patronage",
         "fantasy.domain.cultivation.foundation"
-      ]
+      ],
+      "adventureSeeds": [
+        {
+          "opposition": "掌印者抽取凡人寿数，差役追捕违命者",
+          "crisis": "亲友被选作祭品，身份印记封住出城路",
+          "entry": "主角因真实受役身份卷入，先找到能验证的规则漏洞",
+          "allies": "逃役者熟悉巡逻，匠人能处理印记器具",
+          "escalation": "追捕收紧，脱身可能把风险转给旁人",
+          "stakes": "逃出生天或救人获得自由与盟友；失败受囚、失去寿数或牵连家人"
+        }
+      ],
+      "entryRequirements": {
+        "physique": 9,
+        "intelligence": 8
+      }
     },
     {
       "id": "fantasy.heaven-breaker.cause",
       "label": "破局",
       "objective": "追索异常背后的世间势力与古老因果，打破为人物预设的角色。",
-      "dramaticQuestion": "摆脱操控是否必须摧毁制造这份命运的秩序？",
-      "pressureDirection": "宗门、城邦、异族与古老存在都试图利用人物的特殊性。",
       "payoffMeaning": "人物不再只是被争夺的容器，而成为能够反向改变局势的力量。",
       "beatOutline": {
         "setup": "让异常背后的势力与古老因果进入现实冲突。",
@@ -75,14 +85,26 @@
         "fantasy.domain.destiny.hunters_patronage",
         "fantasy.domain.destiny.rule_breach",
         "fantasy.domain.uncanny.knowledge_cost"
-      ]
+      ],
+      "adventureSeeds": [
+        {
+          "opposition": "执法神使清剿反抗者，盟军首领隐瞒牺牲方案",
+          "crisis": "避难地将被天罚定位",
+          "entry": "凭已验证漏洞和同伴参与一次具体破禁行动",
+          "allies": "阵师、守城者与被奴役族群各掌破禁条件",
+          "escalation": "反抗引来更强惩罚，旧盟也要求献祭",
+          "stakes": "破坏一处控制枢纽带来真正行动自由；失败失去据点、伙伴或关键筹码"
+        }
+      ],
+      "entryRequirements": {
+        "physique": 16,
+        "intelligence": 14
+      }
     },
     {
       "id": "fantasy.heaven-breaker.heaven",
       "label": "改天",
       "objective": "直面支配自身与众生命运的规则，并承担改变规则后的世界。",
-      "dramaticQuestion": "自由意味着超脱世界、取代旧天，还是让众生拥有选择？",
-      "pressureDirection": "个人完整、亲近之人、众生秩序与终极力量无法全部无损保全。",
       "payoffMeaning": "人物从命运的承受者成为规则的回答者，世界也留下不可逆变化。",
       "beatOutline": {
         "setup": "让支配人物与众生的规则显露最终代价和脆弱处。",
@@ -97,7 +119,21 @@
         "fantasy.domain.destiny.rule_breach",
         "fantasy.domain.destiny.world_change",
         "fantasy.domain.cultivation.own_path"
-      ]
+      ],
+      "adventureSeeds": [
+        {
+          "opposition": "天律维持者以众生灾劫要挟，夺权者欲接替旧主",
+          "crisis": "最后枢纽失衡，旧秩序崩坏也会伤及无辜",
+          "entry": "以此前实际破禁成果和联盟面对规则核心",
+          "allies": "受救者与旧敌提供支撑新规则的资源和约束",
+          "escalation": "破除与接管都须承担维持世界的代价",
+          "stakes": "规则真正改变、有限妥协或失败须交代自由与生计，不以口头宣告逆天作结"
+        }
+      ],
+      "entryRequirements": {
+        "physique": 24,
+        "intelligence": 21
+      }
     }
   ],
   "endingDirections": {

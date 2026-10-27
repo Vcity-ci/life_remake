@@ -42,10 +42,6 @@ export function validateNarrativeEffects(raw: unknown, policy: NarrativeAttribut
     effects.push({ stat, direction, band });
     used.add(stat);
   }
-  if (policy.preferredStats?.length && (policy.minPreferredEffects ?? 0) > 0 &&
-      effects.filter((effect) => policy.preferredStats!.includes(effect.stat)).length < policy.minPreferredEffects!) {
-    return fail("growth_focus_missing", "effects", { stats: policy.preferredStats, min: policy.minPreferredEffects }, effects);
-  }
   if (policy.requirePositive && !effects.some((effect) => effect.direction === "up")) return fail("positive_effect_missing", "effects", "at least one up", effects);
   return { ok: true, effects };
 }
@@ -54,8 +50,6 @@ export function describeNarrativeAttributePolicy(policy: NarrativeAttributePolic
   return [
     `提交${policy.minEffects}-${policy.maxEffects}项，每个属性只出现一次。`,
     `属性：${policy.allowedStats.join("、")}；方向：${policy.allowedDirections.join("、")}；幅度：${policy.allowedBands.join("、")}。`,
-    policy.preferredStats?.length && (policy.minPreferredEffects ?? 0) > 0
-      ? `成长以${policy.preferredStats.join("、")}为侧重，至少${policy.minPreferredEffects}项体现该方向；其余属性可按经历搭配。` : "",
     policy.requirePositive ? "至少一项为正向成长（up）。" : "",
     policy.minEffects === 0 ? "仅运用已有能力、处理事务而未形成新成长或损失时，effects 明确返回 []，不用奖励属性来证明行动有效。" : "",
     policy.positiveMagnitudeByBand ? `正向成长由引擎按幅度换算：${Object.entries(policy.positiveMagnitudeByBand).map(([band, value]) => `${band}=${value}`).join("、")}；按实际成长选择标签，不按篇幅或行动次数奖励。` : "",

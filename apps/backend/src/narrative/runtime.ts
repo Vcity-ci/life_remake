@@ -30,7 +30,6 @@ import { applyNarrativeAssetActivity, applyNarrativeAssetUpdates, commitNarrativ
 import { formatNarrativeDialogue, formatNarrativeExperience } from "../narrative-memory.js";
 import { narrativeObservationGap, narrativeObservationHistory } from "./observation.js";
 import { committedNarrativeSequence } from "./history.js";
-import { commitNarrativeActOutline } from "./act-outline.js";
 
 export interface NarrativeAgentTurnInput {
   run: InternalRunState;
@@ -128,11 +127,6 @@ export async function runNarrativeAgentTurn(input: NarrativeAgentTurnInput): Pro
   const choiceCheck = envelope.capabilities.includes("scene") ? prepareChoiceCheck(run, narrativeWorld) : undefined;
   const plan = await generateNarrativeTurnPlan(run, world, { ...envelope, choiceCheck,
     progressGap: narrativeObservationGap(run, envelope.act.id, envelope.beat) }, context);
-  // This state is still inside the existing round transaction. The writer and
-  // observer read the same concrete outline; failure discards the transaction.
-  if (plan.actOutline && !envelope.actOutline) {
-    commitNarrativeActOutline(run.narrative, plan.actOutline);
-  }
   appendAttempt(run, {
     callId: envelope.callId,
     attemptId,

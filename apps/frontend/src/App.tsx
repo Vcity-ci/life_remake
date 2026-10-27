@@ -498,10 +498,12 @@ export default function App(): React.JSX.Element {
   }
 
   function canAdvance(runState: PublicRunState | null): boolean {
-    if (!runState) return false;
+    if (!runState || !envReady) return false;
     if (runState.pendingChoice) return true;
     if (runState.opening?.status === "pending") return false;
     if (runState.growthFocus && !runState.growthFocus.selectedId) return false;
+    if (!runState.nextMilestoneChoice && !runState.survivalCrisis && runState.actPlanning &&
+        (runState.actPlanning.status === "failed" || (runState.actPlanning.status === "pending" && runState.actPlanning.bufferedTurns >= runState.actPlanning.bufferLimit))) return false;
     const runPhase = phaseOf(runState);
     return runPhase === "ready";
   }
@@ -514,6 +516,65 @@ export default function App(): React.JSX.Element {
       !runState.growthFocus.selectedId
     );
   }
+
+  const resumedActRef = useRef(new Set<string>());
+
+  async function prepareCurrentAct(): Promise<void> {
+    const current = runRef.current;
+    if (!current || !envReady || isGeneratingRef.current) return;
+    isGeneratingRef.current = true;
+    setIsGenerating(true);
+    try {
+      await stepRunStream({ runId: current.runId, action: "prepare_act",
+        requestId: makeStepRequestId(current.runId, "prepare_act", ++requestNonceRef.current) }, (event) => {
+        if (event.type === "done" && runRef.current?.runId === current.runId) {
+          runRef.current = event.data.run;
+          setRun(event.data.run);
+        }
+        if (event.type === "error") throw new Error(event.data.message);
+      });
+    } catch {
+      if (current.actPlanning) resumedActRef.current.delete(`${current.runId}:${current.actPlanning.actId}`);
+      setStatus("暂时无法继续，请重试。");
+    }
+    finally { isGeneratingRef.current = false; setIsGenerating(false); }
+  }
+
+  useEffect(() => {
+    if (!run || !envReady || run.ended || run.opening?.status !== "ready" || run.actPlanning?.status !== "pending" || isStreaming || isGenerating) return;
+    const key = `${run.runId}:${run.actPlanning.actId}`;
+    if (!resumedActRef.current.has(key)) {
+      resumedActRef.current.add(key);
+      void prepareCurrentAct();
+    }
+  }, [run, envReady, isStreaming, isGenerating]);
+
+  useEffect(() => {
+    if (!run || run.ended || run.actPlanning?.status !== "pending" || isStreaming || isGenerating) return;
+    let stopped = false;
+    let querying = false;
+    const timer = window.setInterval(() => {
+      if (querying || isGeneratingRef.current) return;
+      const before = runRef.current;
+      querying = true;
+      void fetchCurrentRun().then((payload) => {
+        // An older poll must not overwrite a completed story request or another save.
+        if (stopped || isGeneratingRef.current || runRef.current !== before || payload.run?.runId !== before?.runId) return;
+        setEnvReady(payload.environmentReady);
+        if (!payload.environmentReady && before?.actPlanning) {
+          resumedActRef.current.delete(`${before.runId}:${before.actPlanning.actId}`);
+          setStatus("请在 Setting 重新确认本局环境后继续。");
+        } else if (before?.actPlanning?.status === "pending" && payload.run?.actPlanning?.status === "ready") {
+          setStatus("");
+        }
+        runRef.current = payload.run;
+        setRun(payload.run);
+      }).catch(() => {
+        if (!stopped && before?.actPlanning) resumedActRef.current.delete(`${before.runId}:${before.actPlanning.actId}`);
+      }).finally(() => { querying = false; });
+    }, 2000);
+    return () => { stopped = true; window.clearInterval(timer); };
+  }, [run?.runId, run?.actPlanning?.status, run?.ended, isStreaming, isGenerating]);
 
   async function runStepGeneration(
     decision?: string,
@@ -594,6 +655,8 @@ export default function App(): React.JSX.Element {
               setStatus("命悬一线，请作出求生选择。");
             } else if (event.data.run.nextMilestoneChoice && phaseOf(event.data.run) === "waiting_decision") {
               setStatus("新的抉择出现。");
+            } else if (event.data.run.actPlanning?.status === "pending" && event.data.run.actPlanning.bufferedTurns >= event.data.run.actPlanning.bufferLimit) {
+              setStatus("请稍候…");
             } else {
               setStatus("已就绪，继续推进年份。");
             }
@@ -1106,7 +1169,7 @@ export default function App(): React.JSX.Element {
       setAutoAdvance(false);
       return;
     }
-    if (isStreaming || isGenerating) return;
+    if (isStreaming || isGenerating || !envReady) return;
 
     let action: (() => Promise<void>) | undefined;
     if (debugMode && needsGrowthFocus(run)) {
@@ -1126,6 +1189,8 @@ export default function App(): React.JSX.Element {
       }
     } else if (canAdvance(run)) {
       action = onAdvance;
+    } else if (run.actPlanning?.status === "pending" || run.actPlanning?.status === "failed") {
+      return;
     } else {
       setAutoAdvance(false);
       return;
@@ -1140,9 +1205,11 @@ export default function App(): React.JSX.Element {
       void action();
     }, 350);
     return () => window.clearTimeout(timer);
-  }, [autoAdvance, debugMode, run, timeline.length, activeDecision, activeSurvivalCrisis, isStreaming, isGenerating]);
+  }, [autoAdvance, debugMode, run, timeline.length, activeDecision, activeSurvivalCrisis, isStreaming, isGenerating, envReady]);
 
   const canEnableAutoAdvance = !run || canAdvance(run) || (
+    !run.ended && run.actPlanning?.status === "pending"
+  ) || (
     debugMode && !run.ended && (
       needsGrowthFocus(run) ||
       (phaseOf(run) === "waiting_decision" && Boolean(activeDecision || activeSurvivalCrisis))
@@ -1383,17 +1450,21 @@ export default function App(): React.JSX.Element {
 
               {!run.ended && !showActiveDecision && !(activeSurvivalCrisis && phaseOf(run) === "waiting_decision") ? (
                 <div className="advance-bar">
+                  {run.actPlanning?.status === "failed" ? (
+                    <button disabled={!envReady || isStreaming || isGenerating} onClick={() => void prepareCurrentAct()}>重试</button>
+                  ) : <>
                   <button
                     disabled={isStreaming || isGenerating || (needsGrowthFocus(run) ? false : !canAdvance(run))}
                     onClick={() => {
                       if (needsGrowthFocus(run)) {
                         setShowGrowthFocus(true);
-                        setStatus("请选择此阶段希望积累的方向。");
+                        setStatus("请选择此阶段的学习与行动方式。");
                         return;
                       }
                       void onAdvance();
                     }}
-                  >{needsGrowthFocus(run) ? "踏入人生" : "继续推进"}</button>
+                  >{needsGrowthFocus(run) ? "踏入人生" : run.actPlanning?.status === "pending" && run.actPlanning.bufferedTurns >= run.actPlanning.bufferLimit ? "请稍候…" : "继续推进"}</button>
+                  </>}
                 </div>
               ) : null}
 
@@ -1462,7 +1533,7 @@ export default function App(): React.JSX.Element {
       {showGrowthFocus && run?.growthFocus && !run.growthFocus.selectedId && !run.ended && run.opening?.status !== "pending" ? (
         <div className="modal-mask" role="dialog" aria-modal="true" aria-label="选择成长方向">
           <div className="modal growth-focus-modal">
-            <h2>此阶段的积累</h2>
+            <h2>此阶段的学习与行动方式</h2>
             <div className="growth-focus-options">
               {run.growthFocus.options.map((focus) => (
                 <button key={focus.id} disabled={isStreaming || isGenerating} onClick={() => void onSelectGrowthFocus(focus.id)}>

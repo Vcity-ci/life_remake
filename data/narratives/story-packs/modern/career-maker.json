@@ -1,7 +1,7 @@
 {
   "version": 1,
   "id": "modern.career-maker",
-  "revision": "1.0.0",
+  "revision": "1.3.0",
   "worldId": "modern",
   "name": "事业造物",
   "tagline": "在工作、创造与交换中，建立真正属于自己的事业。",
@@ -37,8 +37,6 @@
       "id": "modern.career-maker.entry",
       "label": "入局",
       "objective": "找到可以立足的工作或创造方向，并完成第一次被现实认可的成果。",
-      "dramaticQuestion": "人物能靠什么在社会交换中站稳脚跟？",
-      "pressureDirection": "经验不足、收入需求与组织规则迫使人物证明价值。",
       "payoffMeaning": "人物取得了独立行动所需的能力、信用或第一批伙伴。",
       "beatOutline": {
         "setup": "让人物面对一项真实工作、创作机会或行业门槛。",
@@ -53,14 +51,26 @@
         "modern.domain.career.entry_work",
         "modern.domain.career.project_team",
         "modern.domain.enterprise.problem_prototype"
-      ]
+      ],
+      "adventureSeeds": [
+        {
+          "opposition": "主管抢功，客户对新手团队缺乏信任",
+          "crisis": "首个产品或服务交付出现关键故障",
+          "entry": "依已有教育和家庭条件进入具体岗位或小生意",
+          "allies": "同事掌技术，客户愿试用，资源须靠兑现争取",
+          "escalation": "合同期限临近，质量与交付冲突",
+          "stakes": "实际解决问题得到稳定工作、技术与伙伴；失败赔付、失单或被辞退"
+        }
+      ],
+      "entryRequirements": {
+        "intelligence": 9,
+        "charisma": 8
+      }
     },
     {
       "id": "modern.career-maker.scale",
       "label": "成事",
       "objective": "把个人能力扩展为稳定业务、作品体系或协作团队。",
-      "dramaticQuestion": "人物要以什么代价扩大自己的事业？",
-      "pressureDirection": "竞争、资金、管理、声誉与亲密关系同时牵动决定。",
       "payoffMeaning": "人物已经能影响一群人的工作与现实选择。",
       "beatOutline": {
         "setup": "让既有成果带来团队、业务或创作规模的扩张。",
@@ -75,14 +85,26 @@
         "modern.domain.career.project_team",
         "modern.domain.career.scale_control",
         "modern.domain.enterprise.funding_market"
-      ]
+      ],
+      "adventureSeeds": [
+        {
+          "opposition": "竞争者挖走核心成员，投资方要求改变业务",
+          "crisis": "扩张导致服务崩溃，员工与老客户受损",
+          "entry": "以已有产品和现金流组建团队，权责来自实际管理",
+          "allies": "骨干、供应商与用户提供可验证支持",
+          "escalation": "资金将断，缩规模、转型或承担高风险订单",
+          "stakes": "活下来的业务与可持续分工形成事业；失败造成裁员、负债与关系破裂"
+        }
+      ],
+      "entryRequirements": {
+        "intelligence": 16,
+        "charisma": 14
+      }
     },
     {
       "id": "modern.career-maker.legacy",
       "label": "立业",
       "objective": "让事业面对一次决定长期价值的危机、机会或传承选择。",
-      "dramaticQuestion": "成功之后，人物究竟想留下什么？",
-      "pressureDirection": "控制权、伦理、公共影响与个人生活集中发生冲突。",
       "payoffMeaning": "事业的去向与人物对成功的定义获得不可逆答案。",
       "beatOutline": {
         "setup": "让重大危机、机会或传承问题检验整个事业。",
@@ -97,7 +119,21 @@
         "modern.domain.career.scale_control",
         "modern.domain.career.value_legacy",
         "modern.domain.enterprise.crisis_transform"
-      ]
+      ],
+      "adventureSeeds": [
+        {
+          "opposition": "行业巨头并购施压，内部合伙人争夺控制权",
+          "crisis": "技术或政策变化使旧模式失效",
+          "entry": "以实际团队、资产和客户作出事业终局决定",
+          "allies": "老同事、家人与合作方各有不能抹去的利益",
+          "escalation": "退出、交班或重建必须面对过去承诺",
+          "stakes": "传承、出售、再造或倒闭交代人员与产品结果，不以职位晋升代替实际事业"
+        }
+      ],
+      "entryRequirements": {
+        "intelligence": 24,
+        "charisma": 21
+      }
     }
   ],
   "endingDirections": {

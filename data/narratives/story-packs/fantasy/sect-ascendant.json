@@ -1,7 +1,7 @@
 {
   "version": 1,
   "id": "fantasy.sect-ascendant",
-  "revision": "1.1.0",
+  "revision": "1.3.0",
   "worldId": "fantasy",
   "name": "宗门问道",
   "tagline": "从入门与传承起步，在道统兴衰中走出自己的大道。",
@@ -37,8 +37,6 @@
       "id": "fantasy.sect-ascendant.initiation",
       "label": "入道",
       "objective": "取得真实传承并完成第一次能够证明自身道路的修行或任务。",
-      "dramaticQuestion": "人物为何修行，又愿意接受怎样的师门约束？",
-      "pressureDirection": "资质差异、功法代价、真实任务与同辈竞争迫使人物形成自己的方法。",
       "payoffMeaning": "人物能够独立运用本领完成一次真实行动，并获得同伴或师长认可。",
       "beatOutline": {
         "setup": "让人物因异象、资质或现实危机接触一方道统。",
@@ -54,14 +52,26 @@
         "fantasy.domain.cultivation.foundation",
         "fantasy.domain.sect.trial_resource",
         "fantasy.practice.combat_exchange"
-      ]
+      ],
+      "adventureSeeds": [
+        {
+          "opposition": "外门管事争夺灵田配额，山兽受灵潮驱动下山",
+          "crisis": "试炼队被困旧矿口，低阶弟子无人接应",
+          "entry": "以入门身份与一门已学功法参与采药或巡山",
+          "allies": "同门会布阵、老役识矿路，互救才能建立信任",
+          "escalation": "灵潮封路，试炼与救人任务冲突",
+          "stakes": "实际应对取得修习资格、法器或同门；失败会受伤、失去配额并欠救命情"
+        }
+      ],
+      "entryRequirements": {
+        "intelligence": 9,
+        "physique": 8
+      }
     },
     {
       "id": "fantasy.sect-ascendant.trial",
       "label": "承脉",
       "objective": "在宗门内外的重大难题中取得决定权并守住重要关系。",
-      "dramaticQuestion": "道统的延续需要忠诚、改变，还是反叛？",
-      "pressureDirection": "派系分歧、秘境危险、强敌与外部势力使师门承诺彼此冲突。",
       "payoffMeaning": "人物成为一脉中不可忽略的力量，并改变了宗门走向。",
       "beatOutline": {
         "setup": "让宗门内外的重大难题要求人物承担超过弟子身份的责任。",
@@ -77,14 +87,26 @@
         "fantasy.domain.sect.faction_crisis",
         "fantasy.domain.cultivation.spell_combat",
         "fantasy.domain.uncanny.expedition"
-      ]
+      ],
+      "adventureSeeds": [
+        {
+          "opposition": "支脉长老抢夺传承，敌宗趁内斗侵占灵脉",
+          "crisis": "驻地阵眼损坏，弟子与凡民一同受威胁",
+          "entry": "凭已有修为、信物与师友接手一处实际防务",
+          "allies": "阵师、同门和凡人向导各掌必要条件",
+          "escalation": "敌宗进逼，内门要求弃守以保秘藏",
+          "stakes": "守住或撤出驻地改变传承归属与带队资格；代价包括同门、灵脉和师门信任"
+        }
+      ],
+      "entryRequirements": {
+        "intelligence": 16,
+        "physique": 14
+      }
     },
     {
       "id": "fantasy.sect-ascendant.dao",
       "label": "开道",
       "objective": "面对足以动摇道统根基的危机，并给出自己的大道答案。",
-      "dramaticQuestion": "人物继承的究竟是力量、制度，还是值得继续的信念？",
-      "pressureDirection": "师门存亡、个人突破、众生代价与天道规则集中碰撞。",
       "payoffMeaning": "人物使道统得以重生、另开一脉或在自己手中终结。",
       "beatOutline": {
         "setup": "让足以动摇道统根基的敌人、异变或内部决裂真正发生。",
@@ -101,7 +123,21 @@
         "fantasy.domain.cultivation.own_path",
         "fantasy.domain.cultivation.spell_combat",
         "fantasy.domain.destiny.world_change"
-      ]
+      ],
+      "adventureSeeds": [
+        {
+          "opposition": "上宗欲抽尽灵脉完成飞升，旧盟约面临背弃",
+          "crisis": "界门开启将毁掉宗门与山下生计",
+          "entry": "以此前实际道基与同伴面对宗门存亡",
+          "allies": "旧敌和盟宗可合作但要求兑现旧承诺",
+          "escalation": "灵潮灾变与飞升机会同时到来",
+          "stakes": "飞升、守界、重建或毁灭以行动结果落定；修为突破不能自动替代危机解决"
+        }
+      ],
+      "entryRequirements": {
+        "intelligence": 24,
+        "physique": 21
+      }
     }
   ],
   "endingDirections": {

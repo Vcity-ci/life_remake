@@ -48,7 +48,7 @@ import { applyNarrativeAssetActivity, applyNarrativeAssetUpdates, commitNarrativ
 import { composeNarrativeContext } from "./narrative/context/orchestrator.js";
 import { commitNarrativeActCanon, commitNarrativeEpisode as commitEpisode, runNarrativeTurnTransaction, type NarrativeCommitDraft } from "./narrative/commit.js";
 import { applyNarrativeMemoryCuration, prepareNarrativeMemoryCuration } from "./narrative/curator.js";
-import { commitNarrativeAgentTurn, runNarrativeAgentTurn, runNarrativeAgentDecision, finishNarrativeAgentDecision, synchronizeNarrativeAgentScene, synchronizeNarrativeAssetBatch } from "./narrative/runtime.js";
+import { commitNarrativeAgentTurn, runNarrativeAgentTurn as executeNarrativeAgentTurn, runNarrativeAgentDecision, finishNarrativeAgentDecision, synchronizeNarrativeAgentScene, synchronizeNarrativeAssetBatch } from "./narrative/runtime.js";
 import { stageNarrativeAssetRound } from "./narrative/asset-buffer.js";
 import { upgradeProviderOutputBudget } from "./config.js";
 import { defaultNarrativeContextProviders } from "./narrative/context/collectors.js";
@@ -58,7 +58,7 @@ import { loadNarrativeStoryPack, loadNarrativeStoryPacksForWorld, validateNarrat
 import { resolveNarrativeExperience } from "./narrative-experience.js";
 import { applyNarrativeIdentityMerges, canonicalizeNarrativeReferences, narrativeCharacterDirectory, parseNarrativeIdentityMerges } from "./narrative-identities.js";
 import { resolveNarrativeStatTiers } from "./engine.js";
-import { generateDirectedStoryTurn, generateDirectedStoryRender, generateDynamicNarrativeScene, generateNarrativeOrigin, renderDirectedDecisionNarrative, renderInterruptedBackground, synchronizeNarrativeContinuity } from "./ai.js";
+import { generateDirectedStoryTurn, generateDirectedStoryRender, generateDynamicNarrativeScene, generateNarrativeOrigin, generateNarrativeActWorldCard, renderDirectedDecisionNarrative, renderInterruptedBackground, synchronizeNarrativeContinuity } from "./ai.js";
 import { registerNarrativeParticipants } from "./narrative-characters.js";
 import { prepareRoundParticipants, roundCharacterDirectory } from "./narrative/handoff.js";
 import { parseNarrativeActWorldCard, commitNarrativeActOutline } from "./narrative/act-outline.js";
@@ -75,6 +75,19 @@ function actWorldCardForTest(task: OutlineFixture = { goal: "推进本幕人物�
 
 function outlineForTest(actId: string, task?: OutlineFixture) {
   return parseNarrativeActWorldCard(actWorldCardForTest(task), actId);
+}
+
+// These fault replays begin after the separate act job has completed. Keep the
+// original mocked protocol failures; never restore inline generation in production.
+async function runNarrativeAgentTurn(input: Parameters<typeof executeNarrativeAgentTurn>[0]) {
+  if (input.envelope.capabilities.includes("scene")) {
+    if (!input.run.narrative.actRuntime?.outline) {
+      const outline = input.envelope.actOutline ?? await generateNarrativeActWorldCard(input.run, input.world, { ...input.envelope, actOutline: undefined }, input.context);
+      commitNarrativeActOutline(input.run.narrative, outline);
+    }
+    input.envelope.actOutline = input.run.narrative.actRuntime?.outline;
+  }
+  return executeNarrativeAgentTurn(input);
 }
 
 function planningReplyForTest<T extends Record<string, unknown>>(fields: T) {
@@ -2047,8 +2060,8 @@ test("三幕属性门槛随责任提高，普通年积累恢复准入，年龄�
     for (const [index, act] of definition.mainlineActs!.entries()) {
       run.narrative.activeMainlineActId = act.id;
       run.narrative.actRuntime = { actId: act.id, beat: "setup", enteredAge: run.age, lastAdvancedAge: run.age, selectedRouteIds: [], decisionCount: 0 };
-      const gates = definition.progression!.actGateThresholds![index];
-      for (const stat of Object.keys(run.stats) as Array<keyof typeof run.stats>) run.stats[stat] = gates.opening - 1;
+      const targets = act.entryRequirements!;
+      for (const [stat, target] of Object.entries(targets)) run.stats[stat as keyof typeof run.stats] = target - 1;
       assert.equal(isNarrativeMainlineActEntryReady(run, definition), false);
       run.age = 75;
       assert.equal(isNarrativeMainlineActEntryReady(run, definition), false, "变老本身不授予能力");
@@ -2061,11 +2074,12 @@ test("三幕属性门槛随责任提高，普通年积累恢复准入，年龄�
         run.stats[stat] += changes![stat]!;
       }
       assert.equal(isNarrativeMainlineActEntryReady(run, definition), true);
-      assert.equal(isNarrativeStageReady(run, definition, "climax"), false);
-      for (const stat of Object.keys(run.stats) as Array<keyof typeof run.stats>) run.stats[stat] = gates.climax;
+      assert.equal(isNarrativeStageReady(run, definition, "climax"), true, "准入后不再逐节拍重新阻断");
+      for (const stat of Object.keys(run.stats) as Array<keyof typeof run.stats>) run.stats[stat] = 0;
       assert.equal(isNarrativeStageReady(run, definition, "climax"), true);
       if (index < definition.mainlineActs!.length - 1) {
-        run.narrative.actRuntime!.actId = definition.mainlineActs![index + 1].id;
+        run.narrative.actRuntime!.beat = "payoff";
+        run.narrative = advanceNarrativeActBeat(run.narrative, definition, run.age).state;
         assert.equal(isNarrativeMainlineActEntryReady(run, definition), false, "上一幕的成熟基础尚不足以承担下一幕责任");
       }
     }
@@ -2284,11 +2298,11 @@ test("实际请求只提供一份人物材料，固定经历先于最新年龄�
       narrativeDecisionOutcomeTool(dynamicSceneAttributePolicy()), "依据当前人物继续经历", { task });
     const text = request.history.map((entry) => entry.content).join("\n");
     assert.equal(text.split(summary).length - 1, 1, `${task}只提供一份经历摘要`);
-    assert.equal(text.split("当前年龄：").length - 1, 1, `${task}只提供一次当前状态`);
+    assert.equal(text.split("你目前16岁").length - 1, 1, `${task}只提供一次当前状态`);
     assert.ok(text.indexOf(run.personaPrompt) < text.indexOf(summary));
-    assert.ok(text.indexOf(summary) < text.indexOf("当前年龄："));
-    assert.ok(text.includes("当前年龄：16岁，青年"));
-    assert.ok(text.includes("体魄=身健耐劳"));
+    assert.ok(text.indexOf(summary) < text.indexOf("你目前16岁"));
+    assert.ok(text.includes("你目前16岁，处在人生的青年阶段"));
+    assert.ok(text.includes("体魄：身健耐劳"));
     assert.ok(!text.includes("出生于北境军户。"), "被摘要覆盖的身世不重复拼入");
     assert.equal(text.split(run.personaPrompt).length - 1, 1, "人设与当前角色档案只提供一次");
   }
@@ -2297,8 +2311,8 @@ test("实际请求只提供一份人物材料，固定经历先于最新年龄�
   run.stats.physique = 35;
   const plan = buildNarrativePromptPlan(run, definition, null, "rendering");
   const request = composeNarrativeContext({ plan, task: "rendering", taskPrompt: "处理眼前困难" });
-  assert.ok(request.renderedContext.includes("当前年龄：36岁，壮年"));
-  assert.ok(request.renderedContext.includes("体魄=精力充沛"));
+  assert.ok(request.renderedContext.includes("你目前36岁，处在人生的壮年阶段"));
+  assert.ok(request.renderedContext.includes("体魄：精力充沛"));
   assert.equal(request.renderedContext.split(summary).length - 1, 1);
   assert.equal(run.narrative.memoryDigests[0].revision, 1, "状态更新不依赖重做经历摘要");
 });
@@ -2317,7 +2331,7 @@ test("年龄属性和所在地变化不再挡住既有经历，幕内规划使�
   commitNarrativeEpisode(run, { callId: "river", sourceEventId: "river", turnKind: "scene", age: 20, storyDelta: prose });
   const prepare = (task: "background" | "rendering" | "dynamic" | "decision") => {
     const ctx = memoryTestContext(run);
-    ctx.narrativePlan = { ...ctx.narrativePlan!, task, actBackground: "本幕需要守住河岸。" };
+    ctx.narrativePlan = { ...ctx.narrativePlan!, task, worldCoreContext: undefined, actBackground: "本幕需要守住河岸。" };
     return prepareNarrativeOutcomeRequest(run, world, ctx, narrativeDecisionOutcomeTool(dynamicSceneAttributePolicy()), "承接当前处境", { task });
   };
   const before = prepare("rendering");
@@ -2329,10 +2343,10 @@ test("年龄属性和所在地变化不再挡住既有经历，幕内规划使�
     const firstChangedContext = beforeText.indexOf("【本轮召回】");
     assert.equal(text.slice(0, firstChangedContext), beforeText.slice(0, firstChangedContext), `${task}保留原文以前的消息前缀`);
     assert.ok(text.indexOf(summary) < text.indexOf(prose));
-    assert.ok(text.indexOf(prose) < text.indexOf("当前年龄：21岁"));
-    assert.ok(text.includes("当前生活或行动所在地：关城。"));
-    assert.notEqual(text.split("\n").find((line) => line.startsWith("当前能力基础：")),
-      beforeText.split("\n").find((line) => line.startsWith("当前能力基础：")), "新属性档位仍按现有规则传达");
+    assert.ok(text.indexOf(prose) < text.indexOf("你目前21岁"));
+    assert.ok(text.includes("你目前在关城。"));
+    assert.notEqual(text.split("\n").find((line) => line.startsWith("你的能力基础：")),
+      beforeText.split("\n").find((line) => line.startsWith("你的能力基础：")), "新属性档位仍按现有规则传达");
     assert.equal(text.split(prose).length - 1, 1);
   }
   const envelope: NarrativeTurnEnvelope = {
@@ -2347,14 +2361,14 @@ test("年龄属性和所在地变化不再挡住既有经历，幕内规划使�
   const prompt = narrativeTurnPlanningPrompt(envelope, ctx.narrativePlan);
   const prepared = prepareNarrativeOutcomeRequest(run, world, ctx, narrativeTurnPlanTools(envelope), prompt, { task: "planning", planningPurpose: "execute" });
   const text = prepared.history.map((entry) => entry.content).join("\n");
-  for (const value of [summary, prose, run.personaPrompt, "当前年龄：21岁", envelope.actOutline!.background]) assert.equal(text.split(value).length - 1, 1);
+  for (const value of [summary, prose, run.personaPrompt, "你目前21岁", envelope.actOutline!.background]) assert.equal(text.split(value).length - 1, 1);
   assert.ok(text.indexOf(summary) < text.indexOf("本幕简要故事："));
   assert.ok(text.indexOf("locationDirective / assetNeeds 地点目录：") < text.indexOf("近期实际经历："));
-  assert.ok(text.indexOf(prose) < text.indexOf("当前年龄：21岁"));
-  assert.ok(text.indexOf("当前年龄：21岁") < text.indexOf("援军尚未到达"));
+  assert.ok(text.indexOf(prose) < text.indexOf("你目前21岁"));
+  assert.ok(text.indexOf("你目前21岁") < text.indexOf("援军尚未到达"));
   const nextRun = structuredClone(run); nextRun.age++;
   const nextPrompt = narrativeTurnPlanningPrompt({ ...envelope, currentAge: nextRun.age }, memoryTestContext(nextRun).narrativePlan);
-  assert.equal(prompt.slice(0, prompt.indexOf("当前年龄：")), nextPrompt.slice(0, nextPrompt.indexOf("当前年龄：")));
+  assert.equal(prompt.slice(0, prompt.indexOf("你目前21岁")), nextPrompt.slice(0, nextPrompt.indexOf("你目前22岁")));
 });
 
 test("导演两次调用沿用同一有序输入，不重新吸收会话或把消息压回一段文本", async (t) => {
@@ -2480,8 +2494,8 @@ test("实际世界成长侧重不会缩窄工具属性目录，搭配效果与�
   for (const focus of runtime.growthFocusOptions!) {
     runtime.growthFocusId = focus.id;
     const policy = dynamicBackgroundAttributePolicy(run);
-    const first = focus.primaryStats[0]!;
-    const other = policy.allowedStats.find((stat) => !focus.primaryStats.includes(stat))!;
+    const first = "intelligence" as const;
+    const other = "physique" as const;
     const effects = [{ stat: first, direction: "up" as const, band: "medium" as const }, { stat: other, direction: "up" as const, band: "light" as const }];
     const tools = dynamicNarrativeSceneTools({
       act: definition.mainlineActs![0], beat: "setup", presentation: "summary", allowedTurnKinds: ["background"],
@@ -2498,16 +2512,14 @@ test("实际世界成长侧重不会缩窄工具属性目录，搭配效果与�
     const tool = prepared.tools[0].function as { parameters: { properties: { effects: { description: string; items: { properties: { stat: { enum: string[] } } } } } } };
     const schema = tool.parameters.properties.effects;
     assert.deepEqual(schema.items.properties.stat.enum, Object.keys(run.stats));
-    for (const stat of focus.primaryStats) assert.ok(taskPrompt.includes(stat));
-    assert.match(taskPrompt, /至少1项/);
+    assert.equal(Object.hasOwn(policy, "minPreferredEffects"), false);
+    assert.equal(Object.hasOwn(policy, "preferredStats"), false);
     assert.equal(validateNarrativeEffects(effects, policy).ok, true);
     const before = structuredClone(run);
     assert.ok(approveNarrativeAttributeOutcome(run, world, { effects }, "background", policy));
     assert.deepEqual(run, before);
-    const rejected = validateNarrativeEffects([effects[1]], policy);
-    assert.ok(!rejected.ok);
-    assert.equal(rejected.issue.rule, "growth_focus_missing");
-    assert.equal(approveNarrativeAttributeOutcome(run, world, { effects: [effects[1]] }, "background", policy), null);
+    assert.ok(validateNarrativeEffects([effects[1]], policy).ok);
+    assert.ok(approveNarrativeAttributeOutcome(run, world, { effects: [effects[1]] }, "background", policy));
   }
 });
 
@@ -4619,7 +4631,7 @@ test("规划的同年时间贯通结算、正文与提交，可用资产不自�
     assert.equal(turn.time.previousAge, 20);
     assert.equal(turn.scene.scenePacing, expectedAge === 20 ? "continuous" : "spanning");
     const writer = calls.filter((entry) => entry.name === "render_scene_prose").at(-1)!;
-    assert.ok(writer.text.includes(`当前年龄：${expectedAge}岁`), "人物介绍采用实际叙述年龄");
+    assert.ok(writer.text.includes(`你目前${expectedAge}岁`), "人物介绍采用实际叙述年龄");
     assert.ok(writer.text.includes("上段已提交经历停在20岁"));
     assert.ok(writer.text.includes(expectedAge === 20 ? "本段与上段同年" : "本段已进入下一岁"));
     assert.deepEqual(turn.scene.assetActivity, { locationIds: [], abilityIds: [] });
@@ -6230,13 +6242,13 @@ test("幕初世界卡的协议错误只纠正该请求，普通年保存后不�
       function: { name: "plan_scene_turn", arguments: JSON.stringify({ actWorldCard: calls === 1 ? { beats: {} } : actWorldCardForTest() }) } }] } }] };
   });
   const ctx = { ...memoryTestContext(run), apiKey: "not-sent", narrativePlan: buildNarrativePromptPlan(run, definition, null, "planning") };
-  const first = await generateNarrativeTurnPlan(run, world, envelope, ctx);
-  commitNarrativeActOutline(run.narrative, first.actOutline!);
+  const first = await generateNarrativeActWorldCard(run, world, envelope, ctx);
+  commitNarrativeActOutline(run.narrative, first);
   const restored = ensureNarrativeRunState(JSON.parse(JSON.stringify(run.narrative)), true, run.age);
   const next = await generateNarrativeTurnPlan(run, world, { ...envelope, actOutline: restored.actRuntime!.outline }, ctx);
   assert.equal(calls, 2);
   assert.equal(next.turnKind, "background");
-  assert.deepEqual(next.actOutline, first.actOutline);
+  assert.deepEqual(next.actOutline, first);
   assert.equal(JSON.stringify(run).includes("originalToolArguments"), false);
 });
 
@@ -6437,8 +6449,8 @@ test("正文实际请求只读统一历史与最新角色面板，技能经历�
   const text = request.history.map((message) => message.content).join("\n");
   assert.equal(text.split("救回同袍后，追兵已经远去。").length - 1, 1);
   assert.ok(text.indexOf("生于边镇") < text.indexOf("救回同袍后"));
-  assert.ok(text.indexOf("救回同袍后") < text.indexOf("当前年龄：20岁"));
-  assert.ok(text.indexOf("当前年龄：20岁") < text.indexOf("叙述21岁的经历"));
+  assert.ok(text.indexOf("救回同袍后") < text.indexOf("你目前20岁"));
+  assert.ok(text.indexOf("你目前20岁") < text.indexOf("叙述21岁的经历"));
   assert.ok(text.indexOf("救回同袍后") < text.indexOf("山口的关城与哨道"));
   assert.ok(text.indexOf("救回同袍后") < text.indexOf("叙述21岁的经历"));
   assert.match(text, /骑射（熟练）/);

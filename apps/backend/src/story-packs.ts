@@ -70,8 +70,12 @@ export function validateNarrativeStoryPack(
   const actIds = new Set<string>();
   for (const act of value.acts) {
     if (!nonEmpty(act.id) || !act.id.startsWith(`${value.id}.`) || actIds.has(act.id) ||
-        !nonEmpty(act.label) || !nonEmpty(act.objective) || !nonEmpty(act.dramaticQuestion) ||
-        !nonEmpty(act.pressureDirection) || !nonEmpty(act.payoffMeaning) || !validBeatOutline(act.beatOutline) ||
+        !nonEmpty(act.label) || !nonEmpty(act.objective) ||
+        !Array.isArray(act.adventureSeeds) || !act.adventureSeeds.length ||
+        act.adventureSeeds.some((seed) => !seed || ![seed.opposition, seed.crisis, seed.entry, seed.allies, seed.escalation, seed.stakes].every(nonEmpty)) ||
+        !act.entryRequirements || !Object.keys(act.entryRequirements).length ||
+        Object.entries(act.entryRequirements).some(([key, target]) => !["intelligence", "charisma", "family", "fortune", "physique"].includes(key) || !Number.isFinite(target) || target! <= 0) ||
+        !nonEmpty(act.payoffMeaning) || !validBeatOutline(act.beatOutline) ||
         act.focusForceIds?.some((id) => !forceIds.has(id)) ||
         act.worldCardRefs?.some((id) => !knownCardIds.has(id))) {
       throw new Error(`${value.id}_story_pack_act_invalid:${act?.id ?? "unknown"}`);

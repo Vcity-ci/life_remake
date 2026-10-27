@@ -42,6 +42,7 @@ import {
   renderInterruptedBackground,
   generateMilestoneOptions,
   generateNarrativeOrigin,
+  generateNarrativeActWorldCard,
   generateYearNarrative,
   isDirectedToolAvailable,
   NarrativeOutcomeError,
@@ -67,7 +68,9 @@ import {
   readContentBundle,
   writeContentBundle
 } from "./content.js";
-import { buildNarrativePromptPlan, narrativeRouteBeatGuidance, ensureNarrativeActRuntime, isNarrativeEarlyLife, isNarrativeMainlineActEntryReady, isNarrativeWorldStageReady, selectNarrativeGrowthFocus } from "./narrative.js";
+import { buildNarrativePromptPlan, narrativeRouteBeatGuidance, ensureNarrativeActRuntime, isNarrativeEarlyLife, refreshNarrativeActAdmission, narrativeActDeficits, selectNarrativeGrowthFocus } from "./narrative.js";
+import { ActPreparationJobs, actPreparationMode, prepareActRequest, recordActTransition } from "./narrative/act-preparation.js";
+import { protagonistIntroduction, statNames } from "./narrative/protagonist.js";
 import { resolveNarrativeExperience } from "./narrative-experience.js";
 import { loadNarrativeStoryPack, loadNarrativeStoryPacksForWorld, toPublicStoryPackOption } from "./story-packs.js";
 import {
@@ -143,6 +146,7 @@ import {
   restoreSaveSlot,
   saveGameEnv,
   saveRun,
+  commitRunActPreparation,
   withRunLock,
   withSessionLock,
   type AnonymousSession
@@ -158,6 +162,39 @@ const deployMode = getDeployMode();
 const debugModel = process.env.DEBUG_MODEL_CALLS === "1";
 const anonymousSessionCookie = "reroll_session";
 type NarrativeCallContext = Parameters<typeof generateYearNarrative>[3];
+
+const actPreparationJobs = new ActPreparationJobs();
+
+async function scheduleActPreparationForRun(run: InternalRunState, world: WorldConfig, narrativeWorld: NarrativeWorldDefinition,
+  sessionId: string, providerConfig: ProviderConfig, apiKey: string, promptPack: Record<string, string>, retry = false): Promise<void> {
+  const requestId = prepareActRequest(run, retry);
+  const actId = run.narrative.actRuntime?.actId;
+  if (!requestId || !actId) return;
+  await saveRun(run, sessionId);
+  // Capture is queued behind the calling mutation; the network request starts after its locks release.
+  void actPreparationJobs.start(`${run.runId}:${actId}`,
+    () => withSessionLock(sessionId, () => withRunLock(run.runId, async () => {
+      const latest = await getRun(run.runId);
+      if (!latest || await getRunSessionId(run.runId) !== sessionId || latest.ended ||
+          latest.narrative.actRuntime?.actId !== actId || latest.narrative.actRuntime.outline ||
+          latest.narrative.actRuntime.preparation?.requestId !== requestId) return;
+      return structuredClone(latest);
+    })),
+    (snapshot) => {
+      const act = narrativeWorld.mainlineActs!.find((entry) => entry.id === actId)!;
+      const input: NarrativeTurnEnvelope = {
+        callId: `act:${snapshot.runId}:${actId}`, source: "scene", worldId: snapshot.worldId,
+        currentAge: snapshot.age, backgroundAgeRange: { fromAge: snapshot.age + 1, toAge: snapshot.age + 1 },
+        act, beat: "setup", capabilities: [], storyPatterns: [], socialForces: [], focusReferences: [],
+        statTiers: resolveNarrativeStatTiers(snapshot.stats, snapshot.narrative.statTierConfig), clock: { ...snapshot.narrative.sceneClock }
+      };
+      return generateNarrativeActWorldCard(snapshot, world, input, { providerConfig, apiKey, promptPack,
+        usageScope: { sessionId, runId: snapshot.runId, worldId: snapshot.worldId },
+        narrativePlan: buildNarrativePromptPlan(snapshot, narrativeWorld, null, "planning") });
+    },
+    (outline) => commitRunActPreparation(run.runId, sessionId, actId, requestId, outline),
+    (error) => console.error("[act-preparation:failed]", { runId: run.runId, actId, error: error instanceof Error ? error.message : String(error) }));
+}
 type TimelineEntryChunk = NonNullable<InternalRunState["timelineChunk"]>;
 type TimelineEntryItem = PublicTimelineEntry;
 type StreamDonePayload = { run: ReturnType<typeof toClientRun>; timelineChunk: PublicTimelineEntry[]; turns?: TurnRecord[] };
@@ -1213,17 +1250,7 @@ async function generateDirectedSegmentForRunUnsafe(options: DirectedSegmentOptio
     narrative: run.narrative
   };
   const earlyLife = isNarrativeEarlyLife(narrativeWorld, run.age);
-  const canEnterAct = !earlyLife && isNarrativeMainlineActEntryReady(narrativeSource, narrativeWorld);
-  const gateStage = runtime.beat === "escalation"
-    ? "escalation"
-    : runtime.beat === "pressure"
-      ? "pressure"
-      : runtime.beat === "climax"
-        ? "climax"
-        : undefined;
-  const currentBeatReady = runtime.beat === "setup"
-    ? canEnterAct
-    : runtime.beat === "payoff" || !gateStage || isNarrativeWorldStageReady(narrativeSource, narrativeWorld, gateStage);
+  const currentBeatReady = Boolean(runtime.outline) && refreshNarrativeActAdmission(narrativeSource, narrativeWorld);
   const backgroundPacing = narrativeWorld.progression?.backgroundPacing ?? { minYears: 1, maxYears: 1 };
   const backgroundMinYears = Math.max(1, Math.trunc(backgroundPacing.minYears));
   const configuredBackgroundMaxYears = Math.max(backgroundMinYears, Math.trunc(backgroundPacing.maxYears));
@@ -1285,6 +1312,9 @@ async function generateDirectedSegmentForRunUnsafe(options: DirectedSegmentOptio
     statTiers: resolveNarrativeStatTiers(run.stats, run.narrative.statTierConfig),
     recentChanges: recentCommittedNarrativeChanges(run.narrative, 3, run.turnRecords),
     growthFocus,
+    preparation: !runtime.outline ? { mode: "transition", deficits: [] } : runtime.admittedAtAge === undefined
+      ? { mode: "prepare", deficits: narrativeActDeficits(narrativeSource, narrativeWorld).map((entry) => ({ ...entry, label: statNames[entry.stat] })) }
+      : undefined,
     clock: { ...run.narrative.sceneClock }
   };
   const agentTurn = await runNarrativeAgentTurn({
@@ -1306,6 +1336,7 @@ async function generateDirectedSegmentForRunUnsafe(options: DirectedSegmentOptio
       attributePolicy: turnPlan.turnKind === "scene" ? dynamicSceneAttributePolicy() : undefined,
       backgroundAttributePolicy,
       growthFocus,
+      preparation: envelope.preparation,
       statTiers: envelope.statTiers,
       recentChanges: envelope.recentChanges,
       lifeStage: earlyLife && Number.isInteger(earlyLifeMaxAge)
@@ -1547,6 +1578,10 @@ async function generateSegmentForRun(
       markRunPhase(run, "ready");
       return { run, generatedChunk: [], fromAge, toAge, rawChunkCount: 0 };
     }
+    if (!run.story.mainlineCompleted && ["waiting", "failed"].includes(actPreparationMode(run))) {
+      markRunPhase(run, "ready");
+      return { run, generatedChunk: [], fromAge, toAge, rawChunkCount: 0 };
+    }
   }
   const useDirectedTurn = usesNarrativeDirector;
   if (usesNarrativeDirector) {
@@ -1734,6 +1769,7 @@ async function runStartFlowUnlocked(
   }
   syncRunPhase(run);
   await saveRun(run, sessionId);
+  await scheduleActPreparationForRun(run, world, narrativeWorld, sessionId, providerConfig, apiKey, content.promptPack);
   return {
     updatedRun: run,
     timelineChunk,
@@ -1829,6 +1865,10 @@ async function runStepFlowUnlocked(
     if (!body.growthFocusId) throw new Error("growth_focus_required");
     if (run.narrative.opening?.status === "pending") throw new Error("opening_not_ready");
     run.narrative = selectNarrativeGrowthFocus(run.narrative, narrativeWorld, body.growthFocusId);
+    const visible = run.turnRecords.at(-1);
+    if (visible?.age === run.age && !run.narrativeReservoir.queued.length) {
+      visible.protagonistIntroductionSnapshot = protagonistIntroduction(run);
+    }
     syncRunPhase(run);
     rememberRequestId(run, body.requestId);
     await saveRun(run, sessionId);
@@ -1861,6 +1901,13 @@ async function runStepFlowUnlocked(
   const eventPoolSummary = summarizeFactionEvents(factionEvents);
   const talentHookSummary = summarizeTalentHooks(run.cards);
 
+  if (action === "prepare_act") {
+    await scheduleActPreparationForRun(run, world, narrativeWorld, sessionId, providerConfig, apiKey, content.promptPack, true);
+    rememberRequestId(run, body.requestId);
+    await saveRun(run, sessionId);
+    return { updatedRun: run, timelineChunk: [], rawChunkCount: 0, fromAge: run.age, toAge: run.age, tuning: allocation, action };
+  }
+
   if (action === "generate_opening") {
     if (!narrativeWorld || !run.narrative.enabled) throw new Error("opening_unavailable");
     run.narrative = ensureNarrativeActRuntime(run.narrative, narrativeWorld, run.age);
@@ -1891,6 +1938,7 @@ async function runStepFlowUnlocked(
     rememberRequestId(run, body.requestId);
     await saveRun(run, sessionId);
     scheduleCommittedNarrativeCuration({ providerConfig, apiKey, promptPack: content.promptPack, usageScope: { sessionId, runId: run.runId, worldId: run.worldId } }, run, world);
+    await scheduleActPreparationForRun(run, world, narrativeWorld, sessionId, providerConfig, apiKey, content.promptPack);
     if (openingRecord && onTurn) await onTurn(openingRecord, 0, 1);
     return {
       updatedRun: run,
@@ -2218,6 +2266,7 @@ async function runStepFlowUnlocked(
       rawChunkCount = stepped.chunk.length;
     }
   } else if (run.narrativeReservoir.queued.length === 0 && !run.nextMilestoneChoice && !run.survivalCrisis && !run.ended) {
+    const transitionAct = actPreparationMode(run) === "transition" ? run.narrative.actRuntime?.actId : undefined;
     const generated = await generateSegmentForRun(
       run,
       world,
@@ -2240,6 +2289,7 @@ async function runStepFlowUnlocked(
     toAge = generated.toAge;
     rawChunkCount = generated.rawChunkCount;
     committedEpisodeId = generated.episodeId;
+    if (transitionAct && generated.rawChunkCount > 0) recordActTransition(run, transitionAct);
   }
 
   const timelineChunk: PublicTimelineEntry[] = [];
@@ -2266,8 +2316,10 @@ async function runStepFlowUnlocked(
 
   syncRunPhase(run);
 
+  if (run.narrative.actRuntime?.outline && !isNarrativeEarlyLife(narrativeWorld, run.age)) refreshNarrativeActAdmission(run, narrativeWorld);
   rememberRequestId(run, body.requestId);
   await saveRun(run, sessionId);
+  await scheduleActPreparationForRun(run, world, narrativeWorld, sessionId, providerConfig, apiKey, content.promptPack);
   scheduleCommittedNarrativeCuration({ providerConfig, apiKey, promptPack: content.promptPack, usageScope: { sessionId, runId: run.runId, worldId: run.worldId } }, run, world);
   if (onTurn) {
     for (const [index, record] of turnRecords.entries()) {
@@ -2380,14 +2432,10 @@ async function currentGameRunPayload(sessionId: string): Promise<{
     return { run: null, timeline: [], turns: [], environmentReady };
   }
 
-  const { content } = await loadGameResources(run.worldId);
+  const internalRun = structuredClone(run) as InternalRunState;
+  const { content } = await loadGameResources(internalRun.worldId);
   const world = resolveWorld(content.worlds, run.worldId);
-  const internalRun = run as InternalRunState;
-  const hadTurnRecords = internalRun.turnRecords?.length ?? 0;
   const turns = ensureVisibleTurnRecords(internalRun, world);
-  if (hadTurnRecords === 0 && turns.length > 0) {
-    await saveRun(internalRun, sessionId);
-  }
   return {
     run: toClientRun(internalRun),
     timeline: turns.map((turn) => ({

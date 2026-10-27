@@ -431,13 +431,16 @@ export default function App() {
         return runState?.revealedAge ?? runState?.age ?? 0;
     }
     function canAdvance(runState) {
-        if (!runState)
+        if (!runState || !envReady)
             return false;
         if (runState.pendingChoice)
             return true;
         if (runState.opening?.status === "pending")
             return false;
         if (runState.growthFocus && !runState.growthFocus.selectedId)
+            return false;
+        if (!runState.nextMilestoneChoice && !runState.survivalCrisis && runState.actPlanning &&
+            (runState.actPlanning.status === "failed" || (runState.actPlanning.status === "pending" && runState.actPlanning.bufferedTurns >= runState.actPlanning.bufferLimit)))
             return false;
         const runPhase = phaseOf(runState);
         return runPhase === "ready";
@@ -448,6 +451,74 @@ export default function App() {
             runState.growthFocus &&
             !runState.growthFocus.selectedId);
     }
+    const resumedActRef = useRef(new Set());
+    async function prepareCurrentAct() {
+        const current = runRef.current;
+        if (!current || !envReady || isGeneratingRef.current)
+            return;
+        isGeneratingRef.current = true;
+        setIsGenerating(true);
+        try {
+            await stepRunStream({ runId: current.runId, action: "prepare_act",
+                requestId: makeStepRequestId(current.runId, "prepare_act", ++requestNonceRef.current) }, (event) => {
+                if (event.type === "done" && runRef.current?.runId === current.runId) {
+                    runRef.current = event.data.run;
+                    setRun(event.data.run);
+                }
+                if (event.type === "error")
+                    throw new Error(event.data.message);
+            });
+        }
+        catch {
+            if (current.actPlanning)
+                resumedActRef.current.delete(`${current.runId}:${current.actPlanning.actId}`);
+            setStatus("暂时无法继续，请重试。");
+        }
+        finally {
+            isGeneratingRef.current = false;
+            setIsGenerating(false);
+        }
+    }
+    useEffect(() => {
+        if (!run || !envReady || run.ended || run.opening?.status !== "ready" || run.actPlanning?.status !== "pending" || isStreaming || isGenerating)
+            return;
+        const key = `${run.runId}:${run.actPlanning.actId}`;
+        if (!resumedActRef.current.has(key)) {
+            resumedActRef.current.add(key);
+            void prepareCurrentAct();
+        }
+    }, [run, envReady, isStreaming, isGenerating]);
+    useEffect(() => {
+        if (!run || run.ended || run.actPlanning?.status !== "pending" || isStreaming || isGenerating)
+            return;
+        let stopped = false;
+        let querying = false;
+        const timer = window.setInterval(() => {
+            if (querying || isGeneratingRef.current)
+                return;
+            const before = runRef.current;
+            querying = true;
+            void fetchCurrentRun().then((payload) => {
+                // An older poll must not overwrite a completed story request or another save.
+                if (stopped || isGeneratingRef.current || runRef.current !== before || payload.run?.runId !== before?.runId)
+                    return;
+                setEnvReady(payload.environmentReady);
+                if (!payload.environmentReady && before?.actPlanning) {
+                    resumedActRef.current.delete(`${before.runId}:${before.actPlanning.actId}`);
+                    setStatus("请在 Setting 重新确认本局环境后继续。");
+                }
+                else if (before?.actPlanning?.status === "pending" && payload.run?.actPlanning?.status === "ready") {
+                    setStatus("");
+                }
+                runRef.current = payload.run;
+                setRun(payload.run);
+            }).catch(() => {
+                if (!stopped && before?.actPlanning)
+                    resumedActRef.current.delete(`${before.runId}:${before.actPlanning.actId}`);
+            }).finally(() => { querying = false; });
+        }, 2000);
+        return () => { stopped = true; window.clearInterval(timer); };
+    }, [run?.runId, run?.actPlanning?.status, run?.ended, isStreaming, isGenerating]);
     async function runStepGeneration(decision, decisionAgeOverride, survivalChoice, survivalCrisisId) {
         const currentRun = runRef.current;
         if (!currentRun)
@@ -511,6 +582,9 @@ export default function App() {
                     }
                     else if (event.data.run.nextMilestoneChoice && phaseOf(event.data.run) === "waiting_decision") {
                         setStatus("新的抉择出现。");
+                    }
+                    else if (event.data.run.actPlanning?.status === "pending" && event.data.run.actPlanning.bufferedTurns >= event.data.run.actPlanning.bufferLimit) {
+                        setStatus("请稍候…");
                     }
                     else {
                         setStatus("已就绪，继续推进年份。");
@@ -1068,7 +1142,7 @@ export default function App() {
             setAutoAdvance(false);
             return;
         }
-        if (isStreaming || isGenerating)
+        if (isStreaming || isGenerating || !envReady)
             return;
         let action;
         if (debugMode && needsGrowthFocus(run)) {
@@ -1095,6 +1169,9 @@ export default function App() {
         else if (canAdvance(run)) {
             action = onAdvance;
         }
+        else if (run.actPlanning?.status === "pending" || run.actPlanning?.status === "failed") {
+            return;
+        }
         else {
             setAutoAdvance(false);
             return;
@@ -1108,8 +1185,8 @@ export default function App() {
             void action();
         }, 350);
         return () => window.clearTimeout(timer);
-    }, [autoAdvance, debugMode, run, timeline.length, activeDecision, activeSurvivalCrisis, isStreaming, isGenerating]);
-    const canEnableAutoAdvance = !run || canAdvance(run) || (debugMode && !run.ended && (needsGrowthFocus(run) ||
+    }, [autoAdvance, debugMode, run, timeline.length, activeDecision, activeSurvivalCrisis, isStreaming, isGenerating, envReady]);
+    const canEnableAutoAdvance = !run || canAdvance(run) || (!run.ended && run.actPlanning?.status === "pending") || (debugMode && !run.ended && (needsGrowthFocus(run) ||
         (phaseOf(run) === "waiting_decision" && Boolean(activeDecision || activeSurvivalCrisis))));
     if (!bootstrap) {
         return _jsx("main", { className: "app", children: _jsx("p", { children: status }) });
@@ -1139,20 +1216,20 @@ export default function App() {
                                                                         next.add(item.turnId);
                                                                     return next;
                                                                 }), children: originExpanded ? "⌃" : "⌄" })) : null] }), (!isOrigin || originExpanded) ? _jsx("p", { children: item.narrative }) : null, isOrigin && originExpanded ? (_jsx("div", { className: "origin-talent-tags", "aria-label": "\u6B64\u751F\u5929\u8D4B", children: run.cards.map((card) => _jsx("span", { className: `asset-chip ${rarityClass(card.rarity)}`, title: card.description, children: card.name }, card.id)) })) : null, !isOrigin ? _jsx("div", { className: "delta-row", children: extractDeltaLabels(item).map((label, idx) => _jsx("small", { children: label }, `${timelineKey(item)}-${idx}`)) }) : null, item.choiceOutcome ? (_jsxs("section", { className: "decision-commit", "aria-label": "\u5DF2\u9009\u884C\u52A8", children: [_jsxs("small", { children: ["\u547D\u8FD0\u6289\u62E9", item.choiceOutcome.status === "selected" ? " · 等待结果" : ""] }), item.choice?.background && item.choice.background !== item.narrative ? _jsx("p", { children: item.choice.background }) : null, _jsx("strong", { children: item.choiceOutcome.label }), _jsx("p", { children: item.choiceOutcome.description })] })) : null, item.decisionResult ? _jsxs("small", { className: "decision-roll", children: ["\u68C0\u5B9A", item.decisionResult.roll.success ? "成功" : "失败", " \u00B7 \u6210\u529F\u7387", (item.decisionResult.roll.probability * 100).toFixed(1), "% \u00B7 \u63B7\u70B9", (item.decisionResult.roll.roll * 100).toFixed(2), "/100", item.decisionResult.status === "rendered" ? " · 变化结算中" : ""] }) : null, (!isOrigin || originExpanded) ? _jsx(NarrativeAssetChanges, { current: item.narrativeAssetsSnapshot, previous: timeline[index - 1]?.narrativeAssetsSnapshot }) : null] }, timelineKey(item)));
-                                        }), run.opening?.status === "pending" ? (_jsxs("section", { className: "opening-pending", "aria-live": "polite", children: [_jsx("small", { children: "\u547D\u8FD0\u521D\u5377" }), _jsx("p", { children: "\u8EAB\u4E16\u6B63\u5728\u663E\u73B0\uFF0C\u5F80\u540E\u7684\u7ECF\u5386\u4F1A\u4ECE\u8FD9\u91CC\u5F00\u59CB\u3002" }), !isStreaming && !isGenerating ? _jsx("button", { type: "button", onClick: () => void onGenerateOpening(), children: "\u91CD\u65B0\u5199\u5C31\u8EAB\u4E16" }) : null] })) : null] }), activeDecision && showActiveDecision ? (_jsxs("section", { className: "decision-dock", "aria-live": "polite", "aria-busy": isGenerating, children: [_jsxs("div", { className: "decision-dock-heading", children: [_jsxs("small", { children: [activeDecision.age, "\u5C81 \u00B7 \u547D\u8FD0\u6289\u62E9"] }), isGenerating ? _jsx("span", { children: "\u6B63\u5728\u7ED3\u7B97..." }) : null] }), _jsx("p", { children: activeDecision.background ?? "你来到抉择时刻：" }), activeDecision.check ? _jsxs("small", { children: ["\u68C0\u5B9A\u4F9D\u636E\uFF1A", statLabels[activeDecision.check.stat], " ", activeDecision.check.value, " \uFF0F \u672C\u8282\u62CD\u95E8\u69DB ", activeDecision.check.threshold] }) : null, _jsx("div", { className: "decision-options", children: activeDecision.options.map((opt) => (_jsxs("button", { disabled: isStreaming || isGenerating, onClick: () => void onDecision(opt.id), children: [_jsx("strong", { children: opt.label }), _jsx("small", { children: opt.description }), opt.probability !== undefined ? _jsxs("small", { children: ["\u6210\u529F\u7387 ", (opt.probability * 100).toFixed(1), "%"] }) : null] }, opt.id))) })] })) : null, activeSurvivalCrisis && phaseOf(run) === "waiting_decision" ? (_jsxs("section", { className: "survival-dock", "aria-live": "polite", children: [_jsxs("p", { className: "survival-kicker", children: [activeSurvivalCrisis.age, "\u5C81 \u00B7 ", activeSurvivalCrisis.stageLabel] }), _jsx("p", { children: activeSurvivalCrisis.summary }), _jsx("div", { className: "survival-options", children: activeSurvivalCrisis.choices.map((choice) => (_jsxs("button", { disabled: isStreaming || isGenerating, onClick: () => void onSurvivalChoice(choice.id), children: [_jsx("strong", { children: choice.label }), _jsxs("small", { children: ["\u51ED ", statLabels[choice.stat], " \u00B7 ", choice.tier === "high" ? "把握十足" : choice.tier === "steady" ? "尚有转机" : "希望渺茫"] }), _jsx("span", { children: choice.description })] }, choice.id))) })] })) : null, !run.ended && !showActiveDecision && !(activeSurvivalCrisis && phaseOf(run) === "waiting_decision") ? (_jsx("div", { className: "advance-bar", children: _jsx("button", { disabled: isStreaming || isGenerating || (needsGrowthFocus(run) ? false : !canAdvance(run)), onClick: () => {
-                                            if (needsGrowthFocus(run)) {
-                                                setShowGrowthFocus(true);
-                                                setStatus("请选择此阶段希望积累的方向。");
-                                                return;
-                                            }
-                                            void onAdvance();
-                                        }, children: needsGrowthFocus(run) ? "踏入人生" : "继续推进" }) })) : null, run.ended ? (_jsxs("div", { className: "ending", children: [_jsxs("div", { className: "ending-head", children: [_jsx("h3", { children: "\u6B64\u751F\u7ED3\u5C40" }), _jsx("span", { className: `ending-pill ${run.outcome === "dead" ? "is-dead" : run.outcome === "ascended" ? "is-ascended" : "is-completed"}`, children: endingBadgeText(run) })] }), _jsxs("p", { className: "ending-meta", children: ["\u540D\u671B ", run.fame, " \u00B7 ", fameTitle(run.fame)] }), _jsx("blockquote", { className: "ending-quote", children: run.endingSummary ?? "命运已暂告一段落。" })] })) : null, _jsx("p", { className: "status", children: status })] }), !isMobileArchive ? _jsx("aside", { className: "reader-rail fate-rail", "aria-label": "\u547D\u8FD0\u6863\u6848", children: _jsx(FateArchiveContent, { assets: visibleAssets, characters: run.narrativeCharacters ?? [], decisions: decisionHistory }) }) : null] })) }), run && isMobileArchive && showFateArchive ? (_jsx("div", { className: "archive-drawer-mask", onMouseDown: (event) => { if (event.target === event.currentTarget)
+                                        }), run.opening?.status === "pending" ? (_jsxs("section", { className: "opening-pending", "aria-live": "polite", children: [_jsx("small", { children: "\u547D\u8FD0\u521D\u5377" }), _jsx("p", { children: "\u8EAB\u4E16\u6B63\u5728\u663E\u73B0\uFF0C\u5F80\u540E\u7684\u7ECF\u5386\u4F1A\u4ECE\u8FD9\u91CC\u5F00\u59CB\u3002" }), !isStreaming && !isGenerating ? _jsx("button", { type: "button", onClick: () => void onGenerateOpening(), children: "\u91CD\u65B0\u5199\u5C31\u8EAB\u4E16" }) : null] })) : null] }), activeDecision && showActiveDecision ? (_jsxs("section", { className: "decision-dock", "aria-live": "polite", "aria-busy": isGenerating, children: [_jsxs("div", { className: "decision-dock-heading", children: [_jsxs("small", { children: [activeDecision.age, "\u5C81 \u00B7 \u547D\u8FD0\u6289\u62E9"] }), isGenerating ? _jsx("span", { children: "\u6B63\u5728\u7ED3\u7B97..." }) : null] }), _jsx("p", { children: activeDecision.background ?? "你来到抉择时刻：" }), activeDecision.check ? _jsxs("small", { children: ["\u68C0\u5B9A\u4F9D\u636E\uFF1A", statLabels[activeDecision.check.stat], " ", activeDecision.check.value, " \uFF0F \u672C\u8282\u62CD\u95E8\u69DB ", activeDecision.check.threshold] }) : null, _jsx("div", { className: "decision-options", children: activeDecision.options.map((opt) => (_jsxs("button", { disabled: isStreaming || isGenerating, onClick: () => void onDecision(opt.id), children: [_jsx("strong", { children: opt.label }), _jsx("small", { children: opt.description }), opt.probability !== undefined ? _jsxs("small", { children: ["\u6210\u529F\u7387 ", (opt.probability * 100).toFixed(1), "%"] }) : null] }, opt.id))) })] })) : null, activeSurvivalCrisis && phaseOf(run) === "waiting_decision" ? (_jsxs("section", { className: "survival-dock", "aria-live": "polite", children: [_jsxs("p", { className: "survival-kicker", children: [activeSurvivalCrisis.age, "\u5C81 \u00B7 ", activeSurvivalCrisis.stageLabel] }), _jsx("p", { children: activeSurvivalCrisis.summary }), _jsx("div", { className: "survival-options", children: activeSurvivalCrisis.choices.map((choice) => (_jsxs("button", { disabled: isStreaming || isGenerating, onClick: () => void onSurvivalChoice(choice.id), children: [_jsx("strong", { children: choice.label }), _jsxs("small", { children: ["\u51ED ", statLabels[choice.stat], " \u00B7 ", choice.tier === "high" ? "把握十足" : choice.tier === "steady" ? "尚有转机" : "希望渺茫"] }), _jsx("span", { children: choice.description })] }, choice.id))) })] })) : null, !run.ended && !showActiveDecision && !(activeSurvivalCrisis && phaseOf(run) === "waiting_decision") ? (_jsx("div", { className: "advance-bar", children: run.actPlanning?.status === "failed" ? (_jsx("button", { disabled: !envReady || isStreaming || isGenerating, onClick: () => void prepareCurrentAct(), children: "\u91CD\u8BD5" })) : _jsx(_Fragment, { children: _jsx("button", { disabled: isStreaming || isGenerating || (needsGrowthFocus(run) ? false : !canAdvance(run)), onClick: () => {
+                                                if (needsGrowthFocus(run)) {
+                                                    setShowGrowthFocus(true);
+                                                    setStatus("请选择此阶段的学习与行动方式。");
+                                                    return;
+                                                }
+                                                void onAdvance();
+                                            }, children: needsGrowthFocus(run) ? "踏入人生" : run.actPlanning?.status === "pending" && run.actPlanning.bufferedTurns >= run.actPlanning.bufferLimit ? "请稍候…" : "继续推进" }) }) })) : null, run.ended ? (_jsxs("div", { className: "ending", children: [_jsxs("div", { className: "ending-head", children: [_jsx("h3", { children: "\u6B64\u751F\u7ED3\u5C40" }), _jsx("span", { className: `ending-pill ${run.outcome === "dead" ? "is-dead" : run.outcome === "ascended" ? "is-ascended" : "is-completed"}`, children: endingBadgeText(run) })] }), _jsxs("p", { className: "ending-meta", children: ["\u540D\u671B ", run.fame, " \u00B7 ", fameTitle(run.fame)] }), _jsx("blockquote", { className: "ending-quote", children: run.endingSummary ?? "命运已暂告一段落。" })] })) : null, _jsx("p", { className: "status", children: status })] }), !isMobileArchive ? _jsx("aside", { className: "reader-rail fate-rail", "aria-label": "\u547D\u8FD0\u6863\u6848", children: _jsx(FateArchiveContent, { assets: visibleAssets, characters: run.narrativeCharacters ?? [], decisions: decisionHistory }) }) : null] })) }), run && isMobileArchive && showFateArchive ? (_jsx("div", { className: "archive-drawer-mask", onMouseDown: (event) => { if (event.target === event.currentTarget)
                     closeFateArchive(); }, children: _jsxs("aside", { ref: archiveDrawerRef, id: "mobile-fate-archive", className: "archive-drawer", role: "dialog", "aria-modal": "true", "aria-labelledby": "mobile-fate-archive-title", children: [_jsx("button", { ref: archiveCloseRef, className: "archive-drawer-close", type: "button", "aria-label": "\u5173\u95ED\u547D\u8FD0\u6863\u6848", onClick: closeFateArchive, children: "\u00D7" }), _jsx(FateArchiveContent, { headingId: "mobile-fate-archive-title", assets: visibleAssets, characters: run.narrativeCharacters ?? [], decisions: decisionHistory })] }) })) : null, showSettings ? (_jsx(AdminPanel, { onClose: () => setShowSettings(false), bootstrap: bootstrap, localApiKey: localApiKey, setLocalApiKey: setLocalApiKey, localProvider: localProvider, setLocalProvider: setLocalProvider, onConfirmEnvironment: onConfirmEnvironment, canConfirmEnv: canConfirmEnv, envReady: envReady, worldId: worldId, setWorldId: (nextWorldId) => {
                     setWorldId(nextWorldId);
                     setStoryPackId("");
                     setStoryPackDraftId("");
                     setShowStoryPackPicker(false);
-                }, difficultyId: difficultyId, setDifficultyId: setDifficultyId, debugMode: debugMode, setDebugMode: setDebugMode })) : null, !run && showStoryPackPicker ? (_jsx(StoryPackPickerModal, { worldName: bootstrap.worlds.find((world) => world.id === worldId)?.name ?? worldId, storyPacks: availableStoryPacks, selectedId: storyPackDraftId, onSelect: setStoryPackDraftId, onConfirm: confirmStoryPack, onClose: () => setShowStoryPackPicker(false) })) : null, showGrowthFocus && run?.growthFocus && !run.growthFocus.selectedId && !run.ended && run.opening?.status !== "pending" ? (_jsx("div", { className: "modal-mask", role: "dialog", "aria-modal": "true", "aria-label": "\u9009\u62E9\u6210\u957F\u65B9\u5411", children: _jsxs("div", { className: "modal growth-focus-modal", children: [_jsx("h2", { children: "\u6B64\u9636\u6BB5\u7684\u79EF\u7D2F" }), _jsx("div", { className: "growth-focus-options", children: run.growthFocus.options.map((focus) => (_jsxs("button", { disabled: isStreaming || isGenerating, onClick: () => void onSelectGrowthFocus(focus.id), children: [_jsx("strong", { children: focus.label }), _jsx("small", { children: focus.description })] }, focus.id))) })] }) })) : null, run?.ended && showEndingModal ? (_jsx("div", { className: "modal-mask", children: _jsxs("div", { className: "modal ending-modal", children: [_jsx("h2", { children: "\u672C\u5C40\u7ED3\u7B97" }), _jsxs("div", { className: "ending-summary-top", children: [_jsx("span", { className: `ending-pill ${run.outcome === "dead" ? "is-dead" : run.outcome === "ascended" ? "is-ascended" : "is-completed"}`, children: outcomeLabel(run.outcome) }), _jsx("small", { children: endingBadgeText(run) })] }), _jsxs("p", { children: ["\u540D\u671B\u5F97\u5206\uFF1A", run.fame] }), _jsxs("p", { children: ["\u79F0\u53F7\uFF1A", fameTitle(run.fame)] }), _jsx("blockquote", { className: "ending-quote ending-quote-modal", children: run.endingSummary ?? "命运已暂告一段落。" }), _jsxs("div", { className: "row", children: [_jsx("button", { onClick: () => void playAgain(), children: "\u518D\u6765\u4E00\u628A" }), _jsx("button", { className: "ghost", onClick: () => setShowEndingModal(false), children: "\u5173\u95ED" })] })] }) })) : null, showBusyModal ? (_jsx("div", { className: "modal-mask", children: _jsxs("div", { className: "modal ending-modal", children: [_jsx("h2", { children: "\u63D0\u793A" }), _jsx("p", { children: "\u670D\u52A1\u5668\u7E41\u5FD9\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5\u3002" }), _jsx("div", { className: "row", children: _jsx("button", { onClick: () => setShowBusyModal(false), children: "\u6211\u77E5\u9053\u4E86" }) })] }) })) : null, showSaveModal ? (_jsx("div", { className: "modal-mask", children: _jsxs("div", { className: "modal save-modal", children: [_jsx("h2", { children: "\u5B58\u6863" }), run ? (_jsxs("section", { className: "save-section", children: [_jsxs("label", { children: ["\u5B58\u6863\u540D\u79F0", _jsx("input", { value: saveTitle, maxLength: 40, onChange: (event) => setSaveTitle(event.target.value), placeholder: `${run.age}岁的人生记录` })] }), _jsx("button", { disabled: saveWorking || isStreaming || isGenerating, onClick: () => void saveCurrentRun(), children: "\u4FDD\u5B58\u5F53\u524D\u4EBA\u751F" })] })) : null, issuedRecoveryCode ? (_jsxs("section", { className: "save-section recovery-issued", children: [_jsx("small", { children: "\u6062\u590D\u7801" }), _jsx("code", { children: issuedRecoveryCode })] })) : null, _jsxs("section", { className: "save-section", children: [_jsx("h3", { children: "\u5F53\u524D\u6D4F\u89C8\u5668\u7684\u5B58\u6863" }), saveSlots.length === 0 ? _jsx("p", { className: "save-empty", children: "\u5C1A\u65E0\u5B58\u6863\u3002" }) : (_jsx("div", { className: "save-list", children: saveSlots.map((slot) => (_jsxs("article", { className: "save-item", children: [_jsxs("div", { children: [_jsx("strong", { children: slot.title }), _jsxs("small", { children: [slot.storyPackName ? `${slot.storyPackName} · ` : "", slot.age, "\u5C81 \u00B7 ", slot.kind === "decision" ? "抉择分岔" : slot.ended ? "已结局" : "进行中", " \u00B7 ", formatSaveTime(slot.updatedAt)] })] }), _jsxs("div", { className: "save-actions", children: [_jsx("button", { className: "ghost", disabled: saveWorking, onClick: () => void restoreSavedRun(slot.id), children: slot.kind === "decision" ? "回到分岔" : "恢复" }), _jsx("button", { className: "icon-action save-delete", disabled: saveWorking, onClick: () => void removeSaveSlot(slot.id), title: "\u5220\u9664\u5B58\u6863", "aria-label": `删除存档 ${slot.title}`, children: "\u00D7" })] })] }, slot.id))) }))] }), _jsxs("section", { className: "save-section", children: [_jsxs("label", { children: ["\u6062\u590D\u7801", _jsx("input", { value: recoveryCode, onChange: (event) => setRecoveryCode(event.target.value), placeholder: "save_..." })] }), _jsx("button", { disabled: saveWorking || !recoveryCode.trim(), onClick: () => void recoverSavedRun(), children: "\u6062\u590D\u5B58\u6863" })] }), _jsxs("section", { className: "save-section reset-anonymous-section", children: [_jsx("h3", { children: "\u533F\u540D\u6863\u6848" }), _jsx("p", { children: "\u5220\u9664\u5F53\u524D\u6D4F\u89C8\u5668\u7684\u5168\u90E8\u4EBA\u751F\u8BB0\u5F55\u3001\u5B58\u6863\u3001\u5206\u5C94\u548C\u6062\u590D\u7801\uFF1B\u6A21\u578B\u914D\u7F6E\u4F1A\u4FDD\u7559\u3002" }), _jsx("button", { className: "danger", disabled: saveWorking || isStreaming || isGenerating, onClick: () => void resetAnonymousSave(), children: "\u91CD\u7F6E\u533F\u540D\u5B58\u6863" })] }), _jsx("div", { className: "row", children: _jsx("button", { className: "ghost", disabled: saveWorking, onClick: () => setShowSaveModal(false), children: "\u5173\u95ED" }) })] }) })) : null, _jsx("footer", { className: "site-footer", children: _jsxs("a", { className: "repo-link", href: "https://github.com/Vcity-ci/life_remake", target: "_blank", rel: "noreferrer", children: [_jsx("svg", { className: "repo-icon", viewBox: "0 0 16 16", "aria-hidden": "true", focusable: "false", children: _jsx("path", { d: "M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.5-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z" }) }), _jsx("span", { children: "Vcity-ci/life_remake" })] }) })] }));
+                }, difficultyId: difficultyId, setDifficultyId: setDifficultyId, debugMode: debugMode, setDebugMode: setDebugMode })) : null, !run && showStoryPackPicker ? (_jsx(StoryPackPickerModal, { worldName: bootstrap.worlds.find((world) => world.id === worldId)?.name ?? worldId, storyPacks: availableStoryPacks, selectedId: storyPackDraftId, onSelect: setStoryPackDraftId, onConfirm: confirmStoryPack, onClose: () => setShowStoryPackPicker(false) })) : null, showGrowthFocus && run?.growthFocus && !run.growthFocus.selectedId && !run.ended && run.opening?.status !== "pending" ? (_jsx("div", { className: "modal-mask", role: "dialog", "aria-modal": "true", "aria-label": "\u9009\u62E9\u6210\u957F\u65B9\u5411", children: _jsxs("div", { className: "modal growth-focus-modal", children: [_jsx("h2", { children: "\u6B64\u9636\u6BB5\u7684\u5B66\u4E60\u4E0E\u884C\u52A8\u65B9\u5F0F" }), _jsx("div", { className: "growth-focus-options", children: run.growthFocus.options.map((focus) => (_jsxs("button", { disabled: isStreaming || isGenerating, onClick: () => void onSelectGrowthFocus(focus.id), children: [_jsx("strong", { children: focus.label }), _jsx("small", { children: focus.description })] }, focus.id))) })] }) })) : null, run?.ended && showEndingModal ? (_jsx("div", { className: "modal-mask", children: _jsxs("div", { className: "modal ending-modal", children: [_jsx("h2", { children: "\u672C\u5C40\u7ED3\u7B97" }), _jsxs("div", { className: "ending-summary-top", children: [_jsx("span", { className: `ending-pill ${run.outcome === "dead" ? "is-dead" : run.outcome === "ascended" ? "is-ascended" : "is-completed"}`, children: outcomeLabel(run.outcome) }), _jsx("small", { children: endingBadgeText(run) })] }), _jsxs("p", { children: ["\u540D\u671B\u5F97\u5206\uFF1A", run.fame] }), _jsxs("p", { children: ["\u79F0\u53F7\uFF1A", fameTitle(run.fame)] }), _jsx("blockquote", { className: "ending-quote ending-quote-modal", children: run.endingSummary ?? "命运已暂告一段落。" }), _jsxs("div", { className: "row", children: [_jsx("button", { onClick: () => void playAgain(), children: "\u518D\u6765\u4E00\u628A" }), _jsx("button", { className: "ghost", onClick: () => setShowEndingModal(false), children: "\u5173\u95ED" })] })] }) })) : null, showBusyModal ? (_jsx("div", { className: "modal-mask", children: _jsxs("div", { className: "modal ending-modal", children: [_jsx("h2", { children: "\u63D0\u793A" }), _jsx("p", { children: "\u670D\u52A1\u5668\u7E41\u5FD9\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5\u3002" }), _jsx("div", { className: "row", children: _jsx("button", { onClick: () => setShowBusyModal(false), children: "\u6211\u77E5\u9053\u4E86" }) })] }) })) : null, showSaveModal ? (_jsx("div", { className: "modal-mask", children: _jsxs("div", { className: "modal save-modal", children: [_jsx("h2", { children: "\u5B58\u6863" }), run ? (_jsxs("section", { className: "save-section", children: [_jsxs("label", { children: ["\u5B58\u6863\u540D\u79F0", _jsx("input", { value: saveTitle, maxLength: 40, onChange: (event) => setSaveTitle(event.target.value), placeholder: `${run.age}岁的人生记录` })] }), _jsx("button", { disabled: saveWorking || isStreaming || isGenerating, onClick: () => void saveCurrentRun(), children: "\u4FDD\u5B58\u5F53\u524D\u4EBA\u751F" })] })) : null, issuedRecoveryCode ? (_jsxs("section", { className: "save-section recovery-issued", children: [_jsx("small", { children: "\u6062\u590D\u7801" }), _jsx("code", { children: issuedRecoveryCode })] })) : null, _jsxs("section", { className: "save-section", children: [_jsx("h3", { children: "\u5F53\u524D\u6D4F\u89C8\u5668\u7684\u5B58\u6863" }), saveSlots.length === 0 ? _jsx("p", { className: "save-empty", children: "\u5C1A\u65E0\u5B58\u6863\u3002" }) : (_jsx("div", { className: "save-list", children: saveSlots.map((slot) => (_jsxs("article", { className: "save-item", children: [_jsxs("div", { children: [_jsx("strong", { children: slot.title }), _jsxs("small", { children: [slot.storyPackName ? `${slot.storyPackName} · ` : "", slot.age, "\u5C81 \u00B7 ", slot.kind === "decision" ? "抉择分岔" : slot.ended ? "已结局" : "进行中", " \u00B7 ", formatSaveTime(slot.updatedAt)] })] }), _jsxs("div", { className: "save-actions", children: [_jsx("button", { className: "ghost", disabled: saveWorking, onClick: () => void restoreSavedRun(slot.id), children: slot.kind === "decision" ? "回到分岔" : "恢复" }), _jsx("button", { className: "icon-action save-delete", disabled: saveWorking, onClick: () => void removeSaveSlot(slot.id), title: "\u5220\u9664\u5B58\u6863", "aria-label": `删除存档 ${slot.title}`, children: "\u00D7" })] })] }, slot.id))) }))] }), _jsxs("section", { className: "save-section", children: [_jsxs("label", { children: ["\u6062\u590D\u7801", _jsx("input", { value: recoveryCode, onChange: (event) => setRecoveryCode(event.target.value), placeholder: "save_..." })] }), _jsx("button", { disabled: saveWorking || !recoveryCode.trim(), onClick: () => void recoverSavedRun(), children: "\u6062\u590D\u5B58\u6863" })] }), _jsxs("section", { className: "save-section reset-anonymous-section", children: [_jsx("h3", { children: "\u533F\u540D\u6863\u6848" }), _jsx("p", { children: "\u5220\u9664\u5F53\u524D\u6D4F\u89C8\u5668\u7684\u5168\u90E8\u4EBA\u751F\u8BB0\u5F55\u3001\u5B58\u6863\u3001\u5206\u5C94\u548C\u6062\u590D\u7801\uFF1B\u6A21\u578B\u914D\u7F6E\u4F1A\u4FDD\u7559\u3002" }), _jsx("button", { className: "danger", disabled: saveWorking || isStreaming || isGenerating, onClick: () => void resetAnonymousSave(), children: "\u91CD\u7F6E\u533F\u540D\u5B58\u6863" })] }), _jsx("div", { className: "row", children: _jsx("button", { className: "ghost", disabled: saveWorking, onClick: () => setShowSaveModal(false), children: "\u5173\u95ED" }) })] }) })) : null, _jsx("footer", { className: "site-footer", children: _jsxs("a", { className: "repo-link", href: "https://github.com/Vcity-ci/life_remake", target: "_blank", rel: "noreferrer", children: [_jsx("svg", { className: "repo-icon", viewBox: "0 0 16 16", "aria-hidden": "true", focusable: "false", children: _jsx("path", { d: "M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.5-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z" }) }), _jsx("span", { children: "Vcity-ci/life_remake" })] }) })] }));
 }
 function milestoneChoiceKey(choice) {
     return `${choice.sceneId}:${choice.revision}`;

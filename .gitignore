@@ -1,10 +1,41 @@
-node_modules
-dist
-.DS_Store
+# Dependencies, build output and caches (all workspaces)
+node_modules/
+dist/
+coverage/
+.vite/
+*.tsbuildinfo
 *.log
+
+# TypeScript output emitted beside frontend/shared sources by the current build
+/apps/frontend/src/**/*.js
+/apps/frontend/src/**/*.js.map
+/apps/frontend/src/**/*.d.ts
+/apps/frontend/src/**/*.d.ts.map
+!/apps/frontend/src/vite-env.d.ts
+!/apps/frontend/src/types/**/*.d.ts
+/packages/shared/src/index.js
+/packages/shared/src/index.js.map
+/packages/shared/src/index.d.ts
+/packages/shared/src/index.d.ts.map
+
+# Local environment; keep empty templates and public frontend deployment defaults
 .env
-.env.local
-coverage
-storage
-.agent
-Material
+.env.*
+!.env.example
+!/apps/frontend/.env.development
+!/apps/frontend/.env.production
+
+# Player data, local configuration, credentials, references and model captures
+/storage/
+/Material/
+
+# Local agent preferences; reusable project skills/instructions remain tracked
+/.agent/
+/.codex/config.toml
+/.trae/skills/skill-config.json
+
+# OS metadata and the legacy local file literally named .txt (not all *.txt)
+.DS_Store
+Thumbs.db
+Desktop.ini
+.txt

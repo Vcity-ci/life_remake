@@ -3,7 +3,7 @@
     "id": "my_world",
     "name": "示例世界",
     "intro": "一份可从人物处境出发、自由展开三幕人生故事的世界包模板。",
-    "stylePrompt": "以具体经历、人物关系与选择后果推进叙事，避免系统说明和章节标题。",
+
     "milestoneAges": [15, 28, 45],
     "endAgeRange": {
       "min": 50,

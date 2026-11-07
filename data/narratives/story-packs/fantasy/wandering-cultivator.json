@@ -38,13 +38,6 @@
       "label": "谋生",
       "objective": "凭一项真实本领完成危险委托或交易，建立最初信用与伙伴关系。",
       "payoffMeaning": "人物获得了能够自由行动的基本实力和可再次合作的人。",
-      "beatOutline": {
-        "setup": "让生计、修炼资源或危险委托把人物推入一次真实行动。",
-        "escalation": "通过交易、探索或战斗验证本领并结识可合作之人。",
-        "pressure": "让报酬、信用、伤亡风险与宗门压力同时逼近。",
-        "climax": "让人物凭自己的本领完成一次危险委托并承担后果。",
-        "payoff": "确认独立行动能力、信用与可再次合作的伙伴。"
-      },
       "worldCardRefs": [
         "fantasy.snapshot.mortal_life",
         "fantasy.snapshot.cultivation_cost",
@@ -72,13 +65,6 @@
       "label": "结路",
       "objective": "建立连接据点、商路、异族或散修群体的长期网络。",
       "payoffMeaning": "人物成为一张关系网络的核心，而不再只是独行者。",
-      "beatOutline": {
-        "setup": "让既有信用连接多个据点、群体或长期需求。",
-        "escalation": "通过护路、结盟、交换资源或共同探索建立网络。",
-        "pressure": "让伙伴利益、宗门封锁与网络安全发生冲突。",
-        "climax": "让人物组织众人应对一次足以切断生存网络的危机。",
-        "payoff": "固定据点、盟友与互助规则，使人物成为网络核心。"
-      },
       "worldCardRefs": [
         "fantasy.snapshot.cultivation_cost",
         "fantasy.snapshot.other_civilizations",
@@ -106,13 +92,6 @@
       "label": "立道",
       "objective": "用自创本领和既有盟友应对一场足以吞没散修生存空间的危机。",
       "payoffMeaning": "人物建立传承、自由共同体或一条不受旧道统垄断的新路。",
-      "beatOutline": {
-        "setup": "让旧道统或世界危机威胁散修群体全部生存空间。",
-        "escalation": "汇集自创本领、盟友与据点资源建立共同应对。",
-        "pressure": "迫使人物在个人飞升、伙伴安全与开放传承间取舍。",
-        "climax": "让人物完成决定独立道路能否存在的最终行动。",
-        "payoff": "交代传承、共同体、人物去向与新道路留下的影响。"
-      },
       "worldCardRefs": [
         "fantasy.snapshot.other_civilizations",
         "fantasy.snapshot.mortal_life",
@@ -137,6 +116,7 @@
     }
   ],
   "endingDirections": {
+    "closureBoundary": "一次争夺失败、暂时孤立或资源短缺不等于自由道路终结；积累已尽失、已被收编而放弃自由或已成为掠夺者时可提前坏结局。保住自由与声望但传承依赖本人属于普通结局。",
     "good": [
       "以信用、伙伴和自创道路建立可延续的散修秩序",
       "获得自由而不把风险与代价全部留给弱者"

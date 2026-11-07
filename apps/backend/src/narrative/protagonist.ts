@@ -13,7 +13,7 @@ interface ProtagonistSource {
 }
 
 /** One data projection, split by update frequency for the model's stable prefix. */
-export function protagonistParts(source: ProtagonistSource) {
+export function protagonistParts(source: ProtagonistSource, options: { includeLocation?: boolean } = {}) {
   const runtime = source.narrative.actRuntime;
   const focus = runtime?.growthFocusOptions?.find((item) => item.id === runtime.growthFocusId);
   const assets = source.narrative.assets;
@@ -26,7 +26,7 @@ export function protagonistParts(source: ProtagonistSource) {
     ].filter(Boolean).join("\n"),
     currentState: [
       `你目前${source.age}岁${source.ageStage ? `，处在人生的${source.ageStage.label}阶段` : ""}。`,
-      location ? `你目前在${location.name}。` : "",
+      options.includeLocation !== false && location ? `你目前在${location.name}。` : "",
       labels ? `你的能力基础：${Object.entries(labels).map(([key, label]) => `${statNames[key as keyof Stats]}：${label}`).join("；")}。` : "",
       focus ? `你的学习与行动方式：${focus.label}——${focus.description}` : ""
     ].filter(Boolean).join("\n")
@@ -35,10 +35,9 @@ export function protagonistParts(source: ProtagonistSource) {
 
 export function protagonistIntroduction(source: ProtagonistSource): string {
   const parts = protagonistParts(source);
-  // The public panel shows known abilities. Model requests receive the same
-  // names/mastery through their selected asset projection, not a second copy here.
+  // This projection belongs to public snapshots only. Narrative requests use
+  // protagonistParts without display-maintained location or abilities.
   const abilities = source.narrative.assets?.abilities ?? [];
   const capabilities = abilities.length ? `你已有的具体本事与凭借：${abilities.map((ability) => `${ability.name}${ability.mastery ? `（${ability.mastery}）` : ""}`).join("；")}。` : "";
-  const origin = source.narrative.opening?.profile?.summary;
-  return [parts.identity, origin ? `你的来处：${origin}` : "", parts.currentState, capabilities].filter(Boolean).join("\n\n");
+  return [parts.identity, parts.currentState, capabilities].filter(Boolean).join("\n\n");
 }

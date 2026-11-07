@@ -38,13 +38,6 @@
       "label": "离岸",
       "objective": "完成一次真正改变生活半径的迁移，并找到最初立足点。",
       "payoffMeaning": "人物在新的地方获得了继续生活的实际位置。",
-      "beatOutline": {
-        "setup": "让迁移、失业或生活变化迫使人物跨出原有圈子。",
-        "escalation": "通过找住处、谋生与认识新的人建立第一处落脚点。",
-        "pressure": "让经济压力、陌生规则与旧关系牵挂同时逼近。",
-        "climax": "让人物完成一次真正改变生活半径的行动。",
-        "payoff": "确认新的住处、工作入口与能继续生活的关系支点。"
-      },
       "worldCardRefs": [
         "modern.snapshot.transition_2027",
         "modern.snapshot.housing_and_mobility",
@@ -72,13 +65,6 @@
       "label": "扎根",
       "objective": "建立工作、住处与关系网络，使新城市不再只是暂住地。",
       "payoffMeaning": "人物建立了新的生活秩序，也明确了自己无法同时拥有的一切。",
-      "beatOutline": {
-        "setup": "让暂时落脚转变为是否长期扎根的现实问题。",
-        "escalation": "通过工作调整、邻里往来和亲密关系建立生活网络。",
-        "pressure": "让事业机会、住房成本、家庭期待与情感需要冲突。",
-        "climax": "让人物为留下或继续迁移作出结构性的生活选择。",
-        "payoff": "固定新的生活秩序，并诚实交代因此失去的可能。"
-      },
       "worldCardRefs": [
         "modern.snapshot.housing_and_mobility",
         "modern.snapshot.platform_reputation",
@@ -106,13 +92,6 @@
       "label": "归处",
       "objective": "在一次迁移、家庭事件或城市变化中决定长期归属。",
       "payoffMeaning": "人物对归属和生活方式作出可以回望一生的决定。",
-      "beatOutline": {
-        "setup": "让家庭事件、城市变化或新的迁移机会检验已有归属。",
-        "escalation": "让人物调动长期关系与生活积累寻找可持续选择。",
-        "pressure": "迫使人物在熟悉、安全、机会与陪伴之间取舍。",
-        "climax": "让人物完成决定长期归处与生活方式的最终行动。",
-        "payoff": "交代居所、关系、工作与人物对何为归属的答案。"
-      },
       "worldCardRefs": [
         "modern.snapshot.platform_reputation",
         "modern.snapshot.transition_2027",
@@ -137,6 +116,7 @@
     }
   ],
   "endingDirections": {
+    "closureBoundary": "一次迁居失败、失业或乡愁不等于无法立足；资源与支持网络已耗尽或为去留已失去全部自主选择时可提前坏结局。取得立足点但归属仍有拉扯属于普通结局。",
     "good": [
       "在选择的地方建立稳定关系与自主生活",
       "能够往返故乡与新生活而不再被任何一处完全困住"

@@ -1,7 +1,7 @@
 {
   "version": 1,
   "id": "ancient.jianghu-master",
-  "revision": "1.3.0",
+  "revision": "1.3.1",
   "worldId": "ancient",
   "name": "江湖宗师",
   "tagline": "以技艺、师承和恩仇行走秩序边缘，决定力量最终归于何处。",
@@ -38,13 +38,6 @@
       "label": "问艺",
       "objective": "取得真正可以立身的技艺、师承与第一段江湖关系。",
       "payoffMeaning": "人物拥有独立行走江湖的能力和名号。",
-      "beatOutline": {
-        "setup": "以师承、挑战或求生契机让人物踏入真实江湖。",
-        "escalation": "通过练艺、比武、护送或寻仇验证第一身本领。",
-        "pressure": "让门规、恩怨与身边人的安危迫使人物表明立场。",
-        "climax": "让人物在一次公开较量或生死冲突中独立担当。",
-        "payoff": "确立名号、技艺边界及首批可信同道与仇敌。"
-      },
       "worldCardRefs": [
         "ancient.snapshot.nine_regions",
         "ancient.snapshot.local_society",
@@ -72,13 +65,6 @@
       "label": "扬名",
       "objective": "在帮派、官府、商路和民间势力之间形成自己的声望与立场。",
       "payoffMeaning": "人物成为能够影响江湖格局的一方人物。",
-      "beatOutline": {
-        "setup": "让既有名声招来帮派、官府和旧怨的共同关注。",
-        "escalation": "通过夺宝、结盟、清理门户或主持公道扩大影响。",
-        "pressure": "让私人承诺与江湖大局无法同时周全。",
-        "climax": "让人物解决一场改变多方关系的武林危机。",
-        "payoff": "固定人物的江湖立场、核心伙伴和需要承担的公共责任。"
-      },
       "worldCardRefs": [
         "ancient.snapshot.local_society",
         "ancient.snapshot.popular_faith",
@@ -106,13 +92,6 @@
       "label": "立宗",
       "objective": "决定接受招安、开宗立派、辅佐一方、远走或归隐。",
       "payoffMeaning": "人物的技艺传承、组织归属和江湖评价得到收束。",
-      "beatOutline": {
-        "setup": "让武林秩序的最终危机触及人物全部传承与关系。",
-        "escalation": "召集门人同道并让一生所学参与最后角力。",
-        "pressure": "迫使人物在个人自由、门派延续与世道安危间取舍。",
-        "climax": "让人物完成决定宗门或江湖格局的最后行动。",
-        "payoff": "交代传承去向、组织归属、江湖评价与人物最终生活。"
-      },
       "worldCardRefs": [
         "ancient.snapshot.popular_faith",
         "ancient.snapshot.nine_regions",
@@ -137,6 +116,7 @@
     }
   ],
   "endingDirections": {
+    "closureBoundary": "一次落败、受伤或离山不等于江湖道路结束；仇杀覆灭或武功、门人与旧友的实际丧失已经终结这条道路时可提前坏结局。主动远离争端但保住技艺与关系属于普通结局。",
     "good": [
       "成为一代宗师并留下可信传承",
       "以招安、辅佐、守护或自立方式让力量获得归处"
@@ -150,6 +130,7 @@
     ]
   },
   "worldCardRefs": [
+    "ancient.domain.jianghu.mastery_rules",
     "ancient.snapshot.nine_regions",
     "ancient.snapshot.local_society",
     "ancient.snapshot.popular_faith"

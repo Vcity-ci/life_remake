@@ -5,7 +5,7 @@ import seedrandom from "seedrandom";
 import { commitNarrativeMemory } from "./narrative-memory.js";
 import { commitNarrativeActCanon } from "./narrative/commit.js";
 import { registerNarrativeParticipants, formatNarrativeRelationship } from "./narrative-characters.js";
-import { factUpdateContract, parseFactUpdates, prepareNarrativeFactUpdates, narrativeFactResolutionModes, normalizeNarrativeHandoffFact, narrativeActFacts } from "./narrative-continuity.js";
+import { factUpdateContract, parseFactUpdates, prepareNarrativeFactUpdates, normalizeNarrativeHandoffFact, narrativeActFacts } from "./narrative-continuity.js";
 import { createHash } from "node:crypto";
 import { choiceProbability, rollChoice } from "./choice-check.js";
 import { protagonistIntroduction, statNames } from "./narrative/protagonist.js";
@@ -30,7 +30,6 @@ import type {
   NarrativeDynamicCharacter,
   NarrativeFactUpdates,
   NarrativeRelationshipUpdate,
-  NarrativeFactResolution,
   NarrativeIntent,
   NarrativeSceneArchetype,
   MilestoneChoice,
@@ -74,7 +73,7 @@ import {
   createNarrativeRunState,
   ensureNarrativeRunState,
   ensureNarrativeActRuntime,
-  advanceNarrativeActBeat,
+  advanceNarrativeAct,
   getNarrativeRouteProgress,
   isNarrativeMainlineActEntryReady,
   isNarrativeStageReady,
@@ -209,7 +208,17 @@ export interface InternalRunState extends RunState {
   pendingDirectedDecisionPolicy?: Record<DecisionType, PendingDirectedDecisionPolicy>;
   pendingDirectedDecisionDirections?: Record<DecisionType, StoryDirectionDefinition>;
   pendingDirectedDecisionFactEffects?: Partial<Record<DecisionType, StoryFactEffect>>;
-  /** Durable progress of the current choice; cleared only after assets and beat commit. */
+  /** Post-commit observation and time handoff, preserved across rescue and retry. */
+  pendingActFinalization?: {
+    actId: string;
+    sourceEventId: string;
+    nextClock: "hold" | "advance";
+    observation?: import("@reroll/shared").NarrativeActObservation;
+    /** Independent planning result, saved separately from closure observation. */
+    nextFlowId?: string;
+    nextEventId?: string;
+    eventFlow?: import("@reroll/shared").NarrativeEventFlowSource;
+  };
   choiceExecution?: {
     choiceId: string;
     roll: ChoiceRoll;
@@ -224,7 +233,6 @@ export interface InternalRunState extends RunState {
     id: string;
     patternIds: string[];
     forceIds: string[];
-    beat: Exclude<NonNullable<EventDefinition["narrativeBeat"]>, "ending">;
     mainlineActId: string;
     factId?: string;
     characterIds?: string[];
@@ -233,6 +241,7 @@ export interface InternalRunState extends RunState {
     abilityIds?: string[];
     worldCardIds?: string[];
     decisionBrief?: NarrativeDecisionBrief;
+    eventFlow?: import("@reroll/shared").NarrativeEventFlowSource;
   };
   narrativeReservoir: NarrativeReservoirState;
   turnRecords: TurnRecord[];
@@ -515,7 +524,10 @@ export function applyNarrativeRelationshipUpdates(
   for (const update of updates ?? []) {
     const character = run.narrative.dynamicCharacters.find((entry) => entry.id === update.characterRef);
     if (!character) throw new Error("relationship_reference_invalid");
-    if (update.stance !== undefined || update.summary !== undefined) character.relationship = {
+    const before = JSON.stringify(character);
+    const relationshipChanged = (update.stance !== undefined && update.stance !== character.relationship?.stance) ||
+      (update.summary !== undefined && (update.summary || undefined) !== character.relationship?.summary);
+    if (relationshipChanged) character.relationship = {
       ...character.relationship,
       ...(update.stance !== undefined ? { stance: update.stance } : {}),
       ...(update.summary !== undefined ? { summary: update.summary || undefined } : {}),
@@ -528,11 +540,12 @@ export function applyNarrativeRelationshipUpdates(
     if (update.condition !== undefined) character.condition = update.condition || undefined;
     if (update.factionId !== undefined) character.factionId = update.factionId || undefined;
     if (update.pendingDetails !== undefined) character.pendingDetails = update.pendingDetails;
+    if (JSON.stringify(character) !== before) delete character.retired;
   }
   run.narrative.activeCharacterIds = Array.from(new Set([
     ...run.narrative.activeCharacterIds,
     ...(updates ?? []).filter((update) => update.status === "active").map((update) => update.characterRef)
-  ])).filter((id) => !run.narrative.dynamicCharacters.some((character) => character.id === id && character.status !== "active"));
+  ])).filter((id) => !run.narrative.dynamicCharacters.some((character) => character.id === id && (character.status !== "active" || character.retired)));
 }
 
 function hasOpenFact(story: StoryDirectorState, id: string): boolean {
@@ -653,7 +666,7 @@ function ensureStoryDirectorState(run: InternalRunState): StoryDirectorState {
     story.lastStoryPosition = undefined;
   }
   story.closureEligible = run.narrative.enabled
-    ? Boolean(story.mainlineCompleted)
+    ? isNarrativeEndingEligible(story, run.narrative)
     : isClosureEligible(story, run.narrative);
   if (story.closureEligible && run.narrative.enabled && run.narrative.endingState === "open") {
     run.narrative.endingState = "eligible";
@@ -1735,7 +1748,7 @@ function publicItemsSnapshot(run: InternalRunState): TurnRecord["itemsSnapshot"]
 
 function publicNarrativeCharactersSnapshot(run: InternalRunState): NonNullable<TurnRecord["narrativeCharactersSnapshot"]> {
   return run.narrative.dynamicCharacters
-    .filter((character) => character.importance !== "momentary")
+    .filter((character) => character.importance !== "momentary" && !character.retired)
     .map((character) => ({
       id: character.id,
       name: character.name,
@@ -1842,6 +1855,16 @@ export function settleChoiceResultRecord(run: InternalRunState, record: TurnReco
   record.fameSnapshot = run.fame;
   record.protagonistIntroductionSnapshot = protagonistIntroduction({ ...run, age: record.age, ageStage: record.ageStage });
   if (record.decisionResult) record.decisionResult.status = "settled";
+}
+
+/** Maintenance may finish after settlement; refresh only this event's latest visible result. */
+export function refreshLatestChoiceAssetSnapshot(run: InternalRunState, episodeId: string | undefined): void {
+  if (!episodeId) return;
+  const episode = run.narrative.episodes.find((entry) => entry.id === episodeId);
+  const record = run.turnRecords.at(-1);
+  if (!record || record.turnId !== episode?.turnId || record.decisionResult?.status !== "settled") return;
+  record.narrativeCharactersSnapshot = publicNarrativeCharactersSnapshot(run);
+  record.narrativeAssetsSnapshot = publicNarrativeAssetsSnapshot(run.narrative.assets);
 }
 
 export function ensureVisibleTurnRecords(run: InternalRunState, world: WorldConfig): TurnRecord[] {
@@ -1972,14 +1995,13 @@ function shouldHoldSceneAge(run: InternalRunState): boolean {
   const clock = run.narrative.sceneClock;
   return Boolean(
     run.narrative.enabled &&
-    run.narrative.activeScene &&
     clock.mode === "hold"
   );
 }
 
 /**
- * Fix the background interval before planning. Scene time is resolved from the
- * planner's clock request once, by resolveNarrativeTurnTime.
+ * Fix the background interval before recall. Scene age is determined separately
+ * from the previously committed next-segment clock.
  */
 export function resolveDynamicNarrativeTurnAges(
   run: InternalRunState,
@@ -3172,7 +3194,8 @@ export function canRequestDirectedClosure(
   if (
     run.ended ||
     run.nextMilestoneChoice ||
-    story.closureState !== "open" ||
+    run.survivalCrisis || run.choiceExecution ||
+    (story.closureState !== "open" && !(run.narrative.version >= 18 && story.closureState === "guiding" && run.narrative.lastActObservation?.decision === "run_ended")) ||
     Boolean(run.narrative.activeScene)
   ) {
     return false;
@@ -3249,7 +3272,7 @@ export function applyDirectedClosureRequest(
   if (
     action !== "finish" ||
     story.closureState !== "guiding" ||
-    (run.narrative.enabled ? run.narrative.payoffCount < 1 : story.completeness.resolution < 1)
+    (run.narrative.enabled ? !isNarrativeEndingEligible(story, run.narrative) : story.completeness.resolution < 1)
   ) {
     story.closureState = "guiding";
     run.narrative = setNarrativeEndingState(run.narrative, "guiding");
@@ -3260,8 +3283,10 @@ export function applyDirectedClosureRequest(
   run.narrative = setNarrativeEndingState(run.narrative, "finished");
   run.ended = true;
   if (run.narrative.enabled) {
-    run.outcome = "completed";
-    run.deathCause = undefined;
+    if (run.outcome !== "dead") {
+      run.outcome = "completed";
+      run.deathCause = undefined;
+    }
   } else if (run.ascension.unlocked) {
     run.outcome = "ascended";
   }
@@ -3388,11 +3413,10 @@ export function advanceWithDirectedEvent(
 }
 
 export interface DynamicNarrativeScenePayload {
+  eventFlow?: import("@reroll/shared").NarrativeEventFlowSource;
   handoff?: import("./narrative/handoff.js").NarrativeRoundHandoff;
   patternIds: string[];
   forceIds: string[];
-  beatDecision: "hold" | "advance";
-  beat: Exclude<NonNullable<EventDefinition["narrativeBeat"]>, "ending">;
   narrative: string;
   factUpdates?: NarrativeFactUpdates;
   relationshipUpdates?: NarrativeRelationshipUpdate[];
@@ -3408,7 +3432,7 @@ export interface DynamicNarrativeScenePayload {
   }>;
   attributeOutcome?: ApprovedNarrativeAttributeOutcome;
   attributePolicy?: NarrativeAttributePolicy;
-  sceneClockMode?: "advance" | "hold";
+  nextClock?: "advance" | "hold";
   sceneAge?: number;
   createsDecision?: boolean;
   decisionBrief?: NarrativeDecisionBrief;
@@ -3416,13 +3440,14 @@ export interface DynamicNarrativeScenePayload {
 
 
 
-/** Complete an observed payoff identically after a scene or a player's choice. */
+/** Complete an observed act identically after a scene or a player's choice. */
 function completeObservedNarrativeAct(
   run: InternalRunState,
   narrativeWorld: NarrativeWorldDefinition,
   act: NonNullable<NarrativeWorldDefinition["mainlineActs"]>[number],
   details: { sourceId: string; narrative: string; characterIds: string[]; factionIds: string[]; experienceId?: string; openedAge: number; decisionCount: number }
 ): { factIds: string[] } {
+  if (run.narrative.actCanon.some((entry) => entry.actId === act.id)) return { factIds: [] };
   const factId = act.factId ?? act.introduceFactIds?.[0];
   const threadId = `arc:${act.id}`;
   const resolvedActFactIds = Array.from(new Set([
@@ -3447,23 +3472,20 @@ function completeObservedNarrativeAct(
     if (!character) continue;
     character.relatedFactIds = Array.from(new Set([...character.relatedFactIds, ...handoffFactIds])).slice(-8);
   }
-  const recorded = recordMainlineActCompletion(run, act, {
+  recordMainlineActCompletion(run, act, {
     sourceId: details.sourceId,
     experienceId: details.experienceId,
     threadId,
     openedAge: details.openedAge,
     decisionCount: details.decisionCount
   });
-  if (!recorded) throw new Error("dynamic_mainline_act_already_completed");
   commitNarrativeActCanon(run, {
     actId: act.id, sourceEventId: details.sourceId, resolvedAge: run.age,
     routeId: details.experienceId
   });
-  run.narrative.payoffCount = Math.min(8, run.narrative.payoffCount + 1);
   run.narrative.lastResolvedSceneAge = run.age;
   run.narrative.activeScene = undefined;
-  run.narrative.sceneClock = { ...run.narrative.sceneClock, mode: "advance", sameAgeTurnCount: 0 };
-  const advanced = advanceNarrativeActBeat(run.narrative, narrativeWorld, run.age);
+  const advanced = advanceNarrativeAct(run.narrative, narrativeWorld, run.age);
   run.narrative = advanced.state;
   refreshNarrativeClosureEligibility(run, narrativeWorld);
   return { factIds: handoffFactIds };
@@ -3484,13 +3506,14 @@ export function advanceWithDynamicNarrativeScene(
   if (run.narrative.enabled && run.story.mainlineCompleted) {
     throw new Error("dynamic_scene_after_mainline_complete");
   }
+  if (!payload.createsDecision) requireNarrativeNextClock(payload.nextClock);
   const knownPatterns = new Set((narrativeWorld.storyPatterns ?? []).map((item) => item.id));
   if (payload.patternIds.some((id) => !knownPatterns.has(id))) throw new Error("dynamic_scene_pattern_invalid");
   const runtimeState = ensureNarrativeActRuntime(run.narrative, narrativeWorld, run.age);
   run.narrative = runtimeState;
   const runtime = run.narrative.actRuntime;
   const act = runtime ? narrativeWorld.mainlineActs?.find((item) => item.id === runtime.actId) : undefined;
-  if (!runtime || !act || runtime.beat !== payload.beat) throw new Error("dynamic_scene_beat_invalid");
+  if (!runtime || !act) throw new Error("dynamic_scene_act_invalid");
   const knownForces = new Set((narrativeWorld.socialForces ?? []).map((force) => force.id));
   if (payload.forceIds.some((id) => !knownForces.has(id))) throw new Error("dynamic_scene_force_invalid");
   const fromAge = run.age;
@@ -3502,7 +3525,7 @@ export function advanceWithDynamicNarrativeScene(
     ? approveNarrativeAttributeOutcome(run, world, payload.attributeOutcome, "background", payload.attributePolicy)
     : undefined;
   const createsDecision = payload.createsDecision === true;
-  if (!createsDecision && (payload.beat === "setup" || payload.beat === "escalation" || payload.beat === "payoff") && !changes) {
+  if (!createsDecision && !changes) {
     throw new Error("dynamic_scene_outcome_required");
   }
   const baseChanges = changes ?? {};
@@ -3512,13 +3535,13 @@ export function advanceWithDynamicNarrativeScene(
       run,
       baseChanges,
       narrativeWorld,
-      seedrandom(`${run.seed}:family-support:dynamic:${run.age}:${payload.patternIds.join(",")}:${payload.beat}`)
+      seedrandom(`${run.seed}:family-support:dynamic:${run.age}:${payload.patternIds.join(",")}`)
     );
   run.stats = applyChanges(run.stats, settledChanges);
   resetRecoveredSurvivalStreak(run);
   run.ageStage = resolveAgeStage(run.age, world);
   updateNegativeStreaks(run);
-  const sceneId = payload.handoff?.sourceEventId ?? `dynamic:${act.id}:${payload.beat}:${run.age}:${run.history.length + 1}`;
+  const sceneId = payload.handoff?.sourceEventId ?? `dynamic:${act.id}:${run.age}:${run.history.length + 1}`;
   const factId = act.factId ?? act.introduceFactIds?.[0];
   const event: YearEvent = {
     age: run.age,
@@ -3531,23 +3554,18 @@ export function advanceWithDynamicNarrativeScene(
       createsDecision ? "milestone" : "normal",
       ...payload.patternIds.map((id) => `pattern_${id}`),
       `act_${act.id}`,
-      `beat_${payload.beat}`,
       ...payload.forceIds.map((id) => `force_${id}`)
     ]
   };
   run.history.push(event);
   const story = ensureStoryDirectorState(run);
   for (const forceId of payload.forceIds) story.factionTension[forceId] = (story.factionTension[forceId] ?? 0) + 1;
-  if (payload.beat === "setup") introduceMainlineActFacts(story, act, narrativeWorld, run.age, sceneId);
-  if (factId && payload.beat !== "setup") applyStoryFactEffect(story, { modifyFactIds: [factId] }, run.age, sceneId);
+  introduceMainlineActFacts(story, act, narrativeWorld, run.age, sceneId);
   const threadId = `arc:${act.id}`;
   const previousScene = run.narrative.activeScene?.mainlineActId === act.id ? run.narrative.activeScene : undefined;
-  run.narrative.activeScene = !createsDecision && payload.beat === "payoff" && payload.beatDecision === "advance"
-    ? undefined
-    : {
+  run.narrative.activeScene = {
       id: previousScene?.id ?? sceneId,
       threadId,
-      phase: payload.beat,
       openedAge: previousScene?.openedAge ?? run.age,
       lastTouchedAge: run.age,
       mainlineActId: act.id,
@@ -3587,34 +3605,8 @@ export function advanceWithDynamicNarrativeScene(
     factionIds: payload.forceIds,
     characterIds: storedCharacterIds, factIds: relatedFactIds, text: payload.narrative.trim()
   });
-  if (payload.sceneClockMode === "hold") {
-    run.narrative.sceneClock = {
-      ...run.narrative.sceneClock,
-      mode: "hold",
-      sameAgeTurnCount: heldAge
-        ? run.narrative.sceneClock.sameAgeTurnCount + 1
-        : 0
-    };
-  } else if (payload.sceneClockMode === "advance") {
-    run.narrative.sceneClock = { ...run.narrative.sceneClock, mode: "advance", sameAgeTurnCount: 0 };
-  } else if (heldAge && run.narrative.activeScene) {
-    run.narrative.sceneClock = {
-      ...run.narrative.sceneClock,
-      sameAgeTurnCount: run.narrative.sceneClock.sameAgeTurnCount + 1
-    };
-  }
-  let completedActId: string | undefined;
-  if (!createsDecision && payload.beat === "payoff" && payload.beatDecision === "advance") {
-    const completed = completeObservedNarrativeAct(run, narrativeWorld, act, {
-      sourceId: sceneId, narrative: payload.narrative,
-      characterIds: storedCharacterIds, factionIds: payload.forceIds, experienceId: payload.patternIds[0],
-      openedAge: previousScene?.openedAge ?? runtime.enteredAge, decisionCount: previousScene?.decisionCount ?? runtime.decisionCount
-    });
-    narrativeFactIds.push(...completed.factIds.filter((id) => !narrativeFactIds.includes(id)));
-    completedActId = act.id;
-  } else if (!createsDecision && payload.beatDecision === "advance") {
-    run.narrative = advanceNarrativeActBeat(run.narrative, narrativeWorld, run.age).state;
-  }
+  if (!createsDecision) run.pendingActFinalization = { actId: act.id, sourceEventId: sceneId, nextClock: requireNarrativeNextClock(payload.nextClock), eventFlow: payload.eventFlow };
+  const completedActId: string | undefined = undefined;
   refreshRunFame(run);
   if (!heldAge) {
     const rng = seedrandom(`${run.seed}:dynamic-scene:${sceneId}`);
@@ -3623,7 +3615,7 @@ export function advanceWithDynamicNarrativeScene(
       run.ascension = maybeUnlockAscension(run, rng);
     }
   }
-  if (!run.ended && !run.survivalCrisis && createsDecision) {
+  if (!run.ended && createsDecision) {
     const tuning = run.tuningSnapshot ?? createDefaultGameplayTuning();
     run.nextMilestoneChoice = generateMilestoneChoice(run.age, payload.narrative, tuning);
     run.pendingDirectedDecisionPolicy = dynamicDecisionPolicies();
@@ -3631,12 +3623,12 @@ export function advanceWithDynamicNarrativeScene(
       id: sceneId,
       patternIds: payload.patternIds,
       forceIds: payload.forceIds,
-      beat: payload.beat,
       mainlineActId: act.id,
       factId,
       characterIds: storedCharacterIds,
       factIds: relatedFactIds,
-      decisionBrief: payload.decisionBrief
+      decisionBrief: payload.decisionBrief,
+      eventFlow: payload.eventFlow
     };
     run.yearsSinceLastMilestone = 0;
   } else if (!run.ended && !run.survivalCrisis) {
@@ -3665,7 +3657,7 @@ export function dynamicBackgroundAttributePolicy(run: InternalRunState): Narrati
     minEffects: 1,
     maxEffects: 2,
     requirePositive: true,
-    positiveMagnitudeByBand: { light: 1, medium: 1 }
+    positiveMagnitudeByBand: { light: 1, medium: run.narrative.version === 20 ? 2 : 1 }
   };
 }
 
@@ -3793,7 +3785,7 @@ export function applyMilestoneDecisionAndAdvance(
   world: WorldConfig,
   difficulty: DifficultyConfig,
   decision: DecisionType,
-  options?: { narrative?: string; relationshipUpdates?: NarrativeRelationshipUpdate[]; milestoneEventPool?: string[]; narrativeOutcome?: ApprovedNarrativeAttributeOutcome; narrativeFactUpdates?: NarrativeFactUpdates; factResolution?: NarrativeFactResolution; narrativeWorld?: NarrativeWorldDefinition | null; beatDecision?: "hold" | "advance"; deferCompletion?: boolean }
+  options?: { narrative?: string; relationshipUpdates?: NarrativeRelationshipUpdate[]; milestoneEventPool?: string[]; narrativeOutcome?: ApprovedNarrativeAttributeOutcome; narrativeFactUpdates?: NarrativeFactUpdates; narrativeWorld?: NarrativeWorldDefinition | null; deferCompletion?: boolean }
 ): { updated: InternalRunState; fromAge: number; toAge: number; chunk: YearEvent[]; decisionEvent: YearEvent; factIds: string[]; sourceEventId: string } {
   if (!run.nextMilestoneChoice) {
     throw new Error("当前没有可用的关键抉择");
@@ -3910,55 +3902,33 @@ export function applyMilestoneDecisionAndAdvance(
   return { updated: run, fromAge: decisionEvent.age, toAge: run.age, chunk: [decisionEvent], decisionEvent, factIds: narrativeFactIds, sourceEventId };
 }
 
-/** Assets are synchronized before this advances a beat or closes the act. */
+/** Complete the choice commit; observation and act finalization resume separately. */
 export function completeMilestoneDecision(
   run: InternalRunState, decisionEvent: YearEvent, sourceEventId: string, narrativeFactIds: string[],
-  options?: { narrativeWorld?: NarrativeWorldDefinition | null; beatDecision?: "hold" | "advance"; factResolution?: NarrativeFactResolution; narrativeFactUpdates?: NarrativeFactUpdates }
+  options?: { narrativeWorld?: NarrativeWorldDefinition | null; narrativeFactUpdates?: NarrativeFactUpdates }
 ): void {
-  const pendingDynamicScene = run.pendingDynamicScene;
-  if (pendingDynamicScene && options?.narrativeWorld) {
-    const act = options.narrativeWorld.mainlineActs?.find((item) => item.id === pendingDynamicScene.mainlineActId);
-    if (!act || pendingDynamicScene.beat !== run.narrative.actRuntime?.beat) {
+  const pending = run.pendingDynamicScene;
+  if (pending && options?.narrativeWorld) {
+    const runtime = run.narrative.actRuntime;
+    const act = options.narrativeWorld.mainlineActs?.find((item) => item.id === pending.mainlineActId);
+    if (!act || runtime?.actId !== act.id ||
+        (run.nextMilestoneChoice?.check?.actId && run.nextMilestoneChoice.check.actId !== act.id)) {
       throw new Error("dynamic_decision_state_invalid");
     }
-    if (pendingDynamicScene.beat === "climax" && pendingDynamicScene.factId) {
-      const permitted = narrativeFactResolutionModes(act, pendingDynamicScene)!;
-      if (!options.factResolution || !permitted.includes(options.factResolution)) throw new Error("dynamic_fact_resolution_required");
-      const resolvedFactIds = Array.from(new Set([
-        ...(options.narrativeFactUpdates?.resolveFactIds ?? []),
-      ]));
-      for (const fact of run.story.factLedger?.facts ?? []) {
-        if (!resolvedFactIds.includes(fact.id)) continue;
-        fact.resolution = options.factResolution;
-        fact.resolutionSummary ??= fact.progressSummary ?? "这项世界事实已在高潮抉择中得到不可逆的处置。";
-      }
-    }
     run.narrative = recordNarrativeSceneDecision(run.narrative);
-    if (!run.survivalCrisis && options.beatDecision === "advance") {
-      if (pendingDynamicScene.beat === "payoff") {
-        const completed = completeObservedNarrativeAct(run, options.narrativeWorld, act, {
-          sourceId: sourceEventId, narrative: decisionEvent.summary,
-          characterIds: pendingDynamicScene.characterIds ?? [], factionIds: pendingDynamicScene.forceIds,
-          experienceId: pendingDynamicScene.patternIds[0],
-          openedAge: run.narrative.activeScene?.openedAge ?? run.narrative.actRuntime!.enteredAge,
-          decisionCount: run.narrative.activeScene?.decisionCount ?? run.narrative.actRuntime!.decisionCount
-        });
-        narrativeFactIds.push(...completed.factIds.filter((id) => !narrativeFactIds.includes(id)));
-      } else {
-        run.narrative = advanceNarrativeActBeat(run.narrative, options.narrativeWorld, run.age, { decision: true }).state;
-      }
-    }
     commitNarrativeMemory(run.narrative, {
-      id: `memory:${sourceEventId}`, age: run.age,
-      factionIds: pendingDynamicScene.forceIds,
-      characterIds: pendingDynamicScene.characterIds ?? [],
-      factIds: Array.from(new Set([...(pendingDynamicScene.factIds ?? []), ...narrativeFactIds])),
+      id: "memory:" + sourceEventId, age: run.age, factionIds: pending.forceIds,
+      characterIds: pending.characterIds ?? [], factIds: Array.from(new Set([...(pending.factIds ?? []), ...narrativeFactIds])),
       text: decisionEvent.summary
     });
+    run.pendingActFinalization = { actId: act.id, sourceEventId,
+      nextClock: requireNarrativeNextClock(run.choiceExecution?.outcome?.nextClock),
+      ...(pending.eventFlow ? { eventFlow: { ...pending.eventFlow,
+        outcome: run.choiceExecution!.roll.decision + ":" + (run.choiceExecution!.roll.success ? "success" : "failure") } } : {}) };
   }
   refreshRunFame(run);
-  if (!pendingDynamicScene) run.narrative = recordNarrativeSceneDecision(run.narrative);
-  if (pendingDynamicScene && !run.survivalCrisis) run.ascension = maybeUnlockAscension(run, seedrandom(`${run.seed}:${run.nextMilestoneChoice?.check?.id ?? sourceEventId}:ascension`));
+  if (!pending) run.narrative = recordNarrativeSceneDecision(run.narrative);
+  if (pending && !run.survivalCrisis) run.ascension = maybeUnlockAscension(run, seedrandom(run.seed + ":" + sourceEventId + ":ascension"));
   run.nextMilestoneChoice = undefined;
   run.pendingDirectedDecisionEffects = undefined;
   run.pendingDirectedDecisionPolicy = undefined;
@@ -3966,6 +3936,51 @@ export function completeMilestoneDecision(
   run.pendingDirectedDecisionFactEffects = undefined;
   run.pendingDynamicScene = undefined;
   run.choiceExecution = undefined;
+}
+
+function requireNarrativeNextClock(value: unknown): "hold" | "advance" {
+  if (value === "hold" || value === "advance") return value;
+  throw new Error("narrative_next_clock_required");
+}
+
+/** The only observed-act commit entry, shared by ordinary scenes and choices. */
+export function finalizeNarrativeActEvent(
+  run: InternalRunState, narrativeWorld: NarrativeWorldDefinition,
+  observation: import("@reroll/shared").NarrativeActObservation
+): boolean {
+  const pending = run.pendingActFinalization;
+  if (!pending) return false;
+  if (observation.actId !== pending.actId || observation.sourceEventId !== pending.sourceEventId ||
+      run.narrative.actRuntime?.actId !== pending.actId) throw new Error("act_finalization_identity_invalid");
+  if (run.survivalCrisis || run.nextMilestoneChoice || run.choiceExecution || run.ended) return false;
+  const runtime = run.narrative.actRuntime;
+  const act = narrativeWorld.mainlineActs?.find((entry) => entry.id === pending.actId);
+  const memory = run.narrative.memoryEntries.find((entry) => entry.id === "memory:" + pending.sourceEventId);
+  if (!act || !memory) throw new Error("act_finalization_source_missing");
+  if (observation.decision === "act_closed" && narrativeWorld.mainlineActs?.at(-1)?.id === pending.actId) throw new Error("final_act_requires_run_ending");
+  if (observation.decision === "run_ended" && (!observation.endingPolarity || !observation.evidence)) throw new Error("run_ending_evidence_required");
+  if (run.narrative.version >= 19 && observation.decision === "run_ended" &&
+      (!observation.lifeStatus || (observation.lifeStatus === "dead" && !observation.deathCause?.trim()))) throw new Error("run_ending_life_status_required");
+  run.narrative.lastActObservation = observation;
+  let closed = false;
+  if (observation.decision === "act_closed") {
+    completeObservedNarrativeAct(run, narrativeWorld, act, {
+      sourceId: pending.sourceEventId, narrative: memory.text,
+      characterIds: memory.characterIds, factionIds: memory.factionIds,
+      openedAge: runtime.enteredAge, decisionCount: runtime.decisionCount
+    });
+    closed = true;
+  }
+  if (observation.decision === "run_ended") {
+    if (observation.lifeStatus === "dead") { run.outcome = "dead"; run.deathCause = observation.deathCause; }
+    run.narrative.activeScene = undefined;
+    run.story.closureEligible = true;
+    if (!beginDirectedClosureGuidance(run, narrativeWorld)) throw new Error("observed_run_ending_unavailable");
+    closed = true;
+  }
+  run.narrative.sceneClock = { ...run.narrative.sceneClock, mode: pending.nextClock, sameAgeTurnCount: 0 };
+  run.pendingActFinalization = undefined;
+  return closed;
 }
 
 export function toClientRun(run: InternalRunState): PublicRunState {
@@ -4046,7 +4061,7 @@ export function toClientRun(run: InternalRunState): PublicRunState {
     narrativeAssets: visibleEnded ? publicNarrativeAssetsSnapshot(run.narrative.assets) : visibleTurn
       ? visibleTurn.narrativeAssetsSnapshot ?? { locations: [], abilities: [] }
       : publicNarrativeAssetsSnapshot(run.narrative.assets),
-    nextMilestoneChoice: visibleChoice,
+    nextMilestoneChoice: visibleSurvivalCrisis ? undefined : visibleChoice,
     pendingChoice: run.choiceExecution && run.nextMilestoneChoice ? {
       choice: toPublicMilestoneChoice(run)!,
       optionId: publicOptionId(run, run.nextMilestoneChoice, run.choiceExecution.roll.decision),

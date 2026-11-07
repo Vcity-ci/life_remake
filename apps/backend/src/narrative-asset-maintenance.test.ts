@@ -16,7 +16,7 @@ import { composeNarrativeContext } from "./narrative/context/orchestrator.js";
 import { dynamicNarrativeRenderPrompt, parseNarrativeTurnPlan, prepareNarrativeOutcomeRequest, type DynamicNarrativeSceneInput, type NarrativeContext } from "./ai.js";
 import type { NarrativeTurnEnvelope } from "./narrative/turn.js";
 
-const world: WorldConfig = { id: "ancient", name: "边地", intro: "边地人生", stylePrompt: "具体叙事", milestoneAges: [], endAgeRange: { min: 90, max: 90 }, yearlyEventHints: [] };
+const world: WorldConfig = { id: "ancient", name: "边地", intro: "边地人生",  milestoneAges: [], endAgeRange: { min: 90, max: 90 }, yearlyEventHints: [] };
 const difficulty: DifficultyConfig = { id: "test", name: "测试", yearlyVolatility: 0, growthBias: 0, riskRewardMultiplier: 1, failurePenaltyMultiplier: 1, description: "测试" };
 function makeRun() {
   const tuning = createDefaultGameplayTuning(); tuning.bootstrap.selectedCardMin = 0;
@@ -35,7 +35,8 @@ test("三轮身份暂存经真实同步入口维护结构字段，保存后选�
   const person = run.narrative.dynamicCharacters[0].id;
   applyNarrativeRelationshipUpdates(run, [{ characterRef: person, condition: "暂被扣押", role: "军中统领" }]);
   run.narrative.assets = applyNarrativeAssetUpdates(run.narrative.assets, { abilities: [], locations: [{ ref: cellar,
-    description: "荒滩旧窖", spatialDescription: "堡北干沟的沙土窖", features: [{ name: "窖内", state: "扣有三人与一头骡子" }] }] }, { age: 16 }).assets;
+    description: "荒滩旧窖", spatialDescription: "堡北干沟的沙土窖", featureChanges: [{ id: "new", name: "窖内", state: "扣有三人与一头骡子" }] }] }, { age: 16 }).assets;
+  const cellarFeatureId = run.narrative.assets.locations.find((entry) => entry.id === cellar)!.features![0].id!;
   const earlier = appendPublicTurnRecord(run, { entryId: "entry:16", age: 16, ageStage: { label: "少年" }, kind: "passage", narrative: "你初到边堡。", statChanges: {} });
   for (const age of [17, 18]) stageNarrativeAssetRound(run, { sourceEventId: `source:${age}`, source: "scene", age, subject: "行动", narrative: age === 18
     ? "陈统领获释，辽骑兵仍驻永安堡；俘虏与骡子已带走。桥烧毁尚未修复，无法由此渡河。你用北语辨明人数，与陈统领商议合作，尚未谈定。" : "你在堡中生活。" }, {}, { age });
@@ -46,19 +47,19 @@ test("三轮身份暂存经真实同步入口维护结构字段，保存后选�
     assert.match(prompt, /source:16.*|source:18/);
     assert.match(prompt, /暂被扣押/);
     const fields = payload.tools[0].function.parameters.properties;
-    assert.ok(fields.locationUpdates.items.properties.actors);
+    assert.ok(fields.locationUpdates.items.properties.actorChanges);
     assert.ok(fields.relationshipUpdates.items.properties.condition);
     assert.ok(fields.factIntroductions.items.properties.locationIds);
     return { choices: [{ finish_reason: "tool_calls", message: { content: null, tool_calls: [{ id: "structured-sync", type: "function", function: {
-      name: "sync_narrative_continuity", arguments: JSON.stringify({ identityMerges: [],
+      name: "sync_narrative_continuity", arguments: JSON.stringify({ retirements: [], identityMerges: [],
         relationshipUpdates: [{ characterRef: person, condition: "", description: "熟悉边地战事的军官", factionId: "ancient.military", summary: "认可你的通译本领" }],
         locationUpdates: [
-          { ref: fort, description: "边防军堡", spatialDescription: "干沟南面的关堡", actors: [{ characterIds: [person], factionId: "ancient.military", organizationName: "辽骑兵", relation: "陈统领率领的边防军长期驻守" }], features: [{ name: "河桥", state: "已经烧毁，尚未修复，无法由此渡河" }] },
-          { ref: cellar, parentLocationId: fort, features: [{ name: "窖内", state: "俘虏和骡子已带走，目前空置" }], actors: [] }
+          { ref: fort, description: "边防军堡", spatialDescription: "干沟南面的关堡", actorChanges: [{ id: "new", characterIds: [person], factionId: "ancient.military", organizationName: "辽骑兵", relation: "陈统领率领的边防军长期驻守" }], featureChanges: [{ id: "new", name: "河桥", state: "已经烧毁，尚未修复，无法由此渡河" }] },
+          { ref: cellar, parentLocationId: fort, featureChanges: [{ id: cellarFeatureId, state: "俘虏和骡子已带走，目前空置" }] }
         ],
         abilityUpdates: [{ ref: skill, description: "听辨与理解北地语言", usage: "辨别北语口音、问答与暗语", mastery: "熟练", source: "父亲传授，随军练习" }],
         factIntroductions: [
-          { kind: "experience", label: "旧窖营救已经完成", status: "finish", sourceEventId: "source:18", characterIds: [person], locationIds: [cellar], abilityIds: [skill], factionIds: ["ancient.military"] },
+          { kind: "commitment", label: "旧窖营救已经完成", status: "finish", sourceEventId: "source:18", characterIds: [person], locationIds: [cellar], abilityIds: [skill], factionIds: ["ancient.military"] },
           { kind: "open_question", label: "两军合作尚未谈定", status: "stay", sourceEventId: "source:18", characterIds: [person], locationIds: [fort], factionIds: ["ancient.military"] }
         ], factUpdates: []
       })
@@ -78,23 +79,20 @@ test("三轮身份暂存经真实同步入口维护结构字段，保存后选�
   restored.narrative = ensureNarrativeRunState(restored.narrative, true, 18);
   const names = { characters: restored.narrative.dynamicCharacters, factions: [{ id: "ancient.military", label: "边军" }] };
   const places = narrativeLocationDirectory(restored.narrative.assets, names);
-  assert.match(places[0].label, /辽骑兵.*陈统领.*边军/);
-  assert.match(places[0].label, /已经烧毁，尚未修复，无法由此渡河/);
-  assert.match(places[1].label, /所属：永安堡.*目前空置/);
+  assert.equal(places[0].label, "永安堡；当前所在");
+  assert.doesNotMatch(places[0].label, /辽骑兵|烧毁/);
+  assert.match(places[1].label, /所属：永安堡/);
   assert.doesNotMatch(places[1].label, /扣有三人/);
-  assert.match(narrativeAbilityDirectory(restored.narrative.assets)[0].label, /听辨与理解北地语言.*辨别北语口音/);
+  assert.equal(narrativeAbilityDirectory(restored.narrative.assets)[0].label, "北语听音（熟练）");
   assert.doesNotMatch(narrativeAbilityDirectory(restored.narrative.assets)[0].label, /父亲传授/);
   const selectedFacts = selectDynamicNarrativeContext(restored, { task: "planning", names }).facts;
-  assert.match(selectedFacts.find((fact) => fact.label.startsWith("两军合作尚未谈定"))!.label, /关联：陈统领、永安堡、边军/);
+  assert.equal(selectedFacts.find((fact) => fact.label.startsWith("两军合作尚未谈定"))!.label, "两军合作尚未谈定（open）");
   const base = (await loadNarrativeWorldDefinition("ancient"))!;
   const definition = resolveNarrativeExperience(base, (await loadNarrativeStoryPack(base, "ancient.frontier-commander"))!);
   restored.narrative = ensureNarrativeActRuntime(restored.narrative, definition, restored.age);
   const plan = buildNarrativePromptPlan(restored, definition, null, "rendering", { focusIds: [fort, person, skill], factionIds: ["ancient.military"] });
   const composed = composeNarrativeContext({ task: "rendering", plan, taskPrompt: "叙述十九岁的经历" }).renderedContext;
-  assert.match(composed, /辽骑兵.*陈统领/);
-  assert.match(composed, /已经烧毁，尚未修复，无法由此渡河/);
-  assert.match(composed, /认可你的通译本领/);
-  assert.match(composed, /北语听音（熟练）/);
+  assert.doesNotMatch(composed, /辽骑兵|已经烧毁，尚未修复，无法由此渡河|认可你的通译本领|北语听音（熟练）/);
   assert.doesNotMatch(composed, /父亲传授，随军练习|旧窖营救已经完成/);
   const latest = appendPublicTurnRecord(restored, { entryId: "entry:18", age: 18, ageStage: { label: "青年" }, kind: "passage", narrative: "你返回堡中。", statChanges: {} });
   assert.equal(latest.narrativeCharactersSnapshot![0].condition, undefined);
@@ -112,7 +110,7 @@ test("维护的省略、替换、清除，以及归并后新增嵌套引用使�
   const [fort, duplicate, cellar] = staged.locations.map((entry) => entry.ref);
   const [person, alias] = run.narrative.dynamicCharacters.map((entry) => entry.id);
   const parsed = parseNarrativeContinuityAssetUpdates({ locationUpdates: [
-    { ref: cellar, parentLocationId: duplicate, actors: [{ characterIds: [alias], factionId: "ancient.military", organizationName: "辽骑兵", relation: "驻防" }], features: [{ name: "入口", state: "已封闭" }] }
+    { ref: cellar, parentLocationId: duplicate, actorChanges: [{ id: "new", characterIds: [alias], factionId: "ancient.military", organizationName: "辽骑兵", relation: "驻防" }], featureChanges: [{ id: "new", name: "入口", state: "已封闭" }] }
   ], abilityUpdates: [] }, run.narrative.assets!, { characterIds: [person, alias], factionIds: ["ancient.military"] });
   run.narrative.assets = applyNarrativeAssetUpdates(run.narrative.assets, parsed, { age: 20 }).assets;
   applyNarrativeIdentityMerges(run, [{ kind: "character", sourceRef: alias, targetRef: person }, { kind: "location", sourceRef: duplicate, targetRef: fort }]);
@@ -121,7 +119,7 @@ test("维护的省略、替换、清除，以及归并后新增嵌套引用使�
   assert.deepEqual(current.actors![0].characterIds, [person]);
   run.narrative.assets = applyNarrativeAssetUpdates(run.narrative.assets, { locations: [{ ref: cellar, description: "堡外仓窖" }], abilities: [] }, { age: 21 }).assets;
   assert.deepEqual(run.narrative.assets.locations.find((entry) => entry.id === cellar)!.features, current.features);
-  run.narrative.assets = applyNarrativeAssetUpdates(run.narrative.assets, { locations: [{ ref: cellar, parentLocationId: "", actors: [], features: [], description: "" }], abilities: [] }, { age: 22 }).assets;
+  run.narrative.assets = applyNarrativeAssetUpdates(run.narrative.assets, { locations: [{ ref: cellar, parentLocationId: "", actorChanges: current.actors!.map(({ id }) => ({ id: id!, remove: true })), featureChanges: current.features!.map(({ id }) => ({ id: id!, remove: true })), description: "" }], abilities: [] }, { age: 22 }).assets;
   const cleared = run.narrative.assets.locations.find((entry) => entry.id === cellar)!;
   assert.equal(cleared.parentLocationId, undefined); assert.equal(cleared.description, undefined);
   assert.deepEqual(cleared.actors, []); assert.deepEqual(cleared.features, []);
@@ -140,19 +138,16 @@ test("现有用途交接按名称进入正文，正文工具仍只登记身份",
     capabilities: ["scene", "choice"], storyPatterns: [], socialForces: [],
     focusReferences: [{ id: "ability:language", kind: "ability", label: "北语听音" }, { id: "location:fort", kind: "location", label: "永安堡" }],
     statTiers: resolveNarrativeStatTiers(run.stats), clock: { mode: "advance", sameAgeTurnCount: 0, maxSameAgeTurns: 3 } };
-  const plan = parseNarrativeTurnPlan({ beatChange: "争取驻军合作抗敌", timeScope: "经过一年准备后正式商议", note: "陈统领尚未答复合作",
-    conflictRefs: [], forceIds: [], abilityRefs: [{ ref: "ability:language", purpose: "用北语与当地驻军交涉" }], assetNeeds: [],
-    locationDirective: { mode: "revisit", locationRef: "location:fort", purpose: "向陈统领商议抗敌" }, clockRequest: "advance" }, "plan_scene_turn", envelope);
-  const input: DynamicNarrativeSceneInput = { presentation: "scene", sceneAge: 21, backgroundAgeRange: { fromAge: 21, toAge: 21 }, beat: "pressure",
+  const plan = parseNarrativeTurnPlan({ recallRefs: ["ability:language", "location:fort"] }, "recall_scene_assets", envelope);
+  const input: DynamicNarrativeSceneInput = { presentation: "scene", sceneAge: 21, backgroundAgeRange: { fromAge: 21, toAge: 21 },
     act: { id: "act.one", label: "边军", prompt: "守卫边地" }, allowedTurnKinds: ["scene"], storyPatterns: [], socialForces: [], knownCharacters: [],
     backgroundAttributePolicy: dynamicBackgroundAttributePolicy(run), statTiers: resolveNarrativeStatTiers(run.stats),
     plan: { ...plan,
       materials: [{ id: "ability:language", kind: "ability", label: "北语听音" }, { id: "location:fort", kind: "location", label: "永安堡" }] }
   };
   const prompt = dynamicNarrativeRenderPrompt(input, 20);
-  assert.match(prompt, /北语听音：用北语与当地驻军交涉/);
-  assert.match(prompt, /永安堡；返回已有地点；向陈统领商议抗敌/);
-  assert.ok(prompt.includes(plan.beatChange!) && prompt.includes(plan.timeScope!) && prompt.includes(plan.note!));
+  assert.doesNotMatch(prompt, /相关材料及其作用|未登记对象与用途|用北语与当地驻军交涉/);
+  assert.equal(Object.hasOwn(plan, "beatChange"), false);
   assert.doesNotMatch(prompt, /ability:language|location:fort/);
   const tool = { type: "function", function: { name: "render_scene_prose", parameters: { properties: { narrative: { type: "string" } }, required: ["narrative"] } } };
   const request = prepareNarrativeOutcomeRequest(run, world, { ...context }, tool, prompt, { task: "rendering", contracts: { assets: "declarations", activity: true } });
@@ -190,7 +185,7 @@ test("宝物沿用本领的身份暂存、同步、恢复与召回路径，无�
     calls++;
     assert.ok(payload.messages.some((message) => message.content.includes(id) && message.content.includes("破阵铜镜")));
     return { choices: [{ finish_reason: "tool_calls", message: { content: null, tool_calls: [{ id: "mirror:sync", type: "function", function: {
-      name: "sync_narrative_continuity", arguments: JSON.stringify({ identityMerges: [], relationshipUpdates: [], locationUpdates: [],
+      name: "sync_narrative_continuity", arguments: JSON.stringify({ retirements: [], identityMerges: [], relationshipUpdates: [], locationUpdates: [],
         abilityUpdates: [{ ref: id, pendingDetails: false, description: "显出阵门的铜镜", usage: "主角持有；镜缘开裂，修复前不能映照阵门" }], factIntroductions: [], factUpdates: [] })
     } }] } }] };
   });
@@ -204,24 +199,22 @@ test("宝物沿用本领的身份暂存、同步、恢复与召回路径，无�
   assert.equal(mirror.id, id);
   assert.equal(mirror.mastery, undefined);
   assert.equal(mirror.pendingDetails, false);
-  assert.match(narrativeAbilityDirectory(restored.narrative.assets)[0].label, /破阵铜镜.*修复前不能映照阵门/);
+  assert.equal(narrativeAbilityDirectory(restored.narrative.assets)[0].label, "破阵铜镜");
   const base = (await loadNarrativeWorldDefinition("ancient"))!;
   const definition = resolveNarrativeExperience(base, (await loadNarrativeStoryPack(base, "ancient.mystic-order"))!);
   restored.narrative = ensureNarrativeActRuntime(restored.narrative, definition, restored.age);
   const act = definition.mainlineActs![0];
-  const plan = parseNarrativeTurnPlan({ beatChange: "争取修复铜镜的条件", timeScope: "经过一段寻访后抵达修镜人住处", note: "尚未取得修复材料",
-    conflictRefs: [], forceIds: [], abilityRefs: [{ ref: id, purpose: mirror.usage! }], assetNeeds: [], locationDirective: { mode: "stay" }, clockRequest: "advance" }, "plan_scene_turn", {
+  const plan = parseNarrativeTurnPlan({ recallRefs: [id] }, "recall_scene_assets", {
     callId: "mirror:recall", source: "scene", worldId: world.id, currentAge: 20, backgroundAgeRange: { fromAge: 21, toAge: 21 }, act, beat: "setup",
     capabilities: ["scene", "choice"], storyPatterns: [], socialForces: [], statTiers: resolveNarrativeStatTiers(restored.stats),
     focusReferences: narrativeAbilityDirectory(restored.narrative.assets).map((entry) => ({ ...entry, kind: "ability" as const })),
     clock: { mode: "advance", sameAgeTurnCount: 0, maxSameAgeTurns: 3 }
   });
-  const taskPrompt = dynamicNarrativeRenderPrompt({ presentation: "scene", sceneAge: 21, backgroundAgeRange: { fromAge: 21, toAge: 21 }, act, beat: "setup",
+  const taskPrompt = dynamicNarrativeRenderPrompt({ presentation: "scene", sceneAge: 21, backgroundAgeRange: { fromAge: 21, toAge: 21 }, act,
     allowedTurnKinds: ["scene"], storyPatterns: [], socialForces: [], knownCharacters: [], backgroundAttributePolicy: dynamicBackgroundAttributePolicy(restored),
     statTiers: resolveNarrativeStatTiers(restored.stats), plan }, 20);
   const prompt = composeNarrativeContext({ task: "rendering", plan: buildNarrativePromptPlan(restored, definition, null, "rendering", { focusIds: [id] }), taskPrompt });
-  assert.ok(prompt.renderedContext.includes("破阵铜镜"));
-  assert.ok(prompt.renderedContext.includes(mirror.usage!), "当前条件通过召回用途交给正文，沿用现有分层而非全量回传档案");
+  assert.ok(!prompt.renderedContext.includes(mirror.usage!), "前端宝物档案不回流正文；实际历史保持独立供应");
   const reused = parseNarrativeAssetDeclarations({ locations: [], abilities: [{ ref: id }] }, restored.narrative.assets!);
   stageNarrativeAssetRound(restored, { sourceEventId: "mirror:carried", source: "scene", age: 21, subject: "带镜求修", narrative: "你带着破阵铜镜去找修镜人。" }, { assetUpdates: reused }, { age: 21 });
   restored.narrative.assets = applyNarrativeAssetActivity(restored.narrative.assets, { locationIds: [], abilityIds: [id] }, { age: 21 });

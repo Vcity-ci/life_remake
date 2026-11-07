@@ -1,6 +1,8 @@
-import { dynamicNarrativeSceneTools, narrativeTurnPlanTools, narrativeTurnPlanningPrompt, narrativeDecisionOutcomeTool, narrativeDecisionRenderTool, narrativeHorizonTool, narrativeBeatObservationPrompt, normalizeMilestoneOptionOverrides, parseDynamicNarrativeParticipants, NarrativeOutcomeError, prepareNarrativeOutcomeRequest, interruptedBackgroundTask, recordDirectedDecisionOutcome, recordDirectedStoryTurnOutcome, buildNarrativeContinuityWriteSet, narrativeContinuityReadSet, narrativeContinuityWritableSet, hasNarrativeContinuityWork, validateNarrativeContinuityToolArguments, extractProviderUsage, type NarrativeContext } from "./ai.js";
+import { hostingFixture } from "./narrative/hosting-fixture.js";
+import { finishPendingNarrativeActEvent } from "./narrative/finalization.js";
+import { dynamicNarrativeSceneTools, narrativeTurnPlanTools, narrativeTurnPlanningPrompt, narrativeDecisionOutcomeTool, narrativeDecisionRenderTool, narrativeActObservationPrompt, normalizeMilestoneOptionOverrides, parseDynamicNarrativeParticipants, NarrativeOutcomeError, prepareNarrativeOutcomeRequest, interruptedBackgroundTask, recordDirectedDecisionOutcome, recordDirectedStoryTurnOutcome, buildNarrativeContinuityWriteSet, narrativeContinuityReadSet, narrativeContinuityWritableSet, hasNarrativeContinuityWork, validateNarrativeContinuityToolArguments, extractProviderUsage, type NarrativeContext } from "./ai.js";
 import { factUpdateContract, parseFactUpdates, prepareNarrativeFactUpdates, parseRelationshipUpdates, narrativeFactResolutionModes, narrativeContinuityFacts, NarrativeContinuityValidationError } from "./narrative-continuity.js";
-import { generateNarrativeTurnPlan, observeNarrativeBeat, parseNarrativeTurnPlan, parseNarrativeMemoryCuration, memoryCurationTool } from "./ai.js";
+import { generateNarrativeTurnPlan, observeNarrativeAct, parseNarrativeTurnPlan, parseNarrativeMemoryCuration, memoryCurationTool } from "./ai.js";
 import { narrativeObservationHistory } from "./narrative/observation.js";
 import { pendingConversationContext, applyConversationSummary, buildConversationPromptMessages, keepRecentConversationRounds, summarizedConversationMemoryIds, type ChatConversationState } from "./conversation.js";
 import { commitNarrativeMemory, narrativeTextOverlap } from "./narrative-memory.js";
@@ -21,7 +23,7 @@ import {
   applyNarrativeFactUpdates,
   applyNarrativeRelationshipUpdates,
   advanceWithDirectedEvent,
-  advanceWithDynamicNarrativeScene,
+  advanceWithDynamicNarrativeScene as advanceSceneWithExplicitClock,
   applyDirectedClosureRequest,
   applyDirectedMilestonePresentation,
   appendPublicTurnRecord,
@@ -42,7 +44,7 @@ import {
   toPublicTimelineEntryFromEvent,
   toClientRun
 } from "./engine.js";
-import { advanceNarrativeActBeat, formatNarrativePromptPlan, buildNarrativePromptPlan, narrativeRouteBeatGuidance, selectDynamicNarrativeContext, selectNarrativeWorldCards, formatTaskNarrativeContext, assessClosureReadiness, assessEnding, ensureNarrativeActRuntime, ensureNarrativeRunState, getNarrativeRouteProgress, isNarrativeEarlyLife, isNarrativeMainlineActEntryReady, isNarrativeStageReady, refreshNarrativeMainlineCompletion } from "./narrative.js";
+import { advanceNarrativeAct, formatNarrativePromptPlan, buildNarrativePromptPlan, narrativeRouteBeatGuidance, selectDynamicNarrativeContext, selectNarrativeWorldCards, formatTaskNarrativeContext, assessClosureReadiness, assessEnding, ensureNarrativeActRuntime, ensureNarrativeRunState, getNarrativeRouteProgress, isNarrativeEarlyLife, isNarrativeMainlineActEntryReady, isNarrativeStageReady, refreshNarrativeMainlineCompletion } from "./narrative.js";
 import { loadEventDefinitions, loadNarrativeWorldDefinition, validateNarrativeWorldFactContract } from "./content.js";
 import { applyNarrativeAssetActivity, applyNarrativeAssetUpdates, commitNarrativeAssets, formatNarrativeAssets, selectNarrativeAssets, narrativeAbilityDirectory, narrativeContinuityAssetContract, narrativeLocationDirectory, narrativeAssetUpdatesSchema, normalizeNarrativeAssets, parseNarrativeAssetUpdates, parseNarrativeContinuityAssetUpdates, publicNarrativeAssetsSnapshot } from "./narrative-assets.js";
 import { composeNarrativeContext } from "./narrative/context/orchestrator.js";
@@ -58,24 +60,21 @@ import { loadNarrativeStoryPack, loadNarrativeStoryPacksForWorld, validateNarrat
 import { resolveNarrativeExperience } from "./narrative-experience.js";
 import { applyNarrativeIdentityMerges, canonicalizeNarrativeReferences, narrativeCharacterDirectory, parseNarrativeIdentityMerges } from "./narrative-identities.js";
 import { resolveNarrativeStatTiers } from "./engine.js";
-import { generateDirectedStoryTurn, generateDirectedStoryRender, generateDynamicNarrativeScene, generateNarrativeOrigin, generateNarrativeActWorldCard, renderDirectedDecisionNarrative, renderInterruptedBackground, synchronizeNarrativeContinuity } from "./ai.js";
+import { generateDirectedStoryTurn, generateDynamicNarrativeScene, generateNarrativeOrigin, generateNarrativeActWorldCard, renderDirectedDecisionNarrative, renderInterruptedBackground, synchronizeNarrativeContinuity } from "./ai.js";
 import { registerNarrativeParticipants } from "./narrative-characters.js";
 import { prepareRoundParticipants, roundCharacterDirectory } from "./narrative/handoff.js";
-import { parseNarrativeActWorldCard, commitNarrativeActOutline } from "./narrative/act-outline.js";
+import { parseNarrativeActWorldCard, commitNarrativeActOutline, formatNarrativeActOutline } from "./narrative/act-outline.js";
 import { buildNarrativeStoryHistory } from "./narrative/story-history.js";
 import { prepareChoiceCheck, rollChoice } from "./choice-check.js";
 
 type OutlineFixture = { goal: string; completionMeaning: string; fork?: { question: string; stakes: string; openingSituation: string } };
-function actWorldCardForTest(task: OutlineFixture = { goal: "推进本幕人物处境", completionMeaning: "本幕问题及其实际后果已经形成" }) {
-  return { background: "当前世界中的人物生活与本幕冲突。", beats: Object.fromEntries(["setup", "escalation", "pressure", "climax", "payoff"].map((beat) => [beat, {
-    change: `${beat}：${task.goal}，承接已发生结果并推动人物面对本幕矛盾。`,
-    props: ["主角", "本幕相关人物"], timeframe: null
-  }])) };
+// Legacy test setup supplies a concrete handoff; omission is tested directly in p1-flow.
+function advanceWithDynamicNarrativeScene(...args: Parameters<typeof advanceSceneWithExplicitClock>) {
+  args[3] = { nextClock: "advance", ...args[3] };
+  return advanceSceneWithExplicitClock(...args);
 }
-
-function outlineForTest(actId: string, task?: OutlineFixture) {
-  return parseNarrativeActWorldCard(actWorldCardForTest(task), actId);
-}
+function actWorldCardForTest(_task?: OutlineFixture) { return hostingFixture("当前世界中的人物生活与本幕冲突。"); }
+function outlineForTest(actId: string, task?: OutlineFixture) { return parseNarrativeActWorldCard(actWorldCardForTest(task), actId, { objective: task?.goal ?? "本幕方向", closureMeaning: task?.completionMeaning ?? "本幕结果落定" }); }
 
 // These fault replays begin after the separate act job has completed. Keep the
 // original mocked protocol failures; never restore inline generation in production.
@@ -86,21 +85,20 @@ async function runNarrativeAgentTurn(input: Parameters<typeof executeNarrativeAg
       commitNarrativeActOutline(input.run.narrative, outline);
     }
     input.envelope.actOutline = input.run.narrative.actRuntime?.outline;
+    input.context.narrativePlan ??= buildNarrativePromptPlan(input.run, input.narrativeWorld, null, "planning");
+    input.context.narrativePlan!.actBackground = formatNarrativeActOutline(input.envelope.actOutline);
   }
   return executeNarrativeAgentTurn(input);
 }
 
 function planningReplyForTest<T extends Record<string, unknown>>(fields: T) {
-  return { beatChange: "承担本拍的一项实际责任", timeScope: "同年完成紧迫行动", note: "", assetNeeds: [], ...fields,
-    ...Object.fromEntries(["conflictRefs", "abilityRefs", "forceIds"].map((field) => [field,
-      ((fields[field] ?? []) as unknown[]).map((entry) => typeof entry === "string" ? { ref: entry, purpose: "为当前阶段改变提供行动条件" } : entry)
-    ])) };
+ const refs = ["conflictRefs", "abilityRefs", "forceIds"].flatMap(key => ((fields[key] ?? []) as any[]).map(entry => typeof entry === "string" ? { ref: entry, purpose: "当前局势条件" } : entry));
+ const location = fields.locationDirective as { locationRef?: string; purpose?: string } | undefined;
+ if (location?.locationRef) refs.push({ ref: location.locationRef, purpose: location.purpose ?? "所在条件" });
+ const needs = ((fields.assetNeeds ?? []) as any[]); for (const entry of needs) if (entry.ref) refs.push({ ref: entry.ref, purpose: entry.purpose });
+ return { recallRefs: ((fields.recallRefs ?? refs) as any[]).map(entry => typeof entry === "string" ? entry : entry.ref) };
 }
-
-function observationReplyForTest(decision: string) {
-  return { beatDecision: decision, evidence: decision === "advance" ? "正文中的阶段改变已经形成实际结果" : null,
-    missing: decision === "hold" ? "本拍要求的处境改变尚未发生" : null };
-}
+function observationReplyForTest(decision: string) { return { decision: decision === "advance" ? "act_closed" : "ongoing", evidence: decision === "advance" ? "整幕结果已经发生" : null }; }
 
 // Older fixtures use storyDelta as their story text. Store that text through the
 // same memory channel as current commits; it is no longer a second model output.
@@ -113,22 +111,29 @@ function commitNarrativeEpisode(run: Parameters<typeof commitEpisode>[0], draft:
 }
 
 function nextNarrativeScript<T extends { name: string; args: Record<string, unknown> }>(scripts: T[], payload: { tools: Array<{ function: { name: string; parameters?: unknown } }> }): T | undefined {
+  // Old replay inputs retain their historical recall response, but the current
+  // runner performs no recall request. World-card preparation is still real.
+  if (scripts[0]?.name === "recall_scene_assets" && payload.tools[0]?.function.name !== "plan_act_world_card") scripts.shift();
   const next = scripts[0];
+
+  if (!next && payload.tools[0]?.function.name === "sync_narrative_continuity") return { name: "sync_narrative_continuity", args: { locationUpdates: [], abilityUpdates: [], retirements: [], identityMerges: [], relationshipUpdates: [], factIntroductions: [], factUpdates: [] } } as unknown as T;
   // Choice results now flush complete experiences before observation. These older
   // fault replays have no profile changes to propose in that new sync call.
-  if (next?.name === "observe_story_beat" && payload.tools[0]?.function.name === "sync_narrative_continuity") {
-    return { name: "sync_narrative_continuity", args: { locationUpdates: [], abilityUpdates: [], identityMerges: [], relationshipUpdates: [], factIntroductions: [], factUpdates: [] } } as unknown as T;
+  if (next?.name === "observe_act_closure" && payload.tools[0]?.function.name === "sync_narrative_continuity") {
+    scripts.shift();
+    return { name: "sync_narrative_continuity", args: { locationUpdates: [], abilityUpdates: [], retirements: [], identityMerges: [], relationshipUpdates: [], factIntroductions: [], factUpdates: [] } } as unknown as T;
   }
   const required = (payload.tools[0]?.function.parameters as { required?: string[] } | undefined)?.required;
-  if (next?.name === "plan_scene_turn" && next.args.actWorldCard && required?.length === 1 && required[0] === "actWorldCard") {
-    return { ...next, args: { actWorldCard: next.args.actWorldCard } };
+  if (next?.name === "recall_scene_assets" && next.args.actWorldCard && payload.tools[0]?.function.name === "plan_act_world_card") {
+    return { ...next, name: "plan_act_world_card", args: next.args.actWorldCard as Record<string, unknown> };
   }
   const step = scripts.shift();
-  if (step?.name === "plan_scene_turn") {
+  if (step?.name === "recall_scene_assets") {
     const { actWorldCard: _outline, ...materials } = step.args;
     return { ...step, args: planningReplyForTest(materials) };
   }
-  if (step?.name === "observe_story_beat") return { ...step, args: { ...step.args, ...observationReplyForTest(String(step.args.beatDecision)) } };
+  if (step?.name === "observe_act_closure") return { ...step, args: { ...step.args, ...observationReplyForTest(String(step.args.beatDecision)) } };
+  if (step && ["render_scene_prose", "render_decision_outcome"].includes(step.name)) { step.args.nextClock ??= "advance"; return step; }
   return step;
 }
 
@@ -150,7 +155,6 @@ const world: WorldConfig = {
   id: "test-world",
   name: "测试世界",
   intro: "用于验证人生事件。",
-  stylePrompt: "简洁、因果明确。",
   milestoneAges: [18],
   endAgeRange: { min: 90, max: 90 },
   yearlyEventHints: ["转机"],
@@ -228,7 +232,6 @@ const narrativeWorld: NarrativeWorldDefinition = {
   version: 2,
   worldId: world.id,
   storyBible: "测试主线",
-  styleRules: [],
   mainlineSkeleton: {
     premise: "一份旧档将几方人卷入同一场清查。",
     opening: "先获得一页证据。",
@@ -413,7 +416,7 @@ test("本领规划目录提供能力与条件，获得来历不随目录传入",
     ]
   }, { age: 12 }).assets;
   const directory = narrativeAbilityDirectory(assets);
-  assert.match(directory[0].label, /听风诀（熟练）.*凭声音判断远处方位.*分辨远处声息/);
+  assert.equal(directory[0].label, "听风诀（熟练）");
   assert.ok(directory.every((entry) => !entry.label.includes("旅途中习得")));
 });
 
@@ -431,18 +434,18 @@ test("旧资产在周期同步中补充用途，状态目录先于正文且与�
     const abilityDirectory = body.split("\n").find((line) => line.startsWith("本领资产："))!;
     assert.equal(JSON.parse(locationDirectory.slice("地点资产：".length))[0].id, "location:legacy");
     assert.equal(JSON.parse(abilityDirectory.slice("本领资产：".length))[0].id, "ability:legacy");
-    for (const prior of ["目录是当前状态的对照", "主角身份：", "地点资产：", "本领资产：", "可更新事件：", "正文来源与年龄："]) {
+    for (const prior of ["主角身份：", "地点资产：", "本领资产：", "可更新事件：", "正文来源与年龄："]) {
       assert.ok(body.indexOf(prior) < body.indexOf("最终正文："));
     }
     assert.equal(body.split("12岁：你在吊桥旁凭听风辨位发现来客，暴雨后听辨失效。").length - 1, 1);
     return { choices: [{ finish_reason: "tool_calls", message: { content: null, tool_calls: [{ id: "sync", type: "function", function: {
-      name: "sync_narrative_continuity", arguments: JSON.stringify({ factIntroductions: [], factUpdates: [], identityMerges: [], relationshipUpdates: [],
+      name: "sync_narrative_continuity", arguments: JSON.stringify({ factIntroductions: [], factUpdates: [], retirements: [], identityMerges: [], relationshipUpdates: [],
         locationUpdates: [{ ref: "location:legacy", description: "河口驻军营地。", spatialDescription: "邻河营地，唯一通路是一座吊桥。" }],
         abilityUpdates: [{ ref: "ability:legacy", description: "凭声音判断方位。", usage: "可定位视野外声响；暴雨时失效。" }] })
     } }] } }] };
   });
   const changes = await synchronizeNarrativeContinuity(run, world, { callId: "batch", source: "scene",
-    subject: "巡行", narrative: "12岁：你在吊桥旁凭听风辨位发现来客，暴雨后听辨失效。", writeSet: narrativeContinuityWritableSet(run, undefined), continuityRequired: true
+    subject: "巡行", narrative: "12岁：你在吊桥旁凭听风辨位发现来客，暴雨后听辨失效。", focusIds: ["location:legacy", "ability:legacy"], writeSet: narrativeContinuityWritableSet(run, undefined), continuityRequired: true
   }, { ...memoryTestContext(run), apiKey: "not-sent" });
   run.narrative.assets = applyNarrativeAssetUpdates(run.narrative.assets, changes.assetUpdates, { age: 12 }).assets;
   const restored = JSON.parse(JSON.stringify(run)) as typeof run;
@@ -482,7 +485,7 @@ test("资产活动只记录到访和使用，不重写稳定档案", () => {
   assert.deepEqual(episode.abilityIds, [ability.id]);
   assert.equal(run.narrative.memoryEntries.some((entry) => entry.id === "memory:activity:14"), false);
   assert.equal(narrativeLocationDirectory(active)[0].id, location.id);
-  assert.match(narrativeLocationDirectory(active)[0].label, /北营校场.*边军操练与点兵的校场.*当前所在/);
+  assert.match(narrativeLocationDirectory(active)[0].label, /北营校场.*当前所在/);
 });
 
 test("连续性同步由持久变化信号触发", () => {
@@ -558,7 +561,7 @@ test("规划引用不再被历史关联评分或人数截取覆盖，连续性�
   const focusIds = [...characterIds, ...abilities.slice(1).map((entry) => entry.id)];
   const plan = buildNarrativePromptPlan(run, definition, null, "rendering", { focusIds })!;
   const context = composeNarrativeContext({ task: "rendering", plan, taskPrompt: "组织守军的行动" });
-  assert.ok(focusIds.every((id) => context.renderedContext.includes(id)), "规划选择超过旧上限时仍完整传入正文请求");
+  assert.ok(focusIds.every((id) => !context.renderedContext.includes(id)), "展示资产不因 focusIds 进入正文");
   const selectedAbility = abilities[4];
   const continuity = buildNarrativePromptPlan(run, definition, null, "continuity", { focusIds: [selectedAbility.id] })!;
   assert.deepEqual(continuity.recall!.assetSources!.map((entry) => entry.id), [selectedAbility.id]);
@@ -621,8 +624,9 @@ test("身世只提供出生时的来处，不预写第一幕或主角往后的�
   const run = makeRun();
   run.storyPackSnapshot = pack;
   const prompt = narrativeOriginPrompt(run);
-  assert.match(prompt, /家庭身份与生计须通向本线第一幕/);
-  assert.ok(prompt.includes(pack.acts[0].objective));
+  assert.match(narrativeTaskContract("origin").systemInstruction, /出生环境与家庭/);
+  assert.equal(prompt.includes(pack.acts[0].objective), false);
+  assert.ok(prompt.includes(pack.entryLens));
   assert.equal(prompt.includes(pack.routePromise), false);
   assert.equal(prompt.includes(pack.originSeeds[0]), false);
   assert.equal(buildNarrativePromptPlan(run, resolveNarrativeExperience(definition, pack), null, "origin")?.mainlineSkeleton, undefined);
@@ -696,75 +700,6 @@ test("路线开场受世界包属性资格控制，不受年龄硬触发", () =>
     .find((item) => item.definition.id === setup.id);
   assert.ok(candidate);
   assert.equal(candidate.kind, "normal");
-});
-
-test("世界幕入口不会覆盖场景内部的压力与高潮门槛", () => {
-  const run = createRun(
-    { world, difficulty, cards: [card], tuning: createDefaultGameplayTuning(), narrativeEnabled: true },
-    {
-      clientId: "paced-scene-client",
-      worldId: world.id,
-      storyPackId: "test.story-pack",
-      difficultyId: difficulty.id,
-      personaPrompt: "愿意承担旧案余波的人",
-      talentPointTotal: 25,
-      stats: { intelligence: 8, charisma: 5, family: 4, fortune: 4, physique: 4 },
-      selectedCardIds: [card.id]
-    }
-  );
-  const definitions: EventDefinition[] = (["setup", "escalation", "pressure", "climax", "payoff"] as const).map((beat) => ({
-    ...event,
-    id: `paced-${beat}`,
-    kind: (beat === "pressure" || beat === "climax" ? "milestone" : "normal") as EventDefinition["kind"],
-    narrativeBeat: beat,
-    narrativeThreadIds: ["test.thread"],
-    opensThreads: beat === "setup" ? ["test.thread"] : undefined,
-    resolvesThreads: beat === "payoff" ? ["test.thread"] : undefined,
-    storyDirectionIds: ["test.guardian"],
-    cooldownYears: 0
-  }));
-  const pacedWorld: NarrativeWorldDefinition = {
-    ...narrativeWorld,
-    mainlineActs: [{ id: "entry", label: "起点", prompt: "让旧档显形。", readinessStage: "opening" }],
-    progression: {
-      ...narrativeWorld.progression!,
-      routes: [{
-        directionId: "test.guardian",
-        gates: {
-          opening: { weights: { intelligence: 1 }, threshold: 8 },
-          pressure: { weights: { intelligence: 1 }, threshold: 12 },
-          climax: { weights: { intelligence: 1 }, threshold: 16 }
-        }
-      }]
-    }
-  };
-  const candidateFor = (beat: EventDefinition["narrativeBeat"]) => buildDirectedEventCandidates(
-    run, world, difficulty, definitions, [item], [], pacedWorld
-  ).find((candidate) => candidate.definition.narrativeBeat === beat);
-
-  const setup = candidateFor("setup");
-  assert.equal(setup?.kind, "normal");
-  advanceWithDirectedEvent(run, world, setup!, "旧档先在日常细节中露出痕迹。", undefined, undefined, pacedWorld, {
-    attributeOutcome: { effects: [{ stat: "charisma", direction: "up", band: "light" }] }
-  });
-  const escalation = candidateFor("escalation");
-  assert.equal(escalation?.kind, "normal");
-  advanceWithDirectedEvent(run, world, escalation!, "你逐渐察觉到证词彼此抵触。", undefined, undefined, pacedWorld, {
-    attributeOutcome: { effects: [{ stat: "charisma", direction: "up", band: "light" }] }
-  });
-
-  // 入口阈值已满足，但压力阈值尚未满足，故仍是普通加压而非抉择。
-  assert.equal(candidateFor("escalation")?.kind, "normal");
-  run.stats.intelligence = 12;
-  const pressure = candidateFor("pressure");
-  assert.equal(pressure?.kind, "milestone");
-  advanceWithDirectedEvent(run, world, pressure!, "证人要求你立刻表态。", undefined, undefined, pacedWorld);
-  run.nextMilestoneChoice = undefined;
-
-  // 高潮门槛不足时，压力场景继续以普通叙事推进。
-  assert.equal(candidateFor("pressure")?.kind, "normal");
-  run.stats.intelligence = 16;
-  assert.equal(candidateFor("climax")?.kind, "milestone");
 });
 
 test("叙事世界没有合法候选时不会生成全路线普通事件", () => {
@@ -1045,7 +980,6 @@ test("基础世界与可独立发现的 IF 路线组合为运行时叙事", asyn
   assert.equal(ancientWorld.version, 10);
   assert.equal(ancientWorld.socialForces?.length, 12);
   assert.ok((ancientWorld.worldCards?.length ?? 0) > 10);
-  assert.doesNotMatch(ancientWorld.storyBible, /清丈|田册|账册|旧案/);
   const localSociety = ancientWorld.worldCards?.find((entry) => entry.id === "ancient.snapshot.local_society");
   const reform = ancientWorld.worldCards?.find((entry) => entry.id === "ancient.snapshot.jingyuan_reform");
   assert.ok(localSociety);
@@ -1135,17 +1069,6 @@ test("三个世界的领域素材按幕引用且保持开放的召回预算", as
   }
 });
 
-test("全局文风示例不绑定某条路线的具体事件", async () => {
-  const routeSpecificObjects = /粮仓|账册|掌柜|石门|阵眼|追兵|邮件|新岗位|复诊|合租/;
-  for (const worldId of ["ancient", "fantasy", "modern"]) {
-    const definition = await loadNarrativeWorldDefinition(worldId);
-    assert.ok(definition);
-    const examples = (definition.worldCards ?? []).filter((card) => card.kind === "style_example");
-    assert.equal(examples.length, 3);
-    assert.ok(examples.every((card) => !routeSpecificObjects.test(card.content)));
-  }
-});
-
 test("古代世界的 opening 属性门槛由世界级门槛控制", async () => {
   const [definitions, ancientWorld] = await Promise.all([
     loadEventDefinitions("ancient"),
@@ -1163,15 +1086,15 @@ test("古代世界的 opening 属性门槛由世界级门槛控制", async () =>
   assert.ok(Array.isArray(candidates));
 });
 
-test("叙事迁移不会再把超过 120 岁的活动场景压回 120 岁", () => {
+test("旧存档只读保留，不推测或改写旧年龄", () => {
   const migrated = ensureNarrativeRunState({
     ...makeRun().narrative,
     version: 2,
     enabled: true,
     activeScene: { id: "legacy-scene", threadId: "test.thread", phase: "pressure", openedAge: 120, lastTouchedAge: 120 }
   }, true, 153);
-  assert.equal(migrated.activeScene?.lastTouchedAge, 153);
-  assert.equal(migrated.activeScene?.openedAge, 153);
+  assert.equal(migrated.activeScene?.lastTouchedAge, 120);
+  assert.equal(migrated.activeScene?.openedAge, 120);
 });
 
 test("普通年份只接受轻度或中度模型属性后果", () => {
@@ -1261,44 +1184,6 @@ test("连续场景停表时不会重复推进年龄", () => {
   assert.equal(run.narrative.sceneClock.sameAgeTurnCount, 1);
 });
 
-test("动态场景同年计数不强制跨年，明确时间投影决定本轮年龄", () => {
-  const run = makeRun();
-  run.narrative.enabled = true;
-  const definition: NarrativeWorldDefinition = {
-    ...narrativeWorld,
-    version: 9,
-    storyPatterns: [],
-    socialForces: [],
-    mainlineActs: [{ id: "act.clock", label: "同年事件", prompt: "让一件事在同年内连续发展" }]
-  };
-  run.age = 30;
-  run.narrative = ensureNarrativeActRuntime(run.narrative, definition, run.age);
-  run.narrative.activeScene = { id: "clock-scene", threadId: "arc:act.clock", phase: "setup", openedAge: 30, lastTouchedAge: 30, mainlineActId: "act.clock", decisionCount: 0 };
-  run.narrative.sceneClock = { mode: "hold", sameAgeTurnCount: 0, maxSameAgeTurns: 3 };
-  const advance = () => advanceWithDynamicNarrativeScene(run, world, definition, {
-    patternIds: [], forceIds: [], beatDecision: "hold", beat: "setup",
-    narrative: "同一件事又向前发展了一步，但还没有到必须跨年的地步。", participants: [],
-    attributeOutcome: { effects: [{ stat: "intelligence", direction: "up", band: "light" }] },
-    attributePolicy: { allowedStats: ["intelligence"], allowedBands: ["light"], allowedDirections: ["up"], minEffects: 1, maxEffects: 1 },
-    sceneClockMode: "hold"
-  });
-  assert.equal(advance().toAge, 30);
-  assert.equal(run.narrative.sceneClock.sameAgeTurnCount, 1);
-  assert.equal(advance().toAge, 30);
-  assert.equal(run.narrative.sceneClock.sameAgeTurnCount, 2);
-  assert.equal(advance().toAge, 30);
-  assert.equal(run.narrative.sceneClock.sameAgeTurnCount, 3);
-  assert.equal(advance().toAge, 30);
-  assert.equal(run.narrative.sceneClock.sameAgeTurnCount, 4);
-  advanceWithDynamicNarrativeScene(run, world, definition, {
-    patternIds: [], forceIds: [], beatDecision: "hold", beat: "setup", sceneAge: 31, sceneClockMode: "advance",
-    narrative: "事情告一段落，次年你开始新的操练。", participants: [],
-    attributeOutcome: { effects: [{ stat: "intelligence", direction: "up", band: "light" }] }
-  });
-  assert.equal(run.age, 31);
-  assert.equal(run.narrative.sceneClock.sameAgeTurnCount, 0);
-});
-
 test("背景段延后结算后才写入模型提出的年度属性变化", () => {
   const run = makeRun();
   const before = run.stats.intelligence;
@@ -1315,45 +1200,6 @@ test("背景段延后结算后才写入模型提出的年度属性变化", () =>
     effects: [{ stat: "intelligence", direction: "up", band: "medium" }]
   }], advanced.chunk.map((event) => event.age)), true);
   assert.equal(run.stats.intelligence, before + 2);
-});
-
-test("三个已完成场景可复用同一经历，但必须覆盖世界定义的阶段", () => {
-  const run = makeRun();
-  run.story.contract.initialDirectionId = "test.guardian";
-  run.story.activeDirectionId = "test.guardian";
-  run.story.committedDirectionIds = ["test.guardian"];
-  run.story.factLedger!.facts = [
-    { id: "decision:three", kind: "commitment", label: "三次抉择留下承诺", status: "open", introducedAge: 10, lastTouchedAge: 10, sourceEventId: "test" },
-    { id: "thread:test.thread", kind: "open_question", label: "旧档", threadId: "test.thread", status: "resolved", introducedAge: 10, lastTouchedAge: 20, resolvedAge: 20, sourceEventId: "test" },
-    { id: "fact.one", kind: "open_question", label: "第一事实", status: "resolved", introducedAge: 10, lastTouchedAge: 20, resolvedAge: 20, sourceEventId: "test" }
-  ];
-  run.narrative.climaxCount = 3;
-  run.narrative.payoffCount = 3;
-  run.narrative.threads = [{ id: "test.thread", status: "resolved", openedAge: 10, lastTouchedAge: 20 }];
-  run.narrative.completedScenes = ["entry", "pressure", "reckoning"].map((mainlineActId, index) => ({
-    id: `scene-${index}`,
-    experienceId: "test.guardian",
-    threadId: "test.thread",
-    mainlineActId,
-    openedAge: 10 + index,
-    resolvedAge: 11 + index,
-    decisionCount: 1
-  }));
-  const worldWithActs: NarrativeWorldDefinition = {
-    ...narrativeWorld,
-    mainlineFacts: [{ id: "fact.one", kind: "open_question", label: "第一事实" }],
-    mainlineActs: [
-      { id: "entry", label: "进入", prompt: "进入处境" },
-      { id: "pressure", label: "压力", prompt: "承担压力" },
-      { id: "reckoning", label: "回应", prompt: "回应结果" }
-    ],
-    progression: {
-      ...narrativeWorld.progression!,
-      completion: { ...narrativeWorld.progression!.completion, minCompletedSceneInstances: 3, requireAllMainlineActs: true }
-    }
-  };
-  const source = { worldId: run.worldId, age: run.age, personaPrompt: run.personaPrompt, stats: run.stats, cards: run.cards, items: run.items, story: run.story, narrative: run.narrative };
-  assert.equal(refreshNarrativeMainlineCompletion(source, worldWithActs), true);
 });
 
 test("叙事结局以主线完成为前提，并稳定区分好、普通、坏三档", () => {
@@ -1450,300 +1296,7 @@ test("属性档位文案由世界包快照，不写死在引擎或已有存档�
   assert.equal(toClientRun(run).statTierLabels?.intelligence, "明察善断");
 });
 
-test("动态世界幕以单一五拍推进，路线可切换且常驻人物进入公开投影", () => {
-  const run = createRun(
-    { world, difficulty, cards: [card], tuning: createDefaultGameplayTuning(), narrativeEnabled: true },
-    {
-      clientId: "dynamic-world-client",
-      worldId: world.id,
-      storyPackId: "test.story-pack",
-      difficultyId: difficulty.id,
-      personaPrompt: "在旧案中寻找出路的人",
-      talentPointTotal: 25,
-      stats: { intelligence: 5, charisma: 5, family: 5, fortune: 5, physique: 5 },
-      selectedCardIds: [card.id]
-    }
-  );
-  const dynamicWorld: NarrativeWorldDefinition = {
-    ...narrativeWorld,
-    version: 9,
-    worldCore: {
-      identity: "一个由人物选择形成具体命运的测试世界。",
-      laws: ["人物已经承担的后果必须继续有效。"],
-      powerStructure: "不同社会位置拥有不同资源。",
-      everydayLife: "人物通过生活、关系与行动积累能力。",
-      tone: "克制而清晰。"
-    },
-    socialForces: [{ id: "force.one", label: "世道人心", summary: "向人物施加现实压力的社会力量。", methods: ["交涉", "施压"] }],
-    narrativePalette: {
-      sceneModes: ["生活积累"],
-      conflictSources: ["关系与责任冲突"],
-      actionVocabulary: ["人物以实际行动改变处境"],
-      scalePossibilities: ["个人与社会之间"]
-    },
-    storyPatterns: [{ id: "pattern.one", label: "承担", summary: "人物面对此前选择带来的责任。" }],
-    mainlineFacts: [{ id: "act.fact", kind: "open_question", label: "一份旧档的矛盾" }],
-    mainlineActs: [{ id: "act.one", label: "旧案显形", prompt: "让旧档进入人物生活", factId: "act.fact" }],
-    narrativeFactions: undefined,
-    routeArcs: undefined
-  };
-  const setup = advanceWithDynamicNarrativeScene(run, world, dynamicWorld, {
-    patternIds: [],
-    forceIds: [],
-    beatDecision: "advance",
-    beat: "setup",
-    narrative: "你从一页被改写的账目里，看见家门旧事与朝局之间的裂缝。",
-    factUpdates: { introduce: [{ kind: "open_question", label: "沈衡为何隐瞒来历" }], touchFactIds: [], resolveFactIds: [] },
-    participants: [{ characterRef: "new", name: "沈衡", factionId: "force.one", role: "递来旧档的书吏", description: "谨慎地试探你的立场", recurring: true, relationship: { stance: "guarded", summary: "愿意交谈，但仍试探你的立场。" } }],
-    attributeOutcome: { effects: [{ stat: "intelligence", direction: "up", band: "light" }] },
-    attributePolicy: { allowedStats: ["intelligence"], allowedBands: ["light"], allowedDirections: ["up"], minEffects: 1, maxEffects: 1 }
-  });
-  assert.equal(setup.updated.narrative.actRuntime?.beat, "escalation");
-  assert.equal(setup.updated.narrative.dynamicCharacters[0]?.name, "沈衡");
-  const shenHengId = setup.updated.narrative.dynamicCharacters[0]!.id;
-  const introducedFact = run.story.factLedger!.facts.find((fact) => fact.id.startsWith("dynamic:"))!;
-  assert.ok(run.narrative.dynamicCharacters[0]!.relatedFactIds.includes(introducedFact.id));
-  assert.equal(run.narrative.dynamicCharacters[0]!.relationship?.stance, "guarded");
-  const escalation = advanceWithDynamicNarrativeScene(run, world, dynamicWorld, {
-    patternIds: [],
-    forceIds: [],
-    beatDecision: "advance",
-    beat: "escalation",
-    narrative: "沈衡带来的口供迫使你把家门的隐忧放到朝局的目光之下。",
-    relationshipUpdates: [{ characterRef: shenHengId, stance: "friendly", summary: "你们因共同处境逐渐信任。" }],
-    participants: [{ characterRef: shenHengId, name: "临时称谓", factionId: "court", role: "被改写的身份", description: "", recurring: false }],
-    attributeOutcome: { effects: [{ stat: "charisma", direction: "up", band: "light" }] },
-    attributePolicy: { allowedStats: ["charisma"], allowedBands: ["light"], allowedDirections: ["up"], minEffects: 1, maxEffects: 1 }
-  });
-  assert.equal(escalation.updated.narrative.actRuntime?.beat, "pressure");
-  assert.deepEqual(escalation.updated.narrative.actRuntime?.selectedRouteIds, []);
-  assert.equal(escalation.updated.narrative.dynamicCharacters.length, 1);
-  assert.equal(escalation.updated.narrative.dynamicCharacters[0]?.name, "沈衡");
-  assert.equal(escalation.updated.narrative.dynamicCharacters[0]?.role, "被改写的身份");
-  assert.equal(escalation.updated.narrative.dynamicCharacters[0]?.description, "谨慎地试探你的立场");
-  assert.equal(toClientRun(run).narrativeCharacters?.[0]?.name, "沈衡");
-  assert.equal(run.narrative.dynamicCharacters[0]?.relationship?.stance, "friendly");
-  advanceWithDynamicNarrativeScene(run, world, dynamicWorld, {
-    patternIds: [], forceIds: [], beatDecision: "hold", beat: "pressure",
-    narrative: "旧档牵连的人被带到堂前，你必须决定先保全谁的性命与名节。",
-    participants: [],
-    sceneClockMode: "hold",
-    createsDecision: true
-  });
-  const pressureDecision = applyMilestoneDecisionAndAdvance(run, world, difficulty, "safe", {
-    narrativeOutcome: { effects: [{ stat: "family", direction: "up", band: "light" }] },
-    narrativeWorld: dynamicWorld,
-    beatDecision: "advance",
-    narrative: "你替沈衡保住家人，他当面说明了隐瞒的原委。",
-    narrativeFactUpdates: { introduce: [], touchFactIds: [], resolveFactIds: [], resolutions: [{ factId: introducedFact.id, summary: "沈衡隐瞒来历是为了保全家人，如今已说明。" }] }
-  });
-  assert.equal(run.narrative.actRuntime?.beat, "climax");
-  assert.equal(run.history.at(-1)?.summary, "你替沈衡保住家人，他当面说明了隐瞒的原委。");
-  assert.equal(run.narrative.memoryEntries.at(-1)?.text, run.history.at(-1)?.summary);
-  assert.ok(!run.story.factLedger!.facts.some((fact) => fact.id.startsWith("decision:") || fact.id.startsWith("cost:")));
-  assert.equal(run.story.factLedger!.facts.find((fact) => fact.id === introducedFact.id)?.status, "resolved");
-  assert.equal(run.story.factLedger!.facts.find((fact) => fact.id === introducedFact.id)?.lastSourceEventId, pressureDecision.sourceEventId);
-  const decisionContext = memoryTestContext(run);
-  decisionContext.conversation = { systemHash: "test", headCore: "规则", headMemory: "", history: [], archive: [] };
-  recordDirectedDecisionOutcome(decisionContext, run, {
-    sourceEventId: pressureDecision.sourceEventId, decision: "safe", label: "保全沈衡家人", narrative: run.history.at(-1)!.summary
-  });
-  assert.doesNotMatch((decisionContext.conversation.history.find((entry) => entry.role === "user") as { content: string }).content, /隐瞒来历|如今已说明/);
-  advanceWithDynamicNarrativeScene(run, world, dynamicWorld, {
-    patternIds: [], forceIds: [], beatDecision: "hold", beat: "climax",
-    narrative: "证词与账册终于合在一处，任何署名都会改变此后谁还能开口。",
-    participants: [],
-    createsDecision: true
-  });
-  applyMilestoneDecisionAndAdvance(run, world, difficulty, "balanced", {
-    narrativeOutcome: { effects: [{ stat: "intelligence", direction: "up", band: "medium" }] },
-    factResolution: "exposed",
-    narrativeWorld: dynamicWorld,
-    beatDecision: "advance",
-  });
-  assert.equal(run.narrative.actRuntime?.beat, "payoff");
-  assert.equal(run.story.factLedger?.facts.find((fact) => fact.id === "act.fact")?.status, "open", "主线事实在幕收束时结束");
-});
-
-function verifyThreeActClimaxCompletion(climaxMode: "choice" | "scene" | "mixed"): void {
-  const run = createRun(
-    { world, difficulty, cards: [card], tuning: createDefaultGameplayTuning(), narrativeEnabled: true },
-    {
-      clientId: "three-act-dynamic-world-client",
-      worldId: world.id,
-      storyPackId: "test.story-pack",
-      difficultyId: difficulty.id,
-      personaPrompt: "愿意承担旧案后果的人",
-      talentPointTotal: 25,
-      stats: { intelligence: 5, charisma: 5, family: 5, fortune: 5, physique: 5 },
-      selectedCardIds: [card.id]
-    }
-  );
-  const dynamicWorld: NarrativeWorldDefinition = {
-    ...narrativeWorld,
-    version: 9,
-    worldCore: {
-      identity: "一个由人物选择形成具体命运的测试世界。",
-      laws: ["已经发生的选择会留下后果。"],
-      powerStructure: "社会力量通过关系与资源发生作用。",
-      everydayLife: "生活积累让人物逐渐取得行动能力。",
-      tone: "清晰而连贯。"
-    },
-    socialForces: [{ id: "force.one", label: "世道人心", summary: "推动人物处境变化的社会力量。", methods: ["交涉", "施压"] }],
-    narrativePalette: {
-      sceneModes: ["生活", "冲突"],
-      conflictSources: ["责任与选择"],
-      actionVocabulary: ["承担", "改变"],
-      scalePossibilities: ["个人", "社会"]
-    },
-    storyPatterns: [{ id: "pattern.one", label: "承担", summary: "人物面对此前选择带来的责任。" }],
-    mainlineActs: [
-      { id: "act.one", label: "旧事入局", prompt: "让人物从自身处境接触被遮蔽的旧事。" },
-      { id: "act.two", label: "立身周旋", prompt: "承接前幕后果，让人物进入新的阵营位置。" },
-      { id: "act.three", label: "大局担当", prompt: "让积累的身份面对更大范围的危机。" }
-    ],
-    endingBlueprints: (["good", "normal", "bad"] as const).map((polarity) => ({
-      id: `world.${polarity}`,
-      worldId: world.id,
-      polarity,
-      title: `${polarity}结局`,
-      premise: "旧案的后果终于落定。",
-      finalConflict: "人物必须承担最后的责任。",
-      payoffFocus: "回应三幕留下的事实。",
-      epilogueFocus: "交代人物与秩序的去处。",
-      statWeights: { intelligence: 1 },
-      requiredThreadIds: []
-    }))
-  };
-  const growthPolicy: NarrativeAttributePolicy = {
-    allowedStats: ["intelligence"],
-    allowedBands: ["light"],
-    allowedDirections: ["up"],
-    minEffects: 1,
-    maxEffects: 1
-  };
-  const scene = (
-    routeId: "route.one" | "route.two",
-    beat: "setup" | "escalation" | "pressure" | "climax" | "payoff",
-    decision?: "hold" | "advance"
-  ) => {
-    const createsDecision = beat === "pressure" || (beat === "climax" &&
-      (climaxMode === "choice" || (climaxMode === "mixed" && run.narrative.actRuntime?.actId !== "act.three")));
-    return advanceWithDynamicNarrativeScene(run, world, dynamicWorld, {
-      patternIds: [],
-      forceIds: [],
-      beatDecision: decision ?? (createsDecision ? "hold" : "advance"),
-      beat,
-      narrative: `这是${beat}阶段，旧案的后果迫使你作出新的承担。`,
-      participants: [],
-      ...(createsDecision ? { createsDecision: true } : {}),
-      ...(!createsDecision
-        ? {
-            attributeOutcome: { effects: [{ stat: "intelligence" as const, direction: "up" as const, band: "light" as const }] },
-            attributePolicy: growthPolicy
-          }
-        : {}),
-      ...(beat === "setup" ? {
-        factUpdates: {
-          introduce: [
-            { kind: "open_question" as const, label: "本幕尚待回答的问题" },
-            { kind: "commitment" as const, label: "会延续到以后的人物承诺" },
-            { kind: "commitment" as const, label: "另一件独立的延续承诺" }
-          ],
-          touchFactIds: [], resolveFactIds: []
-        }
-      } : {}),
-    });
-  };
-  const playAct = (setupRoute: "route.one" | "route.two", climaxRoute: "route.one" | "route.two") => {
-    scene(setupRoute, "setup");
-    scene(climaxRoute, "escalation");
-    scene(setupRoute, "pressure");
-    applyMilestoneDecisionAndAdvance(run, world, difficulty, "safe", {
-      narrativeOutcome: { effects: [{ stat: "family", direction: "up", band: "light" }] },
-      narrativeWorld: dynamicWorld,
-      beatDecision: "advance"
-    });
-    scene(climaxRoute, "climax");
-    if (climaxMode === "choice" || (climaxMode === "mixed" && run.narrative.actRuntime?.actId !== "act.three")) {
-      assert.ok(run.nextMilestoneChoice);
-      applyMilestoneDecisionAndAdvance(run, world, difficulty, "balanced", {
-        narrativeOutcome: { effects: [{ stat: "intelligence", direction: "up", band: "medium" }] },
-        factResolution: "exposed",
-        narrativeWorld: dynamicWorld,
-        beatDecision: "advance"
-      });
-    } else {
-      assert.equal(run.nextMilestoneChoice, undefined);
-    }
-    assert.equal(run.narrative.climaxCount, run.narrative.completedScenes.length + 1);
-    const completingActId = run.narrative.actRuntime!.actId;
-    const heldPayoff = scene(setupRoute, "payoff", "hold");
-    assert.equal(heldPayoff.completedActId, undefined);
-    assert.equal(run.narrative.actRuntime?.actId, completingActId);
-    assert.equal(run.narrative.actRuntime?.beat, "payoff");
-    const completedPayoff = scene(setupRoute, "payoff", "advance");
-    assert.equal(completedPayoff.completedActId, completingActId);
-  };
-
-  playAct("route.one", "route.two");
-  assert.equal(run.narrative.actRuntime?.actId, "act.two");
-  assert.equal(run.narrative.actRuntime?.beat, "setup");
-  assert.equal(run.story.factLedger?.facts.find((fact) => fact.label === "本幕尚待回答的问题")?.status, "open", "幕收束不自动伪造支线完成；旧幕事实退出当前幕召回");
-  assert.equal(run.story.factLedger?.facts.find((fact) => fact.label === "会延续到以后的人物承诺")?.status, "open");
-  assert.ok(run.story.factLedger?.facts.some((fact) =>
-    fact.actId === "act.one" && fact.label === "会延续到以后的人物承诺" && fact.status === "open"
-  ));
-  assert.equal(run.story.factLedger?.facts.find((fact) => fact.label === "另一件独立的延续承诺")?.status, "open", "持续事件跨幕不伪造完成和副本");
-  assert.ok(run.story.factLedger?.facts.some((fact) => fact.actId === "act.one" && fact.label === "另一件独立的延续承诺" && fact.status === "open"));
-  const carriedFactId = run.story.factLedger?.facts.find((fact) => fact.actId === "act.one" && fact.label === "会延续到以后的人物承诺")?.id;
-  assert.ok(carriedFactId);
-  commitNarrativeActCanon(run, { actId: "act.one", sourceEventId: "event.payoff.act.one", resolvedAge: run.age });
-  const planningHandoff = buildNarrativePromptPlan(run, dynamicWorld, null, "planning")!;
-  assert.ok(planningHandoff.recall?.facts.some((fact) => fact.id === carriedFactId));
-  const handoffPlan = buildNarrativePromptPlan(run, dynamicWorld, null, "dynamic", { focusIds: [carriedFactId] })!;
-  assert.equal(Object.hasOwn(handoffPlan, "actHandoff"), false);
-  assert.equal(Object.hasOwn(handoffPlan, "actCanon"), false);
-  assert.ok(handoffPlan.recall?.facts.some((fact) => fact.id === carriedFactId));
-  assert.ok(!handoffPlan.factDirectory?.some((fact) => fact.id.startsWith("act:act.one:")));
-  const horizonPlan = buildNarrativePromptPlan(run, dynamicWorld, null, "horizon")!;
-  const saved = JSON.parse(JSON.stringify(run)) as typeof run;
-  const savedPlan = buildNarrativePromptPlan(saved, dynamicWorld, null, "dynamic", { focusIds: [carriedFactId] })!;
-  assert.equal(Object.hasOwn(savedPlan, "actHandoff"), false);
-  assert.equal(Object.hasOwn(savedPlan, "actCanon"), false);
-  assert.ok(savedPlan.recall?.facts.some((fact) => fact.id === carriedFactId));
-  playAct("route.two", "route.one");
-  assert.equal(run.narrative.actRuntime?.actId, "act.three");
-  assert.equal(run.narrative.actRuntime?.beat, "setup");
-  playAct("route.one", "route.two");
-
-  assert.equal(run.narrative.completedScenes.length, 3);
-  assert.deepEqual(run.narrative.completedScenes.map((item) => item.mainlineActId), ["act.one", "act.two", "act.three"]);
-  assert.equal(run.narrative.climaxCount, 3);
-  assert.equal(run.narrative.payoffCount, 3);
-  assert.ok(run.narrative.actCanon.some((result) => result.actId === "act.one" && result.sourceEventId));
-  assert.ok(run.narrative.actCanon.some((result) => result.actId === "act.two" && result.sourceEventId));
-  assert.equal(run.story.factLedger?.facts.some((fact) => fact.id === "act:act.two:continuation"), false, "幕结果不重复制造成账本事实");
-  assert.equal(run.story.mainlineCompleted, true);
-  assert.equal(run.narrative.endingState, "eligible");
-  assert.equal(canRequestDirectedClosure(run, dynamicWorld), true);
-  assert.throws(() => scene("route.one", "payoff"), /dynamic_scene_after_mainline_complete/);
-
-  const restored = JSON.parse(JSON.stringify(run)) as typeof run;
-  restored.narrative.climaxCount = 2;
-  restored.story.mainlineCompleted = false;
-  restored.story.closureEligible = false;
-  restored.narrative.endingState = "open";
-  assert.equal(canRequestDirectedClosure(restored, dynamicWorld), true);
-  assert.equal(restored.narrative.climaxCount, 3);
-  assert.equal(restored.story.mainlineCompleted, true);
-}
-
-for (const climaxMode of ["choice", "scene", "mixed"] as const) {
-  test(`动态三幕只各自结算一次，并在最终 payoff 后进入结局申请（${climaxMode} 高潮）`, () => {
-    verifyThreeActClimaxCompletion(climaxMode);
-  });
-}
+// Whole-act scene/choice completion, idempotency and ending eligibility are covered by p1-flow.test.ts.
 
 test("世界幕引用不存在的事实会在内容加载前被拒绝", () => {
   const invalid: NarrativeWorldDefinition = {
@@ -1875,7 +1428,7 @@ test("已离场人物的稳定身份在实际渲染目录与连续性目录中�
     task: "rendering", contracts: { references: true }
   });
   assert.ok(rendering.allowedContinuityRefs.characterIds.includes("character:escort"));
-  assert.match(rendering.history.map((entry) => entry.content).join("\n"), /character:escort=郑押队/);
+  assert.doesNotMatch(rendering.history.map((entry) => entry.content).join("\n"), /character:escort=郑押队/);
   const tool = { type: "function", function: { name: "sync_narrative_continuity", parameters: { type: "object", properties: {} } } };
   const prepared = prepareNarrativeOutcomeRequest(run, world, ctx, tool, "只整理本轮变更", {
     task: "continuity", writeSet: { factIds: [], characterIds: [], locationIds: [], abilityIds: [] },
@@ -1901,7 +1454,7 @@ test("人物提及不代替在场判断，状态变化由同步显式提交", ()
   assert.equal(run.narrative.dynamicCharacters[0].status, "gone");
   const participants = parseDynamicNarrativeParticipants([{ characterRef: "character:return" }], [], narrativeCharacterDirectory(run.narrative))!;
   const advance = (relationshipUpdates?: Parameters<typeof applyNarrativeRelationshipUpdates>[1]) => advanceWithDynamicNarrativeScene(run, world, definition, {
-    patternIds: [], forceIds: [], beat: "setup", beatDecision: "hold", narrative: "旧日同行者又来到你身边。", participants,
+    patternIds: [], forceIds: [],   narrative: "旧日同行者又来到你身边。", participants,
     attributeOutcome: { effects: [{ stat: "intelligence", direction: "up", band: "light" }] }, relationshipUpdates
   });
   advance();
@@ -1924,7 +1477,7 @@ test("语义归并贯通资产、待选引用、回合索引和召回，保留�
   const [target, source] = run.narrative.assets.abilities;
   commitNarrativeMemory(run.narrative, { id: "memory:identity", age: 9, text: "你已能辨识远近马队。", characterIds: [], factionIds: [], factIds: [], abilityIds: [target.id, source.id] });
   const episode = commitNarrativeEpisode(run, { callId: "identity", sourceEventId: "identity", turnKind: "scene", age: 9, abilityIds: [source.id] });
-  run.pendingDynamicScene = { id: "scene:identity", patternIds: [], forceIds: [], beat: "pressure", mainlineActId: "act.one", abilityIds: [source.id] };
+  run.pendingDynamicScene = { id: "scene:identity", patternIds: [], forceIds: [],  mainlineActId: "act.one", abilityIds: [source.id] };
   const oldTurn = appendPublicTurnRecord(run, { entryId: "identity", age: 9, kind: "scene", ageStage: { label: "幼年" }, narrative: "你已能辨识远近马队。", statChanges: {} });
   const independent = structuredClone(run);
   const merge = { kind: "ability" as const, sourceRef: source.id, targetRef: target.id };
@@ -2079,7 +1632,7 @@ test("三幕属性门槛随责任提高，普通年积累恢复准入，年龄�
       assert.equal(isNarrativeStageReady(run, definition, "climax"), true);
       if (index < definition.mainlineActs!.length - 1) {
         run.narrative.actRuntime!.beat = "payoff";
-        run.narrative = advanceNarrativeActBeat(run.narrative, definition, run.age).state;
+        run.narrative = advanceNarrativeAct(run.narrative, definition, run.age).state;
         assert.equal(isNarrativeMainlineActEntryReady(run, definition), false, "上一幕的成熟基础尚不足以承担下一幕责任");
       }
     }
@@ -2095,15 +1648,15 @@ test("场景使用已有能力不自动涨属性，实际成长及风险收益�
   const policy = dynamicSceneAttributePolicy();
   const scene = (effects: Parameters<typeof approveNarrativeAttributeOutcome>[2]["effects"], createsDecision = false) =>
     advanceWithDynamicNarrativeScene(run, world, definition, {
-      patternIds: [], forceIds: [], beat: "setup", beatDecision: "hold", sceneAge: run.age,
-      sceneClockMode: "hold", narrative: "你凭已有骑术完成传令，之后继续练习。", participants: [],
+      patternIds: [], forceIds: [],   sceneAge: run.age,
+       narrative: "你凭已有骑术完成传令，之后继续练习。", participants: [],
       createsDecision, attributeOutcome: { effects }, attributePolicy: policy
     });
   assert.equal(scene([]).chunk.length, 1);
   assert.deepEqual(run.stats, before);
   scene([{ stat: "intelligence", direction: "up", band: "medium" }]);
   assert.equal(run.stats.intelligence, before.intelligence + 1);
-  assert.equal(run.narrative.actRuntime?.beat, "setup", "能力成长不自动完成故事阶段");
+  assert.equal(run.narrative.actRuntime?.beat, undefined, "能力成长不自动完成整幕");
   scene([], true);
   const risky = run.pendingDirectedDecisionPolicy!.risky;
   const changes = approveNarrativeAttributeOutcome(run, world, { effects: [
@@ -2122,13 +1675,15 @@ test("同年不会增加生存累计，同年恢复立即清除，随后降低�
   run.narrative.activeScene = { id: "risk:held", threadId: "arc:act.risk", phase: "setup", openedAge: 12, lastTouchedAge: 12, mainlineActId: "act.risk", decisionCount: 0 };
   run.narrative.sceneClock = { mode: "hold", sameAgeTurnCount: 0, maxSameAgeTurns: 3 };
   const scene = (stat: "intelligence" | "physique", band: "light" | "medium", createsDecision = false) => advanceWithDynamicNarrativeScene(run, world, definition, {
-    patternIds: [], forceIds: [], beat: "setup", beatDecision: "hold", sceneClockMode: "hold", narrative: "这一天的事情仍在继续。", participants: [], attributeOutcome: { effects: [{ stat, direction: "up", band }] }, createsDecision
+    patternIds: [], forceIds: [],    narrative: "这一天的事情仍在继续。", participants: [], attributeOutcome: { effects: [{ stat, direction: "up", band }] }, createsDecision
   });
   scene("intelligence", "light");
   assert.equal(run.age, 12); assert.equal(run.survival.lowPhysiqueYears, 2); assert.equal(run.survivalCrisis, undefined);
   scene("physique", "medium");
   assert.equal(run.stats.physique, 5); assert.equal(run.survival.lowPhysiqueYears, 0);
   scene("intelligence", "light", true);
+  run.nextMilestoneChoice!.check = prepareChoiceCheck(run, { ...definition, progression: { ...definition.progression!, choiceDifficulties: [16, 25, 34] } }); rollChoice(run, "risky");
+  run.choiceExecution!.outcome = { narrative: "同年恢复后的事故", effects: [], assetActivity: { locationIds: [], abilityIds: [] }, nextClock: "advance" };
   applyMilestoneDecisionAndAdvance(run, world, difficulty, "risky", { narrativeOutcome: { effects: [{ stat: "physique", direction: "down", band: "light" }] }, narrativeWorld: definition });
   assert.equal(run.stats.physique, 4); assert.equal(run.survival.lowPhysiqueYears, 0); assert.equal(run.age, 12);
   settleQuietYearForTest(run, definition);
@@ -2270,7 +1825,7 @@ function memoryTestContext(run: ReturnType<typeof makeRun>, focusIds: string[] =
     providerConfig: { provider: "openai-compatible", baseUrl: "https://example.invalid", model: "unused", apiPath: "/chat/completions", temperature: 0.7, maxTokens: 2000, timeoutMs: 1000 },
     narrativePlan: buildNarrativePromptPlan(run, {
       ...narrativeWorld, mainlineActs: [{ id: "act.one", label: "第一幕", prompt: "生活的变化" }],
-      endingGuide: "以平静的生活细节表现余韵"
+
     }, null, "background", { focusIds }),
     conversation: run.aiConversation?.year
   };
@@ -2298,11 +1853,16 @@ test("实际请求只提供一份人物材料，固定经历先于最新年龄�
       narrativeDecisionOutcomeTool(dynamicSceneAttributePolicy()), "依据当前人物继续经历", { task });
     const text = request.history.map((entry) => entry.content).join("\n");
     assert.equal(text.split(summary).length - 1, 1, `${task}只提供一份经历摘要`);
-    assert.equal(text.split("你目前16岁").length - 1, 1, `${task}只提供一次当前状态`);
+    assert.equal(text.split("你目前16岁").length - 1, task === "ending" ? 0 : 1,
+      `${task}按职责供应当前行动状态；结局只使用人设、实际历史和确认结果`);
     assert.ok(text.indexOf(run.personaPrompt) < text.indexOf(summary));
-    assert.ok(text.indexOf(summary) < text.indexOf("你目前16岁"));
-    assert.ok(text.includes("你目前16岁，处在人生的青年阶段"));
-    assert.ok(text.includes("体魄：身健耐劳"));
+    if (task === "ending") {
+      assert.ok(!text.includes("体魄：身健耐劳"));
+    } else {
+      assert.ok(text.indexOf(summary) < text.indexOf("你目前16岁"));
+      assert.ok(text.includes("你目前16岁，处在人生的青年阶段"));
+      assert.ok(text.includes("体魄：身健耐劳"));
+    }
     assert.ok(!text.includes("出生于北境军户。"), "被摘要覆盖的身世不重复拼入");
     assert.equal(text.split(run.personaPrompt).length - 1, 1, "人设与当前角色档案只提供一次");
   }
@@ -2340,11 +1900,11 @@ test("年龄属性和所在地变化不再挡住既有经历，幕内规划使�
   for (const task of ["background", "rendering", "dynamic", "decision"] as const) {
     const request = prepare(task);
     const text = request.history.map((entry) => entry.content).join("\n");
-    const firstChangedContext = beforeText.indexOf("【本轮召回】");
+    const firstChangedContext = beforeText.indexOf("【当前人物与相关材料】");
     assert.equal(text.slice(0, firstChangedContext), beforeText.slice(0, firstChangedContext), `${task}保留原文以前的消息前缀`);
     assert.ok(text.indexOf(summary) < text.indexOf(prose));
-    assert.ok(text.indexOf(prose) < text.indexOf("你目前21岁"));
-    assert.ok(text.includes("你目前在关城。"));
+    assert.ok(text.includes(prose));
+    assert.ok(!text.includes("你目前在关城。"), "维护的所在地不回流为主角材料");
     assert.notEqual(text.split("\n").find((line) => line.startsWith("你的能力基础：")),
       beforeText.split("\n").find((line) => line.startsWith("你的能力基础：")), "新属性档位仍按现有规则传达");
     assert.equal(text.split(prose).length - 1, 1);
@@ -2354,45 +1914,29 @@ test("年龄属性和所在地变化不再挡住既有经历，幕内规划使�
     backgroundAgeRange: { fromAge: 22, toAge: 22 }, act: { id: "act.one", label: "河岸", prompt: "守住河岸" }, beat: "setup",
     actOutline: outlineForTest("act.one"), capabilities: ["scene", "choice"], storyPatterns: [], socialForces: [],
     focusReferences: [{ id: "location:fort", kind: "location", label: "关城" }], currentLocationId: "location:fort",
-    statTiers: resolveNarrativeStatTiers(run.stats), recentChanges: [prose], progressGap: "援军尚未到达",
+    statTiers: resolveNarrativeStatTiers(run.stats), recentChanges: [prose],
     clock: { mode: "advance", sameAgeTurnCount: 0, maxSameAgeTurns: 3 }
   };
   const ctx = memoryTestContext(run);
+  ctx.narrativePlan!.actBackground = "本幕背景：\n" + envelope.actOutline!.situation;
   const prompt = narrativeTurnPlanningPrompt(envelope, ctx.narrativePlan);
   const prepared = prepareNarrativeOutcomeRequest(run, world, ctx, narrativeTurnPlanTools(envelope), prompt, { task: "planning", planningPurpose: "execute" });
   const text = prepared.history.map((entry) => entry.content).join("\n");
-  for (const value of [summary, prose, run.personaPrompt, "你目前21岁", envelope.actOutline!.background]) assert.equal(text.split(value).length - 1, 1);
-  assert.ok(text.indexOf(summary) < text.indexOf("本幕简要故事："));
-  assert.ok(text.indexOf("locationDirective / assetNeeds 地点目录：") < text.indexOf("近期实际经历："));
+  for (const value of [summary, prose, run.personaPrompt, "你目前21岁", envelope.actOutline!.situation]) assert.equal(text.split(value).length - 1, 1, value);
+  assert.ok(text.includes(envelope.actOutline!.situation));
+  assert.ok(text.includes("查询目录："));
   assert.ok(text.indexOf(prose) < text.indexOf("你目前21岁"));
-  assert.ok(text.indexOf("你目前21岁") < text.indexOf("援军尚未到达"));
+  assert.ok(text.includes("你目前21岁"));
   const nextRun = structuredClone(run); nextRun.age++;
   const nextPrompt = narrativeTurnPlanningPrompt({ ...envelope, currentAge: nextRun.age }, memoryTestContext(nextRun).narrativePlan);
   assert.equal(prompt.slice(0, prompt.indexOf("你目前21岁")), nextPrompt.slice(0, nextPrompt.indexOf("你目前22岁")));
 });
 
-test("导演两次调用沿用同一有序输入，不重新吸收会话或把消息压回一段文本", async (t) => {
-  const run = makeRun();
-  const ctx = { ...memoryTestContext(run), apiKey: "not-sent" };
-  const sent: Array<Array<{ role: string; content: string | null }>> = [];
-  const prose = "你随同袍沿河岸巡行，确认烧毁的桥仍不能通行。";
-  t.mock.method(OpenAI.Chat.Completions.prototype, "create", async (payload: { messages: Array<{ role: string; content: string | null }>; tools: Array<{ function: { name: string } }> }) => {
-    sent.push(structuredClone(payload.messages));
-    const name = sent.length === 1 ? "propose_story_intent" : "render_story_turn";
-    assert.ok(payload.tools.some((tool) => tool.function.name === name));
-    const args = sent.length === 1 ? { intent: "continue", routeId: "route.main" } : { narrative: prose };
-    return { choices: [{ finish_reason: "tool_calls", message: { content: null, tool_calls: [{ id: name, type: "function", function: { name, arguments: JSON.stringify(args) } }] } }] };
-  });
-  const turn = await generateDirectedStoryTurn(run, world, { allowedIntents: ["continue"], allowClosureRequest: false,
-    routeOptions: [{ id: "route.main", label: "守住河岸", summary: "保护河岸居民" }] }, ctx);
-  assert.deepEqual(sent[0].slice(1), turn.continuation.messages);
-  ctx.conversation!.history.push({ role: "user", content: "不应混入本次续接的会话" }, { role: "assistant", content: "另一段经历" });
-  const rendered = await generateDirectedStoryRender(run, world, { turn, kind: "normal", intent: "continue", eventId: "river",
-    eventTitle: "河岸巡行", premise: "桥已烧毁", outcomeHint: "确认渡河条件" }, ctx);
-  assert.equal(rendered.narrative, prose);
-  assert.deepEqual(sent[1].slice(0, sent[0].length), sent[0]);
-  assert.ok(!JSON.stringify(sent[1]).includes("不应混入本次续接的会话"));
+test("旧关注和预定事件渲染入口已经退出模型模块", async () => {
+  const ai = await import("./ai.js");
+  for (const key of ["generateDirectedStoryRender", "generateDirectedFocusSelection", "generateDirectedNarrative"]) assert.equal(Object.hasOwn(ai, key), false);
 });
+
 
 test("实际请求只开放本轮召回事实，工具目录不随存档事实总量增长", () => {
   const run = makeRun();
@@ -2409,9 +1953,9 @@ test("实际请求只开放本轮召回事实，工具目录不随存档事实�
   for (const id of ids) assert.equal(prepared.history.map((entry) => entry.content).join("\n").includes(id), false);
   const focusedCtx = memoryTestContext(run, [ids[5]]);
   const focused = prepareNarrativeOutcomeRequest(run, world, focusedCtx, task.tool, task.prompt, { task: "background" });
-  assert.deepEqual(focused.factContract.mutableIds, [ids[5]]);
-  assert.ok(focused.history.map((entry) => entry.content).join("\n").includes(ids[5]));
-  assert.doesNotThrow(() => parseFactUpdates({ resolutions: [{ factId: ids[5], summary: "事情已经解决" }] }, focused.factContract));
+  assert.deepEqual(focused.factContract.mutableIds, []);
+  assert.ok(!focused.history.map((entry) => entry.content).join("\n").includes(ids[5]));
+  assert.throws(() => parseFactUpdates({ resolutions: [{ factId: ids[5], summary: "事情已经解决" }] }, focused.factContract));
   const schema = prepared.tools[0]!.function as typeof task.tool.function;
   assert.equal("effects" in schema.parameters.properties, false);
 });
@@ -2422,7 +1966,7 @@ test("payoff背景与场景的最终工具描述、必填字段各自对应", ()
   const policy: NarrativeAttributePolicy = { allowedStats: ["intelligence"], allowedBands: ["light"], allowedDirections: ["up"], minEffects: 1, maxEffects: 1 };
   const tools = dynamicNarrativeSceneTools({
     act: { id: "act.one", label: "第一幕", prompt: "生活变化" },
-    beat: "payoff", presentation: "scene", allowedTurnKinds: ["scene"],
+     presentation: "scene", allowedTurnKinds: ["scene"],
     sceneAge: 12, backgroundAgeRange: { fromAge: 12, toAge: 14 },
     storyPatterns: [{ id: "pattern.a", label: "经历", summary: "经历形态" }],
     socialForces: [{ id: "force.a", label: "同伴", summary: "熟悉的人" }],
@@ -2456,7 +2000,7 @@ test("任务投影保留原人设与四张最终天赋，并隔离不相关身�
   otherRun.personaPrompt = "愿意留在故乡行医的人";
   const otherPrepared = prepareNarrativeOutcomeRequest(otherRun, world, memoryTestContext(otherRun), task.tool, task.prompt);
   assert.equal(prepared.conversation.systemHash, otherPrepared.conversation.systemHash, "角色数据不改变静态任务前缀");
-  assert.match(formatNarrativePromptPlan(ctx.narrativePlan, "ending"), /平静的生活细节/);
+  assert.doesNotMatch(formatNarrativePromptPlan(ctx.narrativePlan, "ending"), /平静的生活细节/);
   assert.doesNotMatch(formatTaskNarrativeContext(ctx.narrativePlan), /结局文风/);
 });
 
@@ -2498,13 +2042,13 @@ test("实际世界成长侧重不会缩窄工具属性目录，搭配效果与�
     const other = "physique" as const;
     const effects = [{ stat: first, direction: "up" as const, band: "medium" as const }, { stat: other, direction: "up" as const, band: "light" as const }];
     const tools = dynamicNarrativeSceneTools({
-      act: definition.mainlineActs![0], beat: "setup", presentation: "summary", allowedTurnKinds: ["background"],
+      act: definition.mainlineActs![0],  presentation: "summary", allowedTurnKinds: ["background"],
       sceneAge: 1, backgroundAgeRange: { fromAge: 1, toAge: 3 },
       storyPatterns: [], socialForces: [], knownCharacters: [], backgroundAttributePolicy: policy,
       statTiers: { intelligence: "low", charisma: "low", family: "low", fortune: "low", physique: "low" }
     });
     const taskPrompt = dynamicNarrativeScenePrompt({
-      act: definition.mainlineActs![0], beat: "setup", presentation: "summary", allowedTurnKinds: ["background"],
+      act: definition.mainlineActs![0],  presentation: "summary", allowedTurnKinds: ["background"],
       sceneAge: 1, backgroundAgeRange: { fromAge: 1, toAge: 3 }, storyPatterns: [], socialForces: [], knownCharacters: [],
       backgroundAttributePolicy: policy, statTiers: { intelligence: "low", charisma: "low", family: "low", fortune: "low", physique: "low" }
     }, tools);
@@ -2540,7 +2084,7 @@ test("属性畸形、重复和方向限制给出具体原因，场景限制也�
   const schema = narrativeEffectsSchema(policy) as { items: { properties: { stat: { enum: string[] } } } };
   assert.deepEqual(schema.items.properties.stat.enum, ["intelligence", "charisma", "family", "fortune", "physique"]);
   const prompt = dynamicNarrativeScenePrompt({
-    act: { id: "act.one", label: "第一幕", prompt: "生活变化" }, beat: "setup", presentation: "scene", allowedTurnKinds: ["scene"],
+    act: { id: "act.one", label: "第一幕", prompt: "生活变化" },  presentation: "scene", allowedTurnKinds: ["scene"],
     sceneAge: 12, backgroundAgeRange: { fromAge: 12, toAge: 13 }, storyPatterns: [], socialForces: [], knownCharacters: [],
     attributePolicy: policy, backgroundAttributePolicy: policy,
     statTiers: { intelligence: "low", charisma: "low", family: "low", fortune: "low", physique: "low" }
@@ -2561,11 +2105,11 @@ test("动态抉择各档位的工具属性合同与引擎审批逐项一致", ()
     narrativeFactions: [{ id: "guardian", label: "同伴", summary: "同行之人" }]
   };
   advanceWithDynamicNarrativeScene(run, world, definition, {
-    patternIds: [], forceIds: [], beatDecision: "advance", beat: "setup", narrative: "你在新学舍认识同伴，并渐渐熟悉周围的人和事。", participants: [],
+    patternIds: [], forceIds: [],   narrative: "你在新学舍认识同伴，并渐渐熟悉周围的人和事。", participants: [],
     attributeOutcome: { effects: [{ stat: "intelligence", direction: "up", band: "light" }] }, attributePolicy: dynamicSceneAttributePolicy()
   });
   advanceWithDynamicNarrativeScene(run, world, definition, {
-    patternIds: [], forceIds: [], beatDecision: "hold", beat: "escalation", narrative: "同伴遇到了困难，你需要决定是否一起承担这次任务。", participants: [], createsDecision: true
+    patternIds: [], forceIds: [],   narrative: "同伴遇到了困难，你需要决定是否一起承担这次任务。", participants: [], createsDecision: true
   });
   for (const policy of Object.values(run.pendingDirectedDecisionPolicy!)) {
     const tool = narrativeDecisionOutcomeTool(policy);
@@ -2600,8 +2144,8 @@ test("动态抉择各档位的工具属性合同与引擎审批逐项一致", ()
   const renderSchema = (renderPrepared.tools[0].function as {
     parameters: { required: string[]; properties: Record<string, unknown> };
   }).parameters;
-  assert.deepEqual(renderSchema.required, ["narrative"]);
-  assert.deepEqual(Object.keys(renderSchema.properties), ["narrative", "survivalThreat"]);
+  assert.deepEqual(renderSchema.required, ["narrative", "nextClock"]);
+  assert.deepEqual(Object.keys(renderSchema.properties), ["narrative", "nextClock", "survivalThreat"]);
 });
 
 test("选项仅按明确ID映射，重复和未知ID不会改派到其他风险档", () => {
@@ -2629,7 +2173,7 @@ test("人物引用沿用档案身份，短关系说明有效，新人物仍需�
   const known = [{ id: "character:one", name: "小林", role: "旧日同窗", description: "与你一同求学" }];
   const policy = dynamicSceneAttributePolicy();
   const sceneInput: DynamicNarrativeSceneInput = {
-    act: { id: "act.one", label: "第一幕", prompt: "生活变化" }, beat: "setup", presentation: "scene", allowedTurnKinds: ["scene"],
+    act: { id: "act.one", label: "第一幕", prompt: "生活变化" },  presentation: "scene", allowedTurnKinds: ["scene"],
     sceneAge: 12, backgroundAgeRange: { fromAge: 12, toAge: 13 }, storyPatterns: [], socialForces: factions, knownCharacters: known,
     attributePolicy: policy, backgroundAttributePolicy: policy,
     statTiers: { intelligence: "low", charisma: "low", family: "low", fortune: "low", physique: "low" }
@@ -2640,7 +2184,7 @@ test("人物引用沿用档案身份，短关系说明有效，新人物仍需�
   const renderPrompt = dynamicNarrativeRenderPrompt({ ...sceneInput, presentation: "choice",
     statTierLabels: { intelligence: "神思通明", charisma: "风姿出众", family: "家资丰厚", fortune: "福星高照", physique: "身强体健" }
   }, 11);
-  assert.match(renderPrompt, /本次叙述年龄：12岁/);
+  assert.match(renderPrompt, /本段年龄：12岁/);
   assert.doesNotMatch(renderPrompt, /safe|balanced|risky|已结算|attributeEffects/);
   assert.equal(dynamicNarrativeSceneTools({ ...sceneInput, presentation: "choice" }).tools.length, 1, "结算工具声明不再依据规划形式隐藏，实际待选正文由运行时跳过结算");
   const sceneTool = dynamicNarrativeSceneTools(sceneInput).tools[0] as { function: { parameters: { properties: Record<string, unknown> } } };
@@ -2709,21 +2253,13 @@ test("地点与本领按引用更新指定字段，省略保留，显式更正�
 });
 
 
-test("高潮世界事实的缺省收束方式在实际请求中可见，无事实时不额外要求", () => {
+test("属性结算不再提交剧情收束字段", () => {
   const run = makeRun();
-  const act = { id: "one", label: "第一幕", prompt: "生活变化" };
-  const scene = { beat: "climax", factId: "world:fact" };
-  const modes = narrativeFactResolutionModes(act, scene);
-  assert.deepEqual(modes, ["exposed", "concealed", "compromised", "sacrificed"]);
-  assert.deepEqual(narrativeFactResolutionModes({ ...act, resolutionModes: [] }, scene), modes);
-  assert.deepEqual(narrativeFactResolutionModes({ ...act, resolutionModes: ["exposed"] }, scene), ["exposed"]);
-  assert.equal(narrativeFactResolutionModes(act, { beat: "climax" }), undefined);
-  assert.equal(narrativeFactResolutionModes(act, { beat: "pressure", factId: scene.factId }), undefined);
   const prepared = prepareNarrativeOutcomeRequest(run, world, memoryTestContext(run),
-    narrativeDecisionOutcomeTool(dynamicSceneAttributePolicy(), modes), "结算抉择结果", { task: "settlement" });
-  const tool = prepared.tools[0].function as { parameters: { required: string[]; properties: { factResolution: { enum: string[] } } } };
-  assert.equal(tool.parameters.required.includes("factResolution"), true);
-  assert.deepEqual(tool.parameters.properties.factResolution.enum, ["exposed", "concealed", "compromised", "sacrificed"]);
+    narrativeDecisionOutcomeTool(dynamicSceneAttributePolicy()), "结算抉择结果", { task: "settlement" });
+  const tool = prepared.tools[0].function as { parameters: { required: string[]; properties: Record<string, unknown> } };
+  assert.deepEqual(tool.parameters.required, ["effects"]);
+  assert.equal(Object.hasOwn(tool.parameters.properties, "factResolution"), false);
 });
 
 test("抉择核心结算不隐式携带连续性字段", () => {
@@ -2737,7 +2273,7 @@ test("抉择核心结算不隐式携带连续性字段", () => {
     { task: "settlement" }
   );
   const tool = prepared.tools[0].function as { parameters: { properties: Record<string, unknown> } };
-  assert.deepEqual(Object.keys(tool.parameters.properties).sort(), ["effects", "factResolution"]);
+  assert.deepEqual(Object.keys(tool.parameters.properties).sort(), ["effects"]);
 });
 
 test("连续性同步使用浅层字段并复用同一引用契约", () => {
@@ -2756,10 +2292,11 @@ test("连续性同步使用浅层字段并复用同一引用契约", () => {
   });
   const definition = prepared.tools[0].function as { parameters: { properties: Record<string, unknown>; required: string[] } };
   assert.deepEqual(Object.keys(definition.parameters.properties).sort(), [
-    "abilityUpdates", "factIntroductions", "factUpdates", "identityMerges", "locationUpdates", "relationshipUpdates"
+    "abilityUpdates", "factIntroductions", "factUpdates", "identityMerges", "locationUpdates", "relationshipUpdates", "retirements"
+
   ]);
-  assert.deepEqual(definition.parameters.required, ["locationUpdates", "abilityUpdates", "factIntroductions", "factUpdates", "relationshipUpdates", "identityMerges"]);
-  validateNarrativeContinuityToolArguments({ locationUpdates: [], abilityUpdates: [], factIntroductions: [], factUpdates: [], relationshipUpdates: [], identityMerges: [] }, definition.parameters);
+  assert.deepEqual(definition.parameters.required, ["locationUpdates", "abilityUpdates", "factIntroductions", "factUpdates", "relationshipUpdates", "identityMerges", "retirements"]);
+  validateNarrativeContinuityToolArguments({ locationUpdates: [], abilityUpdates: [], factIntroductions: [], factUpdates: [], relationshipUpdates: [], retirements: [], identityMerges: [] }, definition.parameters);
   assert.equal("assetUpdates" in definition.parameters.properties, false);
 });
 
@@ -2776,8 +2313,8 @@ test("实际连续性请求允许从最终正文登记多个新地点与本领",
     contracts: { assets: true, layout: "continuity" }
   });
   const definition = prepared.tools[0].function as { parameters: { required: string[]; properties: Record<string, unknown> } };
-  assert.deepEqual(Object.keys(definition.parameters.properties), ["locationUpdates", "abilityUpdates", "identityMerges"]);
-  assert.deepEqual(definition.parameters.required, ["locationUpdates", "abilityUpdates", "identityMerges"]);
+  assert.deepEqual(Object.keys(definition.parameters.properties), ["locationUpdates", "abilityUpdates", "identityMerges", "retirements"]);
+  assert.deepEqual(definition.parameters.required, ["locationUpdates", "abilityUpdates", "identityMerges", "retirements"]);
   assert.match(prepared.conversation.headCore, /只提交.*改变/);
   validateNarrativeContinuityToolArguments({
     locationUpdates: [
@@ -2785,7 +2322,7 @@ test("实际连续性请求允许从最终正文登记多个新地点与本领",
       { ref: "new", name: "河湾哨", description: "沿河设置的哨所", current: true , spatialDescription: "沿河设置的哨所" }
     ],
     abilityUpdates: [{ ref: "new", name: "骑射", description: "马上开弓", source: "随军习得", mastery: "初通" , usage: "马上开弓" }],
-    identityMerges: []
+    retirements: [], identityMerges: []
   }, definition.parameters);
 });
 
@@ -2817,19 +2354,19 @@ test("人物与资产变化在同一个连续性工具对象中提交", () => {
     contracts: { assets: true, relationships: true, layout: "continuity" }
   });
   const parameters = (prepared.tools[0].function as { parameters: { properties: Record<string, unknown>; required: string[] } }).parameters;
-  assert.deepEqual(Object.keys(parameters.properties).sort(), ["abilityUpdates", "identityMerges", "locationUpdates", "relationshipUpdates"]);
-  assert.deepEqual(parameters.required, ["locationUpdates", "abilityUpdates", "relationshipUpdates", "identityMerges"]);
-  assert.match(prepared.conversation.headCore, /sync_narrative_continuity.*参数对象/);
+  assert.deepEqual(Object.keys(parameters.properties).sort(), ["abilityUpdates", "identityMerges", "locationUpdates", "relationshipUpdates", "retirements"]);
+  assert.deepEqual(parameters.required, ["locationUpdates", "abilityUpdates", "relationshipUpdates", "identityMerges", "retirements"]);
+  assert.match(prepared.conversation.headCore, /对照本批实际对话/);
   assert.doesNotMatch(prepared.history.map((entry) => entry.content).join("\n"), /同级必填字段=/, "必填结构由原生 Schema 单独提供");
 
   const valid = {
-    identityMerges: [],
+    retirements: [], identityMerges: [],
     locationUpdates: [{ ref: locationId, description: "边镇新设巡防营地" }],
     abilityUpdates: [],
     relationshipUpdates: [{ characterRef: characterIds[0], stance: "friendly", summary: "共同守护边镇" }]
   };
   validateNarrativeContinuityToolArguments(valid, parameters);
-  validateNarrativeContinuityToolArguments({ locationUpdates: [], abilityUpdates: [], relationshipUpdates: [], identityMerges: [] }, parameters);
+  validateNarrativeContinuityToolArguments({ locationUpdates: [], abilityUpdates: [], relationshipUpdates: [], retirements: [], identityMerges: [] }, parameters);
   assert.equal(parseNarrativeContinuityAssetUpdates(valid, prepared.allowedAssets).locations.length, 1);
   assert.equal(parseRelationshipUpdates(valid.relationshipUpdates, characterIds)?.length, 1);
   assert.throws(() => validateNarrativeContinuityToolArguments({ relationshipUpdates: [] }, parameters),
@@ -2956,10 +2493,9 @@ test("稳定渲染 Schema 通过动态任务目录回接本轮完整引用", () 
   assert.equal(definition.parameters.properties.participants.items.properties.characterRef.enum, undefined);
   const requestText = prepared.history.map((entry) => entry.content).join("\n");
   assert.match(requestText, /本轮 continuityRefs 可修改事实目录/);
-  assert.match(requestText, new RegExp(`${factId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}（需要承接的疑问）`));
-  assert.match(requestText, new RegExp(`${characterId}=沈砚`));
-  assert.match(requestText, /地点身份目录：location:reference-contract=临河旧宅/);
-  assert.match(requestText, /本领身份目录：ability:reference-contract=辨痕/);
+  assert.ok(!requestText.includes(factId));
+  assert.ok(!requestText.includes(characterId));
+  assert.doesNotMatch(requestText, /地点身份目录：|本领身份目录：/);
   assert.deepEqual(prepared.allowedActivityRefs.locationIds, ["location:reference-contract"]);
   assert.deepEqual(prepared.allowedActivityRefs.abilityIds, ["ability:reference-contract"]);
 
@@ -2974,7 +2510,7 @@ test("稳定渲染 Schema 通过动态任务目录回接本轮完整引用", () 
   assert.equal(JSON.stringify(prepared.tools), JSON.stringify(otherPrepared.tools));
   const stableText = (request: typeof prepared) => request.history.find((entry) => entry.content.startsWith("【长期设定】"))?.content;
   assert.equal(stableText(prepared), stableText(otherPrepared));
-  assert.match(otherPrepared.history.map((entry) => entry.content).join("\n"), /另一件需要承接的事/);
+  assert.doesNotMatch(otherPrepared.history.map((entry) => entry.content).join("\n"), /另一件需要承接的事/);
   assert.doesNotMatch(otherPrepared.history.map((entry) => entry.content).join("\n"), /临河旧宅/);
 
   const emptyContract = factUpdateContract([]);
@@ -3025,11 +2561,11 @@ test("旧幕后果不因另一关注对象的描述递归扩张，承诺仍可�
   const ctx = memoryTestContext(run, ["act:one:continuation"]);
   const task = interruptedBackgroundTask(run, 0, []);
   const prepared = prepareNarrativeOutcomeRequest(run, world, ctx, task.tool, task.prompt, { task: "background" });
-  assert.deepEqual(prepared.factContract.mutableIds, ["act:one:continuation"]);
+  assert.deepEqual(prepared.factContract.mutableIds, []);
   assert.ok(!ctx.narrativePlan!.factDirectory?.some((fact) => fact.id === "act:one:consequence"));
   assert.ok(!ctx.narrativePlan!.recall!.resolvedFacts?.some((fact) => fact.id === "act:one:consequence"));
   assert.ok(!selectDynamicNarrativeContext(run, { task: "background", text: "住处" }).resolvedFacts?.some((fact) => fact.label.includes("失去了原先的住处")));
-  const update = parseFactUpdates({ resolutions: [{ factId: "act:one:continuation", summary: "同伴已经安顿下来" }] }, prepared.factContract)!;
+  const update = parseFactUpdates({ resolutions: [{ factId: "act:one:continuation", summary: "同伴已经安顿下来" }] }, factUpdateContract(["act:one:continuation"]))!;
   applyNarrativeFactUpdates(run, update, { sourceEventId: "settlement" });
   assert.equal(run.story.factLedger!.facts.find((fact) => fact.id === "act:one:consequence")?.status, "resolved");
   assert.equal(run.story.factLedger!.facts.find((fact) => fact.id === "act:one:continuation")?.resolutionSummary, "同伴已经安顿下来");
@@ -3037,86 +2573,7 @@ test("旧幕后果不因另一关注对象的描述递归扩张，承诺仍可�
   assert.throws(() => parseFactUpdates({ resolveFactIds: ["world:next"] }, prepared.factContract));
   assert.throws(() => parseFactUpdates({ resolveFactIds: ["act:one:payoff"] }, prepared.factContract));
   assert.equal(snapshot.story.factLedger!.facts.find((fact) => fact.id === "act:one:continuation")?.status, "open");
-  assert.deepEqual(memoryTestContext(snapshot, ["act:one:continuation"]).narrativePlan?.recall?.facts.map((fact) => fact.id), ["act:one:continuation"]);
-});
-
-test("静态 IF 只进入幕初规划，正文与观察只使用本幕简要故事", async () => {
-  for (const worldId of ["ancient", "modern", "fantasy"]) {
-    const definition = await loadNarrativeExperienceForTest(worldId);
-    const run = makeRun(); run.worldId = worldId; run.narrative.enabled = true;
-    run.narrative = ensureNarrativeActRuntime(run.narrative, definition, 20);
-    const actId = run.narrative.actRuntime!.actId;
-    const planning = buildNarrativePromptPlan(run, definition, null, "planning")!;
-    assert.ok(planning.routeGuidance?.includes((definition as ResolvedNarrativeExperience).storyPack.routePromise));
-    const outline = outlineForTest(actId);
-    commitNarrativeActOutline(run.narrative, outline);
-    for (const task of ["rendering", "decision"] as const) {
-      const plan = buildNarrativePromptPlan(run, definition, null, task)!;
-      assert.ok(plan.routeGuidance?.includes(outline.beats.setup.change));
-      assert.equal(plan.mainlineSkeleton, undefined);
-      assert.doesNotMatch(plan.routeGuidance ?? "", /本幕主线职责|本轮执行目标|当前 IF 节拍职责/);
-    }
-    assert.ok(buildNarrativePromptPlan(run, definition, null, "background")?.routeGuidance?.includes(outline.beats.setup.change));
-  }
-});
-
-test("三世界的幕任务归属场景工具，纯背景和混合请求保持生活任务独立", async () => {
-  for (const worldId of ["ancient", "fantasy", "modern"]) {
-    const definition = await loadNarrativeExperienceForTest(worldId);
-    const run = makeRun();
-    run.worldId = definition.worldId;
-    run.narrative.enabled = true;
-    run.narrative = ensureNarrativeActRuntime(run.narrative, definition, run.age);
-    const currentAct = definition.mainlineActs![0];
-    const mainlineFact = definition.mainlineFacts?.find((fact) => fact.id === currentAct.factId);
-    if (mainlineFact) run.story.factLedger!.facts.push({
-      ...mainlineFact, status: "open", sourceEventId: "world", introducedAge: 0, lastTouchedAge: 0
-    });
-    const [dynamicFactId] = applyNarrativeFactUpdates(run, {
-      introduce: [{ kind: "commitment", label: "照料身边患病的亲友" }], touchFactIds: [], resolveFactIds: []
-    }, { sourceEventId: "life" });
-    const input: DynamicNarrativeSceneInput = {
-      act: currentAct,
-      beat: "pressure", presentation: "summary", allowedTurnKinds: ["background"],
-      sceneAge: 20, backgroundAgeRange: { fromAge: 20, toAge: 22 },
-      storyPatterns: definition.storyPatterns!,
-      socialForces: definition.socialForces!, knownCharacters: [], attributePolicy: dynamicSceneAttributePolicy(), backgroundAttributePolicy: dynamicSceneAttributePolicy(),
-      statTiers: { intelligence: "low", charisma: "low", family: "low", fortune: "low", physique: "low" }
-    };
-    for (const allowedTurnKinds of [["background"], ["background", "scene"], ["scene"]] as DynamicNarrativeSceneInput["allowedTurnKinds"][]) {
-      input.allowedTurnKinds = allowedTurnKinds;
-      input.presentation = allowedTurnKinds.includes("background") ? "summary" : "scene";
-      const tools = dynamicNarrativeSceneTools(input);
-      const ctx = memoryTestContext(run);
-      const contextTask = "settlement";
-      ctx.narrativePlan = buildNarrativePromptPlan(run, definition, null, contextTask, { backgroundAllowed: allowedTurnKinds.includes("background") });
-      const taskPrompt = dynamicNarrativeScenePrompt(input);
-      const request = prepareNarrativeOutcomeRequest(run, world, ctx, tools.tools, taskPrompt, { task: ctx.narrativePlan!.task });
-      const text = request.history.map((entry) => entry.content).join("\n");
-      const routeLore = new Set(definition.lore.filter((entry) => entry.directionIds?.length).map((entry) => entry.text));
-      assert.equal(taskPrompt.includes(input.act.prompt), false, "属性结算不携带幕间大纲");
-      assert.equal(ctx.narrativePlan!.mainlineSkeleton, undefined);
-      assert.ok(!text.includes("不得写结局"));
-      assert.ok(ctx.narrativePlan!.activeLore.every((entry) => !routeLore.has(entry)));
-      if (allowedTurnKinds.includes("background")) {
-        assert.ok(!mainlineFact || !text.includes(mainlineFact.label));
-        assert.equal(ctx.narrativePlan!.factDirectory?.some((fact) => fact.id === dynamicFactId), false);
-        assert.equal(request.factContract.mutableIds.includes(dynamicFactId), false);
-      }
-      for (const tool of request.tools) {
-        const fn = tool.function as { name: string; description: string; parameters: { properties: Record<string, unknown> } };
-        if (fn.name === "resolve_background_outcome") {
-          assert.ok(!fn.description.includes(input.act.prompt));
-          assert.match(fn.description, /最终正文/);
-  assert.match(text, /20-22岁/);
-        } else {
-          assert.ok(!fn.description.includes(input.act.prompt));
-          assert.ok(!fn.description.includes(definition.mainlineSkeleton!.premise));
-          assert.equal("routeId" in fn.parameters.properties, false);
-        }
-      }
-    }
-  }
+  assert.deepEqual(memoryTestContext(snapshot, ["act:one:continuation"]).narrativePlan?.recall?.facts.map((fact) => fact.id), []);
 });
 
 test("已结束事件退出正文事实，直接事实与本领用途仍可追溯结果", () => {
@@ -3236,7 +2693,7 @@ test("上下文编排按来源去重并让 dynamic 只读取近期回合与按�
     taskPrompt: "场景发生年龄：18岁。可选路线：study、career。",
     conversation,
     plan: {
-      task: "dynamic", storyBible: "", styleRules: [], activeLore: ["城中书院与商会并立"], plotEssentials: [], activeThreads: [],
+      task: "dynamic", storyBible: "",  activeLore: ["城中书院与商会并立"], plotEssentials: [], activeThreads: [],
       activeCharacters: ["person:mentor=老师（academy，师长）：曾在故乡教书"], scene: "", authorNote: "", ending: "",
       persona: "谨慎而好学", talents: ["过目不忘：善于整理线索"], origin: "生于河畔小镇",
       factDirectory: [
@@ -3256,7 +2713,7 @@ test("上下文编排按来源去重并让 dynamic 只读取近期回合与按�
   });
   const selectedSources = composition.manifest.fragments.flatMap((entry) => entry.sourceIds);
   assert.equal(new Set(selectedSources).size, selectedSources.length);
-  assert.equal(composition.renderedContext.split("fact:exam").length - 1, 1);
+  assert.equal(composition.renderedContext.split("fact:exam").length - 1, 0);
   assert.doesNotMatch(composition.renderedContext, /fact:debt/);
   assert.ok(composition.renderedContext.endsWith("场景发生年龄：18岁。可选路线：study、career。"));
   assert.equal(composition.historyMessages.some((entry) => entry.content.includes("此前已经离开故乡")), false);
@@ -3305,10 +2762,10 @@ test("原始世界只供幕初组织，正文和普通年沿用生成背景并�
   for (const task of ["rendering", "background"] as const) {
     const plan = buildNarrativePromptPlan(run, definition, null, task)!;
     const request = composeNarrativeContext({ task, plan, taskPrompt: "写当前年龄" });
-    assert.equal(request.stableContext.split(outline.background).length - 1, 1);
+    assert.equal(request.stableContext.split(outline.situation).length - 1, 1);
     assert.equal(request.renderedContext.includes(definition.worldCore!.identity), false);
     assert.equal(Object.hasOwn(plan, "narrativePaletteContext"), false);
-    assert.ok(plan.activeWorldCardSources?.every((entry) => entry.contextRole === "knowledge" || entry.contextRole === "style"));
+    assert.ok(plan.activeWorldCardSources?.every((entry) => entry.contextRole === "knowledge"));
   }
   const domain = definition.worldCards!.find((entry) => entry.contextRole === "knowledge")!;
   const recalled = buildNarrativePromptPlan(run, definition, null, "rendering", {
@@ -3317,31 +2774,17 @@ test("原始世界只供幕初组织，正文和普通年沿用生成背景并�
       remainingStickyTurns: 0, remainingCooldownTurns: 0 }]
   })!;
   const knowledgeRequest = composeNarrativeContext({ task: "rendering", plan: recalled, taskPrompt: "写进入新领域后的故事" });
-  assert.equal(knowledgeRequest.renderedContext.split(domain.content).length - 1, 1, "已选领域知识不被旧 author_note 位置丢弃");
-  assert.ok(knowledgeRequest.manifest.fragments.some((entry) => entry.sourceIds.includes(`world-card:${domain.id}`) && entry.section === "lore"));
-});
-
-test("结局任务单独召回世界包结局文风", async () => {
-  const definition = await loadNarrativeExperienceForTest("modern");
-  const run = makeRun();
-  run.worldId = "modern";
-  run.narrative.enabled = true;
-  run.narrative = ensureNarrativeActRuntime(run.narrative, definition, run.age);
-  const plan = buildNarrativePromptPlan(run, definition, null, "ending")!;
-  plan.ending = "普通结局：人物完成了这一生的主要选择。";
-  const ending = composeNarrativeContext({ task: "ending", taskPrompt: "写人生评价", plan });
-  assert.match(ending.renderedContext, /结局文风：以人物最终的生活方式/);
-  const planning = composeNarrativeContext({ task: "planning", taskPrompt: "规划下一步", plan: { ...plan, task: "planning" } });
-  assert.doesNotMatch(planning.renderedContext, /结局文风/);
+  assert.equal(knowledgeRequest.renderedContext.includes(domain.content), false, "幕内不另行追加知识召回");
+  assert.equal(knowledgeRequest.manifest.fragments.some((entry) => entry.sourceIds.includes(`world-card:${domain.id}`)), false);
 });
 
 test("长上下文保留按任务选定的材料与当前任务，估算 token 仅用于观测", () => {
   const activeLore = Array.from({ length: 80 }, (_, index) => `世界知识${index}：${"遥远地区的风俗与传闻".repeat(20)}`);
   const composition = composeNarrativeContext({
-    task: "background",
-    taskPrompt: "叙述10岁至12岁的生活与成长。",
+    task: "planning", planningPurpose: "initial",
+    taskPrompt: "组织本幕局势。",
     plan: {
-      task: "background", storyBible: "", styleRules: [], activeLore, plotEssentials: [], activeThreads: [], activeCharacters: [],
+      task: "planning", storyBible: "", activeLore, plotEssentials: [], activeThreads: [], activeCharacters: [],
       scene: "", authorNote: "", ending: "", persona: "一个正在成长的人"
     }
   });
@@ -3350,19 +2793,18 @@ test("长上下文保留按任务选定的材料与当前任务，估算 token �
   assert.ok(composition.manifest.totalEstimatedTokens > 3600);
   assert.ok(activeLore.every((text) => composition.renderedContext.includes(text)));
   assert.ok(composition.manifest.fragments.some((entry) => entry.id === "task:current" && entry.required));
-  assert.ok(composition.renderedContext.endsWith("叙述10岁至12岁的生活与成长。"));
+  assert.ok(composition.renderedContext.endsWith("组织本幕局势。"));
 });
 
 test("选定 IF 路线后渲染工具只接收当前社会力量和呈现类型", async () => {
   const definition = await loadNarrativeExperienceForTest("ancient");
   const force = definition.socialForces![1];
   const input: DynamicNarrativeSceneInput = {
-    plan: {
+    plan: { recallRefs: [], locationRefs: [],
       callId: "call:one", turnKind: "scene", patternIds: [], forceIds: [force.id],
-      conflictRefs: [], abilityRefs: [], locationDirective: { mode: "stay" },
-       presentation: "scene", clockRequest: "advance"
-    },
-    act: definition.mainlineActs![0], beat: "setup", presentation: "scene", allowedTurnKinds: ["scene"],
+      conflictRefs: [], abilityRefs: [],
+       presentation: "scene"},
+    act: definition.mainlineActs![0],  presentation: "scene", allowedTurnKinds: ["scene"],
     sceneAge: 16, backgroundAgeRange: { fromAge: 16, toAge: 17 },
     storyPatterns: definition.storyPatterns!,
     socialForces: definition.socialForces!, knownCharacters: [],
@@ -3392,55 +2834,27 @@ test("选定 IF 路线固定在本局前提中，正文不重复注入摘要而�
   ];
   const planning = buildNarrativePromptPlan(run, definition, null, "planning")!;
   assert.equal((planning.memoryDigests ?? []).some((entry) => entry.id === "route:obsolete"), false);
-  assert.match(planning.routeGuidance ?? "", /人物将从自身处境进入天下乱局/);
+  const pack = (definition as import("@reroll/shared").ResolvedNarrativeExperience).storyPack;
+  assert.ok(planning.routeGuidance?.includes(pack.protagonistTrajectory));
+  assert.ok(!planning.routeGuidance?.includes(pack.routePromise));
+  assert.ok(!planning.routeGuidance?.includes(pack.endingQuestion));
+  assert.equal(planning.mainlineSkeleton, undefined);
   const rendering = buildNarrativePromptPlan(run, definition, null, "rendering", { patternIds: [], factionIds: [forceId] })!;
   assert.deepEqual(rendering.memoryDigests ?? [], []);
   const horizon = buildNarrativePromptPlan(run, definition, null, "horizon")!;
   assert.equal(horizon.memoryDigests, undefined, "旧分层摘要不再成为第二份故事背景");
 });
 
-test("旧 Horizon 状态不再影响规划召回，当前 Planner 查询独立决定素材", async () => {
-  const base = await loadNarrativeExperienceForTest("fantasy");
-  const definition = {
-    ...base,
-    worldCards: [...(base.worldCards ?? []), {
-      id: "test.horizon", kind: "motif", content: "残阵会改变眼前局势。", priority: 100,
-      activation: { keys: ["玄衡印"], tasks: ["planning"] }
-    }]
-  } as ResolvedNarrativeExperience;
-  const run = makeRun();
-  run.worldId = "fantasy";
-  run.narrative.enabled = true;
-  run.narrative = ensureNarrativeActRuntime(run.narrative, definition, run.age);
-
-  const runtime = run.narrative.actRuntime!;
-  run.narrative.horizonPlan = {
-    id: `horizon:${runtime.actId}:1`, actId: runtime.actId, revision: 1,
-    dramaticQuestion: "如何前进", developingTension: "灵力传承正在显露代价",
-    intents: [{ id: `horizon:${runtime.actId}:1:intent:1`, goal: "理解玄衡印留下的痕迹", status: "active" }], focusRefs: [], payoffShape: "人物形成自己的答案",
-    status: "active", createdAt: 1
-  };
-  run.narrative.lastBeatObservation = { decision: "hold", actId: runtime.actId, beat: runtime.beat, createdAt: 1 };
-  const planning = buildNarrativePromptPlan(run, definition, null, "planning")!;
-  assert.equal(planning.authorNote, "");
-  assert.equal(planning.activeWorldCardSources?.some((entry) => entry.id === "test.horizon"), false);
-  const focused = buildNarrativePromptPlan(run, definition, null, "planning", { semanticQuery: "玄衡印" })!;
-  assert.equal(focused.activeWorldCardSources?.some((entry) => entry.id === "test.horizon"), true);
-  assert.equal(buildNarrativePromptPlan(run, definition, null, "rendering")?.authorNote, "");
-  run.narrative.lastBeatObservation = { ...run.narrative.lastBeatObservation!, decision: "advance" };
-  assert.equal(buildNarrativePromptPlan(run, definition, null, "planning")?.authorNote, "");
-});
-
 test("幕间能力目录直接表达背景、场景与抉择边界", () => {
   assert.deepEqual(narrativeTurnKindsForReadiness(true, true), ["background"]);
   assert.deepEqual(narrativeTurnKindsForReadiness(false, false), ["background"]);
   assert.deepEqual(narrativeTurnKindsForReadiness(false, true), ["scene"]);
-  assert.deepEqual(narrativeTurnCapabilities(true, "setup", ["background"]), ["background"]);
-  assert.deepEqual(narrativeTurnCapabilities(false, "setup", ["scene"]), ["scene", "choice"]);
-  assert.deepEqual(narrativeTurnCapabilities(false, "escalation", ["background", "scene"]), ["background", "scene", "choice"]);
-  assert.deepEqual(narrativeTurnCapabilities(false, "pressure", ["background", "scene"]), ["background", "scene", "choice"]);
-  assert.deepEqual(narrativeTurnCapabilities(false, "climax", ["scene"]), ["scene", "choice"]);
-  assert.deepEqual(narrativeTurnCapabilities(false, "payoff", ["background", "scene"]), ["background", "scene", "choice"]);
+  assert.deepEqual(narrativeTurnCapabilities(true, ["background"]), ["background"]);
+  assert.deepEqual(narrativeTurnCapabilities(false, ["scene"]), ["scene", "choice"]);
+  assert.deepEqual(narrativeTurnCapabilities(false, ["background", "scene"]), ["background", "scene", "choice"]);
+  assert.deepEqual(narrativeTurnCapabilities(false, ["background", "scene"]), ["background", "scene", "choice"]);
+  assert.deepEqual(narrativeTurnCapabilities(false, ["scene"]), ["scene", "choice"]);
+  assert.deepEqual(narrativeTurnCapabilities(false, ["background", "scene"]), ["background", "scene", "choice"]);
 });
 
 test("规划工具目录与能力目录使用同一协议，不再暴露返回后会被拒绝的呈现", () => {
@@ -3457,17 +2871,17 @@ test("规划工具目录与能力目录使用同一协议，不再暴露返回�
   const tools = narrativeTurnPlanTools({ ...envelope, actOutline: outlineForTest(envelope.act.id) }).map((tool) => tool.function as {
     name: string; parameters: { required: string[]; properties: Record<string, unknown> }
   });
-  assert.deepEqual(tools.map((tool) => tool.name), ["plan_scene_turn"]);
+  assert.deepEqual(tools.map((tool) => tool.name), ["recall_scene_assets"]);
   assert.deepEqual(narrativeTurnPlanTools({ ...envelope, actOutline: outlineForTest(envelope.act.id), source: "background", capabilities: ["background"] }), [], "普通年份不进入规划请求");
   assert.ok(!tools.some((tool) => tool.name === "plan_choice_turn"));
-  const scene = tools.find((tool) => tool.name === "plan_scene_turn")!;
+  const scene = tools.find((tool) => tool.name === "recall_scene_assets")!;
   assert.equal(scene.parameters.required.includes("patternIds"), false);
   assert.equal("patternIds" in scene.parameters.properties, false);
-  assert.ok(scene.parameters.required.includes("forceIds"));
+  assert.ok(scene.parameters.required.includes("recallRefs"));
   assert.equal("presentation" in scene.parameters.properties, false);
   const planningPrompt = narrativeTurnPlanningPrompt(envelope);
   assert.doesNotMatch(planningPrompt, /调用plan_/);
-  assert.match(narrativeTaskContract("planning").systemInstruction, /幕内.*召回.*交接时间/);
+  assert.match(narrativeTaskContract("planning", "execute").systemInstruction, /选择.*对象和知识引用/);
 });
 
 test("叙事事务失败不发布半成品，成功后 Episode 与幕结果只保存引用", async () => {
@@ -3521,8 +2935,8 @@ test("异步记忆整理只覆盖已提交 Episode，并以 revision 原子提�
   assert.equal(work.episodeIds.length, 4);
   assert.equal(applyNarrativeMemoryCuration(run, work, { summary: "人物在四年生活中逐渐成长。" }), true);
   assert.equal(run.narrative.memoryRevision, 1);
-  assert.equal(run.narrative.memoryDigests.find((entry) => entry.id === "run")?.coveredEpisodeIds.length, 4);
-  assert.equal(run.aiConversation.year?.headMemory, "人物在四年生活中逐渐成长。");
+  assert.equal(run.narrative.memoryDigests.at(-1)?.coveredEpisodeIds.length, 4);
+  assert.ok(run.aiConversation.year?.headMemory.endsWith("人物在四年生活中逐渐成长。"));
   assert.equal(run.aiConversation.year?.archive.length, 0);
   assert.equal(applyNarrativeMemoryCuration(run, work, { summary: "" }), false);
 });
@@ -3550,22 +2964,22 @@ test("身世实际进入压缩输入并随摘要替代，人物设定与当前�
   const compose = (current: typeof run, task: "planning" | "rendering" | "decision") => composeNarrativeContext({
     task, taskPrompt: "继续当前经历", plan: buildNarrativePromptPlan(current, definition, null, task)
   });
-  assert.equal(compose(run, "planning").renderedContext.split(run.narrative.opening.profile!.summary).length - 1, 1);
+  assert.equal(compose(run, "planning").renderedContext.includes(run.narrative.opening.profile!.summary), false);
   const work = prepareNarrativeMemoryCuration(run)!;
   const prompt = memoryCurationPrompt(work);
-  assert.equal(work.origin?.summary, run.narrative.opening.profile!.summary);
-  assert.equal(prompt.split(work.origin!.summary).length - 1, 1);
+  assert.equal(Object.hasOwn(work, "origin"), false);
+  assert.equal(prompt.includes(run.narrative.opening.profile!.summary), false);
   assert.doesNotMatch(prompt, /当前幕组织背景|阶段目标/);
   const summary = "边镇驿站的家境使你熟悉烽燧和行旅；随巡防队掌握骑射后成为斥候，开始以同袍安危决定自己的军中立场。";
   assert.equal(applyNarrativeMemoryCuration(run, work, parseNarrativeMemoryCuration({ summary }, work)), true);
   run.narrative = ensureNarrativeRunState(JSON.parse(JSON.stringify(run.narrative)), true, 20);
-  assert.equal(run.narrative.memoryDigests.find((entry) => entry.id === "run")?.originCovered, true);
+  assert.equal(buildNarrativeStoryHistory(run.narrative).summary?.originCovered, true);
   for (const task of ["planning", "rendering", "decision"] as const) {
     const input = compose(run, task);
     assert.equal(input.renderedContext.split(summary).length - 1, 1);
     assert.equal(input.manifest.fragments.some((entry) => entry.sourceType === "origin"), false);
     assert.equal(input.renderedContext.includes("你跟随巡防队学会骑射，被编入斥候队。"), false);
-    assert.equal(input.renderedContext.includes(definition.worldCore!.laws[0]), task === "planning");
+    assert.equal(input.renderedContext.includes(definition.worldCore!.identity), task === "planning");
     assert.equal(input.renderedContext.includes("已加入巡防队并成为斥候，当前战事尚待应对。"), false, "幕摘要由观察器消费，不与人生摘要重复注入正文");
   }
   const prepared = prepareNarrativeOutcomeRequest(run, world, {
@@ -3573,7 +2987,7 @@ test("身世实际进入压缩输入并随摘要替代，人物设定与当前�
   }, narrativeDecisionRenderTool(), "写选择结果", { task: "decision" });
   assert.ok(prepared.history.some((message) => message.content.includes(run.personaPrompt)), "人物设定在角色档案中");
   assert.equal(prepared.history.map((message) => message.content).join("\n").split(summary).length - 1, 1);
-  assert.equal(run.narrative.memoryDigests.length, 1, "压缩只维护一份人物经历");
+  assert.equal(run.narrative.memoryDigests.length, 2, "旧时段与新时段各保留一份简述");
 });
 
 test("已提交正文经恢复进入带年龄的压缩输入，正文不再产生第二份进展摘要", () => {
@@ -3591,7 +3005,8 @@ test("已提交正文经恢复进入带年龄的压缩输入，正文不再产�
   assert.deepEqual(work.episodes.map(({ age, narrative }) => ({ age, narrative })),
     [1, 2, 3].map((age) => ({ age, narrative: `人物完成第${age}次巡行的实际正文。` })));
   const prompt = memoryCurationPrompt(work);
-  assert.ok(prompt.includes("3岁：") && prompt.includes("第3次巡行的实际正文"));
+  assert.ok(prompt.includes("本时段：1—3岁") && prompt.includes("第3次巡行的实际正文"));
+  assert.ok(!prompt.includes("3岁："), "不再用逐年标题暗示摘要格式");
   assert.equal(applyNarrativeMemoryCuration(run, work, { summary: "巡行经历使人物熟悉山口与军中生活。" }), true);
   assert.equal(prepareNarrativeMemoryCuration(run), undefined);
 });
@@ -3701,7 +3116,7 @@ test("世界卡按当前任务、节拍和情景动态召回，不依赖固定�
   });
   assert.ok(selected.some((card) => card.id === "fantasy.rule.power_has_trace"));
   assert.ok(selected.some((card) => card.id === "fantasy.setting.weird_ecology"));
-  assert.ok(selected.some((card) => card.id === "fantasy.example.choice"));
+  assert.equal(selected.some((card) => card.id === "fantasy.example.choice"), false);
   assert.equal(selected.some((card) => card.id === "fantasy.example.payoff"), false);
 });
 
@@ -3795,25 +3210,18 @@ test("短程计划在节拍推进后失效，上下文 Provider 保持显式顺�
     ], focusRefs: [],
     payoffShape: "形成阶段结果", status: "active", createdAt: 1
   };
-  const advanced = advanceNarrativeActBeat(run.narrative, definition, run.age);
+  const advanced = advanceNarrativeAct(run.narrative, definition, run.age);
   assert.equal(advanced.state.horizonPlan?.status, "stale");
-  assert.equal(advanced.state.actRuntime?.beat, "escalation");
+  assert.equal(advanced.state.actRuntime?.beat, undefined);
   advanced.state.actRuntime!.beat = "payoff";
-  const nextAct = advanceNarrativeActBeat(advanced.state, definition, run.age);
+  const nextAct = advanceNarrativeAct(advanced.state, definition, run.age);
   assert.equal(nextAct.state.horizonPlan?.status, "stale");
   assert.notEqual(nextAct.state.actRuntime?.actId, actId);
   assert.deepEqual(defaultNarrativeContextProviders.map((provider) => provider.id), [
     "legacy-plan", "stable-character", "story-runtime", "world-cards", "world-lore", "characters", "current-protagonist", "story-history", "facts",
     "narrative-assets", "narrative-memory", "ending", "current-task"
   ]);
-  const horizon = narrativeHorizonTool({
-    callId: "horizon:one", worldId: "test-world", act: { id: "act.one", label: "第一幕", prompt: "展开第一幕" },
-    beat: "setup", storyPatterns: [{ id: "pattern.one", label: "形态", summary: "一种故事形态" }],
-    socialForces: [{ id: "force.one", label: "力量", summary: "一种社会立场" }], focusReferences: [],
-    previousCanon: [], memoryDigests: [], nextRevision: 1
-  }).function as { parameters: { properties: Record<string, unknown> } };
-  assert.equal("routeId" in horizon.parameters.properties, false);
-  assert.equal("allowedRouteIds" in horizon.parameters.properties, false);
+
 
 });
 
@@ -3823,11 +3231,10 @@ test("任务契约将正文登记、资产详情维护和判断分开", () => {
   assert.equal(narrativeTaskContract("rendering").usesNarratorVoice, true);
   for (const task of ["rendering", "decision", "background"] as const) {
     const text = narrativeTaskContract(task).systemInstruction;
-    assert.match(text, /仅登记 ID 与名称/);
-    assert.match(text, /assetActivity/);
+    assert.doesNotMatch(text, /仅登记 ID 与名称|assetActivity/);
     assert.doesNotMatch(text, /storyDelta|continuityRefs|factUpdates/);
   }
-  assert.match(narrativeTaskContract("continuity").systemInstruction, /状态/);
+  assert.match(narrativeTaskContract("continuity").systemInstruction, /现状/);
   assert.equal(narrativeTaskContract("curation").identity, "curator");
   const tool = { type: "function", function: { name: "test_task_contract", description: "测试任务身份",
     parameters: { type: "object", additionalProperties: false, properties: {} } } };
@@ -3875,7 +3282,7 @@ test("完整模型文本经登记、恢复和下轮请求保留能力边界与�
   };
   t.mock.method(OpenAI.Chat.Completions.prototype, "create", async (payload: { tools: Array<{ function: { name: string; parameters: unknown } }> }) => {
     const step = nextNarrativeScript(scripts, payload); assert.ok(step);
-    assert.ok(payload.tools.some((tool) => tool.function.name === step.name));
+    assert.ok(payload.tools.some((tool) => tool.function.name === step.name), `fixture tool ${step.name}; available ${payload.tools.map((tool) => tool.function.name)}`);
     checkSchema(payload.tools[0].function.parameters);
     return { choices: [{ finish_reason: "tool_calls", message: { content: null, tool_calls: [
       { id: step.name, type: "function", function: { name: step.name, arguments: JSON.stringify(step.args) } }
@@ -3884,8 +3291,8 @@ test("完整模型文本经登记、恢复和下轮请求保留能力边界与�
   const ctx = { ...memoryTestContext(run), apiKey: "not-sent" };
   const origin = await generateNarrativeOrigin(run, world, ctx);
   assert.equal(origin.narrative, narrative);
-  assert.deepEqual(origin.profile, { summary: description, seedHints: [description] });
-  run.narrative.opening = { status: "ready", profile: origin.profile };
+  assert.equal(Object.hasOwn(origin, "profile"), false);
+  run.narrative.opening = { status: "ready" };
   registerNarrativeParticipants(run, origin.participants!.map((entry) => ({ ...entry, role: "护送商旅的父亲", description, relationship: { stance: "friendly", summary: description } })), "origin:full");
   assert.equal(run.narrative.dynamicCharacters.length, 1);
   const updates = { ...origin.assetUpdates!, abilities: [
@@ -3912,12 +3319,10 @@ test("完整模型文本经登记、恢复和下轮请求保留能力边界与�
   assert.ok(restored.narrative.memoryEntries.find((entry) => entry.id === "memory:full:asset")!.text.endsWith(description));
   const focusIds = [...links.locationIds, ...links.abilityIds];
   const next = memoryTestContext(restored, focusIds);
-  const abilityText = next.narrativePlan!.recall!.assetSources!.find((entry) => entry.id === links.abilityIds[0])!.text;
-  assert.match(abilityText, /夜行辨踪（熟练）/);
-  assert.ok(!abilityText.includes(description));
+  assert.deepEqual(next.narrativePlan!.recall!.assetSources, [], "存档中的本领详情不进入正文计划");
   const request = prepareNarrativeOutcomeRequest(restored, world, next, narrativeDecisionRenderTool(), "写本轮经历", { task: "rendering", contracts: { references: true } });
   checkSchema(request.tools);
-  assert.ok(request.history.some((entry) => entry.content.includes(abilityText)), "下一轮收到名称与熟练程度");
+  assert.ok(request.history.every((entry) => !entry.content.includes("夜行辨踪（熟练）")), "本领面板不另行回流");
   assert.equal(publicNarrativeAssetsSnapshot(restored.narrative.assets).abilities[0].usage, run.narrative.assets!.abilities[0].usage);
   assert.equal(toClientRun(restored).narrativeAssets!.abilities[0].description, description);
   assert.equal(scripts.length, 0);
@@ -3942,12 +3347,12 @@ test("有效背景无字符硬裁剪，覆盖批次保留且过期结果不能�
   const proposal = (id: string, text = summary) => ({ id, summary: text, activeFactIds: [], historicalFactIds: [], characterIds: [] });
   const result = { summary };
   assert.equal(applyNarrativeMemoryCuration(run, work, result), true);
-  assert.equal(run.aiConversation.year!.headMemory, summary);
+  assert.ok(run.aiConversation.year!.headMemory.endsWith(summary));
   assert.equal(run.aiConversation.year!.archive.length, 0);
-  assert.deepEqual(run.narrative.memoryDigests.find((entry) => entry.id === "run")!.coveredEpisodeIds, work.episodeIds);
+  assert.deepEqual(run.narrative.memoryDigests.at(-1)!.coveredEpisodeIds, work.episodeIds);
   assert.equal(applyNarrativeMemoryCuration(run, work, { summary: "过期内容" }), false);
   const restored = ensureNarrativeRunState(JSON.parse(JSON.stringify(run.narrative)), true);
-  assert.equal(restored.memoryDigests.find((entry) => entry.id === "run")!.summary, summary);
+  assert.equal(restored.memoryDigests.at(-1)!.summary, summary);
   assert.equal(restored.memoryDigests[0].format, "effective_facts");
 });
 
@@ -3984,11 +3389,11 @@ test("正文规格按叙事目的区分软目标，高潮与收束不套用普�
   const decision = narrativeProseProfile("decision", "pressure");
   assert.equal(background.purpose, "background");
   assert.ok(background.targetMaxLength < scene.targetMaxLength);
-  assert.equal(climax.purpose, "climax");
-  assert.ok(climax.targetMaxLength > scene.targetMaxLength);
-  assert.equal(payoff.purpose, "payoff");
+  assert.equal(climax.purpose, "scene");
+  assert.equal(climax.targetMaxLength, scene.targetMaxLength);
+  assert.equal(payoff.purpose, "scene");
   assert.equal(decision.targetMaxLength, 200);
-  assert.match(climax.instruction, /render_choice_prose/);
+  assert.equal(climax.instruction, "");
 });
 
 test("世界卡 sticky 只延续指定提交回合且不会自我续期", async () => {
@@ -4024,7 +3429,7 @@ test("世界卡 sticky 只延续指定提交回合且不会自我续期", async 
     cardId: "test.sticky", lastActivatedSequence: 1, stickyUntilSequence: 2, cooldownUntilSequence: 4
   });
   const stickyPlan = buildNarrativePromptPlan(run, definition, null, "dynamic")!;
-  assert.equal(stickyPlan.activeWorldCardSources?.find((entry) => entry.id === "test.sticky")?.activationKind, "sticky");
+  assert.deepEqual(stickyPlan.activeWorldCardSources, [], "旧冷却状态不重新激活幕内召回");
   commitCard("sticky", 2);
   assert.equal(run.narrative.worldCardActivations?.[0]?.lastActivatedSequence, 1);
   assert.equal(selectNarrativeWorldCards(run, definition, { ...query, text: "山雾升起" }).length, 0);
@@ -4085,7 +3490,7 @@ test("世界卡任务矩阵与 v8 单一数据源保持一致", async () => {
   run.worldId = "modern";
   run.narrative.enabled = true;
   run.narrative = ensureNarrativeActRuntime(run.narrative, base, run.age);
-  assert.equal(selectNarrativeWorldCards(run, base, { task: "origin" }).length, 0);
+  assert.ok(selectNarrativeWorldCards(run, base, { task: "origin" }).length > 0);
   assert.equal(selectNarrativeWorldCards(run, base, { task: "ending" }).length, 0);
   assert.ok(selectNarrativeWorldCards(run, base, { task: "horizon", actId: base.mainlineActs![0].id, beat: "setup" }).length > 0);
   assert.throws(() => validateNarrativeWorldFactContract({ ...base, worldCards: [] }), /world_cards_required/);
@@ -4143,16 +3548,7 @@ test("IF 当前幕世界卡由同一候选集交给规划和正文，执行时�
   assert.ok(candidates.some((entry) => entry.id === militaryCardId));
   run.narrative.worldCardActivations = [{ cardId: militaryCardId, lastActivatedSequence: 0, stickyUntilSequence: 0, cooldownUntilSequence: 9 }];
   const focused = buildNarrativePromptPlan(run, definition, null, "rendering", { focusIds: [militaryCardId], worldCardCandidates: candidates, semanticQuery: "展开本轮行动" })!;
-  assert.equal(focused.activeWorldCardSources?.some((entry) => entry.id === militaryCardId), true);
-});
-
-
-test("节拍观察以既定故事和实际经历作判断，不自行补写阶段目标", () => {
-  const outline = outlineForTest("act.one", { goal: "统领守军迎战", completionMeaning: "实际指挥形成攻守结果" });
-  const prompt = narrativeBeatObservationPrompt({ beat: "payoff", outline, recentStory: "20岁：人物核验了数份文书。" });
-  assert.ok(prompt.includes(outline.beats.payoff.change));
-  assert.match(prompt, /20岁：人物核验了数份文书/);
-  assert.doesNotMatch(prompt, /progressGap|actObjective|completionMeaning/);
+  assert.equal(focused.activeWorldCardSources?.some((entry) => entry.id === militaryCardId), false);
 });
 
 test("抉择上下文精确继承场景地点与本领，风格卡只在声明任务出现", async () => {
@@ -4167,23 +3563,23 @@ test("抉择上下文精确继承场景地点与本领，风格卡只在声明�
     currentLocationId: undefined
   };
   run.pendingDynamicScene = {
-    id: "pending", patternIds: [], forceIds: [], beat: "pressure", mainlineActId: definition.mainlineActs![0].id,
+    id: "pending", patternIds: [], forceIds: [],  mainlineActId: definition.mainlineActs![0].id,
     characterIds: [], factIds: [], locationIds: ["location:gate"], abilityIds: ["ability:seal"]
   };
   run.narrative.actRuntime!.beat = "pressure";
   const decision = buildNarrativePromptPlan(run, definition, null, "decision")!;
-  assert.deepEqual(decision.recall?.assetSources?.map((entry) => entry.id).sort(), ["ability:seal", "location:gate"]);
+  assert.deepEqual(decision.recall?.assetSources?.map((entry) => entry.id).sort(), []);
   assert.equal(decision.activeWorldCardSources?.some((entry) => entry.id.includes(".example.")), false);
-  assert.equal(buildNarrativePromptPlan(run, definition, null, "rendering")?.activeWorldCardSources?.some((entry) => entry.id === "fantasy.example.choice"), true);
+  assert.equal(buildNarrativePromptPlan(run, definition, null, "rendering")?.activeWorldCardSources?.some((entry) => entry.id === "fantasy.example.choice"), false);
   assert.equal(buildNarrativePromptPlan(run, definition, null, "planning")?.activeWorldCardSources?.some((entry) => entry.id.includes(".example.")), false);
-  assert.equal(buildNarrativePromptPlan(run, definition, null, "background")?.activeWorldCardSources?.some((entry) => entry.id === "fantasy.example.background"), true);
+  assert.equal(buildNarrativePromptPlan(run, definition, null, "background")?.activeWorldCardSources?.some((entry) => entry.id === "fantasy.example.background"), false);
 });
 
 test("连续性同步直接结束经历，结果经读档和后续补充保持完成状态", () => {
   const run = makeRun();
   const contract = factUpdateContract([], [{ sourceEventId: "age12", age: 12, actId: "act.one" }]);
   const [id] = applyNarrativeFactUpdates(run, parseFactUpdates({
-    introduce: [{ kind: "experience", label: "随母亲学会查账", status: "stay", sourceEventId: "age12" }], updates: []
+    introduce: [{ kind: "commitment", label: "随母亲学会查账", status: "stay", sourceEventId: "age12" }], updates: []
   }, contract), { sourceEventId: "batch14", actId: "act.one" });
   assert.equal(run.story.factLedger!.facts[0].introducedAge, 12, "批末整理不改写经历发生年龄");
   const finished = parseFactUpdates({ introduce: [], updates: [{ factId: id, status: "finish", summary: "账已核清，主角熟悉了账目，接下来随军。", sourceEventId: "age14" }] },
@@ -4193,7 +3589,7 @@ test("连续性同步直接结束经历，结果经读档和后续补充保持�
   applyNarrativeFactUpdates(restored, parseFactUpdates({ updates: [{ factId: id, status: "finish", summary: "核账已经结束，熟悉账目的经验成为随军基础。" }] }, factUpdateContract([id])),
     { sourceEventId: "supplement", actId: "act.one" });
   const fact = restored.story.factLedger!.facts[0];
-  assert.equal(fact.kind, "experience");
+  assert.equal(fact.kind, "commitment");
   assert.equal(fact.status, "resolved");
   assert.equal(fact.resolutionSummary, "核账已经结束，熟悉账目的经验成为随军基础。");
   const context = selectDynamicNarrativeContext(restored, { task: "rendering", actId: "act.one", resolvedFactVisibility: "current-act" });
@@ -4224,7 +3620,8 @@ test("观察器窗口按故事年份滚动，同年行动全部保留且本轮�
   const text = narrativeObservationHistory(run, { actId: "act.one", age: 12, sourceEventId: "current", narrative: "敌军主力逼近" });
   for (const expected of ["抵达关城", "同年初次巡哨", "发现敌踪", "敌军主力逼近"]) assert.ok(text.includes(expected));
   assert.equal(text.split("敌军主力逼近").length - 1, 1);
-  assert.doesNotMatch(text, /窗口之外|另一幕的事情/);
+  assert.match(text, /窗口之外/, "尚未压缩的旧经历不会按年龄遗漏");
+  assert.doesNotMatch(text, /另一幕的事情/);
 });
 
 test("已有事件使用同一 ID 持续更新并结束，不依赖观察器转交完成", () => {
@@ -4258,81 +3655,12 @@ test("幕初规划通过共享历史读取未压缩的有效选择", () => {
   };
   run.narrative.memoryDigests.push({ ...run.narrative.memoryDigests[0], id: "run", scope: "run", scopeId: undefined });
   const planning = composeNarrativeContext({ task: "planning", taskPrompt: narrativeTurnPlanningPrompt(envelope), plan: {
-    task: "planning", storyBible: "测试世界", storyHistory: buildNarrativeStoryHistory(run.narrative), styleRules: [], activeLore: [],
+    task: "planning", storyBible: "测试世界", storyHistory: buildNarrativeStoryHistory(run.narrative),  activeLore: [],
     plotEssentials: [], activeThreads: [], activeCharacters: [], scene: "", authorNote: "", ending: ""
   } }).renderedContext;
   assert.match(planning, /已选择迁移/);
   assert.equal(planning.split(summary).length - 1, 1);
   assert.match(planning, /其他幕的事情/, "规划保留真实的跨幕历史，观察器依然只读取当前幕");
-});
-
-test("规划交接场景，正文实际抉择的问题与后果意图保留到待选存档和结果提交", async () => {
-  const definition = await loadNarrativeExperienceForTest("ancient");
-  const run = makeRun();
-  run.narrative.enabled = true;
-  run.narrative = ensureNarrativeActRuntime(run.narrative, definition, 20);
-  run.narrative.actRuntime!.beat = "pressure";
-  run.age = 20;
-  run.stats = { intelligence: 50, charisma: 50, family: 50, fortune: 50, physique: 100 };
-  const act = definition.mainlineActs![0];
-  const envelope: NarrativeTurnEnvelope = {
-    callId: "choice-plan", source: "scene", worldId: run.worldId, currentAge: 20,
-    backgroundAgeRange: { fromAge: 21, toAge: 21 }, act: { id: act.id, label: act.label, prompt: act.prompt }, beat: "pressure",
-    capabilities: narrativeTurnCapabilities(false, "pressure", ["scene"]), storyPatterns: [], socialForces: [], focusReferences: [],
-    statTiers: { intelligence: "steady", charisma: "steady", family: "steady", fortune: "steady", physique: "steady" },
-    clock: { mode: "advance", sameAgeTurnCount: 0, maxSameAgeTurns: 3 }
-  };
-  const raw = planningReplyForTest({ conflictRefs: [], abilityRefs: [], forceIds: [], locationDirective: { mode: "stay" },  clockRequest: "hold", actWorldCard: actWorldCardForTest({ goal: "建立新的立足之处", completionMeaning: "人物在取舍后已经开始建立自己的生活" }) });
-  const decisionBrief = { question: "留在故地还是迁居？", stakes: "决定以后生活的位置和交往圈子。" };
-  const tools = narrativeTurnPlanTools(envelope).map((tool) => tool.function as { name: string; parameters: { required: string[] } });
-  assert.ok(!tools.some((tool) => tool.name === "plan_choice_turn"));
-  assert.ok(!tools.find((tool) => tool.name === "plan_scene_turn")!.parameters.required.includes("decisionBrief"));
-  const plan = parseNarrativeTurnPlan(raw, "plan_scene_turn", { ...envelope, actOutline: parseNarrativeActWorldCard(raw.actWorldCard, envelope.act.id) });
-  assert.equal(plan.presentation, "scene");
-  commitNarrativeActOutline(run.narrative, plan.actOutline!);
-  const prose = parseDynamicNarrativeProse({ narrative: "新的去处已有落脚机会，你需要决定是否启程。", storyDelta: "迁居机会使去向成为实质分歧", background: "留下与启程会改变生活与关系。", decisionBrief,
-    optionOverrides: ["safe", "balanced", "risky"].map((id) => ({ id, label: "选择去向", description: "决定下一步生活", abilityRefs: [], locationDirective: { mode: "stay" } })) }, "render_choice_prose", plan);
-  advanceWithDynamicNarrativeScene(run, world, definition, {
-    patternIds: [], forceIds: [], beat: "pressure", beatDecision: "hold",
-    ...prose, participants: []
-  });
-  assert.ok(run.nextMilestoneChoice);
-  const restored = JSON.parse(JSON.stringify(run)) as ReturnType<typeof makeRun>;
-  restored.narrative = ensureNarrativeRunState(restored.narrative, true);
-  assert.deepEqual(restored.narrative.actRuntime?.outline, plan.actOutline);
-  assert.deepEqual(restored.pendingDynamicScene?.decisionBrief, decisionBrief);
-  const [factId] = applyNarrativeFactUpdates(restored, { introduce: [{ kind: "open_question", label: "去向尚未确定" }], touchFactIds: [], resolveFactIds: [] }, { sourceEventId: "choice-question", actId: act.id });
-  const proposal = parseFactUpdates({ updates: [{ factId, status: "finish", summary: "人物已经选择迁居并启程。" }] }, factUpdateContract([factId]))!;
-  applyMilestoneDecisionAndAdvance(restored, world, difficulty, "safe", {
-    narrativeWorld: definition, narrativeOutcome: { effects: [{ stat: "family", direction: "up", band: "light" }] },
-    narrative: "你已经启程，故地的来往至此告一段落。", narrativeFactUpdates: proposal, beatDecision: "advance"
-  });
-  assert.equal(restored.pendingDynamicScene, undefined);
-  assert.equal(restored.nextMilestoneChoice, undefined);
-  assert.equal(restored.narrative.actRuntime!.beat, "climax");
-  assert.equal(restored.narrative.actRuntime!.outline?.beats.climax.change, plan.actOutline!.beats.climax.change);
-  assert.equal(restored.story.factLedger!.facts.find((fact) => fact.id === factId)?.resolutionSummary, "人物已经选择迁居并启程。");
-  assert.ok(restored.stats.family > run.stats.family);
-  assert.equal(run.pendingDynamicScene?.decisionBrief?.question, decisionBrief.question, "另一份快照未被结果提交污染");
-});
-
-test("大纲跨生活年与同年回合保留，失败事务不提交，换幕不沿用旧大纲", async () => {
-  const definition = await loadNarrativeExperienceForTest("ancient");
-  const run = makeRun(); run.narrative.enabled = true;
-  run.narrative = ensureNarrativeActRuntime(run.narrative, definition, 20);
-  const actId = run.narrative.actRuntime!.actId;
-  const outline = outlineForTest(actId);
-  await assert.rejects(runNarrativeTurnTransaction(run, async (working) => { commitNarrativeActOutline(working.narrative, outline); throw new Error("生成失败"); }), /生成失败/);
-  assert.equal(Boolean(run.narrative.actRuntime!.outline), false);
-  commitNarrativeActOutline(run.narrative, outline);
-  settleQuietYearForTest(run, definition);
-  assert.deepEqual(run.narrative.actRuntime!.outline, outline);
-  for (const beat of ["setup", "escalation", "pressure", "climax", "payoff"] as const) {
-    run.narrative.actRuntime!.beat = beat;
-    run.narrative = advanceNarrativeActBeat(run.narrative, definition, run.age).state;
-  }
-  assert.notEqual(run.narrative.actRuntime!.actId, actId);
-  assert.equal(run.narrative.actRuntime!.outline, undefined);
 });
 
 test("规划请求只使用一次幕背景，正文和连续性保留各自的按需召回", async () => {
@@ -4370,27 +3698,8 @@ test("规划请求只使用一次幕背景，正文和连续性保留各自的�
   assert.doesNotMatch(text, /已被摘要替代的过程|另一份历史摘要|原历史输入|最近的历史输入/);
   assert.equal(request.contextManifest.historyMessageCount, 0);
   assert.equal(request.contextManifest.fragments.filter((entry) => entry.section === "route").length, 1);
-  const actOutline = (definition as ResolvedNarrativeExperience).storyPack.acts[0].beatOutline;
-  assert.ok(text.includes(actOutline.setup) && text.includes(actOutline.payoff));
-});
-
-
-
-test("观察器只读取同一份大纲与本轮正文，不返回独立剧情指挥", async (t) => {
-  const run = makeRun();
-  const outline = outlineForTest("act.one");
-  t.mock.method(OpenAI.Chat.Completions.prototype, "create", async (payload: { tools: Array<{ function: { name: string; parameters: { properties: Record<string, unknown> } } }>; messages: Array<{ content: string }> }) => {
-    const tool = payload.tools[0].function;
-    assert.equal(Object.hasOwn(tool.parameters.properties, "progressGap"), false);
-    assert.equal(Object.hasOwn(tool.parameters.properties, "carryFactIds"), false);
-    const text = payload.messages.map((message) => message.content).join("\n");
-    assert.ok(text.includes(outline.beats.pressure.change));
-    assert.ok(text.includes("20岁：\\n敌军已被击退。") || text.includes("敌军已被击退。"));
-    assert.doesNotMatch(text, /本幕人物变化目标|当前故事弧问题|结束含义=/);
-    return { choices: [{ finish_reason: "tool_calls", message: { content: null, tool_calls: [{ id: "observer", type: "function", function: { name: tool.name, arguments: JSON.stringify(observationReplyForTest("advance")) } }] } }] };
-  });
-  const observed = await observeNarrativeBeat(run, world, { callId: "observe", actId: "act.one", beat: "pressure", outline, recentStory: "20岁：\n敌军已被击退。" }, { ...memoryTestContext(run), apiKey: "not-sent" });
-  assert.equal(observed.decision, "advance");
+  const act = (definition as ResolvedNarrativeExperience).storyPack.acts[0];
+  assert.ok(text.includes(act.objective));
 });
 
 test("仅背景入口和濒死重绘保留场景引用，当前位置独立声明后进入足迹与公开快照", async (t) => {
@@ -4417,10 +3726,11 @@ test("仅背景入口和濒死重绘保留场景引用，当前位置独立声�
   scripts.push(structuredClone(scripts.at(-1)!));
   const calls: string[] = [];
   t.mock.method(OpenAI.Chat.Completions.prototype, "create", async (payload: { tools: Array<{ function: { name: string } }>; messages: Array<{ content: string }> }) => {
-    const step = nextNarrativeScript(scripts, payload); assert.ok(step); assert.ok(payload.tools.some((tool) => tool.function.name === step.name));
+    const step = nextNarrativeScript(scripts, payload); assert.ok(step); assert.ok(payload.tools.some((tool) => tool.function.name === step.name), `fixture tool ${step.name}; available ${payload.tools.map((tool) => tool.function.name)}`);
     const text = payload.messages.map((entry) => entry.content).join("\n");
     const expectedIds = step.name === "resolve_background_outcome" ? [] : ["location:fort"];
-    for (const id of expectedIds) assert.ok(text.includes(id), `背景场景资料未传入：${id}`);
+
+    if (!text.includes("originalToolArguments")) for (const id of expectedIds) assert.ok(!text.includes(id), `前端登记不进入背景正文：${id}`);
     calls.push(step.name);
     return { choices: [{ finish_reason: "tool_calls", message: { content: null, tool_calls: [{ id: step.name, type: "function", function: { name: step.name, arguments: JSON.stringify(step.args) } }] } }] };
   });
@@ -4453,64 +3763,10 @@ test("仅背景入口和濒死重绘保留场景引用，当前位置独立声�
   assert.equal(scripts.length, 0);
 });
 
-
-test("payoff 由实际观察结果保持或结束，不要求同步另写交接剧情", async (t) => {
-  const definition = await loadNarrativeExperienceForTest("ancient");
-  const act = definition.mainlineActs![0];
-  let scripts: Array<{ name: string; args: Record<string, unknown> }> = [];
-  t.mock.method(OpenAI.Chat.Completions.prototype, "create", async (payload: { tools: Array<{ function: { name: string; parameters: { properties: Record<string, unknown> } } }>; messages: Array<{ content: string }> }) => {
-    const step = nextNarrativeScript(scripts, payload); assert.ok(step); assert.ok(payload.tools.some((tool) => tool.function.name === step.name));
-    if (step.name === "resolve_scene_outcome") assert.equal(Object.hasOwn(payload.tools[0].function.parameters.properties, "actHandoff"), false);
-    assert.doesNotMatch(payload.messages.map((entry) => entry.content).join("\n"), /拟交接/);
-    return { choices: [{ finish_reason: "tool_calls", message: { content: null, tool_calls: [{ id: step.name, type: "function", function: { name: step.name, arguments: JSON.stringify(step.args) } }] } }] };
-  });
-  for (const decision of ["hold", "advance"] as const) {
-    const run = makeRun(); run.age = 20; run.worldId = definition.worldId; run.narrative.enabled = true;
-    run.narrative = ensureNarrativeActRuntime(run.narrative, definition, run.age);
-    run.narrative.actRuntime!.beat = "payoff";
-    const before = structuredClone(run);
-    const narrative = "你带着巡防小队回到营中，失联同袍仍未寻回，众人决定继续搜寻。";
-    const rendered = { narrative, storyDelta: "巡防小队回营，失联同袍仍未寻回", continuityRefs: { factIds: [], characterIds: [], locationIds: [], abilityIds: [] }, assetActivity: { locationIds: [], abilityIds: [] }, continuityRequired: false, participants: [], assetUpdates: { locations: [], abilities: [] }, factUpdates: { introduce: [], updates: [] } };
-    scripts = [
-      { name: "plan_scene_turn", args: { conflictRefs: [], abilityRefs: [], forceIds: [], locationDirective: { mode: "stay" },  clockRequest: "hold",
-        actWorldCard: actWorldCardForTest({ goal: "落实失联同袍的结果", completionMeaning: "巡防危机及其代价已经落定" }) } },
-      { name: "render_scene_prose", args: rendered },
-      { name: "resolve_scene_outcome", args: { participants: [], effects: [{ stat: "intelligence", direction: "up", band: "light" }] } },
-      { name: "observe_story_beat", args: { beatDecision: decision, resolutions: [], carryFactIds: [] } }
-    ];
-    if (decision === "advance") scripts.push({ name: "sync_narrative_continuity", args: { locationUpdates: [], abilityUpdates: [], identityMerges: [], relationshipUpdates: [], factIntroductions: [], factUpdates: [] } });
-    const execute = async (working: typeof run) => {
-      const turn = await runNarrativeAgentTurn({ run: working, world, narrativeWorld: definition,
-        context: { ...memoryTestContext(working), apiKey: "not-sent" },
-        envelope: { callId: `payoff:${decision}`, source: "scene", worldId: working.worldId, currentAge: 20,
-          backgroundAgeRange: { fromAge: 21, toAge: 21 }, act, beat: "payoff", capabilities: ["scene"], storyPatterns: [], socialForces: [],
-          focusReferences: [], statTiers: resolveNarrativeStatTiers(working.stats), clock: { mode: "hold", sameAgeTurnCount: 0, maxSameAgeTurns: 3 } },
-        buildRenderInput: (plan) => ({ act, beat: "payoff", presentation: plan.presentation, allowedTurnKinds: ["scene"], sceneAge: 20,
-          backgroundAgeRange: { fromAge: 21, toAge: 21 }, storyPatterns: [], socialForces: [], knownCharacters: [], statTiers: resolveNarrativeStatTiers(working.stats),
-          attributePolicy: dynamicSceneAttributePolicy(), backgroundAttributePolicy: dynamicBackgroundAttributePolicy(working) }) });
-      return advanceWithDynamicNarrativeScene(working, world, definition, { ...turn.scene, sceneAge: turn.time.sceneAge,
-        beat: "payoff", beatDecision: turn.scene.beatDecision!, sceneClockMode: "hold", attributeOutcome: { effects: turn.scene.attributeEffects! }, attributePolicy: dynamicSceneAttributePolicy() });
-    };
-    if (decision === "hold") {
-      const committed = await runNarrativeTurnTransaction(run, execute);
-      assert.equal(committed.result.completedActId, undefined);
-      assert.equal(run.narrative.actRuntime!.actId, act.id);
-      assert.equal(run.narrative.actRuntime!.beat, "payoff");
-      assert.deepEqual(run.narrative.actCanon, []);
-    } else {
-      const committed = await runNarrativeTurnTransaction(run, execute);
-      assert.equal(committed.result.completedActId, act.id);
-      assert.equal(run.narrative.actCanon[0].sourceEventId, run.narrative.episodes.at(-1)?.sourceEventId ?? run.narrative.scene.lastEventId);
-      assert.equal(Object.hasOwn(run.narrative.actCanon[0], "continuation"), false);
-    }
-    assert.equal(scripts.length, 0, "正文与审校实际完成后才进入观察裁定");
-  }
-});
-
 test("同步区分局部战事结束与主线仍在持续，观察器不再重判事件状态", async (t) => {
   const run = makeRun(); run.narrative.enabled = true; run.age = 30;
   const [warId, battleId] = applyNarrativeFactUpdates(run, { introduce: [
-    { kind: "open_question", label: "外敌入侵仍需解决" }, { kind: "experience", label: "今夜抵挡夜袭" }
+    { kind: "open_question", label: "外敌入侵仍需解决" }, { kind: "commitment", label: "今夜抵挡夜袭" }
   ], touchFactIds: [], resolveFactIds: [] }, { sourceEventId: "war", actId: "act.one" });
   for (const [i, age] of [28, 29, 30].entries()) stageNarrativeAssetRound(run, {
     sourceEventId: "round:" + i, source: "scene", age, actId: "act.one", subject: "守关", narrative: i === 2 ? "夜袭已退，敌主力仍在境外。" : "守关防御中。"
@@ -4523,7 +3779,7 @@ test("同步区分局部战事结束与主线仍在持续，观察器不再重�
     assert.deepEqual(tool.parameters.properties.factUpdates.items.properties.status.enum, ["stay", "finish"]);
     return { choices: [{ finish_reason: "tool_calls", message: { tool_calls: [{ id: "sync", type: "function", function: {
       name: tool.name, arguments: JSON.stringify({
-        locationUpdates: [], abilityUpdates: [], identityMerges: [], relationshipUpdates: [], factIntroductions: [],
+        locationUpdates: [], abilityUpdates: [], retirements: [], identityMerges: [], relationshipUpdates: [], factIntroductions: [],
         factUpdates: [
           { factId: warId, status: "stay", summary: "敌主力仍在境外，战争尚未结束。", sourceEventId: "round:2" },
           { factId: battleId, status: "finish", summary: "这一轮夜袭已被击退。", sourceEventId: "round:2" }
@@ -4551,7 +3807,7 @@ test("身世人物登记与后续职位变化共用身份，状态更新不伪�
       summary: "来自营镇军户的孩子，父亲韩岐是守门军士。", seedHints: [],
       participants: [{ characterRef: "new", name: "韩岐", factionId: forces[0].id, role: "守门军士", description: "主角的父亲，驻守营镇", recurring: true }], assetUpdates: { locations: [], abilities: [] }
     } : {
-      factIntroductions: [], factUpdates: [], locationUpdates: [], abilityUpdates: [], identityMerges: [],
+      factIntroductions: [], factUpdates: [], locationUpdates: [], abilityUpdates: [], retirements: [], identityMerges: [],
       relationshipUpdates: [{ characterRef: characterId, role: "守备将军", description: "获授守备职责，负责营镇防务", status: "active" }]
     };
     return { choices: [{ finish_reason: "tool_calls", message: { content: null, tool_calls: [{ id: tool.name, type: "function", function: { name: tool.name, arguments: JSON.stringify(args) } }] } }] };
@@ -4580,78 +3836,10 @@ test("身世人物登记与后续职位变化共用身份，状态更新不伪�
   assert.equal(Object.hasOwn(calls[1].properties, "participants"), false);
   assert.ok(Object.hasOwn(calls[1].properties, "relationshipUpdates"));
   assert.match(JSON.stringify(calls[0].properties.participants), /主角.*不作为 participants/);
-  assert.match(calls[0].text, /participants 登记，主角保存在对局中/);
+  assert.doesNotMatch(calls[0].text, /participants 登记，主角保存在对局中/);
   assert.match(calls[1].text, /主角身份：/);
   assert.ok(calls[1].text.includes(characterId));
   assert.equal(makeRun().narrative.dynamicCharacters.length, 0, "人物资产没有跨局共享");
-});
-
-test("规划的同年时间贯通结算、正文与提交，可用资产不自动变成已使用资产", async (t) => {
-  const definition = await loadNarrativeExperienceForTest("ancient");
-  const run = makeRun();
-  run.worldId = definition.worldId; run.age = 20;
-  run.stats = { intelligence: 50, charisma: 50, family: 0, fortune: 50, physique: 1 };
-  run.narrative.enabled = true;
-  run.narrative = ensureNarrativeActRuntime(run.narrative, definition, 20);
-  run.narrative.actRuntime!.beat = "pressure";
-  run.narrative.sceneClock = { mode: "advance", sameAgeTurnCount: 9, maxSameAgeTurns: 3 };
-  run.survival.lowPhysiqueYears = 1;
-  run.narrative.assets = {
-    locations: [{ id: "location:fort", name: "旧营", description: "驻守之处", spatialDescription: "驻守之处", introduced: { age: 18 }, lastSeen: { age: 18 } }],
-    abilities: [{ id: "ability:scout", name: "辨踪", description: "识别骑队行迹", usage: "识别骑队行迹", source: "巡防习得", mastery: "初通", introduced: { age: 19 }, updated: { age: 19 } }],
-    currentLocationId: "location:fort"
-  };
-  const calls: Array<{ name: string; text: string }> = [];
-  const scripts = ["hold", "advance"].flatMap((clockRequest) => [
-    { name: "plan_scene_turn", args: {  actWorldCard: actWorldCardForTest({ goal: "确认后续行动", completionMeaning: "军令明确" }), clockRequest, conflictRefs: [], abilityRefs: ["ability:scout"], forceIds: [], locationDirective: { mode: "move", purpose: "接令后出营" } } },
-    { name: "render_scene_prose", args: { narrative: "你仍在营中等候，军令迟迟未到，只听见值夜人的脚步。", storyDelta: "尚未接令，仍在营中等候", continuityRefs: { factIds: [], characterIds: [], locationIds: [], abilityIds: [] }, assetActivity: { locationIds: [], abilityIds: [] }, continuityRequired: false , participants: [], assetUpdates: { locations: [], abilities: [] }, factUpdates: { introduce: [], updates: [] } } },
-    { name: "resolve_scene_outcome", args: { participants: [], effects: [{ stat: "intelligence", direction: "up", band: "light" }] } },
-    { name: "observe_story_beat", args: { beatDecision: "hold", resolutions: [], carryFactIds: [] } }
-  ]);
-  t.mock.method(OpenAI.Chat.Completions.prototype, "create", async (payload: { tools: Array<{ function: { name: string } }>; messages: Array<{ content: string }> }) => {
-    const step = nextNarrativeScript(scripts, payload); assert.ok(step);
-    assert.ok(payload.tools.some((tool) => tool.function.name === step.name));
-    calls.push({ name: step.name, text: payload.messages.map((entry) => entry.content).join("\n") });
-    return { choices: [{ finish_reason: "tool_calls", message: { content: null, tool_calls: [{ id: `time:${calls.length}`, type: "function", function: { name: step.name, arguments: JSON.stringify(step.args) } }] } }] };
-  });
-  for (const expectedAge of [20, 21]) {
-    const act = definition.mainlineActs![0];
-    const envelope: NarrativeTurnEnvelope = {
-      callId: `clock:${expectedAge}`, source: "scene", worldId: run.worldId, currentAge: run.age,
-      backgroundAgeRange: { fromAge: run.age + 1, toAge: run.age + 2 }, act, beat: "pressure", capabilities: ["scene"], storyPatterns: [], socialForces: [],
-      focusReferences: [{ id: "ability:scout", kind: "ability", label: "辨踪" }, { id: "location:fort", kind: "location", label: "旧营" }],
-      currentLocationId: "location:fort", statTiers: resolveNarrativeStatTiers(run.stats), clock: { ...run.narrative.sceneClock }
-    };
-    const turn = await runNarrativeAgentTurn({ run, world, narrativeWorld: definition,
-      context: { ...memoryTestContext(run), apiKey: "not-sent", narrativePlan: buildNarrativePromptPlan(run, definition, null, "planning") }, envelope,
-      buildRenderInput: (plan) => ({ act, beat: "pressure", presentation: plan.presentation, allowedTurnKinds: ["scene"],
-        storyPatterns: [], socialForces: [], knownCharacters: [], knownFactIds: [], statTiers: envelope.statTiers, attributePolicy: dynamicSceneAttributePolicy(), backgroundAttributePolicy: dynamicBackgroundAttributePolicy(run) })
-    });
-    assert.equal(turn.time.sceneAge, expectedAge);
-    assert.equal(turn.time.previousAge, 20);
-    assert.equal(turn.scene.scenePacing, expectedAge === 20 ? "continuous" : "spanning");
-    const writer = calls.filter((entry) => entry.name === "render_scene_prose").at(-1)!;
-    assert.ok(writer.text.includes(`你目前${expectedAge}岁`), "人物介绍采用实际叙述年龄");
-    assert.ok(writer.text.includes("上段已提交经历停在20岁"));
-    assert.ok(writer.text.includes(expectedAge === 20 ? "本段与上段同年" : "本段已进入下一岁"));
-    assert.deepEqual(turn.scene.assetActivity, { locationIds: [], abilityIds: [] });
-    assert.deepEqual(turn.scene.assetUpdates, { locations: [], abilities: [] }, "规划中的移动没有成为真实到达");
-    const recent = calls.slice(-3);
-    for (const call of recent.filter((entry) => entry.name !== "observe_story_beat")) assert.ok(call.text.includes(`${expectedAge}岁`));
-    advanceWithDynamicNarrativeScene(run, world, definition, { ...turn.scene, beat: "pressure", beatDecision: "hold", sceneAge: turn.time.sceneAge,
-      sceneClockMode: turn.plan.clockRequest, attributeOutcome: { effects: turn.scene.attributeEffects! }, attributePolicy: dynamicSceneAttributePolicy() });
-    run.narrative.assets = applyNarrativeAssetActivity(run.narrative.assets, turn.scene.assetActivity, { age: run.age });
-    assert.equal(run.age, expectedAge);
-    assert.deepEqual(run.narrative.assets.abilities[0].updated, { age: 19 });
-    assert.deepEqual(run.narrative.assets.locations[0].lastSeen, { age: 18 });
-    if (expectedAge === 20) {
-      assert.equal(run.stats.physique, 1, "同年不额外领取家境年度增益");
-      assert.equal(run.survival.lowPhysiqueYears, 1, "同年不重复累计低体魄年份");
-      run.narrative = ensureNarrativeRunState(run.narrative, true);
-      assert.equal(run.narrative.sceneClock.sameAgeTurnCount, 10, "恢复也不截断同年计数");
-    } else assert.equal(run.survival.lowPhysiqueYears, 2, "实际跨年才累计生存年份");
-  }
-  assert.equal(scripts.length, 0);
 });
 
 test("摘要不改写同年展示快照，迟到批次不能覆盖较新的有效背景", () => {
@@ -4678,20 +3866,52 @@ test("摘要不改写同年展示快照，迟到批次不能覆盖较新的有�
   let restored = JSON.parse(JSON.stringify(run)) as ReturnType<typeof makeRun>;
   restored.narrative = ensureNarrativeRunState(restored.narrative, true);
   const work = prepareNarrativeMemoryCuration(restored)!;
-  assert.deepEqual(["run"], ["run"]);
+  assert.equal(work.fromAge, 20);
   assert.equal(run.turnRecords[0].narrativeCharactersSnapshot![0].role, "军士");
   assert.equal(run.turnRecords[0].narrativeAssetsSnapshot!.abilities[0].mastery, "初通");
   assert.doesNotMatch(memoryCurationPrompt(work), /将军|统领守军|扩建后的驻防大营/);
-  const digest = (id: string, summary: string) => ({ id, summary, activeFactIds: [], historicalFactIds: [], characterIds: [] });
   assert.equal(applyNarrativeMemoryCuration(run, work, { summary: "前一批经历。" }), true);
   commitBatch("later");
   const later = prepareNarrativeMemoryCuration(run)!;
   assert.equal(applyNarrativeMemoryCuration(run, later, { summary: "两批经历。" }), true);
   assert.equal(applyNarrativeMemoryCuration(run, work, { summary: "过期背景" }), false);
-  assert.equal(run.narrative.memoryDigests.find((entry) => entry.id === "run")!.summary, "两批经历。");
+  assert.deepEqual(run.narrative.memoryDigests.map((entry) => entry.summary), ["前一批经历。", "两批经历。"]);
 });
 
-test("只绑定地点时规划引用的本领仍可进入选项，审校、作答、同步、恢复与下一轮贯通", async (t) => {
+test("独立时段摘要经过身份归并与恢复仍各自覆盖原文，同岁新增经历继续供应", () => {
+  const run = makeRun(); run.narrative.enabled = true; run.ended = true;
+  const people = [
+    ...registerNarrativeParticipants(run, [{ characterRef: "new", name: "韩岐", role: "军士", description: "同袍", recurring: true }], "origin"),
+    ...registerNarrativeParticipants(run, [{ characterRef: "new", name: "韩军士", role: "军士", description: "同一同袍", recurring: true }], "origin")
+  ];
+  const add = (id: string, age: number, text: string) => {
+    commitNarrativeMemory(run.narrative, { id: `memory:${id}`, age, text,
+      factionIds: [], characterIds: [people[1].character.id], factIds: [] });
+    commitNarrativeEpisode(run, { callId: id, sourceEventId: id, turnKind: "scene", age, storyDelta: text });
+  };
+  add("early-start", 0, "早年生活原文。");
+  add("early-end", 10, "少年遇险原文。");
+  const first = prepareNarrativeMemoryCuration(run)!;
+  assert.equal(applyNarrativeMemoryCuration(run, first, { summary: "少年遇险后获救。" }), true);
+  add("later-start", 11, "入伍原文。");
+  add("later-end", 20, "任职原文。");
+  const second = prepareNarrativeMemoryCuration(run)!;
+  assert.doesNotMatch(memoryCurationPrompt(second), /少年遇险后获救|早年生活原文|少年遇险原文/);
+  assert.equal(applyNarrativeMemoryCuration(run, second, { summary: "入伍后受任队官。" }), true);
+  add("same-year-new", 20, "同年接防的新经历。");
+  applyNarrativeIdentityMerges(run, [{ kind: "character", sourceRef: people[1].character.id, targetRef: people[0].character.id }]);
+  const restored = JSON.parse(JSON.stringify(run)) as typeof run;
+  restored.narrative = ensureNarrativeRunState(restored.narrative, true);
+  assert.equal(restored.narrative.memoryDigests.length, 2);
+  assert.deepEqual(restored.narrative.memoryDigests.map(({ fromAge, throughAge }) => [fromAge, throughAge]), [[0, 10], [11, 20]]);
+  const history = buildNarrativeStoryHistory(restored.narrative, restored.turnRecords);
+  assert.equal(history.summary!.text, "0—10岁：少年遇险后获救。\n\n11—20岁：入伍后受任队官。");
+  assert.deepEqual(history.episodes.map(({ sourceEventId }) => sourceEventId), ["same-year-new"]);
+  assert.equal(history.summary!.coveredEpisodeIds.length, 4);
+  assert.deepEqual(prepareNarrativeMemoryCuration(restored)!.episodeIds, ["episode:same-year-new"]);
+});
+
+test("暂停召回后选项无需档案绑定，实际活动、同步与恢复仍贯通", async (t) => {
   const definition = await loadNarrativeExperienceForTest("ancient");
   const run = makeRun(); run.age = 20; run.worldId = "ancient"; run.narrative.enabled = true;
   run.narrative = ensureNarrativeActRuntime(run.narrative, definition, 20);
@@ -4702,22 +3922,22 @@ test("只绑定地点时规划引用的本领仍可进入选项，审校、作�
   };
   const act = definition.mainlineActs![0];
   const options = ["safe", "balanced", "risky"].map((id) => ({ id, label: "应对来敌", description: "选用弓箭阻击，或前往新的营地求援。",
-    abilityRefs: id === "risky" ? ["ability:bow"] : [],
+    abilityRefs: [],
     locationDirective: id === "safe" ? { mode: "revisit", locationRef: "location:watch" } : { mode: "move", purpose: "前往新营地求援" } }));
   const scripts: Array<{ name: string; args: Record<string, unknown> }> = [
-    { name: "plan_scene_turn", args: {  actWorldCard: actWorldCardForTest({ goal: "守住山口", completionMeaning: "来敌攻势已经得到回应" }),
+    { name: "recall_scene_assets", args: {  actWorldCard: actWorldCardForTest({ goal: "守住山口", completionMeaning: "来敌攻势已经得到回应" }),
       clockRequest: "hold", forceIds: [], conflictRefs: [], abilityRefs: [],
       locationDirective: { mode: "stay" }, assetNeeds: [{ kind: "ability", ref: "ability:bow", purpose: "弓箭射击来敌" }, { kind: "location", ref: "location:watch", purpose: "山口哨所观察来敌" }] } },
     { name: "render_choice_prose", args: { decisionBrief: { question: "如何应对来敌？", stakes: "防守方法与去向会改变" }, narrative: "来敌逼近山口，你带着弓站在营门，等候下一步的决定。\n\n来敌逼近山口，你带着弓站在营门，等候下一步的决定。\n\n来敌逼近山口，你带着弓站在营门，等候下一步的决定。", background: "守军尚未出动，你需要选择在山口阻击，还是离营寻求援军。",
       storyDelta: "来敌逼近，防守方式尚待选择", optionOverrides: options, continuityRefs: { factIds: [], characterIds: [], locationIds: [], abilityIds: [] }, assetActivity: { locationIds: [], abilityIds: [] }, continuityRequired: false , participants: [], assetUpdates: { locations: [], abilities: [] }, factUpdates: { introduce: [], updates: [] } } }
   ];
   t.mock.method(OpenAI.Chat.Completions.prototype, "create", async (payload: { tools: Array<{ function: { name: string } }>; messages: Array<{ content: string }> }) => {
-    const step = nextNarrativeScript(scripts, payload); assert.ok(step); assert.ok(payload.tools.some((tool) => tool.function.name === step.name));
-    if (["render_choice_prose", "render_decision_outcome", "sync_narrative_continuity"].includes(step.name)) assert.ok(payload.messages.some((entry) => entry.content.includes("ability:bow")), "规划需求引用的本领直接进入执行请求");
+    const step = nextNarrativeScript(scripts, payload); assert.ok(step); assert.ok(payload.tools.some((tool) => tool.function.name === step.name), `fixture tool ${step.name}; available ${payload.tools.map((tool) => tool.function.name)}`);
+    if (["render_choice_prose", "render_decision_outcome"].includes(step.name)) assert.ok(!payload.messages.some((entry) => entry.content.includes("ability:bow")), "档案引用不进入正文请求");
     if (step.name === "render_choice_prose") {
       const text = payload.messages.map((entry) => entry.content).join("\n");
       assert.doesNotMatch(text, /本轮已绑定材料/);
-      assert.equal(text.split("本领身份目录：").length - 1, 1, "变更与活动共用一份本领身份目录");
+      assert.equal(text.split("本领身份目录：").length - 1, 0, "正文不接收完整身份目录");
     }
     return { choices: [{ finish_reason: "tool_calls", message: { content: null, tool_calls: [{ id: step.name, type: "function", function: { name: step.name, arguments: JSON.stringify(step.args) } }] } }] };
   });
@@ -4730,12 +3950,12 @@ test("只绑定地点时规划引用的本领仍可进入选项，审校、作�
     buildRenderInput: (plan) => ({ act, beat: "pressure", presentation: plan.presentation, allowedTurnKinds: ["scene"], sceneAge: 20,
       backgroundAgeRange: { fromAge: 21, toAge: 21 }, storyPatterns: [], socialForces: [], knownCharacters: [],
       statTiers: resolveNarrativeStatTiers(run.stats), attributePolicy: dynamicSceneAttributePolicy(), backgroundAttributePolicy: dynamicBackgroundAttributePolicy(run) }) });
-  assert.deepEqual(turn.scene.milestoneCopy!.optionOverrides[2].abilityRefs, ["ability:bow"]);
-  const advanced = advanceWithDynamicNarrativeScene(run, world, definition, { ...turn.scene, sceneAge: turn.time.sceneAge, beat: "pressure", beatDecision: "hold", decisionBrief: turn.scene.decisionBrief, sceneClockMode: "hold" });
+  assert.deepEqual(turn.scene.milestoneCopy!.optionOverrides[2].abilityRefs, []);
+  const advanced = advanceWithDynamicNarrativeScene(run, world, definition, { ...turn.scene, sceneAge: turn.time.sceneAge,   decisionBrief: turn.scene.decisionBrief});
   applyDirectedMilestonePresentation(advanced.updated, turn.scene.milestoneCopy);
   const restored = JSON.parse(JSON.stringify(run)) as typeof run;
   restored.narrative = ensureNarrativeRunState(restored.narrative, true);
-  assert.deepEqual(restored.nextMilestoneChoice!.options[2].abilityRefs, ["ability:bow"]);
+  assert.deepEqual(restored.nextMilestoneChoice!.options[2].abilityRefs, []);
   assert.equal(restored.narrative.assets!.locations.length, 1, "未来选项中的新营地还没有成为足迹");
   assert.deepEqual(restored.narrative.assets!.abilities[0].updated, { age: 18 }, "可选择本领不等于已经使用或升级");
   assert.equal(restored.age, 20);
@@ -4751,7 +3971,7 @@ test("只绑定地点时规划引用的本领仍可进入选项，审校、作�
       abilities: [{ ref: "ability:bow", mastery: "熟练" }, { ref: "new", name: "夜行辨路", description: "在夜间辨识行军道路", usage: "在夜间辨识行军道路", source: "抵营后向斥候学得", mastery: "初通" }]
     }, factUpdates: { introduce: [], updates: [] } } },
     { name: "resolve_decision_outcome", args: { effects: [{ stat: "family", direction: "up", band: "light" }] } },
-    { name: "observe_story_beat", args: { beatDecision: "hold", resolutions: [], carryFactIds: [] } }
+    { name: "observe_act_closure", args: { beatDecision: "hold", resolutions: [], carryFactIds: [] } }
   );
   const context = { ...memoryTestContext(restored), apiKey: "not-sent", narrativePlan: buildNarrativePromptPlan(restored, definition, null, "decision", {
     focusIds: [...selected.abilityRefs!, ...(selected.locationDirective?.locationRef ? [selected.locationDirective.locationRef] : [])],
@@ -4762,10 +3982,12 @@ test("只绑定地点时规划引用的本领仍可进入选项，审校、作�
     attributePolicy: { allowedStats: ["family"], allowedDirections: ["up"], allowedBands: ["light"], minEffects: 1, maxEffects: 1 }
   } });
   assert.equal(restored.narrative.assets!.abilities[0].mastery, "初通", "正文只登记身份，能力变化由周期同步提炼后写入");
+  restored.nextMilestoneChoice!.check ??= prepareChoiceCheck(restored, definition); rollChoice(restored, "risky");
   const settled = applyMilestoneDecisionAndAdvance(restored, world, difficulty, "risky", { narrativeWorld: definition,
     narrativeOutcome: { effects: decision.outcome.effects }, narrative: decision.outcome.narrative, deferCompletion: true });
   const observation = await finishNarrativeAgentDecision({ run: restored, world, narrativeWorld: definition, context, callId: "materials:answer", attemptId: decision.attemptId, decision: selected, outcome: decision.outcome });
-  completeMilestoneDecision(restored, settled.decisionEvent, settled.sourceEventId, settled.factIds, { narrativeWorld: definition, beatDecision: observation.decision });
+  restored.choiceExecution!.outcome = decision.outcome;
+  completeMilestoneDecision(restored, settled.decisionEvent, settled.sourceEventId, settled.factIds, { narrativeWorld: definition});
   const committed = applyNarrativeAssetUpdates(applyNarrativeAssetActivity(restored.narrative.assets, decision.outcome.assetActivity, { age: restored.age }), decision.outcome.assetUpdates, { age: restored.age });
   commitNarrativeAssets(restored.narrative, committed, { age: restored.age }, {}, settled.sourceEventId);
   appendPublicTurnRecord(restored, { entryId: settled.sourceEventId, kind: "choice_outcome", narrative: decision.outcome.narrative, age: restored.age, ageStage: { label: "青年" }, statChanges: settled.decisionEvent.statChanges });
@@ -4780,12 +4002,13 @@ test("只绑定地点时规划引用的本领仍可进入选项，审校、作�
   assert.equal(toClientRun(nextRun).narrativeAssets!.abilities.some((entry) => entry.id === learned.id), true);
   assert.equal(nextRun.turnRecords.at(-1)!.narrativeAssetsSnapshot!.currentLocationId, arrived.id);
   const nextPlan = buildNarrativePromptPlan(nextRun, definition, null, "rendering", { focusIds: [bow.id, learned.id, arrived.id], semanticQuery: "运用弓箭与夜行辨路组织营地巡防" })!;
-  assert.ok([bow.id, learned.id, arrived.id].every((id) => nextPlan.recall?.assetSources?.some((entry) => entry.id === id)));
+  assert.deepEqual(nextPlan.recall?.assetSources, [], "展示档案不再进入下一轮正文");
   assert.equal(nextRun.age, 20, "选择与后果保留在同年");
+  await finishPendingNarrativeActEvent(restored, world, definition, context, async () => {});
   assert.equal(scripts.length, 0);
 });
 
-test("回放镇北关回城选项：已有目的地按本局身份通过，选中后再召回详情", async (t) => {
+test("回城行动不召回目的地档案，实际回城仍更新前端位置", async (t) => {
   const baseWorld = await loadNarrativeWorldDefinition("ancient"); assert.ok(baseWorld);
   const pack = await loadNarrativeStoryPack(baseWorld, "ancient.frontier-commander"); assert.ok(pack);
   const definition = resolveNarrativeExperience(baseWorld, pack);
@@ -4811,11 +4034,11 @@ test("回放镇北关回城选项：已有目的地按本局身份通过，选�
     continuityRefs: { factIds: [], characterIds: [], locationIds: [], abilityIds: [] }, continuityRequired: false };
   const options = [
     { id: "safe", label: "收队回城缴令", description: "弃探而归，把四骑与虚实一并带回镇北关，当面认下超期出哨与借粮之账。", abilityRefs: [], locationDirective: { mode: "revisit", locationRef: cityId } },
-    { id: "balanced", label: "分骑：两骑回城报讯，你带两骑贴住重股", description: "以两骑携口信与账目回城缴令，余众短程咬住西去驮队，摸清换哨便退。", abilityRefs: [abilityId], locationDirective: { mode: "stay" } },
-    { id: "risky", label: "全队咬住重股探到底", description: "不报不撤，四骑随你循重蹄印追到敌屯，赌一夜摸清辎重与换哨再回。", abilityRefs: [abilityId], locationDirective: { mode: "stay" } }
+    { id: "balanced", label: "分骑：两骑回城报讯，你带两骑贴住重股", description: "以两骑携口信与账目回城缴令，余众短程咬住西去驮队，摸清换哨便退。", abilityRefs: [], locationDirective: { mode: "stay" } },
+    { id: "risky", label: "全队咬住重股探到底", description: "不报不撤，四骑随你循重蹄印追到敌屯，赌一夜摸清辎重与换哨再回。", abilityRefs: [], locationDirective: { mode: "stay" } }
   ];
   const scripts: Array<{ name: string; args: Record<string, unknown> }> = [
-    { name: "plan_scene_turn", args: { conflictRefs: [], abilityRefs: [abilityId], assetNeeds: [{ kind: "character", ref: characterId, purpose: "同行老兵点明继续追踪与回城的风险" }],
+    { name: "recall_scene_assets", args: { conflictRefs: [], abilityRefs: [abilityId], assetNeeds: [{ kind: "character", ref: characterId, purpose: "同行老兵点明继续追踪与回城的风险" }],
       locationDirective: { mode: "stay" }, clockRequest: "hold", forceIds: [],  actWorldCard: actWorldCardForTest({ goal: "形成深入侦察或保全人马归队的取舍", completionMeaning: "这次无令出哨的去向与后果已经形成" }),
       } },
     { name: "render_choice_prose", args: { decisionBrief: { question: "继续咬住敌骑，还是回城缴令？", stakes: "敌情、人马安危与违令责任将随选择改变" }, ...emptyChanges,
@@ -4826,23 +4049,20 @@ test("回放镇北关回城选项：已有目的地按本局身份通过，选�
       assetActivity: { locationIds: [], abilityIds: [abilityId], currentLocationId: currentId } } },
     { name: "render_decision_outcome", args: { ...emptyChanges, narrative: "你收拢四骑，沿旧道返回镇北关。天黑前人马进城，你交还军令，将两股敌骑的去向如实禀报，也认下无令续探的责任。四人平安归队，这趟侦察到此结束。",
       storyDelta: "主角带四骑平安返回镇北关，提交敌骑动向并承担无令续探的责任。", assetActivity: { locationIds: [], abilityIds: [], currentLocationId: cityId } } },
-    { name: "resolve_decision_outcome", args: { effects: [{ stat: "family", direction: "up", band: "light" }] } },
-    { name: "observe_story_beat", args: { beatDecision: "hold", resolutions: [], carryFactIds: [] } }
-  ];
+    { name: "resolve_decision_outcome", args: { effects: [{ stat: "family", direction: "up", band: "light" }] } }];
   t.mock.method(OpenAI.Chat.Completions.prototype, "create", async (payload: { tools: Array<{ function: { name: string; parameters: { properties: Record<string, any> } } }>; messages: Array<{ content: string }> }) => {
     const step = nextNarrativeScript(scripts, payload); assert.ok(step, "只调用本次故障链路所需请求");
     const tool = payload.tools.find((entry) => entry.function.name === step.name)?.function; assert.ok(tool);
     const text = payload.messages.map((entry) => entry.content).join("\n");
     if (step.name === "render_choice_prose") {
-      assert.ok(text.includes(cityId), "回城地点的完整身份已经提供给模型");
+      assert.ok(!text.includes(cityId), "目的地不另行绑定前端目录");
       assert.ok(!text.includes(citySpace), "待选场景只召回当前地点详情");
-      assert.match(tool.parameters.properties.optionOverrides.items.properties.locationDirective.properties.locationRef.description, /本局地点身份目录/);
-      assert.match(tool.parameters.properties.optionOverrides.items.properties.abilityRefs.items.description, /本轮可用材料目录/);
-      assert.ok(text.includes(cityId), "目的地身份可引用，详情在作答时召回");
+      assert.equal(tool.parameters.properties.optionOverrides.items.properties.locationDirective, undefined);
+      assert.equal(tool.parameters.properties.optionOverrides.items.properties.abilityRefs, undefined);
     }
     if (step.name === "render_decision_outcome") {
-      assert.ok(text.includes(citySpace), "选中回城后召回镇北关空间详情");
-      assert.ok(text.includes(`revisit:${cityId}`), "原选项目的地完整传入作答正文");
+      assert.ok(!text.includes(citySpace), "返回地点仍由实际行动承接，不展开前端空间档案");
+      assert.ok(text.includes(selected.label), "已选行动传入作答正文");
       assert.equal(run.narrative.assets!.currentLocationId, currentId, "作答正文提交前仍停留在草滩");
     }
     return { choices: [{ finish_reason: "tool_calls", message: { content: null, tool_calls: [{ id: step.name, type: "function", function: { name: step.name, arguments: JSON.stringify(step.args) } }] } }] };
@@ -4860,9 +4080,9 @@ test("回放镇北关回城选项：已有目的地按本局身份通过，选�
         backgroundAgeRange: { fromAge: 27, toAge: 27 }, storyPatterns: [], socialForces: [], knownCharacters: [],
         statTiers: resolveNarrativeStatTiers(run.stats), attributePolicy: dynamicSceneAttributePolicy(), backgroundAttributePolicy: dynamicBackgroundAttributePolicy(run) };
     } });
-  assert.deepEqual(renderLocationIds, [currentId], "待选场景只有当前地点详情，回城目的地不提前进入材料");
+  assert.deepEqual(renderLocationIds, [], "当前地点及目的地的展示档案都不进入正文材料");
   assert.deepEqual(turn.scene.milestoneCopy!.optionOverrides[0].locationDirective, options[0].locationDirective);
-  const advanced = advanceWithDynamicNarrativeScene(run, world, definition, { ...turn.scene, sceneAge: turn.time.sceneAge, beat: "pressure", beatDecision: "hold", decisionBrief: turn.scene.decisionBrief, sceneClockMode: "hold" });
+  const advanced = advanceWithDynamicNarrativeScene(run, world, definition, { ...turn.scene, sceneAge: turn.time.sceneAge,   decisionBrief: turn.scene.decisionBrief});
   applyDirectedMilestonePresentation(advanced.updated, turn.scene.milestoneCopy);
   const selected = run.nextMilestoneChoice!.options[0];
   assert.deepEqual(selected.locationDirective, options[0].locationDirective);
@@ -4876,10 +4096,12 @@ test("回放镇北关回城选项：已有目的地按本局身份通过，选�
       abilityRefs: selected.abilityRefs, locationDirective: selected.locationDirective, decisionBrief: turn.scene.decisionBrief,
       attributePolicy: { allowedStats: ["family"], allowedDirections: ["up"], allowedBands: ["light"], minEffects: 1, maxEffects: 1 } } });
   assert.equal(result.outcome.assetActivity!.currentLocationId, cityId);
+  run.nextMilestoneChoice!.check ??= prepareChoiceCheck(run, definition); rollChoice(run, "safe");
   const settled = applyMilestoneDecisionAndAdvance(run, world, difficulty, "safe", { narrativeWorld: definition,
     narrativeOutcome: { effects: result.outcome.effects }, narrative: result.outcome.narrative, deferCompletion: true });
   const observation = await finishNarrativeAgentDecision({ run, world, narrativeWorld: definition, context: { ...memoryTestContext(run), apiKey: "not-sent" }, callId: "replay:town-return:answer", attemptId: result.attemptId, choice: publicChoice, decision: selected, outcome: result.outcome });
-  completeMilestoneDecision(run, settled.decisionEvent, settled.sourceEventId, settled.factIds, { narrativeWorld: definition, beatDecision: observation.decision });
+  run.choiceExecution!.outcome ??= { narrative: settled.decisionEvent.summary, effects: [], assetActivity: { locationIds: [], abilityIds: [] }, nextClock: "advance" };
+  completeMilestoneDecision(run, settled.decisionEvent, settled.sourceEventId, settled.factIds, { narrativeWorld: definition});
   const application = applyNarrativeAssetUpdates(applyNarrativeAssetActivity(run.narrative.assets, result.outcome.assetActivity, { age: 26 }), result.outcome.assetUpdates, { age: 26 });
   commitNarrativeAssets(run.narrative, application, { age: 26 }, {}, "replay:town-return:answer");
   resolveTurnRecordChoice(run, publicChoice, publicChoice.options[0]);
@@ -4904,11 +4126,11 @@ test("回放边将高潮部分绑定：三项既有本领可组合为选项，�
     currentLocationId: locationId
   };
   const input: DynamicNarrativeSceneInput = {
-    act: definition.mainlineActs![1], beat: "climax", presentation: "choice", allowedTurnKinds: ["scene"], sceneAge: 28,
+    act: definition.mainlineActs![1],  presentation: "choice", allowedTurnKinds: ["scene"], sceneAge: 28,
     backgroundAgeRange: { fromAge: 28, toAge: 28 }, storyPatterns: [], socialForces: [], knownCharacters: [],
     statTiers: resolveNarrativeStatTiers(run.stats), attributePolicy: dynamicSceneAttributePolicy(), backgroundAttributePolicy: dynamicBackgroundAttributePolicy(run),
-    plan: { callId: "frontier-replay", turnKind: "scene", presentation: "choice", patternIds: [], forceIds: [], conflictRefs: [], abilityRefs: ids.slice(0, 2),
-       clockRequest: "advance", decisionBrief: { question: "如何攻破敌营？", stakes: "行动方式与军队处境将改变" },
+    plan: { recallRefs: [], locationRefs: [],  callId: "frontier-replay", turnKind: "scene", presentation: "choice", patternIds: [], forceIds: [], conflictRefs: [], abilityRefs: ids.slice(0, 2),
+        decisionBrief: { question: "如何攻破敌营？", stakes: "行动方式与军队处境将改变" },
       materials: [{ id: locationId, kind: "location", label: "朔州镇北堡" }, ...ids.map((id, index) => ({ id, kind: "ability" as const, label: names[index] }))] }
   };
   const pairs = [[ids[1], ids[2]], [ids[0], ids[1]], [ids[0], ids[2]]];
@@ -4918,14 +4140,12 @@ test("回放边将高潮部分绑定：三项既有本领可组合为选项，�
       assetActivity: { locationIds: [locationId], currentLocationId: locationId, abilityIds: [] }, continuityRefs: { factIds: [], characterIds: [], locationIds: [], abilityIds: [] }, continuityRequired: false , participants: [], assetUpdates: { locations: [], abilities: [] }, factUpdates: { introduce: [], updates: [] } } }
   ];
   t.mock.method(OpenAI.Chat.Completions.prototype, "create", async (payload: { tools: Array<{ function: { name: string; parameters: { properties: Record<string, any> } } }>; messages: Array<{ content: string }> }) => {
-    const step = nextNarrativeScript(scripts, payload); assert.ok(step); assert.ok(payload.tools.some((tool) => tool.function.name === step.name));
+    const step = nextNarrativeScript(scripts, payload); assert.ok(step); assert.ok(payload.tools.some((tool) => tool.function.name === step.name), `fixture tool ${step.name}; available ${payload.tools.map((tool) => tool.function.name)}`);
     if (step.name === "render_choice_prose") {
       const text = payload.messages.map((entry) => entry.content).join("\n");
-      assert.ok(ids.every((id) => text.includes(id)), "工具与模型接收完整候选引用，而非地点绑定子集");
-      assert.ok(names.every((name) => text.includes(name)), "本领身份同时提供名称供模型理解");
-      const abilitySchema = payload.tools.find((tool) => tool.function.name === step.name)!.function.parameters.properties.optionOverrides.items.properties.abilityRefs.items;
-      assert.match(abilitySchema.description, /本轮可用材料目录/);
-      assert.equal(abilitySchema.enum, undefined, "目录动态，原生 Schema 保持稳定");
+      assert.ok(ids.every((id) => !text.includes(id)), "即使保留旧材料交接也不追加档案目录");
+      assert.ok(names.every((name) => !text.includes(name)), "档案名称不单独回流");
+      assert.equal(payload.tools.find((tool) => tool.function.name === step.name)!.function.parameters.properties.optionOverrides.items.properties.abilityRefs, undefined);
     }
     return { choices: [{ finish_reason: "tool_calls", message: { content: null, tool_calls: [{ id: step.name, type: "function", function: { name: step.name, arguments: JSON.stringify(step.args) } }] } }] };
   });
@@ -4950,12 +4170,12 @@ test("正文登记同轮身份，观察器只判断节拍，失败不发布候�
   t.mock.method(OpenAI.Chat.Completions.prototype, "create", async (payload: { tools: Array<{ function: { name: string } }>; messages: Array<{ content: string }> }) => {
     const name = payload.tools[0].function.name;
     const text = payload.messages.map((entry) => entry.content).join("\n");
-    const args = name === "plan_scene_turn" ? planningReplyForTest({ conflictRefs: [], abilityRefs: [], forceIds: [], locationDirective: { mode: "stay" }, clockRequest: "hold" })
-      : name === "render_scene_prose" ? { narrative: "你将来使平安护送入山口营地，与他商量驻守。", participants: [{ characterRef: "new", name: "来使" }],
+    const args = name === "recall_scene_assets" ? planningReplyForTest({ conflictRefs: [], abilityRefs: [], forceIds: [], locationDirective: { mode: "stay" }, clockRequest: "hold" })
+      : name === "render_scene_prose" ? { nextClock: "hold", narrative: rejectObservation ? "" : "你将来使平安护送入山口营地，与他商量驻守。", participants: [{ characterRef: "new", name: "来使" }],
         assetUpdates: { locations: [{ ref: "new", name: "山口营地", current: true }], abilities: [] }, assetActivity: { locationIds: [], abilityIds: [] } }
       : name === "resolve_scene_outcome" ? { effects: [{ stat: "intelligence", direction: "up", band: "light" }] }
       : observationReplyForTest(rejectObservation ? "unknown" : "hold");
-    if (name === "observe_story_beat") assert.ok(text.includes("20岁") && text.includes("将来使平安护送"));
+    if (name === "observe_act_closure") assert.ok(text.includes("20岁") && text.includes("将来使平安护送"));
     return { choices: [{ finish_reason: "tool_calls", message: { content: null, tool_calls: [{ id: name, type: "function", function: { name, arguments: JSON.stringify(args) } }] } }] };
   });
   const execute = (run: typeof base) => runNarrativeAgentTurn({ run, world, narrativeWorld: definition,
@@ -4995,7 +4215,7 @@ test("中断背景采用实际终点正文登记轻量资产，年龄区间与�
       }, factUpdates: { introduce: [{ kind: "commitment", label: "答谢医者收留", status: "open" }], updates: [] } } }
   ];
   t.mock.method(OpenAI.Chat.Completions.prototype, "create", async (payload: { tools: Array<{ function: { name: string; parameters: { properties: Record<string, unknown> } } }>; messages: Array<{ content: string }> }) => {
-    const step = nextNarrativeScript(scripts, payload); assert.ok(step); assert.ok(payload.tools.some((tool) => tool.function.name === step.name));
+    const step = nextNarrativeScript(scripts, payload); assert.ok(step); assert.ok(payload.tools.some((tool) => tool.function.name === step.name), `fixture tool ${step.name}; available ${payload.tools.map((tool) => tool.function.name)}`);
     if (step.name === "sync_narrative_continuity") {
       assert.ok(Object.hasOwn(payload.tools[0].function.parameters.properties, "factIntroductions"));
       assert.equal(payload.messages.map((entry) => entry.content).join("\n").split(finalText).length - 1, 1);
@@ -5012,7 +4232,7 @@ test("中断背景采用实际终点正文登记轻量资产，年龄区间与�
   const result = (await synchronizeNarrativeAgentScene({
     run, world, narrativeWorld: definition, context, callId: "accepted-background",
     scene: { ...rendered, turnKind: "background", patternIds: [], forceIds: [] },
-    plan: { callId: "accepted-background", turnKind: "background", presentation: "summary", patternIds: [], forceIds: [], conflictRefs: [], abilityRefs: [],  clockRequest: "advance" },
+    plan: { recallRefs: [], locationRefs: [],  callId: "accepted-background", turnKind: "background", presentation: "summary", patternIds: [], forceIds: [], conflictRefs: [], abilityRefs: []},
     promptPlan: buildNarrativePromptPlan(run, definition, null, "background")!
   })).scene;
   const source = `background:21:22:${run.history.length}`;
@@ -5043,26 +4263,26 @@ test("规划完整引用保留用途，省略前缀不会被静默丢弃或自�
   const args = { beatChange: "守住山口", timeScope: "同年完成阻击", note: "", abilityRefs: [{ ref: abilityId, purpose: "阻击来敌" }], conflictRefs: [], forceIds: [], clockRequest: "hold",
     locationDirective: { mode: "revisit", locationRef: locationId }, actWorldCard: actWorldCardForTest({ goal: "守住山口", completionMeaning: "来敌得到回应" }),
     assetNeeds: [{ kind: "ability", ref: abilityId, purpose: "阻击来敌" }] };
-  const plan = parseNarrativeTurnPlan(args, "plan_scene_turn", envelope);
+  const plan = parseNarrativeTurnPlan(planningReplyForTest(args), "recall_scene_assets", envelope);
   assert.deepEqual(plan.abilityRefs, [abilityId]);
-  assert.equal(plan.assetNeeds![0].purpose, "阻击来敌");
+  assert.ok(plan.recallRefs.includes(abilityId));
+  assert.equal(Object.hasOwn(plan, "recallUses"), false);
   const schema = JSON.stringify(narrativeTurnPlanTools({ ...envelope, actOutline: outlineForTest(envelope.act.id) }));
-  assert.match(schema, /原样复制 abilityRefs 目录/);
+  assert.match(schema, /目录完整 ID/);
   assert.equal(schema.includes(abilityId), false, "引用说明稳定，具体目录仍在动态输入中");
   const prompt = narrativeTurnPlanningPrompt({ ...envelope, actOutline: outlineForTest(envelope.act.id) });
   assert.ok(prompt.includes(abilityId) && prompt.includes(locationId));
   assert.ok(prompt.includes(JSON.stringify({ id: cardId, kind: "world_card", label: "斥候、地形与敌情" })));
   assert.equal(prompt.includes(`${cardId}=world_card:`), false);
-  assert.deepEqual(parseNarrativeTurnPlan({ ...args, conflictRefs: [{ ref: cardId, purpose: "判断山口的防守条件" }] }, "plan_scene_turn", envelope).conflictRefs, [cardId]);
+  assert.deepEqual(parseNarrativeTurnPlan(planningReplyForTest({ ...args, conflictRefs: [{ ref: cardId, purpose: "判断山口的防守条件" }] }), "recall_scene_assets", envelope).conflictRefs, [cardId]);
   const decoratedRef = `${cardId}=world_card:斥候、地形与敌情`;
-  assert.throws(() => parseNarrativeTurnPlan({ ...args, conflictRefs: [{ ref: decoratedRef, purpose: "防守" }] }, "plan_scene_turn", envelope),
-    (error: unknown) => error instanceof NarrativeOutcomeError && error.validation?.path === "conflictRefs[0].ref" && error.validation.received === decoratedRef);
-  assert.throws(() => parseNarrativeTurnPlan({ ...args, abilityRefs: [{ ref: abilityId.slice("ability:".length), purpose: "阻击" }] }, "plan_scene_turn", envelope),
-    (error: unknown) => error instanceof NarrativeOutcomeError && error.validation?.path === "abilityRefs[0].ref" && error.validation.received === abilityId.slice("ability:".length));
-  assert.throws(() => parseNarrativeTurnPlan({ ...args, locationDirective: { mode: "revisit", locationRef: locationId.slice("location:".length) } }, "plan_scene_turn", envelope),
-    (error: unknown) => error instanceof NarrativeOutcomeError && error.validation?.path === "locationDirective.locationRef");
-  assert.deepEqual(parseNarrativeTurnPlan({ ...args, abilityRefs: [], assetNeeds: [{ kind: "ability", purpose: "学习新的护阵能力" }] }, "plan_scene_turn", envelope).assetNeeds,
-    [{ kind: "ability", purpose: "学习新的护阵能力" }]);
+  assert.throws(() => parseNarrativeTurnPlan(planningReplyForTest({ ...args, conflictRefs: [{ ref: decoratedRef, purpose: "防守" }] }), "recall_scene_assets", envelope),
+    (error: unknown) => error instanceof NarrativeOutcomeError && error.validation?.path?.startsWith("recallRefs[") && error.validation.received === decoratedRef);
+  assert.throws(() => parseNarrativeTurnPlan(planningReplyForTest({ ...args, abilityRefs: [{ ref: abilityId.slice("ability:".length), purpose: "阻击" }] }), "recall_scene_assets", envelope),
+    (error: unknown) => error instanceof NarrativeOutcomeError && error.validation?.path?.startsWith("recallRefs[") && error.validation.received === abilityId.slice("ability:".length));
+  assert.throws(() => parseNarrativeTurnPlan(planningReplyForTest({ ...args, locationDirective: { mode: "revisit", locationRef: locationId.slice("location:".length) } }), "recall_scene_assets", envelope),
+    (error: unknown) => error instanceof NarrativeOutcomeError && error.validation?.path?.startsWith("recallRefs["));
+  assert.throws(() => parseNarrativeTurnPlan({ recallRefs: [], assetNeeds: [{ kind: "ability", purpose: "学习新的护阵能力" }] }, "recall_scene_assets", envelope));
 });
 
 test("边将规划目录原样引用贯通素材、移动和新资产登记，错误引用不发布本轮", async (t) => {
@@ -5084,7 +4304,7 @@ test("边将规划目录原样引用贯通素材、移动和新资产登记，�
   base.narrative.assets = initialAssets.assets;
   const abilityId = initialAssets.abilityIds[0], locationId = initialAssets.locationIds[0];
   const [factId] = applyNarrativeFactUpdates(base, { introduce: [{ kind: "open_question", label: "黑石滩掠骑规模尚待实地确认" }], touchFactIds: [], resolveFactIds: [] }, { sourceEventId: "scouting", actId: act.id });
-  const cardIds = ["ancient.domain.military.reconnaissance", "ancient.domain.military.logistics_morale"];
+  const cardIds = ["ancient.domain.military.reconnaissance", "ancient.domain.military.raid_siege"];
   const selectedCards = cardIds.map((id) => { const found = definition.worldCards!.find((entry) => entry.id === id); assert.ok(found); return found; });
   const socialForces = definition.socialForces!;
   const assetNeeds = [
@@ -5101,14 +4321,16 @@ test("边将规划目录原样引用贯通素材、移动和新资产登记，�
     const text = payload.messages.map((entry) => entry.content).join("\n");
     requests.push({ name, text, system: payload.messages.find((entry) => entry.role === "system")!.content });
     let args: Record<string, unknown>;
-    if (name === "plan_scene_turn") {
+    if (name === "plan_act_world_card") {
+      args = actWorldCardForTest();
+    } else if (name === "recall_scene_assets") {
       args = { conflictRefs: [fatherId, scoutId, ...cardIds.map((id, index) => invalidRef ? `${id}=world_card:${selectedCards[index].title}` : id)], abilityRefs: [abilityId],
         locationDirective: { mode: "move", purpose: "随父亲出关到黑石滩哨铺，将口头推断落到实地" },
          clockRequest: "advance",
         forceIds: ["ancient.military", "ancient.markets"], assetNeeds,
         actWorldCard: actWorldCardForTest({ goal: "确认敌方骑兵动向", completionMeaning: "已用实地证据判断掠骑规模与去向" }) };
     } else if (name === "render_scene_prose") {
-      args = { narrative: "你骑马随父亲抵达黑石滩哨铺。哨长教你辨认蹄印深浅和马蹄铁式样，你沿驼道核验，确认数十骑刚向北撤去，并把判断当面报给父亲。",
+      args = { nextClock: "advance", narrative: "你骑马随父亲抵达黑石滩哨铺。哨长教你辨认蹄印深浅和马蹄铁式样，你沿驼道核验，确认数十骑刚向北撤去，并把判断当面报给父亲。",
         storyDelta: "抵达黑石滩哨铺，习得验迹并确认掠骑北撤", continuityRefs: { factIds: [], characterIds: [], locationIds: [], abilityIds: [] },
         assetActivity: { locationIds: [], abilityIds: [abilityId] }, continuityRequired: true,
         participants: [{ characterRef: fatherId }, { characterRef: "new", name: "黑石滩哨长", role: "哨长", description: "传授验迹并核实军情的守军", recurring: true }],
@@ -5118,10 +4340,10 @@ test("边将规划目录原样引用贯通素材、移动和新资产登记，�
     } else if (name === "resolve_scene_outcome") {
       args = { effects: [{ stat: "intelligence", direction: "up", band: "light" }] };
     } else {
-      assert.equal(name, "observe_story_beat");
+      assert.equal(name, "observe_act_closure");
       args = observationReplyForTest("hold");
     }
-    if (name === "plan_scene_turn") {
+    if (name === "recall_scene_assets") {
       if (payload.tools[0].function.parameters.required.includes("actWorldCard")) args = { actWorldCard: args.actWorldCard };
       else { delete args.actWorldCard; args = planningReplyForTest(args); }
     }
@@ -5129,7 +4351,8 @@ test("边将规划目录原样引用贯通素材、移动和新资产登记，�
   });
   const execute = (run: typeof base) => {
     const promptPlan = buildNarrativePromptPlan(run, definition, null, "planning")!;
-    assert.ok(cardIds.every((id) => promptPlan.activeWorldCardSources!.some((card) => card.id === id)));
+    if (run.narrative.actRuntime?.outline) assert.deepEqual(promptPlan.activeWorldCardSources, [], "已有世界卡时不再组织素材");
+    else assert.ok(cardIds.every((id) => promptPlan.activeWorldCardSources!.some((card) => card.id === id)), "幕初规划仍可取得静态世界素材");
     const envelope: NarrativeTurnEnvelope = { callId: "frontier-directory", source: "scene", worldId: "ancient", currentAge: 20,
       backgroundAgeRange: { fromAge: 21, toAge: 21 }, act, beat: "pressure", capabilities: ["scene"], storyPatterns: [], socialForces,
       focusReferences: [
@@ -5145,23 +4368,17 @@ test("边将规划目录原样引用贯通素材、移动和新资产登记，�
   };
   const run = structuredClone(base);
   const turn = await execute(run);
-  assert.deepEqual(calls, ["plan_scene_turn", "plan_scene_turn", "render_scene_prose", "resolve_scene_outcome", "observe_story_beat"], "幕初建立大纲后选材，不重复规划剧情");
-  const planner = requests.filter((entry) => entry.name === "plan_scene_turn").at(-1)!;
-  for (const card of selectedCards) assert.ok(planner.text.includes(JSON.stringify({ id: card.id, kind: "world_card", label: card.title ?? card.id })));
-  assert.ok(planner.text.includes(JSON.stringify({ id: abilityId, kind: "ability", label: narrativeAbilityDirectory(base.narrative.assets)[0].label })));
-  assert.ok(planner.text.includes(JSON.stringify({ id: locationId, kind: "location", label: narrativeLocationDirectory(base.narrative.assets)[0].label, current: true })));
-  assert.equal(planner.text.split(`"id":"${factId}","kind":"fact",`).length - 1, 1, "事实由事实提供器注入一次");
-  assert.ok(planner.text.includes("黑石滩掠骑规模尚待实地确认"));
-  assert.ok(planner.text.includes(run.narrative.actRuntime!.outline!.beats.pressure.change), "召回实际收到本幕选定的当前改变");
+  assert.deepEqual(calls, ["plan_act_world_card", "render_scene_prose", "resolve_scene_outcome"], "幕初组织后直接叙事，不进行资产召回");
+  assert.equal(requests.some((entry) => entry.name === "recall_scene_assets"), false);
   const writer = requests.find((entry) => entry.name === "render_scene_prose")!;
-  for (const card of selectedCards) assert.ok(writer.text.includes(card.content), "选中的完整世界材料到达正文请求");
-  for (const need of assetNeeds) assert.ok(writer.text.includes(need.purpose), "新对象需求原样交给正文请求");
-  assert.ok(writer.text.includes("骑乘（初通）"));
+  for (const card of selectedCards) assert.ok(!writer.text.includes(card.content), "幕初素材不经召回重新追加到正文");
+  for (const need of assetNeeds) assert.equal(writer.text.includes(need.purpose), false, "召回不再向正文追加对象用途或需求");
+  assert.ok(!writer.text.includes("骑乘（初通）"));
   assert.ok(!writer.text.includes(base.narrative.assets!.abilities[0].usage!));
   assert.match(requests.find((entry) => entry.name === "resolve_scene_outcome")!.text, /确认数十骑刚向北撤去/);
-  assert.ok(cardIds.every((id) => turn.worldCardIds.includes(id)));
-  assert.deepEqual(turn.plan.assetNeeds, assetNeeds);
-  advanceWithDynamicNarrativeScene(run, world, definition, { ...turn.scene, sceneAge: turn.time.sceneAge, beat: "pressure", beatDecision: "hold", sceneClockMode: "advance", attributePolicy: dynamicSceneAttributePolicy(), attributeOutcome: { effects: turn.scene.attributeEffects! } });
+  assert.deepEqual(turn.worldCardIds, []);
+  assert.equal(Object.hasOwn(turn.plan, "assetNeeds"), false);
+  advanceWithDynamicNarrativeScene(run, world, definition, { ...turn.scene, sceneAge: turn.time.sceneAge,    attributePolicy: dynamicSceneAttributePolicy(), attributeOutcome: { effects: turn.scene.attributeEffects! } });
   commitNarrativeAssets(run.narrative, applyNarrativeAssetUpdates(run.narrative.assets, turn.scene.assetUpdates, { age: 21 }), { age: 21 }, {}, turn.scene.handoff!.sourceEventId);
   const episode = commitNarrativeEpisode(run, { callId: turn.plan.callId, sourceEventId: turn.scene.handoff!.sourceEventId, turnKind: "scene", age: 21, actId: act.id, beat: "pressure", storyDelta: turn.scene.narrative });
   commitNarrativeAgentTurn(run, turn.attemptId, episode.id);
@@ -5170,16 +4387,17 @@ test("边将规划目录原样引用贯通素材、移动和新资产登记，�
   assert.deepEqual(run.narrative.assets!.abilities.map((entry) => entry.name), ["骑乘", "实地验迹"]);
   assert.ok(run.narrative.dynamicCharacters.some((entry) => entry.name === "黑石滩哨长"));
   assert.equal(run.story.factLedger!.facts.find((entry) => entry.id === factId)!.status, "open", "事件等待连续性批次整理，观察器不直接关闭");
-  assert.ok(cardIds.every((id) => run.narrative.worldCardActivations!.some((entry) => entry.cardId === id)));
+  assert.ok(cardIds.every((id) => !run.narrative.worldCardActivations?.some((entry) => entry.cardId === id)));
   const callsBeforeFailure = calls.length;
-  const failed = structuredClone(base), before = structuredClone(failed);
+  const failed = structuredClone(base);
+  failed.narrative.actRuntime!.outline = structuredClone(run.narrative.actRuntime!.outline);
+  const before = structuredClone(failed);
   invalidRef = true;
-  await assert.rejects(runNarrativeTurnTransaction(failed, execute), (error: unknown) => error instanceof NarrativeOutcomeError && error.validation?.path === "conflictRefs[2].ref");
-  assert.deepEqual(calls.slice(callsBeforeFailure), ["plan_scene_turn", "plan_scene_turn", "plan_scene_turn"], "幕初大纲完成后，只纠正失败选材一次，不重跑大纲或正文");
-  assert.deepEqual(failed, before, "错误引用不发布人物、资产、事实或素材冷却");
+  await runNarrativeTurnTransaction(failed, execute);
+  assert.deepEqual(calls.slice(callsBeforeFailure), ["render_scene_prose", "resolve_scene_outcome"], "旧召回错误不再位于推进链路");
 });
 
-test("摘要只交接旧背景与本区间，模型返回更新后的摘要而非维护多类引用", () => {
+test("每次只压缩本区间大事，不把旧摘要交回模型重写", () => {
   const run = makeRun(); run.ended = true;
   commitNarrativeEpisode(run, { callId: "first", sourceEventId: "first", turnKind: "scene", age: 20, storyDelta: "开始守关，结识同伴。" });
   const first = prepareNarrativeMemoryCuration(run)!;
@@ -5187,8 +4405,10 @@ test("摘要只交接旧背景与本区间，模型返回更新后的摘要而�
   commitNarrativeEpisode(run, { callId: "second", sourceEventId: "second", turnKind: "scene", age: 21, storyDelta: "守关成功，被任命为队长。" });
   const work = prepareNarrativeMemoryCuration(run)!;
   const prompt = memoryCurationPrompt(work);
-  assert.ok(prompt.includes("上一版长期记忆（与新增经历整合后整体替换）：主角开始守关，结识同伴。"));
-  assert.ok(prompt.includes("21岁：\n守关成功，被任命为队长。"));
+  assert.ok(!prompt.includes("旧摘要"));
+  assert.ok(!prompt.includes("主角开始守关，结识同伴。"));
+  assert.ok(prompt.includes("本时段：21—21岁"));
+  assert.ok(prompt.includes("守关成功，被任命为队长。"));
   assert.doesNotMatch(prompt, /当前幕组织背景|当前字段|已提交事实的当前状态/);
   assert.equal(applyNarrativeMemoryCuration(run, work, { summary: "主角守关成功，与军中同伴建立信任并升为队长。" }), true);
   assert.equal(prepareNarrativeMemoryCuration(run), undefined);
@@ -5197,7 +4417,7 @@ test("摘要只交接旧背景与本区间，模型返回更新后的摘要而�
 
 test("仅使用已有本领和地点的抉择直接结算，活动展示保存且稳定档案不重写", async (t) => {
   const definition = await loadNarrativeExperienceForTest("ancient");
-  definition.worldCards = [{ id: "test.decision-voice", kind: "style_example", content: "写出行动之后眼前可见的余波。", priority: 90,
+  definition.worldCards = [{ id: "test.decision-voice", kind: "world_rule", content: "写出行动之后眼前可见的余波。", priority: 90,
     activation: { tasks: ["decision"] }, cooldownTurns: 2 }];
   const run = makeRun(); run.age = 20; run.worldId = "ancient"; run.narrative.enabled = true;
   run.narrative = ensureNarrativeActRuntime(run.narrative, definition, 20);
@@ -5215,11 +4435,11 @@ test("仅使用已有本领和地点的抉择直接结算，活动展示保存�
   ];
   const calls: string[] = [];
   t.mock.method(OpenAI.Chat.Completions.prototype, "create", async (payload: { tools: Array<{ function: { name: string } }>; messages: Array<{ content: string }> }) => {
-    const step = nextNarrativeScript(scripts, payload); assert.ok(step); assert.ok(payload.tools.some((tool) => tool.function.name === step.name));
+    const step = nextNarrativeScript(scripts, payload); assert.ok(step); assert.ok(payload.tools.some((tool) => tool.function.name === step.name), `fixture tool ${step.name}; available ${payload.tools.map((tool) => tool.function.name)}`);
     const text = payload.messages.map((entry) => entry.content).join("\n");
     if (step.name === "render_decision_outcome") {
-      assert.ok(text.includes("ability:bow") && text.includes("location:watch"));
-      assert.ok(text.includes("写出行动之后眼前可见的余波"));
+      assert.ok(!text.includes("ability:bow") && !text.includes("location:watch"));
+      assert.ok(text.includes("裁定并结束这次事件"));
     }
     if (step.name === "resolve_decision_outcome") assert.ok(text.includes(narrative), "结算使用最终正文");
     calls.push(step.name);
@@ -5232,7 +4452,7 @@ test("仅使用已有本领和地点的抉择直接结算，活动展示保存�
   assert.deepEqual(result.outcome.assetUpdates, { locations: [], abilities: [] });
   const episode = commitNarrativeEpisode(run, { callId: "activity:only", sourceEventId: "activity:only", turnKind: "decision", age: 20 });
   commitNarrativeAgentTurn(run, result.attemptId, episode.id);
-  assert.deepEqual(run.narrative.worldCardActivations?.map((entry) => entry.cardId), ["test.decision-voice"]);
+  assert.deepEqual(run.narrative.worldCardActivations?.map((entry) => entry.cardId), []);
   run.narrative.assets = applyNarrativeAssetActivity(run.narrative.assets, result.outcome.assetActivity, { age: run.age });
   appendPublicTurnRecord(run, { entryId: "activity:only", kind: "choice_outcome", narrative: result.outcome.narrative, age: 20, ageStage: { label: "青年" }, statChanges: {} });
   assert.deepEqual(run.narrative.assets.abilities, previous.abilities);
@@ -5241,46 +4461,6 @@ test("仅使用已有本领和地点的抉择直接结算，活动展示保存�
   assert.equal(run.turnRecords.at(-1)!.narrativeAssetsSnapshot!.abilities[0].name, "弓箭术");
   assert.equal(run.age, 20);
   assert.equal(scripts.length, 0);
-});
-
-
-
-test("三世界的压力和高潮可直接叙事，同年保持且无需生成新的抉择", async () => {
-  for (const worldId of ["ancient", "modern", "fantasy"]) {
-    const definition = await loadNarrativeExperienceForTest(worldId);
-    for (const beat of ["pressure", "climax"] as const) {
-      const run = makeRun();
-      run.narrative.enabled = true;
-      run.narrative = ensureNarrativeActRuntime(run.narrative, definition, 20);
-      run.narrative.actRuntime!.beat = beat;
-      run.age = 20;
-      run.stats.physique = 100;
-      run.narrative.activeScene = { id: "active", threadId: `arc:${run.narrative.actRuntime!.actId}`, phase: beat, mainlineActId: run.narrative.actRuntime!.actId, openedAge: 20, lastTouchedAge: 20 };
-      run.narrative.sceneClock.mode = "hold";
-      const policy = dynamicSceneAttributePolicy();
-      const toolSet = dynamicNarrativeSceneTools({
-        act: { id: run.narrative.actRuntime!.actId, label: "当前幕", prompt: "当前幕发展" }, beat, presentation: "scene", allowedTurnKinds: ["scene"],
-        sceneAge: 20, backgroundAgeRange: { fromAge: 21, toAge: 21 }, storyPatterns: [], socialForces: [], knownCharacters: [], knownFactIds: [],
-        statTiers: { intelligence: "steady", charisma: "steady", family: "steady", fortune: "steady", physique: "steady" },
-        attributePolicy: policy, backgroundAttributePolicy: dynamicBackgroundAttributePolicy(run)
-      });
-      assert.deepEqual(toolSet.names, ["resolve_scene_outcome"]);
-      const directScene = (beatDecision: "hold" | "advance") => advanceWithDynamicNarrativeScene(run, world, definition, {
-        patternIds: [], forceIds: [], beat, beatDecision, narrative: "你完成先前决定的行动，新的处境已经形成。", participants: [],
-        attributePolicy: policy, attributeOutcome: { effects: [{ stat: "intelligence", direction: "up", band: "light" }] }, createsDecision: false
-      });
-      directScene("hold");
-      assert.equal(run.narrative.actRuntime!.beat, beat);
-      assert.equal(run.narrative.climaxCount, 0);
-      directScene("advance");
-      assert.equal(run.age, 20);
-      assert.equal(run.nextMilestoneChoice, undefined);
-      assert.equal(run.pendingDynamicScene, undefined);
-      assert.equal(run.narrative.actRuntime!.beat, beat === "pressure" ? "climax" : "payoff");
-      assert.equal(run.narrative.climaxCount, beat === "climax" ? 1 : 0);
-      assert.ok(run.history.at(-1)?.statChanges.intelligence);
-    }
-  }
 });
 
 test("同名新资产保持独立，实际登记 ID 贯通经历链接和公开档案", () => {
@@ -5305,77 +4485,6 @@ test("同名新资产保持独立，实际登记 ID 贯通经历链接和公开�
   appendPublicTurnRecord(run, { entryId: "second", kind: "scene", age: 13, ageStage: { label: "少年" }, narrative: "你转入步营，学会步战连珠箭。", statChanges: {} });
   assert.equal(toClientRun(run).narrativeAssets!.abilities.length, 2);
   assert.equal(toClientRun(run).narrativeCharacters!.length, 2);
-});
-
-
-test("终幕 payoff 抉择与结果可同年延续，观察完成后才写结论和开放结局", async (t) => {
-  const definition: NarrativeWorldDefinition = {
-    ...narrativeWorld, version: 9, storyPatterns: [], socialForces: [],
-    mainlineFacts: [{ id: "war", kind: "open_question", label: "敌军入侵能否结束" }],
-    mainlineActs: [{ id: "act.final", label: "平定边患", prompt: "击退入侵并决定战后安排", introduceFactIds: ["war"], resolveFactIds: ["war"] }]
-  };
-  const run = makeRun(); run.age = 20; run.stats.physique = 100; run.narrative.enabled = true;
-  run.narrative = ensureNarrativeActRuntime(run.narrative, definition, 20);
-  advanceWithDynamicNarrativeScene(run, world, definition, {
-    patternIds: [], forceIds: [], beat: "setup", beatDecision: "advance", sceneAge: 20,
-    narrative: "敌军入侵，你承担守关职责。", participants: [],
-    attributePolicy: dynamicSceneAttributePolicy(), attributeOutcome: { effects: [{ stat: "intelligence", direction: "up", band: "light" }] }
-  });
-  run.narrative.actRuntime!.beat = "payoff"; run.narrative.climaxCount = 1;
-  const scene = () => advanceWithDynamicNarrativeScene(run, world, definition, {
-    patternIds: [], forceIds: [], beat: "payoff", beatDecision: "advance", createsDecision: true,
-    narrative: "敌军撤退后，停战条件尚待你的答复。", participants: [], sceneAge: 20, sceneClockMode: "hold"
-  });
-  scene();
-  assert.equal(run.narrative.payoffCount, 0);
-  assert.ok(run.narrative.activeScene && run.nextMilestoneChoice);
-  assert.equal(canRequestDirectedClosure(run, definition), false);
-  let complete = false;
-  const handoff = { resolvedTension: "敌军退回界外，双方停止交战", lastingConsequence: "你保住关城并获封侯", continuation: "留守重建防务" };
-  t.mock.method(OpenAI.Chat.Completions.prototype, "create", async (payload: { tools: Array<{ function: { name: string } }>; messages: Array<{ content: string }> }) => {
-    const name = payload.tools[0].function.name;
-    const args = name === "render_decision_outcome" ? {
-      narrative: complete ? "你签定停战条件，敌军退出关外。守军归营，你因守关之功获封侯。" : "你提出撤军条件，敌方使者须回营取得授权，战后安排仍未落定。",
-      storyDelta: complete ? "敌军撤出，停战落定，主角获封侯" : "停战条件送往敌营，等待授权",
-      assetActivity: { locationIds: [], abilityIds: [] }, continuityRefs: { factIds: [], characterIds: [], locationIds: [], abilityIds: [] }, continuityRequired: false
-    , participants: [], assetUpdates: { locations: [], abilities: [] }, factUpdates: { introduce: [], updates: [] } } : name === "resolve_decision_outcome" ? { effects: [{ stat: "fortune", direction: "up", band: "light" }] }
-      : name === "sync_narrative_continuity" ? { locationUpdates: [], abilityUpdates: [], identityMerges: [], relationshipUpdates: [], factIntroductions: [], factUpdates: [] }
-      : observationReplyForTest(complete ? "advance" : "hold");
-    assert.ok(["render_decision_outcome", "resolve_decision_outcome", "observe_story_beat", "sync_narrative_continuity"].includes(name), "干净正文不强制再整理");
-    return { choices: [{ finish_reason: "tool_calls", message: { content: null, tool_calls: [{ id: name, type: "function", function: { name, arguments: JSON.stringify(args) } }] } }] };
-  });
-  const choose = async () => {
-    const pending = structuredClone(run.pendingDynamicScene!);
-    const result = await runNarrativeAgentDecision({ run, world, narrativeWorld: definition, context: { ...memoryTestContext(run), apiKey: "not-sent" }, callId: `payoff:${complete}`,
-      decision: { decision: "safe", label: "停战并守关", description: "确认敌军撤出再停止交战", attributePolicy: { allowedStats: ["fortune"], allowedDirections: ["up"], allowedBands: ["light"], minEffects: 1, maxEffects: 1 } } });
-    const settled = applyMilestoneDecisionAndAdvance(run, world, difficulty, "safe", { narrativeWorld: definition,
-      narrative: result.outcome.narrative, narrativeOutcome: { effects: result.outcome.effects }, deferCompletion: true });
-    const observation = await finishNarrativeAgentDecision({ run, world, narrativeWorld: definition, context: { ...memoryTestContext(run), apiKey: "not-sent" }, callId: `payoff:${complete}`, attemptId: result.attemptId, decision: { label: "停战并守关", description: "确认敌军撤出再停止交战" }, outcome: result.outcome });
-    completeMilestoneDecision(run, settled.decisionEvent, settled.sourceEventId, settled.factIds, { narrativeWorld: definition, beatDecision: observation.decision });
-    commitNarrativeEpisode(run, { callId: `payoff:${complete}`, sourceEventId: settled.sourceEventId, turnKind: "decision", age: 20, actId: pending.mainlineActId, beat: "payoff", storyDelta: result.outcome.narrative });
-    return settled;
-  };
-  await choose();
-  assert.equal(run.age, 20);
-  assert.equal(run.narrative.actRuntime!.beat, "payoff");
-  assert.equal(run.narrative.payoffCount, 0);
-  assert.equal(run.narrative.actCanon.length, 0);
-  assert.equal(canRequestDirectedClosure(run, definition), false);
-  scene(); complete = true;
-  const settled = await choose();
-  assert.equal(run.age, 20);
-  assert.equal(run.narrative.payoffCount, 1);
-  assert.equal(run.narrative.completedScenes.length, 1);
-  assert.equal(run.narrative.activeScene, undefined);
-  assert.equal(run.narrative.actCanon[0].sourceEventId, settled.sourceEventId);
-  assert.equal(run.narrative.actCanon[0].resolvedAge, 20);
-  assert.equal(run.story.factLedger!.facts.find((fact) => fact.id === "war")!.status, "resolved");
-  assert.equal(canRequestDirectedClosure(run, definition), true);
-  assert.equal(run.ended, false, "确认幕间完成只开放结局申请");
-  assert.equal(prepareNarrativeMemoryCuration(run), undefined, "终幕已结束但结局正文尚未提交，暂不启动终局压缩");
-  commitNarrativeEpisode(run, { callId: "ending", sourceEventId: "ending", turnKind: "ending", age: 20, storyDelta: "主角封侯，留守边关" });
-  run.ended = true;
-  assert.ok(prepareNarrativeMemoryCuration(run)!.episodeIds.includes("episode:ending"), "结局提交后与终幕实际结论一起压缩");
 });
 
 test("未满十年仍可由幕间完成触发压缩，摘要不淘汰新幕和同年经历", () => {
@@ -5403,7 +4512,7 @@ test("未满十年仍可由幕间完成触发压缩，摘要不淘汰新幕和�
   assert.equal(prepareNarrativeMemoryCuration({ ...run, narrative: restored }), undefined);
 });
 
-test("幕内十年滚动压缩承接旧记忆，只替代本次覆盖原文并保留异步期间的新正文", () => {
+test("十年分段压缩分别保留大事，只替代本次覆盖原文并保留异步期间的新正文", () => {
   const run = makeRun();
   const add = (age: number, suffix = "") => commitNarrativeEpisode(run, {
     callId: `rolling:${age}:${suffix}`, sourceEventId: `rolling:${age}:${suffix}`,
@@ -5416,7 +4525,7 @@ test("幕内十年滚动压缩承接旧记忆，只替代本次覆盖原文并�
   add(10);
   const first = prepareNarrativeMemoryCuration(run)!;
   assert.equal(first.throughAge, 10);
-  assert.equal(first.previousSummary, "");
+  assert.equal(first.fromAge, 9);
   assert.doesNotMatch(memoryCurationPrompt(first), /本次结束区间/);
   const during = add(11);
   const summary = "幼年到十岁间，救回同袍使你获其信任；边防对峙仍未结束。";
@@ -5428,17 +4537,17 @@ test("幕内十年滚动压缩承接旧记忆，只替代本次覆盖原文并�
   assert.equal(prepareNarrativeMemoryCuration(run), undefined, "从成功覆盖的十岁重新累计");
   add(20);
   const second = prepareNarrativeMemoryCuration(run)!;
-  assert.equal(second.previousSummary, summary);
+  assert.equal(second.fromAge, 11);
   assert.deepEqual(second.episodes.map((entry) => entry.age), [11, 19, 20]);
   const prompt = memoryCurationPrompt(second);
-  assert.equal(prompt.split(summary).length - 1, 1);
+  assert.equal(prompt.includes(summary), false, "下一时段不重新压缩前一时段摘要");
   assert.equal(prompt.includes("9岁同年救援"), false, "旧原文已被旧记忆取代");
   const after = add(21);
   assert.equal(applyNarrativeMemoryCuration(run, second, { summary: "救援建立的信任延续至青年，二十岁仍在边防对峙。" }), true);
   assert.deepEqual(buildNarrativeStoryHistory(run.narrative).episodes.map((entry) => entry.id), [after.id]);
   assert.equal(applyNarrativeMemoryCuration(run, first, { summary: "旧结果" }), false);
   run.narrative = ensureNarrativeRunState(JSON.parse(JSON.stringify(run.narrative)), true);
-  assert.equal(run.narrative.memoryDigests[0].throughAge, 20);
+  assert.deepEqual(run.narrative.memoryDigests.map((digest) => digest.throughAge), [10, 20]);
   run.narrative.episodes = run.narrative.episodes.filter((entry) => entry.age > 20);
   add(29);
   assert.equal(prepareNarrativeMemoryCuration(run), undefined, "原覆盖记录退出保留窗口也不丢覆盖年龄");
@@ -5452,29 +4561,6 @@ test("幕内十年滚动压缩承接旧记忆，只替代本次覆盖原文并�
   assert.deepEqual(intervalWork.episodes.map(({ ageFrom, age }) => [ageFrom, age]), [[8, 12]], "跨十年边界仍压缩整段已提交经历");
 });
 
-test("观察器只判断生成大纲的当前改变，不混入另一套静态 IF 目标", async (t) => {
-  const base = (await loadNarrativeWorldDefinition("ancient"))!;
-  const pack = (await loadNarrativeStoryPack(base, "ancient.frontier-commander"))!;
-  const run = makeRun(); run.storyPackSnapshot = pack;
-  const act = pack.acts[2];
-  const outline = outlineForTest(act.id);
-  const recentStory = "46岁：击退眼前一队敌骑，但敌军主力仍在关外。";
-  t.mock.method(OpenAI.Chat.Completions.prototype, "create", async (payload: any) => {
-    const text = payload.messages.map((entry: any) => entry.content).join("\n");
-    assert.ok(text.includes(outline.beats.payoff.change));
-    for (const goal of [act.objective, act.beatOutline.payoff, act.payoffMeaning, outline.beats.setup.change]) assert.equal(text.includes(goal), false);
-    assert.ok(text.includes(recentStory));
-    assert.equal(text.includes(pack.acts[0].beatOutline.setup), false);
-    assert.deepEqual(Object.keys(payload.tools[0].function.parameters.properties), ["beatDecision", "evidence", "missing"]);
-    return { choices: [{ finish_reason: "tool_calls", message: { tool_calls: [{ id: "goals", type: "function", function: {
-      name: "observe_story_beat", arguments: JSON.stringify(observationReplyForTest("hold"))
-    } }] } }] };
-  });
-  const observation = await observeNarrativeBeat(run, world, { callId: "goals", actId: act.id, beat: "payoff", outline, recentStory },
-    { ...memoryTestContext(run), apiKey: "not-sent" });
-  assert.equal(observation.decision, "hold", "只验证目标和判断交接，不以模拟返回证明模型语义正确");
-});
-
 test("身世空人物与抉择空间指令在原生工具、解析器中使用同一协议", async (t) => {
   const run = makeRun(); run.age = 20;
   let directive: Record<string, string> = { mode: "move", purpose: "前往山口求援" };
@@ -5485,9 +4571,8 @@ test("身世空人物与抉择空间指令在原生工具、解析器中使用�
       assert.deepEqual(Object.keys(tool.parameters.properties.participants.items.properties), ["characterRef", "name"]);
     } else {
       assert.equal(tool.parameters.properties.continuityRefs, undefined);
-      const location = tool.parameters.properties.optionOverrides.items.properties.locationDirective;
-      assert.deepEqual(location.anyOf.find((branch: any) => branch.properties.mode.const === "move").required, ["purpose"]);
-      assert.deepEqual(location.anyOf.find((branch: any) => branch.properties.mode.const === "revisit").required, ["locationRef"]);
+      assert.equal(tool.parameters.properties.optionOverrides.items.properties.locationDirective, undefined);
+      assert.equal(tool.parameters.properties.optionOverrides.items.properties.abilityRefs, undefined);
     }
     const args = tool.name === "render_origin" ? {
       narrative: "你出生在北方的一户寻常人家，家中以放牧维持生活。", summary: "来自北方牧户的孩子。", participants: [], assetUpdates: { locations: [], abilities: [] }
@@ -5501,7 +4586,7 @@ test("身世空人物与抉择空间指令在原生工具、解析器中使用�
   const ctx = { ...memoryTestContext(run), apiKey: "not-sent" };
   assert.deepEqual((await generateNarrativeOrigin(run, world, ctx)).participants, []);
   const input: DynamicNarrativeSceneInput = {
-    act: { id: "contract", label: "守关", prompt: "守住关口" }, beat: "pressure", presentation: "choice", allowedTurnKinds: ["scene"],
+    act: { id: "contract", label: "守关", prompt: "守住关口" },  presentation: "choice", allowedTurnKinds: ["scene"],
     sceneAge: 20, backgroundAgeRange: { fromAge: 21, toAge: 21 }, storyPatterns: [], socialForces: [], knownCharacters: [],
     statTiers: resolveNarrativeStatTiers(run.stats), attributePolicy: dynamicSceneAttributePolicy(), backgroundAttributePolicy: dynamicBackgroundAttributePolicy(run)
   };
@@ -5544,8 +4629,8 @@ test("三种回合的连续性归并贯通使用记录、最终状态、新资�
     const prompt = payload.messages.map((entry) => entry.content).join("\n");
     for (const id of identities) assert.ok(prompt.includes(id));
     assert.doesNotMatch(prompt, /unavailable/);
-    assert.match(prompt, /identityMerges/);
-    return { choices: [{ finish_reason: "tool_calls", message: { content: null, tool_calls: [{ id: tool.name, type: "function", function: { name: tool.name, arguments: JSON.stringify(proposal) } }] } }] };
+    assert.ok(tool.parameters.properties.identityMerges);
+    return { choices: [{ finish_reason: "tool_calls", message: { content: null, tool_calls: [{ id: tool.name, type: "function", function: { name: tool.name, arguments: JSON.stringify({ retirements: [], ...proposal }) } }] } }] };
   });
   for (const source of ["background", "scene", "decision"] as const) {
     const run = makeRun(); run.age = 20; run.narrative.enabled = true;
@@ -5622,7 +4707,7 @@ test("人物当前阵营通过唯一更新入口传入前端和下一轮身份�
     { updates: [{ characterRef: person.id, factionId: "court" }], expected: "court", role: "侍卫" }
   ];
   for (const [index, entry] of cases.entries()) {
-    raw = { relationshipUpdates: entry.updates, locationUpdates: [], abilityUpdates: [], factIntroductions: [], factUpdates: [], identityMerges: [] };
+    raw = { relationshipUpdates: entry.updates, locationUpdates: [], abilityUpdates: [], factIntroductions: [], factUpdates: [], retirements: [], identityMerges: [] };
     const changes = await synchronizeNarrativeContinuity(run, world, {
       callId: `faction:${index}`, source: "scene", subject: "人物归属变化", narrative: "陆平的去向已经有了新的变化。",
       writeSet: { factIds: [], characterIds: [person.id], locationIds: [], abilityIds: [] }, continuityRequired: true, socialForces: forces
@@ -5680,7 +4765,7 @@ test("轻量登记经读档保留身份，周期同步按正文补齐资料并�
     const text = payload.messages.map((entry) => entry.content).join("\n");
     for (const value of ["12岁", "13岁", firstBody, secondBody, thirdBody, placeId, duplicateId, personId, skillId]) assert.ok(text.includes(value));
     return { choices: [{ finish_reason: "tool_calls", message: { content: null, tool_calls: [{ id: "sync", type: "function", function: {
-      name: "sync_narrative_continuity", arguments: JSON.stringify({ factIntroductions: [], factUpdates: [],
+      name: "sync_narrative_continuity", arguments: JSON.stringify({ retirements: [], factIntroductions: [], factUpdates: [],
 
         locationUpdates: [{ ref: placeId, description: "阿岚常年摆渡之处", spatialDescription: "河流下游的渡口，又称下河渡", pendingDetails: false }],
         abilityUpdates: [{ ref: skillId, description: "能依风势选择渡河时机", usage: "观察风向风力判断行船时机", source: "阿岚传授", mastery: "初通", pendingDetails: false }],
@@ -5748,7 +4833,7 @@ test("暂存资产即时沿用原目录和前端接口，恢复后第三轮语�
     return { choices: [{ finish_reason: "tool_calls", message: { content: null, tool_calls: [{ id: "batch", type: "function", function: { name: tool.name, arguments: JSON.stringify({
       factIntroductions: [], factUpdates: [], relationshipUpdates: [{ characterRef: doctorId, description: "随军医师，已带主角处理毒伤", status: "resolved" }], locationUpdates: [],
       abilityUpdates: [{ ref: bowId, mastery: "精通", usage: "疾驰中连续射击并选择敌军薄弱处" }],
-      identityMerges: [{ kind: "ability", sourceRef: duplicateId, targetRef: bowId }]
+      retirements: [], identityMerges: [{ kind: "ability", sourceRef: duplicateId, targetRef: bowId }]
     }) } }] } }] };
   });
   assert.equal((await synchronizeNarrativeAssetBatch(restored, world, ctx, "before-third")).status, "skipped");
@@ -5791,19 +4876,20 @@ test("第三轮同步失败保留前两轮暂存，结束不足三轮也能整�
   t.mock.method(OpenAI.Chat.Completions.prototype, "create", async (payload: { tools: Array<{ function: { name: string } }> }) => {
     requests++;
     if (fail) throw new Error("batch_request_failed");
-    return { choices: [{ finish_reason: "tool_calls", message: { content: null, tool_calls: [{ id: "batch", type: "function", function: { name: payload.tools[0].function.name, arguments: JSON.stringify({ locationUpdates: [], abilityUpdates: [], identityMerges: [], relationshipUpdates: [], factIntroductions: [], factUpdates: [] }) } }] } }] };
+    return { choices: [{ finish_reason: "tool_calls", message: { content: null, tool_calls: [{ id: "batch", type: "function", function: { name: payload.tools[0].function.name, arguments: JSON.stringify({ locationUpdates: [], abilityUpdates: [], retirements: [], identityMerges: [], relationshipUpdates: [], factIntroductions: [], factUpdates: [] }) } }] } }] };
   });
   const ctx = { ...memoryTestContext(run), apiKey: "not-sent" };
-  await assert.rejects(runNarrativeTurnTransaction(run, async (working) => {
+  await runNarrativeTurnTransaction(run, async (working) => {
     stageNarrativeAssetRound(working, { sourceEventId: "short:three", source: "decision", age: 1, subject: "行动", narrative: "你学会借地势隐藏踪迹。" }, {
       assetUpdates: { locations: [], abilities: [{ ref: "new", name: "藏踪", description: "借地势藏匿", usage: "回避追踪和侦察", source: "本次实践", mastery: "初通" }] }
     }, { age: 1 });
-    await synchronizeNarrativeAssetBatch(working, world, ctx, "failed-third");
-  }));
-  assert.deepEqual(run, before, "失败不发布第三轮候选，也不清空前两轮暂存");
+    assert.equal((await synchronizeNarrativeAssetBatch(working, world, ctx, "failed-third")).status, "failed");
+  });
+  assert.equal(run.narrative.assetBuffer!.rounds.length, 3, "第三轮已成立正文与候选保留，维护失败不回滚故事");
+  assert.equal(run.narrative.assets!.abilities.filter((entry) => entry.name === "藏踪").length, 1);
   fail = false;
   run.ended = true;
-  assert.equal((await synchronizeNarrativeAssetBatch(run, world, ctx, "ending", [], true)).status, "requested_empty");
+  assert.equal((await synchronizeNarrativeAssetBatch(run, world, { ...ctx, continuityAttempts: new Set<string>() }, "ending", [], true)).status, "requested_empty");
   assert.equal(requests, 2);
   assert.equal(run.narrative.assetBuffer, undefined);
   assert.equal(run.narrative.assets!.locations[0].id, before.narrative.assets!.locations[0].id);
@@ -5825,7 +4911,7 @@ test("已摘要的旧幕不会反复压缩，新幕完成后独立提交下一�
   const next = prepareNarrativeMemoryCuration(run)!;
   assert.ok(next);
   assert.deepEqual(next.episodeIds, [0, 1, 2, 3, 4, 5].map((i) => `episode:new-act:${i}`));
-  assert.equal(next.previousSummary, "主角结束第一段军旅磨砺，转入新的阵营。");
+  assert.ok(!memoryCurationPrompt(next).includes("主角结束第一段军旅磨砺，转入新的阵营。"));
 });
 
 test("旧默认输出预算升级，显式自定义预算不被覆盖", () => {
@@ -5900,7 +4986,7 @@ test("规划候选不消耗冷却，正文只消费所选卡且待选场景将�
   const chosen = cards[7];
   const renderPlan = buildNarrativePromptPlan(run, definition, null, "rendering", { focusIds: [chosen.id], worldCardCandidates: candidates })!;
   const writer = composeNarrativeContext({ task: "rendering", taskPrompt: "执行选中材料", plan: renderPlan });
-  assert.ok(writer.renderedContext.includes(chosen.content));
+  assert.ok(!writer.renderedContext.includes(chosen.content));
   assert.ok(cards.slice(0, 7).every((card) => !writer.renderedContext.includes(card.content)));
   const attemptId = "attempt:material";
   run.narrative.agentAttempts.push(
@@ -5911,13 +4997,13 @@ test("规划候选不消耗冷却，正文只消费所选卡且待选场景将�
   );
   const episode = commitNarrativeEpisode(run, { callId: "material", sourceEventId: "material", turnKind: "scene", age: 20 });
   commitNarrativeAgentTurn(run, attemptId, episode.id);
-  assert.deepEqual(run.narrative.worldCardActivations?.map((entry) => entry.cardId), [chosen.id]);
-  run.pendingDynamicScene = { id: "material", mainlineActId: actId, beat: "setup", patternIds: [], forceIds: [], worldCardIds: [chosen.id] };
+  assert.deepEqual(run.narrative.worldCardActivations?.map((entry) => entry.cardId), []);
+  run.pendingDynamicScene = { id: "material", mainlineActId: actId,  patternIds: [], forceIds: [], worldCardIds: [chosen.id] };
   const restored = JSON.parse(JSON.stringify(run)) as typeof run;
   restored.narrative = ensureNarrativeRunState(restored.narrative, true);
   const decision = buildNarrativePromptPlan(restored, definition, null, "decision")!;
   const result = composeNarrativeContext({ task: "decision", taskPrompt: "写选定行动的结果", plan: decision });
-  assert.ok(result.renderedContext.includes(chosen.content), "作答沿用场景材料，不受场景提交后冷却再次否决");
+  assert.ok(!result.renderedContext.includes(chosen.content), "作答不通过旧材料 ID 回读档案");
   assert.ok(cards.slice(0, 7).every((card) => !result.renderedContext.includes(card.content)));
 });
 
@@ -5974,15 +5060,16 @@ test("回放原日志：已有本领更新、变化引用与返回住处在四�
       ];
       replay.mock.method(OpenAI.Chat.Completions.prototype, "create", async (payload: { tools: Array<{ function: { name: string } }>; messages: Array<{ content: string }> }) => {
         const step = nextNarrativeScript(scripts, payload); assert.ok(step, "只回放本次正文及其必要结算请求");
-        assert.ok(payload.tools.some((tool) => tool.function.name === step.name));
+        assert.ok(payload.tools.some((tool) => tool.function.name === step.name), `fixture tool ${step.name}; available ${payload.tools.map((tool) => tool.function.name)}`);
         if (step.name === toolName) {
           const text = payload.messages.map((message) => message.content).join("\n");
-          assert.ok(text.includes(abilityId) && text.includes(homeId), "原输出中的合法身份已提供给模型");
-          if (entry === "background") assert.ok(text.includes("辨边情（初通）"), "普通年份接到近期本领名称和熟练程度");
+
+          assert.ok(!text.includes(abilityId) && !text.includes(homeId), "身份可由内部解析识别，不追加到正文");
+          if (entry === "background") assert.ok(!text.includes("本领身份目录："));
         }
         return { choices: [{ finish_reason: "tool_calls", message: { content: null, tool_calls: [{ id: "replay:original", type: "function", function: { name: step.name, arguments: JSON.stringify(step.args) } }] } }] };
       });
-      const plan = { callId: "replay", turnKind: "scene" as const, presentation: "scene" as const, patternIds: [], forceIds: [], conflictRefs: [], abilityRefs: [],
+      const plan = { recallRefs: [], locationRefs: [],  callId: "replay", turnKind: "scene" as const, presentation: "scene" as const, patternIds: [], forceIds: [], conflictRefs: [], abilityRefs: [],
          clockRequest: "advance" as const, materials: [{ id: trailId, kind: "location" as const, label: "黑石滩哨道" }] };
       const renderInput = { act, beat: "setup" as const, presentation: "scene" as const, allowedTurnKinds: ["scene" as const], sceneAge: 14,
         backgroundAgeRange: { fromAge: 14, toAge: 16 }, storyPatterns: [], socialForces: [], knownCharacters: [],
@@ -6027,15 +5114,15 @@ test("正文、审校按本局身份核对引用，规划材料仅提供选中�
     assert.deepEqual(prepared.allowedAssets.abilities.map((entry) => entry.id), [selected.id, other.id]);
     assert.deepEqual(prepared.allowedActivityRefs.abilityIds, [selected.id, other.id]);
     const text = prepared.history.map((entry) => entry.content).join("\n");
-    assert.ok(text.includes(other.id), "全局身份目录仍可帮助辨认重复对象");
+    assert.ok(!text.includes(other.id), "全局目录仅用于内部身份核对");
     assert.ok(!text.includes(other.usage!), "未选中技能的使用方式不进入正文请求");
-    if (task === "rendering") assert.equal(text.split(`${selected.id}=${selected.name}（${selected.mastery}）`).length - 1, 1);
-    assert.ok(!text.includes(selected.usage!), "已选中技能也不携带展示策略进入正文");
+    if (task === "rendering") assert.equal(text.split(`${selected.id}=${selected.name}（${selected.mastery}）`).length - 1, 0);
+    assert.ok(!text.includes(selected.usage!), "本领现状仅供展示维护");
   }
 });
 
 
-test("原日志回放：新地点位置与节拍字段各自纠正一次，前序故事不重跑且真实位置提交", async (t) => {
+test("原日志回放：新地点位置纠正一次，前序故事不重跑且真实位置提交", async (t) => {
   const definition = await loadNarrativeExperienceForTest("ancient");
   const run = makeRun(); run.worldId = "ancient"; run.age = 43; run.narrative.enabled = true;
   run.narrative = ensureNarrativeActRuntime(run.narrative, definition, run.age);
@@ -6061,37 +5148,22 @@ test("原日志回放：新地点位置与节拍字段各自纠正一次，前�
   };
   const goodRender = { ...badRender, assetActivity: { locationIds: [oldLocationId], abilityIds } };
   const scripts = [
-    { name: "plan_scene_turn", args: {  actWorldCard: actWorldCardForTest({ goal: "应对敌军入侵", completionMeaning: "敌军主力已被击退" }), clockRequest: "hold", conflictRefs: [], abilityRefs: [], forceIds: [], locationDirective: { mode: "move", purpose: "移防远哨" } } },
+    { name: "recall_scene_assets", args: {  actWorldCard: actWorldCardForTest({ goal: "应对敌军入侵", completionMeaning: "敌军主力已被击退" }), clockRequest: "hold", conflictRefs: [], abilityRefs: [], forceIds: [], locationDirective: { mode: "move", purpose: "移防远哨" } } },
     { name: "render_scene_prose", args: badRender },
     { name: "render_scene_prose", args: goodRender },
     { name: "resolve_scene_outcome", args: { effects: [{ stat: "intelligence", direction: "up", band: "light" }] } },
-    { name: "observe_story_beat", args: { beatDecision: "unknown" } },
-    { name: "observe_story_beat", args: { beatDecision: "hold",  resolutions: [] } }
   ];
   const calls: string[] = [];
-  let stagedLocationId: string | undefined;
   t.mock.method(OpenAI.Chat.Completions.prototype, "create", async (payload: { tools: Array<{ function: { name: string; parameters: any } }>; messages: Array<{ content: string }> }) => {
-    const step = nextNarrativeScript(scripts, payload); assert.ok(step); assert.ok(payload.tools.some((tool) => tool.function.name === step.name));
+    const step = nextNarrativeScript(scripts, payload); assert.ok(step); assert.ok(payload.tools.some((tool) => tool.function.name === step.name), `fixture tool ${step.name}; available ${payload.tools.map((tool) => tool.function.name)}`);
     calls.push(step.name);
     const text = payload.messages.map((entry) => entry.content).join("\n");
     if (calls.at(-1) === "render_scene_prose" && calls.filter((name) => name === "render_scene_prose").length === 2) {
       const correction = JSON.parse(payload.messages.at(-1)!.content.split("\n").at(-1)!);
       assert.equal(correction.validation.path, "assetActivity.currentLocationId");
-      assert.deepEqual(correction.originalToolArguments, badRender);
-      assert.match(payload.tools[0].function.parameters.properties.assetActivity.properties.currentLocationId.description, /新地点.*省略/);
-    }
-    if (step.name === "observe_story_beat") {
-      assert.ok(text.includes("敌军主力仍在集结"));
-      assert.equal(Object.hasOwn(payload.tools[0].function.parameters.properties, "carryFactIds"), false);
-      const current = run.narrative.assets!.currentLocationId;
-      assert.notEqual(current, oldLocationId);
-      if (stagedLocationId) assert.equal(current, stagedLocationId, "观察纠正不重建暂存资产");
-      stagedLocationId = current;
-      if (calls.filter((name) => name === "observe_story_beat").length === 2) {
-        const correction = JSON.parse(payload.messages.at(-1)!.content.split("\n").at(-1)!);
-        assert.equal(correction.validation.path, "beatDecision");
-        assert.deepEqual(correction.validation.expected, ["hold", "advance"]);
-      }
+      assert.deepEqual(correction.originalToolArguments, { nextClock: "advance", ...badRender });
+      assert.match(payload.tools[0].function.parameters.properties.assetActivity.properties.currentLocationId.description, /准确名称.*登记候选/);
+      assert.deepEqual(correction.validation.expected, ["已有对象的准确名称；新对象使用 new 登记"]);
     }
     return { choices: [{ finish_reason: "tool_calls", message: { content: null, tool_calls: [{ id: `replay:${calls.length}`, type: "function", function: { name: step.name, arguments: JSON.stringify(step.args) } }] } }] };
   });
@@ -6099,8 +5171,10 @@ test("原日志回放：新地点位置与节拍字段各自纠正一次，前�
   const turn = await runNarrativeAgentTurn({ run, world, narrativeWorld: definition, context,
     envelope: { callId: "original-log", source: "scene", worldId: run.worldId, currentAge: 43, backgroundAgeRange: { fromAge: 44, toAge: 44 }, act, beat: "pressure", capabilities: ["scene"], storyPatterns: [], socialForces: [], focusReferences: [], statTiers: resolveNarrativeStatTiers(run.stats), clock: { mode: "hold", sameAgeTurnCount: 0, maxSameAgeTurns: 3 } },
     buildRenderInput: (plan) => ({ act, beat: "pressure", presentation: plan.presentation, allowedTurnKinds: ["scene"], sceneAge: 43, backgroundAgeRange: { fromAge: 44, toAge: 44 }, storyPatterns: [], socialForces: [], knownCharacters: [], statTiers: resolveNarrativeStatTiers(run.stats), attributePolicy: dynamicSceneAttributePolicy(), backgroundAttributePolicy: dynamicBackgroundAttributePolicy(run) }) });
-  assert.deepEqual(calls, ["plan_scene_turn", "plan_scene_turn", "render_scene_prose", "render_scene_prose", "resolve_scene_outcome", "observe_story_beat", "observe_story_beat"]);
+  assert.deepEqual(calls, ["plan_act_world_card", "render_scene_prose", "render_scene_prose", "resolve_scene_outcome"]);
   assert.equal(turn.scene.narrative, goodRender.narrative);
+  const stagedLocationId = run.narrative.assets!.locations.find((entry) => entry.name === "西边道远哨")!.id;
+  assert.notEqual(stagedLocationId, oldLocationId);
   assert.deepEqual(turn.scene.assetUpdates!.locations, [{ ref: stagedLocationId, current: true }]);
   const assets = applyNarrativeAssetUpdates(applyNarrativeAssetActivity(run.narrative.assets, turn.scene.assetActivity, { age: 43 }), turn.scene.assetUpdates, { age: 43 });
   commitNarrativeAssets(run.narrative, assets, { age: 43 });
@@ -6110,23 +5184,6 @@ test("原日志回放：新地点位置与节拍字段各自纠正一次，前�
   assert.equal(scripts.length, 0);
 });
 
-test("普通与 payoff 观察都只裁定节拍，非法返回仅纠正当前请求", async (t) => {
-  const run = makeRun();
-  const scripts = [observationReplyForTest("unknown"), observationReplyForTest("hold"), observationReplyForTest("advance")];
-  let calls = 0;
-  t.mock.method(OpenAI.Chat.Completions.prototype, "create", async (payload: any) => {
-    const tool = payload.tools[0].function;
-    assert.deepEqual(Object.keys(tool.parameters.properties), ["beatDecision", "evidence", "missing"]);
-    calls++;
-    return { choices: [{ finish_reason: "tool_calls", message: { tool_calls: [{ id: "observe", type: "function", function: { name: tool.name, arguments: JSON.stringify(scripts.shift()) } }] } }] };
-  });
-  const context = { ...memoryTestContext(run), apiKey: "not-sent" };
-  const input = { callId: "observe", actId: "act.one", beat: "pressure" as const, recentStory: "敌军还未撤退。", outline: outlineForTest("act.one") };
-  assert.equal((await observeNarrativeBeat(run, world, input, context)).decision, "hold");
-  assert.equal((await observeNarrativeBeat(run, world, { ...input, beat: "payoff" }, context)).decision, "advance");
-  assert.equal(calls, 3);
-});
-
 test("事件整理失败不清空批次或发布事实，修正后能从原批次提交", async (t) => {
   const run = makeRun(); run.age = 12;
   stageNarrativeAssetRound(run, { sourceEventId: "r12", source: "scene", age: 12, actId: "act.one", subject: "学艺", narrative: "你完成了查账，启程随军。" }, {}, { age: 12 });
@@ -6134,14 +5191,15 @@ test("事件整理失败不清空批次或发布事实，修正后能从原批�
   t.mock.method(OpenAI.Chat.Completions.prototype, "create", async (payload: any) => ({
     choices: [{ finish_reason: "tool_calls", message: { tool_calls: [{ id: "sync", type: "function", function: {
       name: payload.tools[0].function.name, arguments: JSON.stringify({
-        locationUpdates: [], abilityUpdates: [], identityMerges: [], relationshipUpdates: [], factUpdates: [],
-        factIntroductions: [{ kind: "experience", label: "查账结束后随军", status: "finish", sourceEventId: valid ? "r12" : "unknown-source" }]
+        locationUpdates: [], abilityUpdates: [], retirements: [], identityMerges: [], relationshipUpdates: [], factUpdates: [],
+        factIntroductions: [{ kind: "commitment", label: "查账结束后随军", status: "finish", sourceEventId: valid ? "r12" : "unknown-source" }]
       })
     } }] } }]
   }));
   const before = structuredClone(run);
-  await assert.rejects(runNarrativeTurnTransaction(run, (working) =>
-    synchronizeNarrativeAssetBatch(working, world, { ...memoryTestContext(working), apiKey: "not-sent" }, "flush", [], true)), NarrativeOutcomeError);
+  const failed = await runNarrativeTurnTransaction(run, (working) =>
+    synchronizeNarrativeAssetBatch(working, world, { ...memoryTestContext(working), apiKey: "not-sent" }, "flush", [], true));
+  assert.equal(failed.result.status, "failed");
   assert.deepEqual(run, before);
   valid = true;
   await synchronizeNarrativeAssetBatch(run, world, { ...memoryTestContext(run), apiKey: "not-sent" }, "flush", [], true);
@@ -6163,8 +5221,8 @@ test("同步工具跨来源和人物目录保持固定结构，年龄幕间由�
     assert.equal(Object.hasOwn(tool.parameters.properties.factIntroductions.items.properties.sourceEventId, "enum"), false);
     assert.ok(tool.parameters.required.includes("relationshipUpdates"));
     return { choices: [{ finish_reason: "tool_calls", message: { tool_calls: [{ id: "sync", type: "function", function: {
-      name: tool.name, arguments: JSON.stringify({ locationUpdates: [], abilityUpdates: [], relationshipUpdates: [], identityMerges: [], factUpdates: [],
-        factIntroductions: [{ kind: "experience", label: source === "story:first" ? "学艺已经完成" : "护送已经完成", status: "finish", sourceEventId: source }] })
+      name: tool.name, arguments: JSON.stringify({ locationUpdates: [], abilityUpdates: [], relationshipUpdates: [], retirements: [], identityMerges: [], factUpdates: [],
+        factIntroductions: [{ kind: "commitment", label: source === "story:first" ? "学艺已经完成" : "护送已经完成", status: "finish", sourceEventId: source }] })
     } }] } }] };
   });
   const events: string[] = [];
@@ -6209,11 +5267,11 @@ test("有效工具字段缺失或非法引用不会被默认成空数组、原�
     clock: { mode: "hold", sameAgeTurnCount: 2, maxSameAgeTurns: 3 }, actOutline: outlineForTest("act.one")
   };
   const args = planningReplyForTest({ clockRequest: "hold", conflictRefs: [], abilityRefs: ["ability:bow"], forceIds: [], locationDirective: { mode: "stay" } });
-  const { abilityRefs: _omitted, ...missing } = args;
-  assert.throws(() => parseNarrativeTurnPlan(missing, "plan_scene_turn", envelope),
-    (error: unknown) => error instanceof NarrativeOutcomeError && error.validation?.path === "abilityRefs");
-  assert.throws(() => parseNarrativeTurnPlan({ ...args, forceIds: [{ ref: "unregistered", purpose: "支援" }] }, "plan_scene_turn", envelope),
-    (error: unknown) => error instanceof NarrativeOutcomeError && error.validation?.path === "forceIds[0].ref");
+  const { recallRefs: _omitted, ...missing } = args;
+  assert.throws(() => parseNarrativeTurnPlan(missing, "recall_scene_assets", envelope),
+    (error: unknown) => error instanceof NarrativeOutcomeError && error.validation?.path === "recallRefs");
+  assert.throws(() => parseNarrativeTurnPlan({ recallRefs: [{ ref: "unregistered", purpose: "支援" }] }, "recall_scene_assets", envelope),
+    (error: unknown) => error instanceof NarrativeOutcomeError && error.validation?.path?.startsWith("recallRefs["));
   const choices = ["safe", "balanced", "risky"].map((id) => ({ id, label: "守住河口", description: "改变防守部署", abilityRefs: [], locationDirective: { mode: "stay" } }));
   assert.throws(() => normalizeMilestoneOptionOverrides(choices.map((row) => ({ ...row, locationDirective: { mode: "unknown" } })), true),
     (error: unknown) => error instanceof NarrativeOutcomeError && error.validation?.rule === "choice_location_mode_invalid");
@@ -6232,14 +5290,14 @@ test("幕初世界卡的协议错误只纠正该请求，普通年保存后不�
   let calls = 0;
   t.mock.method(OpenAI.Chat.Completions.prototype, "create", async (payload: { tools: Array<{ function: { name: string; parameters: { required: string[] } } }>; messages: Array<{ content: string }> }) => {
     calls++;
-    assert.deepEqual(payload.tools[0].function.parameters.required, ["actWorldCard"]);
+    assert.deepEqual(payload.tools[0].function.parameters.required, ["situation", "actors", "locations", "pressures", "stakes", "worldRuleRefs"]);
     if (calls === 2) {
       const correction = JSON.parse(payload.messages.at(-1)!.content.split("\n").at(-1)!);
       assert.equal(correction.reason, "narrative_act_outline_invalid");
-      assert.equal(correction.validation.path, "actWorldCard");
+      assert.equal(correction.validation.path, "hostingMaterials");
     }
     return { choices: [{ finish_reason: "tool_calls", message: { content: null, tool_calls: [{ id: `initial:${calls}`, type: "function",
-      function: { name: "plan_scene_turn", arguments: JSON.stringify({ actWorldCard: calls === 1 ? { beats: {} } : actWorldCardForTest() }) } }] } }] };
+      function: { name: "plan_act_world_card", arguments: JSON.stringify(calls === 1 ? {} : actWorldCardForTest()) } }] } }] };
   });
   const ctx = { ...memoryTestContext(run), apiKey: "not-sent", narrativePlan: buildNarrativePromptPlan(run, definition, null, "planning") };
   const first = await generateNarrativeActWorldCard(run, world, envelope, ctx);
@@ -6271,8 +5329,8 @@ test("原人物同步故障回放：八人只更新关系说明，父亲离场�
     assert.deepEqual(tool.parameters.properties.relationshipUpdates.items.required, ["characterRef"]);
     assert.equal(tool.parameters.properties.relationshipUpdates.items.anyOf, undefined);
     return { choices: [{ finish_reason: "tool_calls", message: { content: null, tool_calls: [{ id: "maintain", type: "function", function: { name: tool.name, arguments: JSON.stringify({
-      locationUpdates: [], abilityUpdates: [], identityMerges: [], factUpdates: [],
-      factIntroductions: [{ kind: "experience", label: "粮案已经结清", status: "finish", sourceEventId: "maintenance:61" }],
+      locationUpdates: [], abilityUpdates: [], retirements: [], identityMerges: [], factUpdates: [],
+      factIntroductions: [{ kind: "commitment", label: "粮案已经结清", status: "finish", sourceEventId: "maintenance:61" }],
       relationshipUpdates: people.slice(0, 8).map((person, index) => ({ characterRef: person.id,
         summary: index === 7 ? "父亲已经病故，留下的教诲仍影响你" : "旧日交情尚在，各自生活已安定",
         ...(index === 7 ? { status: "gone", description: "边镇老军士，性情沉稳，已经病故" } : {})
@@ -6345,7 +5403,7 @@ test("轻登记在三轮后按原 ID 补充已知资料，未知字段不强填�
       locationUpdates: [{ ref: locationId, spatialDescription: "军营内用于医治伤员的帐篷" }],
       abilityUpdates: [{ ref: abilityId, usage: "清理伤口并包裹，能处理轻伤", mastery: "初学" }],
       relationshipUpdates: [{ characterRef: personId, role: "随军医师", summary: "你的包扎老师" }],
-      identityMerges: [], factIntroductions: [], factUpdates: []
+      retirements: [], identityMerges: [], factIntroductions: [], factUpdates: []
     }) } }] } }] };
   });
   await synchronizeNarrativeAssetBatch(saved, world, { ...memoryTestContext(saved), apiKey: "not-sent" }, "first-fill");
@@ -6408,7 +5466,7 @@ test("归并暂存对象后同一响应的整合字段落在保留 ID，保存�
 
 test("同一经历由持续转为完成，保留发生幕间和来源年龄，下一幕不再作为待办", () => {
   const run = makeRun(); run.age = 30;
-  const initial = parseFactUpdates({ introduce: [{ kind: "experience", label: "随队学习营中救护", status: "stay", sourceEventId: "event:20" }] },
+  const initial = parseFactUpdates({ introduce: [{ kind: "commitment", label: "随队学习营中救护", status: "stay", sourceEventId: "event:20" }] },
     factUpdateContract([], [{ sourceEventId: "event:20", age: 20, actId: "act.one" }]))!;
   const [id] = applyNarrativeFactUpdates(run, initial, { sourceEventId: "batch:last", actId: "act.one" });
   const finished = parseFactUpdates({ updates: [{ factId: id, status: "finish", summary: "随队救护学习已经完成，具备了处理轻伤的经验", sourceEventId: "event:23" }] },
@@ -6451,15 +5509,10 @@ test("正文实际请求只读统一历史与最新角色面板，技能经历�
   assert.ok(text.indexOf("生于边镇") < text.indexOf("救回同袍后"));
   assert.ok(text.indexOf("救回同袍后") < text.indexOf("你目前20岁"));
   assert.ok(text.indexOf("你目前20岁") < text.indexOf("叙述21岁的经历"));
-  assert.ok(text.indexOf("救回同袍后") < text.indexOf("山口的关城与哨道"));
+  assert.ok(!text.includes("山口的关城与哨道"));
   assert.ok(text.indexOf("救回同袍后") < text.indexOf("叙述21岁的经历"));
-  assert.match(text, /骑射（熟练）/);
-  assert.match(text, /石墩.*巡防同袍/);
-  assert.match(text, /愿意协助巡防/);
-  assert.match(text, /边关.*山口的关城与哨道/);
-  assert.match(text, /沉稳寡言的老斥候/);
-  assert.match(text, /控制山口的边防关城/);
-  for (const unwanted of ["不应混入的旧会话文本", "不应走这条摘要旁路", skill.description!, skill.usage!]) assert.ok(!text.includes(unwanted));
+  assert.doesNotMatch(text, /骑射（熟练）|石墩.*巡防同袍|愿意协助巡防|沉稳寡言的老斥候|控制山口的边防关城/);
+  for (const unwanted of ["不应混入的旧会话文本", "不应走这条摘要旁路", skill.source!]) assert.ok(!text.includes(unwanted));
   const legacy = { ...skill, status: "unavailable" };
   assert.equal(normalizeNarrativeAssets({ locations: [], abilities: [legacy] }).abilities.length, 1);
   assert.equal(Object.hasOwn(normalizeNarrativeAssets({ locations: [], abilities: [legacy] }).abilities[0], "status"), false);
@@ -6512,7 +5565,7 @@ test("本次原故障回放：新人物漏 characterRef 在分配身份前纠正
   };
   await saveRun(structuredClone(run), session.id);
   const before = structuredClone(run);
-  const bad = {
+  const bad = { nextClock: "advance",
     narrative: "九岁那年秋，山下妇人抱来一个泻得脱了形的孩子。外祖开柜取药，叫你在旁一味一味指认、复述药性。你报得清楚，还说了句\"这味炮过才不伤脾胃\"。妇人怔住，问：这么小的娃也懂药？外祖只答：先记着。此后山下有人上山，总要多看你两眼。",
     storyDelta: "山下村民抱腹泻脱水的孩子来求治，外祖让主角在旁指认药包、复述药性；主角辨得分明，还指出某味须炮制才不伤脾胃。求治的妇人惊讶议论，主角的辨药第一次被外人看见，山下渐有口碑。",
     participants: [{ name: "陈阿嫂", role: "山下村民", description: "邻村妇人，抱泻得脱形的孩子上山求治，见九岁的主角能指认药包、说出炮制之理，惊讶之余把这事带下山去传。", recurring: true, factionId: "ancient.faith", relationship: { stance: "friendly", summary: "对这观里的小娃会辨药觉得稀奇，愿意信他几分。" } }],
@@ -6548,7 +5601,7 @@ test("本次原故障回放：新人物漏 characterRef 在分配身份前纠正
   const act = definition.mainlineActs![0];
   const { result } = await runNarrativeTurnTransaction(run, async (working) => {
     const rendered = await generateDynamicNarrativeScene(working, world, {
-      act, beat: "setup", presentation: "summary", allowedTurnKinds: ["background"], sceneAge: 9,
+      act,  presentation: "summary", allowedTurnKinds: ["background"], sceneAge: 9,
       backgroundAgeRange: { fromAge: 9, toAge: 9 }, storyPatterns: [],
       socialForces: [{ id: "ancient.faith", label: "教门", summary: "民间医药与信仰" }], knownCharacters: [],
       statTiers: resolveNarrativeStatTiers(working.stats), attributePolicy: dynamicSceneAttributePolicy(), backgroundAttributePolicy: dynamicBackgroundAttributePolicy(working)
@@ -6578,7 +5631,8 @@ test("本次原故障回放：新人物漏 characterRef 在分配身份前纠正
 });
 
 test("本次原故障回放：郝敬人物 ID 抄错在具名目录内纠正，原正文和抉择正常提交", async (t) => {
-  const background = {
+  const background = { nextClock: "advance",
+
   "narrative": "二十四年上，镇里没起大警。你清早到厅上生火盆，誊完轮值册便去渠口点出工，午后又替郝敬核一遍哨粮。白氏磨面时仍唤你记草束，孙韩二人下墙来，蹲在厅阶上啃干粮，问一句北面的路。祖父算盘声一日轻似一日，母亲仍不盖严那本悬名册。",
   "participants": [
     {
@@ -6730,13 +5784,14 @@ test("本次原故障回放：郝敬人物 ID 抄错在具名目录内纠正，�
       assert.equal(tool.parameters.properties.participants.items.properties.characterRef.enum, undefined,
         "具体人物 ID 留在请求目录，新增人物不改变工具定义；完整引用仍由解析器核对");
       const messages = payload.messages.map((entry) => entry.content).join("\n");
-      assert.ok(messages.includes(correctId + "=郝敬"));
+      assert.ok(!messages.includes(correctId + "=郝敬"));
       if (calls === 2) {
         assert.deepEqual(payload.tool_choice, { type: "function", function: { name: scenario.toolName } });
         const correction = JSON.parse(payload.messages.at(-1)!.content.split("\n").at(-1)!);
         assert.equal(correction.validation.path, "participants[0].characterRef");
         assert.equal(correction.validation.received, scenario.original.participants[0].characterRef);
-        assert.deepEqual(correction.allowedCharacters, characters);
+        assert.equal(correction.allowedCharacters, undefined);
+        assert.deepEqual(correction.validation.expected, ["new"]);
         assert.deepEqual(correction.originalToolArguments, scenario.original);
         assert.deepEqual(run, before, "第一次失败尚未登记人物或提交故事");
         assert.deepEqual((await getRun(run.runId))!, before);
@@ -6752,16 +5807,16 @@ test("本次原故障回放：郝敬人物 ID 抄错在具名目录内纠正，�
       const context = { ...memoryTestContext(working), apiKey: "not-sent", requestId: "character-id-replay",
         usageScope: { sessionId: session.id, runId: run.runId, worldId: run.worldId } };
       const rendered = await generateDynamicNarrativeScene(working, world, {
-        act: definition.mainlineActs![0], beat: "climax",
+        act: definition.mainlineActs![0],
         presentation: scenario.isChoice ? "scene" : "summary",
         allowedTurnKinds: scenario.isChoice ? ["scene"] : ["background"],
         sceneAge: 24, backgroundAgeRange: { fromAge: 24, toAge: 24 },
         storyPatterns: [], socialForces: definition.socialForces ?? [], knownCharacters: [],
         statTiers: resolveNarrativeStatTiers(working.stats),
         attributePolicy: dynamicSceneAttributePolicy(), backgroundAttributePolicy: dynamicBackgroundAttributePolicy(working),
-        plan: { callId: "character-id-replay", turnKind: scenario.isChoice ? "scene" : "background",
+        plan: { recallRefs: [], locationRefs: [],  callId: "character-id-replay", turnKind: scenario.isChoice ? "scene" : "background",
           presentation: scenario.isChoice ? "scene" : "summary", patternIds: [], forceIds: [],
-          conflictRefs: [correctId], abilityRefs: [ability.id], clockRequest: scenario.isChoice ? "hold" : "advance" }
+          conflictRefs: [correctId], abilityRefs: [ability.id]}
       }, context);
       assert.deepEqual(working, before, "成功解析后才进入原登记与提交步骤");
       assert.equal(rendered.narrative, normalizeNarrativeText(scenario.original.narrative));
@@ -6771,7 +5826,7 @@ test("本次原故障回放：郝敬人物 ID 抄错在具名目录内纠正，�
         source: scenario.isChoice ? "scene" : "background", subject: "人物引用原故障回放",
         age: 24, narrative: rendered.narrative }, rendered, { age: 24 });
       if (scenario.isChoice) advanceWithDynamicNarrativeScene(working, world, definition, {
-        ...rendered, beat: "climax", beatDecision: "hold", sceneAge: 24
+        ...rendered,   sceneAge: 24
       });
       else working.age = 24;
       appendPublicTurnRecord(working, { entryId: rendered.handoff!.sourceEventId, age: 24,
@@ -6813,8 +5868,8 @@ test("抉择的真实情景和选择贯通结果、提交前观察、保存恢�
   commitNarrativeActOutline(run.narrative, outline);
   const prose = "追击途中，同袍坠入沟底，你停在岔路口。";
   const background = "救援会失去追踪敌军的时机，追击则使同袍失去照应。";
-  advanceWithDynamicNarrativeScene(run, world, definition, { patternIds: [], forceIds: [], beat: "pressure", beatDecision: "hold",
-    narrative: prose, participants: [], createsDecision: true, sceneAge: 20, sceneClockMode: "hold",
+  advanceWithDynamicNarrativeScene(run, world, definition, { patternIds: [], forceIds: [],
+    narrative: prose, participants: [], createsDecision: true, sceneAge: 20,
     decisionBrief: { question: "救人还是继续追踪？", stakes: "同袍生死与军情去向" } });
   applyDirectedMilestonePresentation(run, { background, optionOverrides: [
     { id: "safe", label: "救回同袍", description: "放弃追击，背回伤员。" },
@@ -6838,23 +5893,23 @@ test("抉择的真实情景和选择贯通结果、提交前观察、保存恢�
     const tool = payload.tools[0].function;
     const text = payload.messages.map((message) => message.content).join("\n");
     calls.push(tool.name);
-    assert.equal(choiceRecord.choiceOutcome, undefined, "请求中不能提前把选择记作已提交");
+    if (["render_decision_outcome", "resolve_decision_outcome"].includes(tool.name)) assert.equal(choiceRecord.choiceOutcome, undefined, "结果成稿与结算前不能提前记作已提交");
     if (tool.name === "render_decision_outcome") {
       assert.equal(text.split(background).length - 1, 1);
       assert.ok(text.includes(selected.label) && text.includes(selected.description));
       assert.ok(JSON.stringify(tool.parameters.properties.assetUpdates.properties.abilities).includes(NARRATIVE_ABILITY_DEFINITION));
       assert.doesNotMatch(text, /召来援手|全力追敌|丢下伤员/);
     }
-    if (tool.name === "observe_story_beat") {
+    if (tool.name === "observe_act_closure") {
       for (const value of [prose, background, `玩家已选行动：${selected.label}`, resultProse]) assert.equal(text.split(value).length - 1, 1);
       assert.equal(text.split(`本次行动检定：${verdict}`).length - 1, 1);
       assert.doesNotMatch(text, /召来援手|全力追敌/);
     }
     if (tool.name === "sync_narrative_continuity") assert.ok(text.includes(`行动结果（检定${verdict}）：${resultProse}`));
     const args = tool.name === "render_decision_outcome"
-      ? { narrative: resultProse, participants: [], assetUpdates: { locations: [], abilities: [] }, assetActivity: { locationIds: [], abilityIds: [] } }
+      ? { nextClock: "advance", narrative: resultProse, participants: [], assetUpdates: { locations: [], abilities: [] }, assetActivity: { locationIds: [], abilityIds: [] } }
       : tool.name === "resolve_decision_outcome" ? { effects: [{ stat: "fortune", direction: "up", band: "light" }] }
-      : tool.name === "sync_narrative_continuity" ? { locationUpdates: [], abilityUpdates: [], identityMerges: [], relationshipUpdates: [], factIntroductions: [], factUpdates: [] }
+      : tool.name === "sync_narrative_continuity" ? { locationUpdates: [], abilityUpdates: [], retirements: [], identityMerges: [], relationshipUpdates: [], factIntroductions: [], factUpdates: [] }
       : observationReplyForTest("hold");
     return { choices: [{ finish_reason: "tool_calls", message: { content: null, tool_calls: [{ id: tool.name, type: "function", function: { name: tool.name, arguments: JSON.stringify(args) } }] } }] };
   });
@@ -6864,10 +5919,12 @@ test("抉择的真实情景和选择贯通结果、提交前观察、保存恢�
       attributePolicy: { allowedStats: ["fortune"], allowedDirections: ["up"], allowedBands: ["light"], minEffects: 1, maxEffects: 1 } }
   });
   assert.equal(choiceRecord.choiceOutcome, undefined);
+  run.nextMilestoneChoice!.check ??= prepareChoiceCheck(run, definition); rollChoice(run, "safe");
   const settled = applyMilestoneDecisionAndAdvance(run, world, difficulty, "safe", { narrativeWorld: definition,
     narrative: result.outcome.narrative, narrativeOutcome: { effects: result.outcome.effects }, deferCompletion: true });
   const observation = await finishNarrativeAgentDecision({ run, world, narrativeWorld: definition, context: { ...memoryTestContext(run), apiKey: "not-sent" }, callId: "choice:result", attemptId: result.attemptId, choice, decision: selected, outcome: result.outcome });
-  completeMilestoneDecision(run, settled.decisionEvent, settled.sourceEventId, settled.factIds, { narrativeWorld: definition, beatDecision: observation.decision });
+  run.choiceExecution!.outcome ??= { narrative: settled.decisionEvent.summary, effects: [], assetActivity: { locationIds: [], abilityIds: [] }, nextClock: "advance" };
+  completeMilestoneDecision(run, settled.decisionEvent, settled.sourceEventId, settled.factIds, { narrativeWorld: definition});
   resolveTurnRecordChoice(run, choice, selected);
   const resultEpisode = commitNarrativeEpisode(run, { callId: "choice:result", sourceEventId: settled.sourceEventId, turnKind: "decision",
     age: 20, actId: runtime.actId, beat: "pressure" });
@@ -6876,9 +5933,10 @@ test("抉择的真实情景和选择贯通结果、提交前观察、保存恢�
   resultRecord.decisionResult = { sceneId: choice.sceneId, revision: choice.revision, roll, status: "settled" };
   resultEpisode.turnId = resultRecord.turnId;
   assert.deepEqual(run.narrative.actRuntime!.outline, outline, "临时救援分歧的答案不删除大纲中的守城分歧");
-  assert.equal(run.narrative.actRuntime!.beat, "pressure");
+  assert.ok(run.pendingActFinalization);
   assert.equal(choiceRecord.choice!.options.length, 3);
-  assert.deepEqual(calls, ["render_decision_outcome", "resolve_decision_outcome", "sync_narrative_continuity", "observe_story_beat"]);
+  await synchronizeNarrativeAssetBatch(run, world, { ...memoryTestContext(run), apiKey: "not-sent" }, "choice:committed", definition.socialForces, true);
+  assert.deepEqual(calls, ["render_decision_outcome", "resolve_decision_outcome", "sync_narrative_continuity"]);
   const restored = JSON.parse(JSON.stringify(run)) as typeof run;
   const changes = recentCommittedNarrativeChanges(restored.narrative, 3, restored.turnRecords).join("\n");
   assert.ok(changes.indexOf(background) < changes.indexOf("玩家已选行动："));
@@ -6902,11 +5960,11 @@ test("同步提示词的事件目录与工具解析使用同一动态事件范�
   run.narrative = ensureNarrativeActRuntime(run.narrative, definition, run.age);
   const actId = run.narrative.actRuntime!.actId;
   const [openId, finishedId, blockedId] = applyNarrativeFactUpdates(run, { introduce: [
-    { kind: "experience", label: "修复城防" }, { kind: "experience", label: "夜袭已退" }, { kind: "experience", label: "已失效事项" }
+    { kind: "commitment", label: "修复城防" }, { kind: "commitment", label: "夜袭已退" }, { kind: "commitment", label: "已失效事项" }
   ], touchFactIds: [], resolveFactIds: [] }, { sourceEventId: "before", actId });
   applyNarrativeFactUpdates(run, { introduce: [], touchFactIds: [], resolveFactIds: [finishedId] }, { sourceEventId: "finished", actId });
   run.story.factLedger!.facts.find((fact) => fact.id === blockedId)!.status = "blocked";
-  const [oldFinishedId] = applyNarrativeFactUpdates(run, { introduce: [{ kind: "experience", label: "旧幕已结束经历" }], touchFactIds: [], resolveFactIds: [] }, { sourceEventId: "old", actId: "old.act" });
+  const [oldFinishedId] = applyNarrativeFactUpdates(run, { introduce: [{ kind: "commitment", label: "旧幕已结束经历" }], touchFactIds: [], resolveFactIds: [] }, { sourceEventId: "old", actId: "old.act" });
   applyNarrativeFactUpdates(run, { introduce: [], touchFactIds: [], resolveFactIds: [oldFinishedId] }, { sourceEventId: "old-end", actId: "old.act" });
   run.story.factLedger!.facts.push({ id: "world:setting", kind: "open_question", label: "静态世界设定标记", status: "open", sourceEventId: "world", introducedAge: 0, lastTouchedAge: 0 });
   for (let index = 0; index < 3; index++) stageNarrativeAssetRound(run, {
@@ -6916,15 +5974,15 @@ test("同步提示词的事件目录与工具解析使用同一动态事件范�
   t.mock.method(OpenAI.Chat.Completions.prototype, "create", async (payload: { tools: Array<{ function: { name: string; parameters: any } }>; messages: Array<{ content: string }> }) => {
     requests++;
     const text = payload.messages.map((message) => message.content).join("\n");
-    const line = text.split("\n").find((entry) => entry.startsWith("可更新事件："))!;
-    const directory = JSON.parse(line.slice("可更新事件：".length)) as Array<{ id: string }>;
-    assert.deepEqual(directory.map((entry) => entry.id), [openId, finishedId]);
+    const line = text.split("\n").find((entry) => entry.startsWith("可更新事项："))!;
+    const directory = [...JSON.parse(line.slice("可更新事项：".length)), ...JSON.parse(text.split("\n").find((entry) => entry.startsWith("其他事项索引："))!.slice("其他事项索引：".length))] as Array<{ id: string }>;
+    assert.deepEqual(directory.map((entry) => entry.id), [openId]);
     const contract = factUpdateContract(directory.map((entry) => entry.id));
     assert.deepEqual(contract.factIds, directory.map((entry) => entry.id));
     assert.deepEqual(contract.mutableIds, contract.factIds);
     assert.doesNotMatch(text, /静态世界设定标记|旧幕已结束经历|已失效事项/);
     assert.ok(JSON.stringify(payload.tools[0].function.parameters.properties.abilityUpdates).includes(NARRATIVE_ABILITY_DEFINITION));
-    const args = { locationUpdates: [], abilityUpdates: [], relationshipUpdates: [], identityMerges: [], factIntroductions: [],
+    const args = { locationUpdates: [], abilityUpdates: [], relationshipUpdates: [], retirements: [], identityMerges: [], factIntroductions: [],
       factUpdates: [{ factId: openId, status: "finish", summary: "城防修复完成。", sourceEventId: "events:2" }] };
     return { choices: [{ finish_reason: "tool_calls", message: { content: null, tool_calls: [{ id: "sync", type: "function", function: { name: "sync_narrative_continuity", arguments: JSON.stringify(args) } }] } }] };
   });
@@ -6936,79 +5994,4 @@ test("同步提示词的事件目录与工具解析使用同一动态事件范�
   assert.equal(run.story.factLedger!.facts.find((fact) => fact.id === "world:setting")!.status, "open");
   assert.equal(run.narrative.assetBuffer, undefined);
 });
-
-test("本次原故障回放：势力错入 conflictRefs 由规划请求纠正，重复失败保留证据但不提交", async (t) => {
-  const stored = replayStore(t);
-  const { session } = await resolveAnonymousSession();
-  const run = makeRun(); run.age = 10; run.worldId = "ancient"; run.narrative.enabled = true;
-  await saveRun(structuredClone(run), session.id);
-  const characterId = "character:f0dc006e-c556-4735-9b2f-777240893a25";
-  const abilityId = "ability:24461dcd-47c2-44b7-a5d8-8575bd4492ff";
-  const cardId = "ancient.domain.faith.disaster_healing";
-  const envelope: NarrativeTurnEnvelope = {
-    callId: "planner-replay", source: "scene", worldId: "ancient", currentAge: 10,
-    backgroundAgeRange: { fromAge: 11, toAge: 11 }, act: { id: "faith.first", label: "问诊入世", prompt: "在求治中认识民间" },
-    beat: "pressure", capabilities: ["scene"], storyPatterns: [],
-    actOutline: outlineForTest("faith.first", { goal: "独立问症并接受外祖检验", completionMeaning: "第一次问症形成结果" }),
-    socialForces: [{ id: "ancient.faith", label: "教门", summary: "施药治病" }, { id: "ancient.commoners", label: "乡民", summary: "上山求治" }],
-    focusReferences: [{ id: characterId, kind: "character", label: "温衡" }, { id: cardId, kind: "world_card", label: "灾病与医药" }, { id: abilityId, kind: "ability", label: "辨药识性" }, { id: "dynamic:51418147459740e2", kind: "fact", label: "学习问症" }],
-    statTiers: resolveNarrativeStatTiers(run.stats), clock: { mode: "advance", sameAgeTurnCount: 0, maxSameAgeTurns: 3 }
-  };
-  const bad = planningReplyForTest({
-    conflictRefs: [characterId, cardId, "ancient.faith"], abilityRefs: [abilityId],
-    assetNeeds: [{ kind: "character", purpose: "一位带着具体病症上山求治的乡民（或携病孩的妇人与同行的邻人），作为主角第一次独立问症的活教材，并能带回山下教门活动的消息" }],
-    locationDirective: { mode: "stay" },
-
-    clockRequest: "advance", forceIds: ["ancient.faith", "ancient.commoners"], actWorldCard: null
-  });
-  const good = { ...bad, conflictRefs: bad.conflictRefs.slice(0, 2) };
-  let calls = 0;
-  const payloads: string[] = [];
-  t.mock.method(OpenAI.Chat.Completions.prototype, "create", async (payload: { tools: Array<{ function: { name: string; parameters: any } }>; messages: Array<{ content: string }> }) => {
-    calls++;
-    const tool = payload.tools[0].function;
-    assert.equal(tool.name, "plan_scene_turn");
-    const prompt = payload.messages.at(calls === 2 || calls === 4 ? -2 : -1)!.content;
-    const conflictLine = prompt.split("\n").find((line) => line.startsWith("conflictRefs 目录"));
-    assert.ok(conflictLine);
-    assert.ok(conflictLine.includes(cardId) && conflictLine.includes("dynamic:51418147459740e2"));
-    assert.equal(conflictLine.includes('"ancient.faith"'), false);
-    assert.ok(prompt.split("\n").find((line) => line.startsWith("forceIds 目录"))?.includes('"ancient.faith"'));
-    assert.match(tool.parameters.properties.conflictRefs.items.properties.ref.description, /社会力量填写 forceIds/);
-    if (calls === 2 || calls === 4) {
-      const correction = JSON.parse(payload.messages.at(-1)!.content.split("\n").at(-1)!);
-      assert.equal(correction.validation.path, "conflictRefs[2].ref");
-      assert.equal(correction.validation.received, "ancient.faith");
-      assert.deepEqual(correction.validation.expected, [characterId, cardId, "dynamic:51418147459740e2"]);
-      assert.deepEqual(correction.originalToolArguments, bad);
-    }
-    payloads.push(JSON.stringify(payload));
-    const args = calls === 2 || calls === 5 ? good : bad;
-    return { id: `planner-response:${calls}`, choices: [{ finish_reason: "tool_calls", message: { content: null, tool_calls: [{ id: `planner-call:${calls}`, type: "function", function: { name: tool.name, arguments: JSON.stringify(args) } }] } }] };
-  });
-  const context = { ...memoryTestContext(run), apiKey: "not-sent", requestId: "planner-step", usageScope: { sessionId: session.id, runId: run.runId, worldId: run.worldId } };
-  const plan = await generateNarrativeTurnPlan(run, world, envelope, context);
-  assert.deepEqual(plan.conflictRefs, [characterId, cardId]);
-  assert.deepEqual(plan.forceIds, ["ancient.faith", "ancient.commoners"]);
-  assert.equal(plan.assetNeeds!.length, 1);
-  assert.equal(calls, 2);
-  const before = structuredClone(run);
-  await assert.rejects(runNarrativeTurnTransaction(run, async (working) => {
-    await generateNarrativeTurnPlan(working, world, { ...envelope, callId: "planner-still-invalid" }, context);
-    working.age++;
-  }), (error: unknown) => error instanceof NarrativeOutcomeError && error.validation?.path === "conflictRefs[2].ref");
-  assert.equal(calls, 4);
-  assert.deepEqual(run, before);
-  assert.deepEqual((await getRun(run.runId))!, before);
-  assert.equal(stored(run.runId).generationFailures!.length, 3);
-  await generateNarrativeTurnPlan(run, world, { ...envelope, callId: "planner-next-request" }, context);
-  assert.equal(calls, 5);
-  assert.equal(payloads[4].includes("originalToolArguments"), false, "纠正材料只存在于失败子请求的局部 history");
-  await saveRun(run, session.id);
-  const failures = stored(run.runId).generationFailures!;
-  assert.deepEqual(failures.map((entry) => entry.attempt), [0, 0, 1]);
-  assert.ok(failures.every((entry) => entry.reason === "narrative_turn_plan_material_invalid" && entry.toolName === "plan_scene_turn" && entry.age === 10));
-  assert.equal(failures[0].actId, envelope.act.id);
-  assert.equal(failures[0].beat, envelope.beat);
-  assert.equal(JSON.stringify(run).includes("originalToolArguments"), false);
-});
+// Unified force-reference classification and unknown-reference rejection are covered in narrative-planning.test.ts.

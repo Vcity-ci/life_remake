@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { hostingFixture } from "./narrative/hosting-fixture.js";
 import test from "node:test";
 import OpenAI from "openai";
 import { createDefaultGameplayTuning, type WorldConfig, type DifficultyConfig } from "@reroll/shared";
@@ -6,20 +7,23 @@ import { choiceProbability, prepareChoiceCheck, rollChoice, canOpenChoiceSurviva
 import { createRun, advanceWithDynamicNarrativeScene, appendPublicTurnRecord, applyMilestoneDecisionAndAdvance,
   completeMilestoneDecision, resolveTurnRecordChoice, toPublicMilestoneChoice, toClientRun,
   dynamicDecisionPolicies, openChoiceSurvivalCrisis, resolveSurvivalCrisis } from "./engine.js";
-import { settleChoiceResultRecord } from "./engine.js";
+import { settleChoiceResultRecord, refreshLatestChoiceAssetSnapshot } from "./engine.js";
 import { loadNarrativeWorldDefinition } from "./content.js";
 import { loadNarrativeStoryPack } from "./story-packs.js";
 import { resolveNarrativeExperience } from "./narrative-experience.js";
 import { ensureNarrativeActRuntime, buildNarrativePromptPlan } from "./narrative.js";
-import { runNarrativeAgentDecision, finishNarrativeAgentDecision } from "./narrative/runtime.js";
+import { runNarrativeAgentDecision, finishNarrativeAgentDecision, synchronizeNarrativeAssetBatch } from "./narrative/runtime.js";
 import { stageNarrativeAssetRound, narrativeAssetBatchReady } from "./narrative/asset-buffer.js";
 import { validateNarrativeEffects } from "./narrative-attributes.js";
+import { finishPendingNarrativeActEvent } from "./narrative/finalization.js";
+import { commitNarrativeEpisode } from "./narrative/commit.js";
+import { parseNarrativeActWorldCard, commitNarrativeActOutline } from "./narrative/act-outline.js";
 import type { NarrativeContext } from "./ai.js";
 
-const world: WorldConfig = { id: "ancient", name: "边地", intro: "边地人生", stylePrompt: "具体叙事", milestoneAges: [], endAgeRange: { min: 90, max: 90 }, yearlyEventHints: [] };
+const world: WorldConfig = { id: "ancient", name: "边地", intro: "边地人生",  milestoneAges: [], endAgeRange: { min: 90, max: 90 }, yearlyEventHints: [] };
 const difficulty: DifficultyConfig = { id: "test", name: "测试", yearlyVolatility: 0, growthBias: 0, riskRewardMultiplier: 1, failurePenaltyMultiplier: 1, description: "测试" };
 const context: NarrativeContext = { apiKey: "mock-only", promptPack: {}, providerConfig: { provider: "openai-compatible", baseUrl: "https://example.invalid", model: "mock", apiPath: "/chat/completions", temperature: 0.7, maxTokens: 2000, timeoutMs: 1000 } };
-const emptySync = { locationUpdates: [], abilityUpdates: [], identityMerges: [], relationshipUpdates: [], factIntroductions: [], factUpdates: [] };
+const emptySync = { locationUpdates: [], abilityUpdates: [], retirements: [], identityMerges: [], relationshipUpdates: [], factIntroductions: [], factUpdates: [] };
 
 async function fixture(beat: "pressure" | "payoff" = "pressure") {
   const base = (await loadNarrativeWorldDefinition("ancient"))!;
@@ -32,7 +36,7 @@ async function fixture(beat: "pressure" | "payoff" = "pressure") {
     stats: { intelligence: 5, charisma: 5, family: 5, fortune: 5, physique: 5 }, selectedCardIds: []
   });
   run.age = 20; run.narrative = ensureNarrativeActRuntime(run.narrative, definition, 20);
-  run.narrative.actRuntime!.beat = beat;
+  commitNarrativeActOutline(run.narrative, parseNarrativeActWorldCard(hostingFixture("关门遭敌，守军救援"), run.narrative.actRuntime!.actId, { objective: "应对入侵", closureMeaning: "入侵结局实际落定" }));
   run.narrative.opening = { status: "ready" };
   const actId = run.narrative.actRuntime!.actId;
   stageNarrativeAssetRound(run, { sourceEventId: "previous", source: "scene", age: 19, actId, subject: "巡防", narrative: "你此前在边堡巡防。" }, {
@@ -40,19 +44,21 @@ async function fixture(beat: "pressure" | "payoff" = "pressure") {
     assetUpdates: { locations: [{ ref: "new", name: "永安堡", current: true }], abilities: [{ ref: "new", name: "北语听音" }] }
   }, { age: 19 });
   const background = "河桥损毁，陈统领陷在对岸，救援尚待你决定。";
-  advanceWithDynamicNarrativeScene(run, world, definition, { patternIds: [], forceIds: [], beat, beatDecision: "hold",
-    sceneAge: 20, sceneClockMode: "hold", narrative: background, participants: [], createsDecision: true });
+  advanceWithDynamicNarrativeScene(run, world, definition, { patternIds: [], forceIds: [],
+    sceneAge: 20,  narrative: background, participants: [], createsDecision: true });
   run.nextMilestoneChoice!.check = prepareChoiceCheck(run, definition);
   const choice = toPublicMilestoneChoice(run)!;
   const selected = choice.options[2];
   const record = appendPublicTurnRecord(run, { entryId: "choice-scene", kind: "scene", age: 20,
     ageStage: { label: "青年" }, narrative: background, statChanges: {} }, choice);
+  const episode = commitNarrativeEpisode(run, { callId: "choice", sourceEventId: run.pendingDynamicScene!.id, turnKind: "scene", age: 20, actId });
+  episode.turnId = record.turnId;
   stageNarrativeAssetRound(run, { sourceEventId: run.pendingDynamicScene!.id, source: "scene", age: 20, actId,
     subject: "待选", narrative: background }, { pendingChoice: true }, { age: 20 });
   return { run, definition, actId, choice, selected, record, background };
 }
 
-test("按当前幕节拍门槛检查四属性，概率与保存后的掷点保持一致", async () => {
+test("按本幕固定难度检查四属性，概率与保存后的掷点保持一致", async () => {
   for (const [ratio, expected] of [[1, [.8, .55, .25]], [.5, [2 / 3, 11 / 29, 1 / 7]], [2, [8 / 9, 22 / 31, .4]]] as const) {
     [.2, .45, .75].forEach((risk, index) => assert.ok(Math.abs(choiceProbability(ratio * 20, 20, risk) - expected[index]) < 1e-12));
   }
@@ -61,7 +67,7 @@ test("按当前幕节拍门槛检查四属性，概率与保存后的掷点保�
     run.narrative.actRuntime!.beat = beat;
     const check = prepareChoiceCheck(run, definition);
     assert.ok(["family", "intelligence", "charisma", "fortune"].includes(check.stat));
-    assert.equal(check.threshold, definition.progression!.actGateThresholds![0][stage]);
+    assert.equal(check.threshold, 16);
     assert.equal(check.value, run.stats[check.stat]);
   }
   const first = rollChoice(run, "risky");
@@ -100,8 +106,8 @@ test("结果成稿先交付；恢复不重写不重掷，结算后完整经历�
     const text = payload.messages.map((message: any) => message.content).join("\n");
     let args: object;
     if (name === "render_decision_outcome") {
-      assert.match(text, /引擎检定已确定.*失败/);
-      args = { narrative, participants: [], assetUpdates: { locations: [], abilities: [] }, assetActivity: { locationIds: [location], abilityIds: [ability], currentLocationId: location } };
+      assert.match(text, /检定结果：失败/);
+      args = { nextClock: "advance", narrative, participants: [], assetUpdates: { locations: [], abilities: [] }, assetActivity: { locationIds: [location], abilityIds: [ability], currentLocationId: location } };
     } else if (name === "resolve_decision_outcome") {
       args = { effects: [{ stat: "charisma", direction: "down", band: "light" }] };
     } else if (name === "sync_narrative_continuity") {
@@ -112,14 +118,15 @@ test("结果成稿先交付；恢复不重写不重掷，结算后完整经历�
       assert.equal(run.narrative.actRuntime!.actId, actId);
       args = { ...emptySync,
         relationshipUpdates: [{ characterRef: person, condition: "被俘", summary: "救援失败后等待再会" }],
-        locationUpdates: [{ ref: location, features: [{ name: "河桥", state: "烧毁，尚未修复，不能渡河" }] }],
+        locationUpdates: [{ ref: location, featureChanges: [{ id: "new", name: "河桥", state: "烧毁，尚未修复，不能渡河" }] }],
         abilityUpdates: [{ ref: ability, mastery: "初通" }],
-        factIntroductions: [{ kind: "experience", label: "这次救援已经失败，陈统领被俘", status: "finish", sourceEventId: `${run.nextMilestoneChoice!.check!.id}:result`, characterIds: [person], locationIds: [location], abilityIds: [ability] }]
+        factIntroductions: [{ kind: "commitment", label: "这次救援已经失败，陈统领被俘", status: "finish", sourceEventId: `${choice.check!.id}:result`, characterIds: [person], locationIds: [location], abilityIds: [ability] }]
       };
     } else {
-      assert.equal(name, "observe_story_beat");
+      assert.equal(name, "observe_act_closure");
+      for (const part of [background, selected.label, narrative, "本次行动检定：失败"]) assert.equal(text.split(part).length - 1, 1, part);
       assert.equal(run.narrative.dynamicCharacters[0].condition, "被俘");
-      args = { beatDecision: "hold", evidence: null, missing: "被俘同袍的处境尚未形成阶段结果" };
+      args = { decision: "ongoing", evidence: null };
     }
     return { choices: [{ finish_reason: "tool_calls", message: { content: null, tool_calls: [{ id: name, type: "function", function: { name, arguments: JSON.stringify(args) } }] } }] };
   });
@@ -148,13 +155,21 @@ test("结果成稿先交付；恢复不重写不重掷，结算后完整经历�
   assert.equal(run.history.length, historyLength);
   assert.equal(run.stats.charisma, beforeSettlement - 1);
   const finish = () => finishNarrativeAgentDecision({ ...makeInput(), attemptId: result.attemptId, outcome: run.choiceExecution!.outcome! });
-  const observation = await finish();
-  assert.deepEqual(calls, ["render_decision_outcome", "resolve_decision_outcome", "sync_narrative_continuity", "observe_story_beat"]);
   await finish();
-  assert.equal(calls.filter((name) => name === "sync_narrative_continuity").length, 1);
+  assert.deepEqual(calls, ["render_decision_outcome", "resolve_decision_outcome"]);
+  await finish();
+  assert.equal(calls.filter((name) => name === "sync_narrative_continuity").length, 0);
   const resultTurn = run.turnRecords.find((record) => record.turnId === run.choiceExecution!.resultTurnId)!;
-  completeMilestoneDecision(run, settled.decisionEvent, settled.sourceEventId, settled.factIds, { narrativeWorld: definition, beatDecision: observation.decision });
+  run.choiceExecution!.outcome = { narrative: "强渡失败，落水重伤。", effects: [], assetActivity: { locationIds: [], abilityIds: [] }, nextClock: "hold" };
+  completeMilestoneDecision(run, settled.decisionEvent, settled.sourceEventId, settled.factIds, { narrativeWorld: definition});
   settleChoiceResultRecord(run, resultTurn, settled.decisionEvent);
+  const resultEpisode = commitNarrativeEpisode(run, { callId: "choice-result", sourceEventId: settled.sourceEventId, turnKind: "decision", age: 20, actId });
+  resultEpisode.turnId = resultTurn.turnId;
+  await synchronizeNarrativeAssetBatch(run, world, context, "choice:committed", definition.socialForces, true);
+  refreshLatestChoiceAssetSnapshot(run, resultEpisode.id);
+  assert.equal(calls.filter((name) => name === "sync_narrative_continuity").length, 1);
+  await finishPendingNarrativeActEvent(run, world, definition, context, async () => {});
+  assert.equal(calls.at(-1), "observe_act_closure");
   assert.equal(run.turnRecords[0].narrativeCharactersSnapshot![0].condition, undefined, "抉择前快照仍是当时状态");
   assert.equal(run.choiceExecution, undefined);
   assert.equal(run.nextMilestoneChoice, undefined);
@@ -162,7 +177,7 @@ test("结果成稿先交付；恢复不重写不重掷，结算后完整经历�
   assert.equal(run.story.factLedger!.facts.find((fact) => fact.label.includes("这次救援"))!.status, "resolved");
   const restored = JSON.parse(JSON.stringify(run)) as typeof run;
   const next = buildNarrativePromptPlan(restored, definition, null, "rendering", { focusIds: [person, location, ability] })!;
-  assert.ok(JSON.stringify(next).includes("烧毁，尚未修复，不能渡河"));
+  assert.ok(!JSON.stringify(next).includes("烧毁，尚未修复，不能渡河"));
   assert.equal(toClientRun(restored).narrativeCharacters![0].condition, "被俘");
 });
 
@@ -180,8 +195,9 @@ test("仅冒险失败且核查属性低于半门槛才开放实际险境，求�
   openChoiceSurvivalCrisis(run, "河桥断裂，落水重伤", "强渡失败，落水重伤。", "强渡救人");
   assert.equal(run.survival.lowPhysiqueYears, 0, "事故不借用多年低体魄的慢性入口");
   assert.equal(toClientRun(run).survivalCrisis, undefined, "完整事件未收尾前不开放下一项操作");
-  completeMilestoneDecision(run, settled.decisionEvent, settled.sourceEventId, settled.factIds, { narrativeWorld: definition, beatDecision: "advance" });
-  assert.equal(run.narrative.actRuntime!.beat, "payoff");
+  run.choiceExecution!.outcome = { narrative: "强渡失败，落水重伤。", effects: [], assetActivity: { locationIds: [], abilityIds: [] }, nextClock: "hold" };
+  completeMilestoneDecision(run, settled.decisionEvent, settled.sourceEventId, settled.factIds, { narrativeWorld: definition});
+  assert.ok(run.pendingActFinalization);
   assert.equal(run.narrative.payoffCount, 0);
   assert.match(toClientRun(run).survivalCrisis!.summary, /河桥断裂/);
   run.stats.intelligence = 100;

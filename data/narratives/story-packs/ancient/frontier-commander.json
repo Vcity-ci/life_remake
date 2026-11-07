@@ -1,24 +1,25 @@
 {
   "version": 1,
   "id": "ancient.frontier-commander",
-  "revision": "1.3.0",
+  "revision": "2.4.0",
+  "eventFlowId": "ancient.frontier-commander",
   "worldId": "ancient",
   "name": "边镇将帅",
-  "tagline": "在烽火、互市与朝廷猜忌之间，决定一支军队和一方边地的命运。",
+  "tagline": "从边地军户走入军营，带起自己的部伍，亲自面对守边大战。",
   "summary": "从边地遇险、侦察报信和实际军旅行动进入军中，以救援与作战取得同伴和指挥职责，最终率军面对外敌入侵及战后军权的归属。",
-  "routePromise": "人物将通过边境经验、军功与关系取得军中决定权，并回答武力究竟用来守护、割据还是重塑秩序。",
+  "routePromise": "人物经历成长入伍、带队作战与独立统军，最终承担抵御全面入侵的责任；具体战果、损失和结局由实际游戏产生。",
   "protagonistTrajectory": "从被边地局势支配的无名之人，成长为能够亲自操练、作战、统军并决定一方攻守的将帅。",
   "coreOpposition": "外敌持续入侵与军镇、朝廷、边民之间相互冲突的安全诉求。",
   "stakesProgression": "从个人生存与同袍信任，扩大到部伍存亡、边民安危，最终牵动疆土归属与军政秩序。",
   "endingQuestion": "当人物真正握有兵权时，会用它守护谁，又愿意为此承担什么后果？",
   "centralConflict": "一股正在由边境侵扰升级为全面战争的外部力量持续压迫边地，使军镇、朝廷与边民必须围绕守土、求和或扩张付出真实代价。",
-  "entryLens": "家庭立足于边境守御生活，能接触巡哨、操练与山道；提供一件可辨认来处的实物和一位能联系守军的亲友。人设与天赋决定行事方式，不把军旅入口替换成账房或商队生涯。",
+  "entryLens": "家庭立足于边境守御生活，能接触巡哨、操练与山道；家中有一件用于军旅生活的实物，有一位与守军相熟的亲友。人设与天赋决定行事方式，家庭身份与生计以这份入口为准。",
   "originSeeds": [
     "家庭熟悉一处可探索的山道、关口与对应警号，孩子有当地伙伴",
     "一位巡哨或教练亲友可以接应与引路，但信任、同袍和职责仍须以后续实际行动取得"
   ],
   "stakeAxes": [
-    "粮饷",
+    "部伍战力",
     "军心",
     "边民安全",
     "周边势力关系",
@@ -29,28 +30,20 @@
     "ancient.military",
     "ancient.neighbors",
     "ancient.court",
-    "ancient.markets",
     "ancient.commoners"
   ],
   "acts": [
     {
       "id": "ancient.frontier-commander.service",
       "label": "从戎",
-      "objective": "通过操练、巡防、侦察或真实冲突中的行动，在边地秩序中取得可信职责、同袍关系和军中位置。",
-      "payoffMeaning": "本幕军事危机已经因人物的实际行动落定，能力、同袍关系与军中位置产生明确得失；由这次成败带来的职责、托付或追责，使人物进入需要承担指挥后果的新处境。",
-      "beatOutline": {
-        "setup": "让人物从边地日常看见军情逼近，并找到进入军旅行动的位置。",
-        "escalation": "敌方试探开始造成实际损失，人物借操练、巡防、侦察或初次交锋取得可用本领与同袍信任。",
-        "pressure": "让敌情、军纪与边民安危同时逼迫人物承担风险。",
-        "climax": "让人物在一次真实军事危机中亲自行动并影响小队存亡。",
-        "payoff": "落定此次军事危机的成败，交代同袍与上官如何据此授予职责、交付部众或要求担责，打开更大范围的军中冲突。"
-      },
+      "objective": "通过成长、操练和实际军旅经历锻炼自己，正式入伍，开始承担士兵的职责。",
+      "payoffMeaning": "主角已实际入伍并开始履行士兵职责，是本幕的成功结果。一次报信、获得认可或获准训练只是成长经历，不等于入伍。若实际结果已经终结本线军旅道路，则依据 IF 失败标准判断整局结局。",
       "worldCardRefs": [
         "ancient.snapshot.frontier_pressure",
         "ancient.snapshot.nine_regions",
         "ancient.domain.military.reconnaissance",
         "ancient.domain.military.training_command",
-        "ancient.domain.military.logistics_morale"
+        "ancient.domain.military.raid_siege"
       ],
       "adventureSeeds": [
         {
@@ -70,19 +63,12 @@
     {
       "id": "ancient.frontier-commander.command",
       "label": "掌军",
-      "objective": "以此前留下的职责或追责接手实际人手，在重大军事或救援危机中完成调度、协作与行动，以部众和军民的实际结果建立指挥能力。",
-      "payoffMeaning": "本幕军事或救援危机的实际结果、同伴存亡与指挥责任已落定；上官与部众据此明确长期职责或问责，留下的力量与损失成为应对全面入侵的现实基础。",
-      "beatOutline": {
-        "setup": "承接此前军事行动留下的职责、关系或追责，让新的敌情与军中任务把人物推入需要调度兵马和资源的位置。",
-        "escalation": "把明确的人手与分工交到主角手里，以一次实地行动检验别人为何跟随，以及主角能否调度他们。",
-        "pressure": "危机升级与支援不足让救人、保护部众和完成军令难以兼得，已作行动留下实际代价。",
-        "climax": "人物带领实际部众完成一次决定危机走向的救援或攻守行动，成败落实到人、阵地与通路。",
-        "payoff": "交代军民和同伴的结果，上官据此授予或收回明确的人手与指挥责任；不能以一次口头认可代替危机落定。"
-      },
+      "objective": "从士兵成长为带队者，训练部伍、带队出击，在军事实践与战果中积累同伴、威望和统军能力，成为能够独当一面的将军。",
+      "payoffMeaning": "主角已在训练和实际行动中形成能够持续作战的部伍与指挥能力，并实际成为将军，是本幕的成功结果。一次救援、临时领队或单次获授职责只属于其中的发展。局部受挫仍可改变部伍和人物的处境；军旅道路确已终结时，依据 IF 失败标准判断整局结局。",
       "worldCardRefs": [
         "ancient.snapshot.nine_regions",
         "ancient.snapshot.central_figures",
-        "ancient.domain.military.logistics_morale",
+        "ancient.domain.military.prisoners_retreat",
         "ancient.domain.military.raid_siege",
         "ancient.domain.military.reconnaissance"
       ],
@@ -114,19 +100,12 @@
       "label": "镇疆",
       "objective": "面对足以改变边地格局的战争威胁与中央制衡，亲自承担一方军民的最终攻守责任。",
       "payoffMeaning": "外部战争的核心威胁已经落定为击退、停战、失败或其他确实改变敌我关系的结果，军民存亡、边境秩序与人物政治位置得到最终回答。一波进攻被阻退仍只属于战事进展。",
-      "beatOutline": {
-        "setup": "外部势力的征服、围攻或断道把边地推向全面战争或崩解，人物以此前成败留下的部众、盟友、职责与损失迎接新的危机。",
-        "escalation": "调动旧部、盟友、城防与民众形成一方战争格局。",
-        "pressure": "让决战需要、朝廷猜忌与边地长期生存正面冲突。",
-        "climax": "让人物以主将身份完成一场具有战争尺度的攻守行动。",
-        "payoff": "交代外部战争如何真正结束或形成已落定的失败，敌方因此撤离、停战、占领或改变关系；再回答疆土、军队与人物权力的归属，朝廷和边民据此回应功过与战后归处。"
-      },
       "worldCardRefs": [
         "ancient.snapshot.central_figures",
         "ancient.snapshot.frontier_pressure",
         "ancient.domain.military.raid_siege",
         "ancient.domain.military.prisoners_retreat",
-        "ancient.domain.military.logistics_morale"
+        "ancient.domain.military.training_command"
       ],
       "adventureSeeds": [
         {
@@ -145,19 +124,20 @@
     }
   ],
   "endingDirections": {
+    "closureBoundary": "局部失利、暂时失地或被俘仍可形成后续经历。结局按已经落定的战局、军民处境和守边事业判断；尚存外敌或朝廷猜忌本身不决定等级。守边事业实际败亡时可以提前结束。",
     "good": [
-      "守住边疆并妥善安置军民，以可信方式交代军权",
-      "在战争与互市之间留下长期秩序"
+      "本次全面入侵已被击退或迫退，主要防区保住或收复，军民得到实际保护，主角的守边事业取得成立的成果。"
     ],
     "normal": [
-      "保住一方安定或军中声望，但未能消除朝廷猜忌和边境隐患"
+      "战争已以停战、撤守或有限防卫落定，幸存军民得到保全，但主要失地未复或防区被迫收缩，留下实际未能实现的守土成果。"
     ],
     "bad": [
-      "因谋反嫌疑、内斗或诱杀失去部曲与性命",
-      "军事冒险失败并导致边镇陷落"
+      "主角死亡或部伍覆灭、军权被彻底剥夺，实际已经终结其军旅事业。",
+      "战争失败导致边镇陷落或军民遭受毁灭性损失，守边事业已经败亡。"
     ]
   },
   "worldCardRefs": [
+    "ancient.domain.military.ranks_and_merit",
     "ancient.snapshot.frontier_pressure",
     "ancient.snapshot.nine_regions",
     "ancient.snapshot.central_figures"

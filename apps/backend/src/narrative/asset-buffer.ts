@@ -4,6 +4,8 @@ import { applyNarrativeAssetUpdates, commitNarrativeAssets } from "../narrative-
 import { registerNarrativeParticipants } from "../narrative-characters.js";
 import type { NarrativeParticipant } from "../narrative-characters.js";
 import type { NarrativeRoundHandoff } from "./handoff.js";
+import { retireNarrativeAssets } from "./asset-scope.js";
+import { usesPresetEventAssets, applyEventAssetChanges } from "./event-assets.js";
 
 export const NARRATIVE_ASSET_SYNC_ROUNDS = 3;
 type Buffer = NonNullable<NarrativeRunState["assetBuffer"]>;
@@ -15,9 +17,21 @@ type Buffer = NonNullable<NarrativeRunState["assetBuffer"]>;
 export function stageNarrativeAssetRound(
   run: InternalRunState,
   round: Buffer["rounds"][number],
-  changes: { assetUpdates?: NarrativeAssetUpdates; participants?: NarrativeParticipant[]; handoff?: NarrativeRoundHandoff; pendingChoice?: boolean },
+  changes: { assetUpdates?: NarrativeAssetUpdates; participants?: NarrativeParticipant[]; handoff?: NarrativeRoundHandoff; pendingChoice?: boolean; assetActivity?: import("@reroll/shared").NarrativeAssetActivity },
   when: NarrativeAssetMoment
 ): NarrativeAssetUpdates | undefined {
+  if (usesPresetEventAssets(run)) {
+    if (round.source === "origin" && run.narrative.eventFlow) applyEventAssetChanges(run, {
+      locations: [], abilities: [], characters: [], rounds: [round]
+    }, { introductions: run.storyPackSnapshot!.eventFlow!.originRoles!.map((roleId) => ({ roleId })), updates: [] });
+    const buffer = run.narrative.assetBuffer ??= { locations: [], abilities: [], characters: [], rounds: [] };
+    if (!changes.pendingChoice && !buffer.rounds.some((entry) => entry.sourceEventId === round.sourceEventId)) buffer.rounds.push({
+      ...round, flowId: !round.actId || run.narrative.eventFlow?.actId === round.actId ? run.narrative.eventFlow?.flowId : undefined
+    });
+    if (changes.handoff) changes.handoff.participantsRegistered = true;
+    return undefined;
+  }
+  retireNarrativeAssets(run);
   const buffer = run.narrative.assetBuffer ??= { locations: [], abilities: [], characters: [], rounds: [] };
   const application = applyNarrativeAssetUpdates(run.narrative.assets, changes.assetUpdates, when, true);
   // IDs are allocated here once. All later links refer to these exact records.
@@ -29,7 +43,11 @@ export function stageNarrativeAssetRound(
   buffer.locations = upsert(buffer.locations, application.assets.locations.filter((entry) => application.locationIds.includes(entry.id)));
   buffer.abilities = upsert(buffer.abilities, application.assets.abilities.filter((entry) => application.abilityIds.includes(entry.id)));
   buffer.characters = upsert(buffer.characters, characters.map(({ character }) => character));
-  if (!changes.pendingChoice && !buffer.rounds.some((entry) => entry.sourceEventId === round.sourceEventId)) buffer.rounds.push({ ...round });
+  if (!changes.pendingChoice && !buffer.rounds.some((entry) => entry.sourceEventId === round.sourceEventId)) buffer.rounds.push({ ...round, relatedIds: Array.from(new Set([
+    ...(round.relatedIds ?? []), ...application.locationIds, ...application.abilityIds,
+    ...characters.map(({ character }) => character.id), ...(changes.assetActivity?.locationIds ?? []),
+    ...(changes.assetActivity?.abilityIds ?? []), ...(changes.assetActivity?.currentLocationId ? [changes.assetActivity.currentLocationId] : [])
+  ])) });
   const currentLocationId = changes.assetUpdates?.locations.some((entry) => entry.current === true)
     ? application.assets.currentLocationId : undefined;
   // Later commit paths link the source experience, without replaying stale profile

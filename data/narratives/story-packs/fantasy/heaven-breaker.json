@@ -38,13 +38,6 @@
       "label": "夺身",
       "objective": "确认异常力量如何影响自身，并夺回第一次真正的自主行动。",
       "payoffMeaning": "人物建立了自我边界，并能主动使用或拒绝这份异常力量。",
-      "beatOutline": {
-        "setup": "让异常力量以可感知的方式侵入人物生活与身体。",
-        "escalation": "通过试探、对抗与第一次主动使用确认其能力和危险。",
-        "pressure": "让异常意志、外部觊觎与重要关系共同挑战人物自我。",
-        "climax": "让人物夺回一次关键行动的控制权并付出真实代价。",
-        "payoff": "确立自我边界、力量用法与继续追查来源的主动地位。"
-      },
       "worldCardRefs": [
         "fantasy.snapshot.cultivation_cost",
         "fantasy.snapshot.two_layers",
@@ -72,13 +65,6 @@
       "label": "破局",
       "objective": "追索异常背后的世间势力与古老因果，打破为人物预设的角色。",
       "payoffMeaning": "人物不再只是被争夺的容器，而成为能够反向改变局势的力量。",
-      "beatOutline": {
-        "setup": "让异常背后的势力与古老因果进入现实冲突。",
-        "escalation": "通过追索、结盟、修炼和对决反向利用既有安排。",
-        "pressure": "让自由所需代价威胁伙伴、身份与人物仍珍视的人性。",
-        "climax": "让人物摧毁或夺取一项为其预设命运的关键结构。",
-        "payoff": "确认人物从被争夺对象变为能改变大局的独立力量。"
-      },
       "worldCardRefs": [
         "fantasy.snapshot.two_layers",
         "fantasy.snapshot.central_figures",
@@ -106,13 +92,6 @@
       "label": "改天",
       "objective": "直面支配自身与众生命运的规则，并承担改变规则后的世界。",
       "payoffMeaning": "人物从命运的承受者成为规则的回答者，世界也留下不可逆变化。",
-      "beatOutline": {
-        "setup": "让支配人物与众生的规则显露最终代价和脆弱处。",
-        "escalation": "汇集伙伴、敌手、旧因果与全部能力逼近规则核心。",
-        "pressure": "迫使人物在个人解脱、众生代价与新秩序风险间取舍。",
-        "climax": "让人物以完整意志完成一次改写、拒绝或承担天道的行动。",
-        "payoff": "交代规则变化、众生命运、人物自我与重要关系的最终结果。"
-      },
       "worldCardRefs": [
         "fantasy.snapshot.central_figures",
         "fantasy.snapshot.cultivation_cost",
@@ -137,6 +116,7 @@
     }
   ],
   "endingDirections": {
+    "closureBoundary": "一次突破失败、诅咒发作或受制不等于失去自我；自我被彻底取代或自身已经成为严酷新天命时可提前坏结局。摆脱主要控制但留有因果属于普通结局。",
     "good": [
       "保有完整自我并改变强加于众生的命运规则",
       "让力量不再依靠吞噬他人的选择延续"

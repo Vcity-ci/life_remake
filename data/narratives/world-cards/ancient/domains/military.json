@@ -2,11 +2,21 @@
   "worldId": "ancient",
   "cards": [
     {
+      "id": "ancient.domain.military.ranks_and_merit",
+      "title": "军职、指挥与战功",
+      "kind": "world_rule",
+      "contextRole": "knowledge",
+      "content": "大衍军中以兵卒、队正、校尉、偏将、镇将区分常设军职。队正领一队，校尉协同数队，偏将承担一处防区的步骑指挥，镇将统辖本镇驻军。军职决定实际所属部伍和调度范围，爵位与将号不自行附带兵权。\n\n镇将可任免本镇的队正、校尉与偏将；镇将由朝廷任免，跨镇调兵依朝廷授权。战时临时任命在军令范围内具备指挥效力，职权随撤任或该项差遣结束而转移。\n\n练成可用部伍、守住要地、击退入侵、破围救军与夺取敌据均可构成功绩。直属主将依据已经发生的成果论功，镇将落实本镇升职与赏赐，超出其权限的封爵和国家级封赏报朝廷。战功、赏物与军职分别成立；升职同时交付对应部伍和职责。",
+      "priority": 78,
+      "placement": "scenario",
+      "activation": { "keys": ["军职", "入伍", "带队", "统军", "军功", "授职", "将军", "守边", "军镇"], "scanDepth": 5, "tasks": ["planning"] }
+    },
+    {
       "id": "ancient.domain.military.reconnaissance",
       "title": "斥候、地形与敌情",
       "kind": "practice",
       "contextRole": "knowledge",
-      "content": "军情来自哨探、向导、俘口、烽燧与地形判断。侦察可以发现道路、营垒、伏兵或补给弱点，也可能因误报、泄密和地方向导的立场改变整支军队的选择。",
+      "content": "边境侦察辨认敌军的兵种、来向、营地与退路。山口可伏弩手，沟谷会遮住骑队，渡口和水源影响驻营，敌骑的备用马与携粮情况反映其能否久留。哨探、向导、俘口与烽燧各能提供一部分军情，误报或泄密会使迎击、绕行、接应变成伏击、失援或撤退。",
       "priority": 74,
       "placement": "scenario",
       "activation": { "keys": ["斥候", "侦察", "敌情", "地形", "烽燧", "向导"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] }
@@ -16,7 +26,7 @@
       "title": "操练、军纪与临阵号令",
       "kind": "practice",
       "contextRole": "knowledge",
-      "content": "军队的战力来自操练、编制、军纪、旗鼓号令和将校之间的信任。练兵能把乌合之众变成可用之军，也会暴露逃亡、冒功、私兵与新旧将领争权。",
+      "content": "队内练枪盾相护、弓弩射击、负重行军和同伍救护；多队合练时，队官分别带枪盾、弓弩和骑哨，按旗鼓完成接战、换阵、追击与撤回。队正亲自带一队，校尉调度数队，偏将依靠下属队官分派防区和战场任务，不必亲自代替每名兵卒行动。新卒逐渐能独立守位，骨干可升任队官；旧同伴取得不同职责后，会各自带人、判断和回应主将。",
       "priority": 73,
       "placement": "scenario",
       "activation": { "keys": ["练兵", "操练", "军纪", "号令", "将校", "部曲"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] }
@@ -36,7 +46,7 @@
       "title": "夜袭、攻守与围城",
       "kind": "conflict",
       "contextRole": "knowledge",
-      "content": "交战可表现为试探、伏击、夜袭、野战、攻城或长期围困。每种打法都受兵力、城防、天气、平民与退路牵制，胜负之外还会留下伤亡、俘虏和城中秩序。",
+      "content": "游骑依靠速度袭掠和佯退，枪盾在隘口与坡地阻住冲击，弓弩争取射界，骑哨侧击或截断归路。野战胜负会改变营地、道路和村堡的控制；夺得据点可供驻兵与接应，丢失据点则要撤守或另选阵地。围城军需要渡口、饮水、粮道与攻具，守军能出击破坏、据墙抵抗或与援军合击；一方改变部署，另一方也会转移兵力和进攻方向。",
       "priority": 76,
       "placement": "scenario",
       "activation": { "keys": ["夜袭", "伏击", "围城", "攻城", "守城", "野战"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] }
@@ -46,7 +56,7 @@
       "title": "追击、撤退与战后处置",
       "kind": "consequence",
       "contextRole": "knowledge",
-      "content": "胜败之后仍要决定追击或收兵、交换俘虏、安置降卒、抚恤死伤与恢复边地。一次克制的撤退可能保存实力，一次过度追击也可能让战功变成灾难。",
+      "content": "追击与收兵涉及退路和兵力保存，克制撤退可以保全实力，过度追击有陷入灾难的风险。交换俘虏、安置降卒、抚恤死伤和恢复边地属于战后处置。",
       "priority": 72,
       "placement": "scenario",
       "activation": { "keys": ["追击", "撤退", "俘虏", "降卒", "抚恤", "战后"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] }

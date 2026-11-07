@@ -14,7 +14,7 @@ import type { NarrativeTurnPlan } from "./narrative/turn.js";
 function sceneInput(presentation: "scene" | "choice" | "summary" = "scene"): DynamicNarrativeSceneInput {
   const policy = dynamicSceneAttributePolicy();
   return {
-    presentation, act: { id: "act.one", label: "第一幕", prompt: "护送失散同袍归营" }, beat: "payoff",
+    presentation, act: { id: "act.one", label: "第一幕", prompt: "护送失散同袍归营" },
     allowedTurnKinds: presentation === "summary" ? ["background"] : ["scene"], sceneAge: 20, backgroundAgeRange: { fromAge: 20, toAge: 21 },
     storyPatterns: [], socialForces: [], knownCharacters: [], attributePolicy: policy, backgroundAttributePolicy: policy,
     statTiers: { intelligence: "low", charisma: "low", family: "low", fortune: "low", physique: "low" }
@@ -24,7 +24,7 @@ function sceneInput(presentation: "scene" | "choice" | "summary" = "scene"): Dyn
 function plan(presentation: "scene" | "choice" = "scene"): NarrativeTurnPlan {
   return {
     callId: "writer-test", turnKind: "scene", presentation, patternIds: [], forceIds: [], conflictRefs: [],
-    abilityRefs: ["ability:horsemanship"], locationDirective: { mode: "stay" },  clockRequest: "hold",
+    abilityRefs: ["ability:horsemanship"], recallRefs: [], locationRefs: [],
     decisionBrief: { question: "旧规划中的问题", stakes: "旧规划中的影响" },
     materials: [{ id: "ability:horsemanship", kind: "ability", label: "骑术" }]
   };
@@ -55,15 +55,15 @@ test("场景工具同时开放自然结果与实际抉择，普通年份保持�
   }
   assert.deepEqual(dynamicNarrativeRenderTools(sceneInput("summary")).names, ["render_background_prose"]);
   const prompt = dynamicNarrativeRenderPrompt({ ...sceneInput(), plan: plan() }, 20);
-  assert.match(prompt, /本次叙述年龄：20岁/);
-  assert.match(prompt, /本段与上段同年/);
+  assert.match(prompt, /本段年龄：20岁/);
+  assert.match(prompt, /当前岁内继续经历/);
   const nextYear = dynamicNarrativeRenderPrompt({ ...sceneInput(), sceneAge: 21 }, 20);
-  assert.match(nextYear, /本段已进入下一岁/);
-  assert.match(nextYear, /交代上段处境经过这段时间如何延续或变化/);
+  assert.match(nextYear, /从20岁到21岁/);
+  assert.doesNotMatch(nextYear, /交代上段处境/);
   const backgroundPrompt = dynamicNarrativeRenderPrompt(sceneInput("summary"), 19);
-  assert.match(backgroundPrompt, /20-21岁/);
-  assert.match(backgroundPrompt, /日常生活与积累，允许平静/);
-  assert.match(backgroundPrompt, /已有处境怎样随时间延续或变化/);
+  assert.match(backgroundPrompt, /20—21岁/);
+  assert.doesNotMatch(backgroundPrompt, /当前节拍/);
+  assert.doesNotMatch(backgroundPrompt, /交代上段处境/);
   assert.doesNotMatch(backgroundPrompt, /五节拍具体故事|当前执行节拍/);
 });
 
@@ -79,7 +79,7 @@ test("正文新分歧以实际工具和问题为准，保留选项本领与目�
 });
 
 test("规划预期抉择但正文已有自然结果时，不继承过期问题或选项", () => {
-  const parsed = parseDynamicNarrativeProse({ narrative: "同袍已被巡船接回营中，你向船夫道谢，独自沿岸归营。", storyDelta: "巡船接回伤员，护送已有结果。" }, "render_scene_prose", plan("choice"));
+  const parsed = parseDynamicNarrativeProse({ nextClock: "advance", narrative: "同袍已被巡船接回营中，你向船夫道谢，独自沿岸归营。", storyDelta: "巡船接回伤员，护送已有结果。" }, "render_scene_prose", plan("choice"));
   assert.equal(parsed.createsDecision, false);
   assert.equal(parsed.decisionBrief, undefined);
   assert.equal(parsed.milestoneCopy, undefined);
@@ -94,7 +94,7 @@ test("抉择缺少实际问题时不以旧规划补造，交回原请求纠正",
 
 test("原场景请求可返回payoff新抉择，正式生成结果保留待选而不结算", async (t) => {
   const world: WorldConfig = {
-    id: "writer-world", name: "渡口世界", intro: "同袍返营", stylePrompt: "具体叙事", milestoneAges: [18],
+    id: "writer-world", name: "渡口世界", intro: "同袍返营", milestoneAges: [18],
     endAgeRange: { min: 90, max: 90 }, yearlyEventHints: [],
     ageThresholds: [{ id: "youth", label: "青年", min: 0, max: 120 }]
   };
@@ -127,5 +127,5 @@ test("原场景请求可返回payoff新抉择，正式生成结果保留待选�
   assert.equal(result.decisionBrief?.question, "如何带同袍渡河？");
   assert.equal(result.milestoneCopy?.optionOverrides?.length, 3);
   assert.equal(result.attributeEffects, undefined);
-  assert.equal(result.beatDecision, undefined, "正文提出抉择不替观察器完成payoff");
+  assert.equal(result.nextClock, undefined, "提出抉择时不交接结果后的时间");
 });

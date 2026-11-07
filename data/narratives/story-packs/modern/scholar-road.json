@@ -38,13 +38,6 @@
       "label": "求知",
       "objective": "形成一项可持续投入的学习方向，并获得真实的训练、作品或认可。",
       "payoffMeaning": "人物拥有了可以继续深造或投入现实的能力基础。",
-      "beatOutline": {
-        "setup": "让学校、家庭或一次发现显露人物真正愿意投入的方向。",
-        "escalation": "通过训练、作品、竞赛或师友关系形成可验证的能力。",
-        "pressure": "让评价、资源、家庭期待与个人兴趣发生冲突。",
-        "climax": "让人物完成一次决定学习方向的真实挑战或选择。",
-        "payoff": "确认能力基础、学习关系与继续前行的具体机会。"
-      },
       "worldCardRefs": [
         "modern.snapshot.education_channels",
         "modern.snapshot.ai_and_work",
@@ -72,13 +65,6 @@
       "label": "择业",
       "objective": "在升学、专业、工作与生活条件之间作出会长期影响人生的选择。",
       "payoffMeaning": "人物确立了知识进入现实的道路，也失去了一部分可能。",
-      "beatOutline": {
-        "setup": "让升学、专业与工作机会要求人物选择现实道路。",
-        "escalation": "通过深造、实习、研究或转向把知识投入实际环境。",
-        "pressure": "让经济条件、关系与职业前景无法同时满足。",
-        "climax": "让人物作出会长期改变生活结构的专业选择。",
-        "payoff": "固定知识进入现实的路径，并交代被放弃的可能与新责任。"
-      },
       "worldCardRefs": [
         "modern.snapshot.ai_and_work",
         "modern.snapshot.transition_2027",
@@ -106,13 +92,6 @@
       "label": "成章",
       "objective": "以专业能力回应一个足够重要的现实问题，并形成可被他人承接的成果。",
       "payoffMeaning": "人物以研究、教育、技术、作品或专业实践留下了明确结果。",
-      "beatOutline": {
-        "setup": "让一个重要现实问题检验人物多年的专业积累。",
-        "escalation": "调动同伴、机构与知识完成能够被社会使用的工作。",
-        "pressure": "让专业伦理、现实利益与个人生活发生最终冲突。",
-        "climax": "让人物以研究、教育、技术或作品回应这个问题。",
-        "payoff": "交代成果影响、职业归宿、重要关系与人物对所学的最终理解。"
-      },
       "worldCardRefs": [
         "modern.snapshot.transition_2027",
         "modern.snapshot.education_channels",
@@ -137,6 +116,7 @@
     }
   ],
   "endingDirections": {
+    "closureBoundary": "一次落榜、研究受挫或资源不足不等于求学道路终结；继续学习的条件已失去或能力与独立性已被长期消磨成实际结果时可提前坏结局。取得专业立足点而理想有限属于普通结局。",
     "good": [
       "将所学转化为长期成果并保有独立判断",
       "建立能够继续成长、传授或服务他人的专业道路"

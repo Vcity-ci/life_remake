@@ -1,9 +1,8 @@
 import type { WorldConfig } from "@reroll/shared";
 import {
-  generateDirectedStoryRender,
+
   generateDirectedStoryTurn,
-  type DirectedStoryRenderInput,
-  type DirectedStoryRenderResult,
+
   type DirectedStoryTurnInput,
   type DirectedStoryTurnResult,
   type NarrativeContext
@@ -17,12 +16,6 @@ export interface NarrativeTurnRequest {
   context: NarrativeContext;
 }
 
-export interface NarrativeRenderRequest {
-  run: InternalRunState;
-  world: WorldConfig;
-  input: DirectedStoryRenderInput;
-  context: NarrativeContext;
-}
 
 /**
  * The provider boundary is deliberately local. The project borrows layered
@@ -30,8 +23,4 @@ export interface NarrativeRenderRequest {
  */
 export async function generateNarrativeTurn(request: NarrativeTurnRequest): Promise<DirectedStoryTurnResult> {
   return generateDirectedStoryTurn(request.run, request.world, request.input, request.context);
-}
-
-export async function generateNarrativeRender(request: NarrativeRenderRequest): Promise<DirectedStoryRenderResult> {
-  return generateDirectedStoryRender(request.run, request.world, request.input, request.context);
 }

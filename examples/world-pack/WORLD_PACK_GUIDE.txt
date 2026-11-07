@@ -3,7 +3,7 @@
 
 本目录包含：
 - world.example.json：前端世界名称、简介、年龄段和基础时间线配置。
-- story.example.json：基础世界的规律、力量、文风、数值、生存与结局规则。
+- story.example.json：基础世界的规律、力量、数值、生存与结局规则。
 - world-cards.example.json：可拆分维护、按任务与情景召回的世界资料卡目录。
 - story-pack.example.json：玩家可选择的一条 IF 人生路线。
 - STORY_PACK_GUIDE.txt：IF 子世界包的字段与安装说明。
@@ -11,16 +11,16 @@
 一、权责边界
 ------------
 基础世界包只回答“这是怎样的世界”：
-- worldCore：恒定世界规律、权力结构、日常生活与整体气质。
+- worldCore：已有时代、地域、制度与生活事实。laws 可省略，只放适用于全世界的明确规则，不生成权力公式或叙事指导；具体领域制度放在对应资料卡。
 - socialForces：可供所有路线使用的阵营、阶层、组织和社会力量。
 - narrativePalette：题材常见的场景、冲突、行动方式与叙事尺度。
-- worldCards：按任务、关键词、节拍和局内对象召回的局部设定。
-- progression / survival：属性成长、节拍准入与生存规则。
+- worldCards：按任务、关键词和局内对象召回的局部设定。
+- progression / survival：属性成长、整幕准入与生存规则。
 - endingBlueprints：世界级好、普通、坏三档结算方式。
 
 基础世界包不再包含 storyPatterns、mainlineSkeleton 或 mainlineActs。它不列出、绑定或限制子世界包数量，也不承担某一条人生路线的起承转合。
 
-IF 子世界包回答“玩家要在这个世界里完成怎样的一生”：它提供路线承诺、入口视角、三幕目标和路线结局方向。人物、地点、本领、具体事件与抉择仍由每局人设和已发生事实动态生成。
+IF 子世界包回答“玩家要在这个世界里经历怎样的一生”：它提供路线承诺、入口视角、三幕目标和路线结局方向。已配置事件组的边镇线还读取人工事件骨架，由幕初模型选组和绑定名称；其他路线保留各自现有生成入口。详见 docs/EVENT_FLOW_V20.md。
 
 二、安装新世界
 --------------
@@ -36,9 +36,10 @@ IF 子世界包回答“玩家要在这个世界里完成怎样的一生”：�
 三、基础世界字段
 ----------------
 - version：当前为 10。
-- storyBible：世界总览，不写某一条路线的剧情梗概。
-- styleRules：正向说明该题材怎样表达，不堆叠防御性禁令。
-- worldCore：少量稳定常驻设定。
+- storyBible：开局时代局势。具体行动方、地域和制度详情放在对应世界卡，避免在总览重抄完整卡片。
+- 世界材料只描述规律、制度、空间与行动知识，不提供表现手法、作者指令或文风示例。
+
+- worldCore：少量稳定常驻设定；laws 为可选字符串数组，未配置时不供应“世界规律”栏目。
 - socialForces：必须使用稳定 ID；子世界包可通过 focusForceIds 引用。
 - worldCards：运行时合并后的通用知识卡。创作源放在 data/narratives/world-cards/<worldId>/**/*.json；基础 story 文件保留空数组即可。
 - opening：早年叙事配置。
@@ -52,16 +53,18 @@ IF 子世界包回答“玩家要在这个世界里完成怎样的一生”：�
 --------------
 - 每份目录文件使用 { worldId, cards } 结构；同一世界的多个文件会按路径顺序合并，ID 必须全局唯一。
 - 卡片正文属于基础世界，不属于某条 IF 线。子世界包只能通过 worldCardRefs 引用卡片 ID，不能复制卡片正文。
-- activation.tasks：background、planning、horizon、rendering、dynamic、decision。
+- activation.tasks：origin、background、planning、horizon、rendering、dynamic、decision。
 - activation 可使用 keys、secondaryKeys、selectiveLogic、scanDepth、actIds、beats、factionIds、factIds、characterIds、locationIds、abilityIds。
-- placement：world、scenario、example、author_note。
+- placement：世界设定使用 world，局部情景知识使用 scenario；不制作文风样例或作者指挥卡。
 - priority 决定预算内优先级；inclusionGroup 同组择一；stickyTurns、cooldownTurns 与 relatedCardIds 管理生命周期。
 - 基础世界卡不引用某条 IF 路线的 actId。路线可在自身或某一幕的 worldCardRefs 中声明召回偏好；偏好不是剧情准入门槛。
+- 区分“世界中有行会、军镇”与“行会成员能使用哪些资源、谁能授予什么军职”。后者才是可推动行动的运行规则；社会制度不必是超自然规律。不要将普通常识或作者任务写成规则。
+- 可独立选择的规则使用 kind=world_rule、contextRole=knowledge，按 origin/planning 的相关范围供应。幕初模型用 worldRuleRefs 选择，引擎保存原文到本幕 worldRules；正文和结果从同一幕卡稳定读取，不逐轮重选或重写。不将所有领域规则设为 foundation 全量供应。
 
 五、检查清单
 ------------
 1. story JSON 的 version 为 10，worldId 与基础世界 ID 一致。
-2. worldCore、socialForces、narrativePalette、progression、survival 与三档 endingBlueprints 完整。
+2. worldCore 的 identity、powerStructure、everydayLife 与 socialForces、narrativePalette、progression、survival、三档 endingBlueprints 完整；不为补齐 laws 生成常识性结论。
 3. 不在基础世界包中重新加入路线目录、三幕主线或具体事件表。
 4. 每个可游玩世界至少存在一份校验通过的 IF 子世界包。
 5. 子世界包引用的 social force 必须存在于基础世界。

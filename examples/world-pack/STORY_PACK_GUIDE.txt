@@ -22,8 +22,9 @@ IF 子世界包 JSON 说明（v1）
 - stakeAxes：路线中最值得长期追踪的关系、成果和代价。
 - focusForceIds：优先相关的基础世界力量 ID；不是唯一可出现的阵营。
 - worldCardRefs：优先相关的基础世界卡 ID；它只提高按需召回相关度，不把未列出的卡或剧情排除在外。
-- acts：恰好三幕。每幕提供 objective、dramaticQuestion、pressureDirection 与 payoffMeaning；具体事件由模型依据本局状态生成。
+- acts：恰好三幕。每幕提供 objective、payoffMeaning、adventureSeeds 和 entryRequirements；后两者的实际消费取决于路线是否配置事件组，不能假定补写 adventureSeeds 就会进入事件组路线的幕初请求。
 - acts[].worldCardRefs：当前幕更值得考虑的基础世界卡，可省略。
+- 示例中的 entryRequirements 数值 1 只是格式占位；制作路线时应按其成长收益和准备跨度另行配置，不能作为平衡默认值。
 - endingDirections：good、normal、bad 各自的路线结算方向，与基础世界结局蓝图组合。
 
 三、独立创作边界
@@ -31,8 +32,10 @@ IF 子世界包 JSON 说明（v1）
 - 路线可以自由增删改，不得要求其他路线同步变化。
 - act id 必须以本子世界包 id 开头，并在三幕内唯一。
 - worldCardRefs 必须引用所属基础世界中已经存在的卡片；子世界包不保存世界卡正文。
-- 子世界包不写年龄门槛、属性数值、生存公式、公共阵营详情或通用文风，它们属于基础世界和引擎。
-- 不穷举每个节拍的事件。现有 setup → escalation → pressure → climax → payoff 状态机负责叙事完整性，模型负责结合人物与已发生事实生成具体经历。
+- 子世界包不复制公共阵营详情、通用文风或生存公式。entryRequirements 按现行接口指定本幕关键属性；故事期限不增加引擎时间核验。
+- 当前主流程不执行五拍任务链。边镇线通过 eventFlowId 读取 data/narratives/event-flows/ 下的人工骨架：幕初选组、绑定名称，正文落实当前单元或已选结果；规划只选后续单元，组末观察判断收束，ongoing 后独立接组。详见 docs/EVENT_FLOW_V20.md。
+- 适合经过日常的单元可配置 lifeBefore: { minYears, maxYears, context }。引擎一次选定并保存普通生活年数，准备期间实际经过的年份同时计入；不配置的连续行动直接承接。context 写此时真实身份与生活，不预写下一事件或其结果。详见 docs/ORDINARY_LIFE_INTERVALS.md。
+- 增加角色、危机或事件分支属于剧情制作，应先确认；整理旧素材不自动扩展事件组。
 
 四、存档语义
 ------------

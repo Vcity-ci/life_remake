@@ -2,26 +2,26 @@ import type { NarrativeTask } from "../../narrative-prompts.js";
 import type { NarrativeContextSection, NarrativeTaskContextProfile } from "./types.js";
 
 const ALL_SECTIONS: NarrativeContextSection[] = [
-  "persona", "protagonist", "talents", "seedHints", "origin", "world", "worldSituation", "actWorld", "mainline", "route", "lore",
-  "styleExamples", "authorNote",
+  "persona", "protagonist", "talents", "world", "worldSituation", "actWorld", "mainline", "route", "lore",
+  "authorNote",
   "characters", "factDirectory", "facts", "resolvedFacts", "locations", "abilities", "assets",
   "memories", "digests", "ending", "history", "storyHistory", "raw", "task"
 ];
 
 const TASK_SECTIONS: Record<NarrativeTask, NarrativeContextSection[]> = {
-  origin: ["persona", "talents", "seedHints", "origin", "world", "worldSituation", "lore", "task"],
+  origin: ["persona", "talents", "world", "worldSituation", "lore", "task"],
   curation: ["task"],
-  horizon: ["persona", "origin", "world", "mainline", "route", "lore", "characters", "facts", "history", "task"],
+  horizon: ["persona", "world", "mainline", "route", "lore", "characters", "facts", "history", "task"],
   settlement: ["task"],
   continuity: ["task"],
   planning: ["protagonist", "world", "worldSituation", "mainline", "route", "lore", "storyHistory", "task"],
-  observation: ["task"],
-  background: ["world", "actWorld", "route", "protagonist", "lore", "characters", "facts", "locations", "abilities", "styleExamples", "storyHistory", "task"],
-  rendering: ["actWorld", "route", "protagonist", "lore", "characters", "facts", "locations", "abilities", "styleExamples", "storyHistory", "task"],
-  dynamic: ["actWorld", "route", "protagonist", "lore", "characters", "facts", "locations", "abilities", "styleExamples", "storyHistory", "task"],
-  decision: ["actWorld", "route", "protagonist", "lore", "characters", "facts", "locations", "abilities", "styleExamples", "storyHistory", "task"],
+  observation: ["actWorld", "task"],
+  background: ["world", "actWorld", "protagonist", "storyHistory", "task"],
+  rendering: ["actWorld", "protagonist", "storyHistory", "task"],
+  dynamic: ["actWorld", "protagonist", "storyHistory", "task"],
+  decision: ["actWorld", "protagonist", "storyHistory", "task"],
   closure: ["protagonist", "storyHistory", "task"],
-  ending: ["actWorld", "protagonist", "storyHistory", "ending", "task"]
+  ending: ["protagonist", "storyHistory", "ending", "task"]
 };
 
 const TASK_HISTORY: Record<NarrativeTask, NarrativeTaskContextProfile["history"]> = {
@@ -40,11 +40,11 @@ const TASK_HISTORY: Record<NarrativeTask, NarrativeTaskContextProfile["history"]
   ending: { includeHeadMemory: false, includeArchive: false, recentRoundLimit: 0, requiredRecentRounds: 0 }
 };
 
-export function narrativeTaskContextProfile(task: NarrativeTask, planningPurpose?: "initial" | "execute"): NarrativeTaskContextProfile {
+export function narrativeTaskContextProfile(task: NarrativeTask, planningPurpose?: "initial" | "execute" | "continuation"): NarrativeTaskContextProfile {
   return {
     task,
     allowedSections: task === "planning" && planningPurpose
-      ? planningPurpose === "initial" ? ["protagonist", "world", "worldSituation", "mainline", "route", "lore", "storyHistory", "task"] : ["task"]
+      ? planningPurpose === "initial" ? ["protagonist", "world", "worldSituation", "mainline", "route", "lore", "storyHistory", "task"] : ["actWorld", "protagonist", "storyHistory", "task"]
       : [...(TASK_SECTIONS[task] ?? ALL_SECTIONS), ...(["planning", "background", "rendering", "dynamic", "decision"].includes(task) ? ["protagonist" as const] : [])],
     history: { ...TASK_HISTORY[task] }
   };

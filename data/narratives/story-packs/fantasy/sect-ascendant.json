@@ -38,13 +38,6 @@
       "label": "入道",
       "objective": "取得真实传承并完成第一次能够证明自身道路的修行或任务。",
       "payoffMeaning": "人物能够独立运用本领完成一次真实行动，并获得同伴或师长认可。",
-      "beatOutline": {
-        "setup": "让人物因异象、资质或现实危机接触一方道统。",
-        "escalation": "通过修炼、试炼与首次实战掌握可用本领并结识同伴。",
-        "pressure": "让资源竞争、门规与外部威胁检验人物选择的道路。",
-        "climax": "让人物独立运用所学解决一次具有危险的真实任务。",
-        "payoff": "确认修行身份、本领、同伴关系与继续深入道途的资格。"
-      },
       "worldCardRefs": [
         "fantasy.snapshot.old_pact",
         "fantasy.snapshot.cultivation_cost",
@@ -73,13 +66,6 @@
       "label": "承脉",
       "objective": "在宗门内外的重大难题中取得决定权并守住重要关系。",
       "payoffMeaning": "人物成为一脉中不可忽略的力量，并改变了宗门走向。",
-      "beatOutline": {
-        "setup": "让宗门内外的重大难题要求人物承担超过弟子身份的责任。",
-        "escalation": "通过探索、对决、结盟或传法扩大人物在一脉中的影响。",
-        "pressure": "让师门立场、同伴安危与修行突破彼此冲突。",
-        "climax": "让人物以本领和判断改变一次宗门级危机的结果。",
-        "payoff": "固定人物在道统中的权责，并交代因此形成的敌友与代价。"
-      },
       "worldCardRefs": [
         "fantasy.snapshot.cultivation_cost",
         "fantasy.snapshot.central_figures",
@@ -108,13 +94,6 @@
       "label": "开道",
       "objective": "面对足以动摇道统根基的危机，并给出自己的大道答案。",
       "payoffMeaning": "人物使道统得以重生、另开一脉或在自己手中终结。",
-      "beatOutline": {
-        "setup": "让足以动摇道统根基的敌人、异变或内部决裂真正发生。",
-        "escalation": "调动同门、盟友、传承与已掌握的本领迎接最终危机。",
-        "pressure": "迫使人物在飞升、自身道路与守护宗门众人之间取舍。",
-        "climax": "让人物完成一场决定道统存亡与自身大道的终极行动。",
-        "payoff": "交代道统去向、人物境界、重要关系与其为世界留下的新道路。"
-      },
       "worldCardRefs": [
         "fantasy.snapshot.central_figures",
         "fantasy.snapshot.old_pact",
@@ -141,6 +120,7 @@
     }
   ],
   "endingDirections": {
+    "closureBoundary": "一次落败、派系受挫或突破失败不等于大道终结；传承已葬送，或同门、信念与自身道路实际丧失时可提前坏结局。保住一方道统但改革有限属于普通结局。",
     "good": [
       "保全值得延续的传承并开辟更完整的修行道路",
       "让同门、后来者与所守之地不再只依赖个人强大"

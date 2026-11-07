@@ -53,13 +53,14 @@ function defaultContent(): ContentBundle {
     cards: [],
     difficulties: [],
     promptPack: {
-      systemCore: "",
-      immersionRules: "",
+
       yearNormalRule: "",
       yearMinorRule: "",
       milestoneRule: "",
-      storyConstraint: "",
-      endingHint: ""
+      userInputGuardRule: "",
+      restrictedContentRule: "",
+
+
     }
   };
 }
@@ -146,8 +147,8 @@ export function AdminPanel(props: Props): React.JSX.Element {
             yearNormalRule: loadedContent.promptPack.yearNormalRule ?? "",
             yearMinorRule: loadedContent.promptPack.yearMinorRule ?? "",
             milestoneRule: loadedContent.promptPack.milestoneRule ?? "",
-            storyConstraint: loadedContent.promptPack.storyConstraint ?? "",
-            endingHint: loadedContent.promptPack.endingHint ?? ""
+
+
           }
         };
 
@@ -261,7 +262,7 @@ export function AdminPanel(props: Props): React.JSX.Element {
           id: `world_${Date.now()}`,
           name: "新世界观",
           intro: "简介",
-          stylePrompt: "叙事风格",
+
           milestoneAges: [18, 25, 35],
           endAgeRange: { min: 60, max: 85 },
           yearlyEventHints: ["成长", "冲突", "转机"],
@@ -460,7 +461,6 @@ export function AdminPanel(props: Props): React.JSX.Element {
                   <label>ID<input value={w.id} onChange={(e) => patchWorld(i, { id: e.target.value })} /></label>
                   <label>名称<input value={w.name} onChange={(e) => patchWorld(i, { name: e.target.value })} /></label>
                   <label>简介<textarea value={w.intro} onChange={(e) => patchWorld(i, { intro: e.target.value })} /></label>
-                  <label>风格<textarea value={w.stylePrompt} onChange={(e) => patchWorld(i, { stylePrompt: e.target.value })} /></label>
                   <button className="ghost" onClick={() => removeWorld(i)}>删除</button>
                 </div>
               ))}
@@ -481,13 +481,14 @@ export function AdminPanel(props: Props): React.JSX.Element {
 
             <details>
               <summary>提示词包</summary>
-              <label>systemCore<textarea rows={4} value={content.promptPack.systemCore ?? ""} onChange={(e) => setContent((prev) => ({ ...prev, promptPack: { ...prev.promptPack, systemCore: e.target.value } }))} /></label>
-              <label>immersionRules<textarea rows={4} value={content.promptPack.immersionRules ?? ""} onChange={(e) => setContent((prev) => ({ ...prev, promptPack: { ...prev.promptPack, immersionRules: e.target.value } }))} /></label>
+              <label>输入边界<textarea rows={3} value={content.promptPack.userInputGuardRule ?? ""} onChange={(e) => setContent((prev) => ({ ...prev, promptPack: { ...prev.promptPack, userInputGuardRule: e.target.value } }))} /></label>
+              <label>内容边界<textarea rows={3} value={content.promptPack.restrictedContentRule ?? ""} onChange={(e) => setContent((prev) => ({ ...prev, promptPack: { ...prev.promptPack, restrictedContentRule: e.target.value } }))} /></label>
+
               <label>yearNormalRule<textarea rows={3} value={content.promptPack.yearNormalRule ?? ""} onChange={(e) => setContent((prev) => ({ ...prev, promptPack: { ...prev.promptPack, yearNormalRule: e.target.value } }))} /></label>
               <label>yearMinorRule<textarea rows={3} value={content.promptPack.yearMinorRule ?? ""} onChange={(e) => setContent((prev) => ({ ...prev, promptPack: { ...prev.promptPack, yearMinorRule: e.target.value } }))} /></label>
               <label>milestoneRule<textarea rows={3} value={content.promptPack.milestoneRule ?? ""} onChange={(e) => setContent((prev) => ({ ...prev, promptPack: { ...prev.promptPack, milestoneRule: e.target.value } }))} /></label>
-              <label>storyConstraint<textarea rows={3} value={content.promptPack.storyConstraint ?? ""} onChange={(e) => setContent((prev) => ({ ...prev, promptPack: { ...prev.promptPack, storyConstraint: e.target.value } }))} /></label>
-              <label>endingHint<textarea rows={3} value={content.promptPack.endingHint ?? ""} onChange={(e) => setContent((prev) => ({ ...prev, promptPack: { ...prev.promptPack, endingHint: e.target.value } }))} /></label>
+
+
             </details>
 
             <div className="row">

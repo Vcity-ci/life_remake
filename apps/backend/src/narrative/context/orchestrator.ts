@@ -39,14 +39,16 @@ export function composeNarrativeContext(input: NarrativeContextComposeInput): Na
   const selectedHistoryMessages = historyMessages.filter((message, index) => selectedHistoryIds.has(narrativeContentId(`history:${index}:${message.role}`, message.content)));
   const droppedFragmentIds = deduped.droppedFragmentIds;
   const stableContext = formatNarrativeContextFragments(fragments, new Set(["stable"]));
-  const runtimeContext = formatNarrativeContextFragments(fragments, new Set(["runtime"]));
+  const storyHistory = formatNarrativeContextFragments(fragments.filter((entry) => entry.section === "storyHistory"));
+  const runtimeContext = formatNarrativeContextFragments(fragments.filter((entry) => entry.section !== "storyHistory"), new Set(["runtime"]));
   const activeContext = formatNarrativeContextFragments(fragments, new Set(["active", "recall"]));
   const taskContext = formatNarrativeContextFragments(fragments, new Set(["task"]));
   const messages: ConversationPromptMessage[] = [
     ...(stableContext ? [{ role: "user" as const, content: `【长期设定】\n${stableContext}` }] : []),
+    ...(storyHistory ? [{ role: "user" as const, content: `【故事历史】\n${storyHistory}` }] : []),
     ...(runtimeContext ? [{ role: "user" as const, content: `【当前状态】\n${runtimeContext}` }] : []),
     ...selectedHistoryMessages,
-    ...(activeContext ? [{ role: "user" as const, content: `【本轮召回】\n${activeContext}` }] : []),
+    ...(activeContext ? [{ role: "user" as const, content: `【当前人物与相关材料】\n${activeContext}` }] : []),
     ...(taskContext ? [{ role: "user" as const, content: `【当前任务】\n${taskContext}` }] : [])
   ];
   return {

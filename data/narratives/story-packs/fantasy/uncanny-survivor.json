@@ -38,13 +38,6 @@
       "label": "识迹",
       "objective": "从一次具体异象中辨认可验证的规律，并带回第一项真实成果。",
       "payoffMeaning": "人物拥有了进入未知的本领、伙伴和必须继续追索的问题。",
-      "beatOutline": {
-        "setup": "让一项异象或失踪事件打破人物熟悉的生活规律。",
-        "escalation": "通过观察、试探和逃生辨认第一条可验证的禁区规则。",
-        "pressure": "让救人、取证与污染风险迫使人物继续深入。",
-        "climax": "让人物凭已知规则完成第一次进入未知并带回成果的行动。",
-        "payoff": "确认行者身份、探索伙伴、本领与尚未解释的核心问题。"
-      },
       "worldCardRefs": [
         "fantasy.snapshot.two_layers",
         "fantasy.snapshot.three_rifts",
@@ -72,13 +65,6 @@
       "label": "涉险",
       "objective": "组织或加入一次深入禁区的行动，揭示污染与外部势力的真实联系。",
       "payoffMeaning": "人物改变了人们进入禁区的方式，也承担了知识扩散的后果。",
-      "beatOutline": {
-        "setup": "让更深禁区与现实势力的联系要求一次有组织的探索。",
-        "escalation": "招募伙伴、准备规则工具并穿越多重异常环境。",
-        "pressure": "让队员生命、知识价值与污染扩散无法同时保全。",
-        "climax": "让人物领导探索队揭开一项改变禁区认知的真相。",
-        "payoff": "重塑进入禁区的方法，并交代知识扩散带来的敌友与责任。"
-      },
       "worldCardRefs": [
         "fantasy.snapshot.three_rifts",
         "fantasy.snapshot.cultivation_cost",
@@ -106,13 +92,6 @@
       "label": "临渊",
       "objective": "面对足以扩散到现实世界的诡异源头，并决定它与众生的关系。",
       "payoffMeaning": "禁区的未来、人物自身变化与世界对未知的认知得到不可逆答案。",
-      "beatOutline": {
-        "setup": "让诡异源头开始影响现实秩序并召回历次探索代价。",
-        "escalation": "汇集幸存者、知识、本领与世界势力进入最终深处。",
-        "pressure": "迫使人物在封锁、利用、救援与自身异化之间取舍。",
-        "climax": "让人物直接面对源头并作出改变两个世界边界的行动。",
-        "payoff": "交代禁区未来、现实认知、人物变化与伙伴结局。"
-      },
       "worldCardRefs": [
         "fantasy.snapshot.cultivation_cost",
         "fantasy.snapshot.two_layers",
@@ -137,6 +116,7 @@
     }
   ],
   "endingDirections": {
+    "closureBoundary": "一次探查失败、污染或牺牲不等于全局失控；诡异已扩散成灾、人物已被吞没或同伴故乡已被换取虚假掌控时可提前坏结局。主要危险受控但留有污染属于普通结局。",
     "good": [
       "建立可靠的禁区认知与防护方式并保全重要同伴",
       "理解未知而不被其吞没，让成果能够被后来者验证"

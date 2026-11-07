@@ -3,7 +3,6 @@
     "id": "fantasy",
     "name": "诡境仙途",
     "intro": "诡异、异族、宗门争衡与修行大道并存的仙途世界。",
-    "stylePrompt": "东方奇幻叙事，具象描写修行代价、诡异威胁、势力竞争与人间生路。",
     "milestoneAges": [16, 22, 30, 42],
     "endAgeRange": {
       "min": 55,

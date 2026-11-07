@@ -1,7 +1,7 @@
 {
   "version": 1,
   "id": "ancient.sovereign-rise",
-  "revision": "1.3.0",
+  "revision": "1.3.1",
   "worldId": "ancient",
   "name": "布衣逐鹿",
   "tagline": "从乱世低处聚集人心与力量，最终回答天下归于何人。",
@@ -37,13 +37,6 @@
       "label": "立足",
       "objective": "取得第一批真实支持、资源或组织基础。",
       "payoffMeaning": "人物成为一股能够持续行动的力量。",
-      "beatOutline": {
-        "setup": "让乱世危机直接威胁人物所在群体，并显露组织众人的机会。",
-        "escalation": "通过救援、起事、收编或夺取据点形成第一批追随者。",
-        "pressure": "让官军、豪强、资源匮乏与内部意见同时考验新生组织。",
-        "climax": "让人物亲自领导一次决定据点与追随者存亡的行动。",
-        "payoff": "确认组织、地盘与共同目标，使人物从求生者成为一方首领。"
-      },
       "worldCardRefs": [
         "ancient.snapshot.central_figures",
         "ancient.snapshot.jingyuan_reform",
@@ -71,13 +64,6 @@
       "label": "逐鹿",
       "objective": "进入军政角逐并形成自己的统治道路。",
       "payoffMeaning": "人物已经足以左右一方局势。",
-      "beatOutline": {
-        "setup": "让第一处据点卷入更大的军政竞争与联盟格局。",
-        "escalation": "通过征战、攻城、收编或分封扩大军政版图。",
-        "pressure": "让盟友野心、百姓负担、军纪与争霸时机产生冲突。",
-        "climax": "让人物领导一场改变势力版图的大战或政治整合。",
-        "payoff": "确立疆域、班底、制度雏形和必须最终击败的竞争者。"
-      },
       "worldCardRefs": [
         "ancient.snapshot.jingyuan_reform",
         "ancient.snapshot.frontier_pressure",
@@ -105,13 +91,6 @@
       "label": "定鼎",
       "objective": "争夺或重塑最高秩序，并承担胜利后的治理问题。",
       "payoffMeaning": "天下归属与人物留下的制度得到不可逆的回答。",
-      "beatOutline": {
-        "setup": "让天下归属与新秩序合法性成为最后必须回答的问题。",
-        "escalation": "调动军队、盟友、民心与制度承诺争取最终优势。",
-        "pressure": "让胜利所需手段与人物曾许诺建立的秩序发生冲突。",
-        "climax": "让人物完成决定天下归属的决战、受禅、建制或退让。",
-        "payoff": "交代新秩序、权力归属、治理代价与人物在历史中的位置。"
-      },
       "worldCardRefs": [
         "ancient.snapshot.frontier_pressure",
         "ancient.snapshot.local_society",
@@ -136,6 +115,7 @@
     }
   ],
   "endingDirections": {
+    "closureBoundary": "一场争夺失败、暂失支持或被迫撤退不等于争天下已经失败；死亡、众叛亲离或秩序崩溃已经终结实际基业时可提前坏结局。保住一方基业但无法平定全局属于普通结局。",
     "good": [
       "平定局势并建立可延续的新秩序",
       "使百姓、追随者与继承安排获得相对稳定的归处"
@@ -149,6 +129,9 @@
     ]
   },
   "worldCardRefs": [
+    "ancient.domain.commerce.succession_public",
+    "ancient.domain.military.ranks_and_merit",
+    "ancient.domain.court.audience_appointment",
     "ancient.snapshot.central_figures",
     "ancient.snapshot.jingyuan_reform",
     "ancient.snapshot.frontier_pressure",

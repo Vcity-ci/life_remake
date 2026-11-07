@@ -36,7 +36,7 @@
       "title": "改变、妥协与长期担责",
       "kind": "consequence",
       "contextRole": "knowledge",
-      "content": "公共成果可能是政策改变、服务改善、社群延续或仅让问题被看见。人物需要交代妥协影响了谁、承诺由谁继续，以及个人影响力如何受到监督。",
+      "content": "公共成果可能是政策改变、服务改善、社群延续或仅让问题被看见。妥协会影响不同群体，承诺需要实际承担者，个人影响力也受监督。",
       "priority": 75,
       "placement": "scenario",
       "activation": { "keys": ["政策", "改善", "妥协", "监督", "承诺", "长期责任"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] }

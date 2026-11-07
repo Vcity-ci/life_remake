@@ -20,7 +20,7 @@ export function formatNarrativeRelationship(relationship?: Pick<NarrativeCharact
 
 /** The player lives in the run; this projection distinguishes them from NPCs. */
 export function narrativeProtagonistAnchor(run: InternalRunState): string {
-  return run.personaPrompt || run.narrative.opening?.profile?.summary || "本局玩家人物";
+  return run.personaPrompt || "本局玩家人物";
 }
 
 export function registerNarrativeParticipants(

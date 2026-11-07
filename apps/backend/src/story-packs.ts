@@ -6,6 +6,7 @@ import type {
   PublicStoryPackOption
 } from "@reroll/shared";
 import { resolveProjectRoot } from "./project-root.js";
+import { validateNarrativeEventFlow } from "./narrative/event-flow.js";
 
 const storyPackRoot = path.resolve(resolveProjectRoot(import.meta.url), "data", "narratives", "story-packs");
 
@@ -30,11 +31,6 @@ function nonEmpty(value: unknown): value is string {
 
 function stringList(value: unknown, min = 0): value is string[] {
   return Array.isArray(value) && value.length >= min && value.every(nonEmpty);
-}
-
-function validBeatOutline(value: NarrativeStoryPackDefinition["acts"][number]["beatOutline"]): boolean {
-  return Boolean(value) && ["setup", "escalation", "pressure", "climax", "payoff"].every((beat) =>
-    nonEmpty(value[beat as keyof typeof value]));
 }
 
 export function validateNarrativeStoryPack(
@@ -75,7 +71,7 @@ export function validateNarrativeStoryPack(
         act.adventureSeeds.some((seed) => !seed || ![seed.opposition, seed.crisis, seed.entry, seed.allies, seed.escalation, seed.stakes].every(nonEmpty)) ||
         !act.entryRequirements || !Object.keys(act.entryRequirements).length ||
         Object.entries(act.entryRequirements).some(([key, target]) => !["intelligence", "charisma", "family", "fortune", "physique"].includes(key) || !Number.isFinite(target) || target! <= 0) ||
-        !nonEmpty(act.payoffMeaning) || !validBeatOutline(act.beatOutline) ||
+        !nonEmpty(act.payoffMeaning) ||
         act.focusForceIds?.some((id) => !forceIds.has(id)) ||
         act.worldCardRefs?.some((id) => !knownCardIds.has(id))) {
       throw new Error(`${value.id}_story_pack_act_invalid:${act?.id ?? "unknown"}`);
@@ -86,6 +82,11 @@ export function validateNarrativeStoryPack(
     if (!stringList(value.endingDirections?.[polarity], 1)) {
       throw new Error(`${value.id}_story_pack_ending_invalid:${polarity}`);
     }
+  }
+  if (value.endingDirections.closureBoundary !== undefined && !nonEmpty(value.endingDirections.closureBoundary)) throw new Error(`${value.id}_story_pack_ending_boundary_invalid`);
+  if (value.eventFlowId) {
+    if (value.eventFlowId !== value.id || !value.eventFlow) throw new Error("story_pack_event_flow_missing");
+    value.eventFlow = validateNarrativeEventFlow(value.eventFlow, value);
   }
   return structuredClone(value);
 }
@@ -101,6 +102,10 @@ export async function loadNarrativeStoryPacksForWorld(
     try {
       const raw = JSON.parse(await fs.readFile(file, "utf8")) as NarrativeStoryPackDefinition;
       if (raw.worldId !== world.worldId) continue;
+      if (raw.eventFlowId) {
+        if (raw.eventFlowId !== raw.id || !/^[a-z0-9.-]+$/.test(raw.eventFlowId)) throw new Error("story_pack_event_flow_id_invalid");
+        raw.eventFlow = JSON.parse(await fs.readFile(path.resolve(storyPackRoot, "..", "event-flows", raw.eventFlowId + ".json"), "utf8"));
+      }
       const pack = validateNarrativeStoryPack(raw, world);
       if (ids.has(pack.id)) throw new Error(`story_pack_id_duplicate:${pack.id}`);
       ids.add(pack.id);

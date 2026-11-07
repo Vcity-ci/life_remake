@@ -1,22 +1,19 @@
-import type { NarrativeBeat, PublicMilestoneChoice } from "@reroll/shared";
+import type { PublicMilestoneChoice } from "@reroll/shared";
 import type { InternalRunState } from "../engine.js";
 import { formatNarrativeDialogue, formatNarrativeExperience, narrativeExperienceContent } from "../narrative-memory.js";
+import { buildNarrativeStoryHistory } from "./story-history.js";
 
-/** Only the latest unmet change of the same act and beat is actionable feedback. */
-export function narrativeObservationGap(run: InternalRunState, actId: string, beat: Exclude<NarrativeBeat, "ending">): string | undefined {
-  const observation = run.narrative.lastBeatObservation;
-  return observation?.decision === "hold" && observation.actId === actId && observation.beat === beat ? observation.missing : undefined;
-}
-
-/** Three story years, including every same-year action; append the uncommitted passage once. */
+/** Use the same exact coverage as story history; no uncovered act experience may fall out by age. */
 export function narrativeObservationHistory(
   run: InternalRunState,
   current: { actId: string; age: number; sourceEventId: string; narrative: string;
     decisionResult?: "success" | "failure";
     selection?: { choice: PublicMilestoneChoice; label: string; description: string } }
 ): string {
+  const summary = buildNarrativeStoryHistory(run.narrative, run.turnRecords).summary;
+  const covered = new Set(summary?.coveredEpisodeIds ?? []);
   const episodes = run.narrative.episodes.filter((episode) =>
-    episode.actId === current.actId && episode.age >= current.age - 2 && episode.age <= current.age &&
+    episode.actId === current.actId && !covered.has(episode.id) && episode.age <= current.age &&
     episode.sourceEventId !== current.sourceEventId
   );
   const seen = new Set<string>();
@@ -40,5 +37,5 @@ export function narrativeObservationHistory(
       selectedAction: `${current.selection.label}：${current.selection.description}`
     })));
   }
-  return [...history, formatNarrativeExperience(current, formatNarrativeDialogue({ narrative: current.narrative, decisionResult: current.decisionResult }))].join("\n\n");
+  return [summary?.text, ...history, formatNarrativeExperience(current, formatNarrativeDialogue({ narrative: current.narrative, decisionResult: current.decisionResult }))].filter(Boolean).join("\n\n");
 }

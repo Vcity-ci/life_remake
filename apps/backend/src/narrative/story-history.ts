@@ -1,4 +1,4 @@
-import type { NarrativeEpisodeRecord, NarrativeMemoryDigest, NarrativeRunState, TurnRecord } from "@reroll/shared";
+import type { NarrativeEpisodeRecord, NarrativeRunState, TurnRecord } from "@reroll/shared";
 import type { ConversationPromptMessage } from "../conversation.js";
 import { narrativeExperienceContent, type NarrativeExperienceContent } from "../narrative-memory.js";
 
@@ -13,19 +13,22 @@ export interface NarrativeStoryHistoryProjection {
   changes: NarrativeStoryHistory["episodes"];
 }
 
-/** The run digest is the sole coverage authority for the shared story background. */
+/** Independent period summaries jointly replace exactly their covered dialogue. */
 export function buildNarrativeStoryHistory(
   state: Pick<NarrativeRunState, "episodes" | "memoryDigests"> & Partial<Pick<NarrativeRunState, "actRuntime" | "memoryEntries">>,
   turnRecords: readonly TurnRecord[] = []
 ): NarrativeStoryHistory {
-  const digest: NarrativeMemoryDigest | undefined = state.memoryDigests.find((entry) =>
-    entry.id === "run" && entry.format === "effective_facts" && entry.summary.trim().length > 0);
-  const covered = new Set(digest?.coveredEpisodeIds ?? []);
+  const digests = state.memoryDigests.filter((entry) =>
+    entry.scope === "run" && entry.format === "effective_facts" && entry.summary.trim().length > 0);
+  const covered = new Set(digests.flatMap((digest) => digest.coveredEpisodeIds));
   const experiences = state.episodes.map((episode) => ({ episode,
     ...narrativeExperienceContent({ memoryEntries: state.memoryEntries ?? [] }, episode, turnRecords)
   }));
   return {
-    summary: digest ? { id: digest.id, text: digest.summary, coveredEpisodeIds: [...digest.coveredEpisodeIds], originCovered: digest.originCovered } : undefined,
+    summary: digests.length ? { id: "history", text: digests.map((digest) =>
+      digest.fromAge === undefined ? digest.summary : `${digest.fromAge}—${digest.throughAge}岁：${digest.summary}`
+    ).join("\n\n"), coveredEpisodeIds: [...covered], originCovered: digests.some((digest) => digest.originCovered)
+      || state.episodes.some((episode) => episode.turnKind === "origin" && covered.has(episode.id)) } : undefined,
     latestSituationId: experiences.filter((entry) => entry.narrative).at(-1)?.episode.id,
     episodes: experiences.filter(({ episode, narrative }) => !covered.has(episode.id) && narrative).map(({ episode, ...content }) => ({
       id: episode.id,

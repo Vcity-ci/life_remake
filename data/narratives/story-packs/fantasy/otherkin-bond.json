@@ -38,13 +38,6 @@
       "label": "相见",
       "objective": "在一次真实冲突或互助中建立跨族群的个人关系与共同事实。",
       "payoffMeaning": "人物拥有了另一文明中的名字、关系和必须回应的承诺。",
-      "beatOutline": {
-        "setup": "让边境冲突或一次互助使人物真正遇见另一文明。",
-        "escalation": "通过共同危险、交换知识或守诺建立个人信任。",
-        "pressure": "让双方偏见、身份秘密与现实利益考验这段关系。",
-        "climax": "让人物在一次族群冲突中公开保护共同事实或重要之人。",
-        "payoff": "确认跨族名字、承诺与继续往来的真实关系。"
-      },
       "worldCardRefs": [
         "fantasy.snapshot.other_civilizations",
         "fantasy.snapshot.three_rifts",
@@ -72,13 +65,6 @@
       "label": "结盟",
       "objective": "围绕共同威胁或利益建立能够经受背叛风险的合作。",
       "payoffMeaning": "人物成为双方都无法绕开的中介、代表或共同领袖。",
-      "beatOutline": {
-        "setup": "让共同威胁迫使私人信任升级为阵营合作。",
-        "escalation": "通过协商、并肩作战或资源交换建立联盟结构。",
-        "pressure": "让背叛嫌疑、旧仇与盟友伤亡逼迫人物表态。",
-        "climax": "让人物挫败一次足以摧毁联盟的冲突或阴谋。",
-        "payoff": "固定双方合作方式与人物作为中介或领袖的责任。"
-      },
       "worldCardRefs": [
         "fantasy.snapshot.three_rifts",
         "fantasy.snapshot.two_layers",
@@ -106,13 +92,6 @@
       "label": "共界",
       "objective": "在战争、迁徙或天地异变中决定多个文明的长期边界。",
       "payoffMeaning": "族群关系因人物的选择形成战争、联盟或全新的共同生活方式。",
-      "beatOutline": {
-        "setup": "让战争、迁徙或天地异变把多个文明推向最终边界。",
-        "escalation": "调动两边关系、力量与共同经验建立最终应对。",
-        "pressure": "迫使人物在某一族群的安全与共同未来之间取舍。",
-        "climax": "让人物完成决定文明战争、联盟或共居方式的行动。",
-        "payoff": "交代族群边界、重要关系、人物归属与新秩序能否延续。"
-      },
       "worldCardRefs": [
         "fantasy.snapshot.two_layers",
         "fantasy.snapshot.other_civilizations",
@@ -137,6 +116,7 @@
     }
   ],
   "endingDirections": {
+    "closureBoundary": "一次谈判失败、猜忌或局部冲突不等于盟约道路终结；报复已造成长期战争或背叛已毁掉信任基础时可提前坏结局。主要冲突终结而合作有限属于普通结局。",
     "good": [
       "建立尊重差异且能够处理冲突的长期盟约",
       "让跨族群关系从个人奇迹变成可以延续的现实秩序"

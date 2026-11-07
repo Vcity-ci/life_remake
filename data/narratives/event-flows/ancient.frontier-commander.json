@@ -1,0 +1,977 @@
+{
+  "id": "ancient.frontier-commander",
+  "revision": "2.4.0",
+  "originRoles": ["home", "mentor", "token", "father", "mother"],
+  "roles": [
+    { "id": "father", "kind": "character", "identity": "主角的父亲，边境军户家庭成员" },
+    { "id": "mother", "kind": "character", "identity": "主角的母亲，边境军户家庭成员" },
+    { "id": "spear", "kind": "ability", "name": "长兵与盾阵", "identity": "持枪格挡、突刺及与同伍结阵作战的本领" },
+    { "id": "bow", "kind": "ability", "name": "弓弩与侦察", "identity": "射击、辨认地形与侦察敌情的本领" },
+    { "id": "command", "kind": "ability", "name": "练兵与统军", "identity": "编练部伍、指挥步骑及与友军协同作战的本领" },
+    { "id": "armor", "kind": "item", "name": "戍卒甲胄", "identity": "入伍后使用的军用甲胄，提供身体防护" },
+    {
+      "id": "home",
+      "kind": "location",
+      "identity": "主角出生的边境军户聚落"
+    },
+    {
+      "id": "pass",
+      "kind": "location",
+      "identity": "边境驻防关城"
+    },
+    {
+      "id": "mentor",
+      "kind": "character",
+      "identity": "熟悉巡防、与守军有联系的长辈或亲友"
+    },
+    {
+      "id": "companion",
+      "kind": "character",
+      "identity": "自幼相识的同乡伙伴"
+    },
+    {
+      "id": "enemyScout",
+      "kind": "character",
+      "identity": "渗透边境哨线的敌方斥候头目"
+    },
+    {
+      "id": "enemyCommander",
+      "kind": "character",
+      "identity": "敌对势力统军侵入边境的主将"
+    },
+    {
+      "id": "ally",
+      "kind": "character",
+      "identity": "统领邻防区步骑的偏将，受本镇镇将统辖，拥有自己的部伍并与主角协同作战"
+    },
+    {
+      "id": "river",
+      "kind": "location",
+      "identity": "关城附近的河谷渡口，连接迁民通路和侧翼"
+    },
+    {
+      "id": "token",
+      "kind": "item",
+      "identity": "家中用于军旅生活的实物"
+    },
+    {
+      "id": "map",
+      "kind": "item",
+      "identity": "标明边境通道与地形的侦察图"
+    },
+    {
+      "id": "blade",
+      "kind": "item",
+      "identity": "便于近身作战的军用佩刀"
+    },
+    {
+      "id": "banner",
+      "kind": "item",
+      "identity": "偏将统领多队步骑、号令所属防区部伍的将旗"
+    }
+  ],
+  "items": [
+    {
+      "id": "border-map",
+      "roleId": "map",
+      "description": "来自实际侦察的敌军通路与隐蔽侧道，可交付守军安排侧翼。"
+    },
+    {
+      "id": "service-blade",
+      "roleId": "blade",
+      "description": "侦察或救援功绩的实用佩刀，可在后续生活与作战中继续使用。"
+    },
+    {
+      "id": "command-banner",
+      "roleId": "banner",
+      "description": "随偏将授职交付的将旗，用于调动所属多队步骑和辨认主将位置。"
+    }
+  ],
+  "groups": [
+    {
+      "id": "border-childhood",
+      "actIds": [
+        "ancient.frontier-commander.service"
+      ],
+      "narrativeRole": "成长",
+      "label": "边地成长与操练",
+      "routing": "planned",
+      "assetRoles": ["home", "father", "mother", "pass", "mentor", "companion", "bow", "spear"],
+      "entry": "尚未正式入伍，需要从军户孩子成长为能够行动的少年。",
+      "events": [
+        {
+          "id": "childhood-games",
+          "kind": "life",
+          "entry": "主角仍在军户家中成长，尚未与伙伴建立日常交往。",
+          "situation": "你在{{home}}长大，与{{companion}}玩追逐、辨路和攻守游戏。{{mentor}}教你辨认警号；游戏有胜负，也使伙伴性情与彼此关系逐渐显现。",
+          "outcome": {
+            "result": "你熟悉家乡山路与警号，和伙伴形成共同经历；家庭生活与身体成长已经真实经过。"
+          }
+        },
+        {
+          "id": "childhood-drills",
+          "lifeBefore": { "minYears": 2, "maxYears": 4, "context": "你仍在{{home}}过军户孩子的日子，家人照料生计，你与{{companion}}相处、玩耍，也跟着大人做力所能及的家务。" },
+          "kind": "life",
+          "entry": "已经有边地家庭和伙伴的生活，开始接受长辈教习。",
+          "situation": "{{mentor}}带你练长兵与盾阵，{{companion}}在辨路、弓弩或气力上显出与你不同的长处。你们从互相较劲走向配合，训练中学会照顾彼此的短处，家人也开始把守家与外出的事情交给你。",
+          "outcome": {
+            "result": "你掌握初步的奔走、警戒和兵器基础，与伙伴形成能够共同做事的配合。"
+          }
+        },
+        {
+          "id": "childhood-household",
+          "lifeBefore": { "minYears": 2, "maxYears": 3, "context": "家中生活照常，你继续长身体，跟{{mentor}}学习，与{{companion}}往来。" },
+          "kind": "life",
+          "entry": "主角已有基本操练和同伴，尚需独立承担边地生活中的责任。",
+          "situation": "家人轮值外出时，你承担家中劳作，和{{companion}}往返村落与{{pass}}。父母和{{mentor}}不再事事跟随；路途、天气与劳作使你实际运用学过的本事，也改变了家人对你的依赖。伙伴有自己的家务与打算，你们各自成长。",
+          "outcome": {
+            "result": "你已经能独立照应家中、往返边地，与伙伴从玩伴成为能彼此托付事情的少年；这一段家庭成长结束。",
+            "endsFlow": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "ridge-scouts",
+      "actIds": [
+        "ancient.frontier-commander.service"
+      ],
+      "narrativeRole": "入伍前的大事件",
+      "label": "雾山遇敌",
+      "routing": "planned",
+      "assetRoles": ["pass", "mentor", "companion", "enemyScout", "bow", "map", "token"],
+      "entry": "少年已能独自活动，尚未经历决定从军道路的边地危险。",
+      "events": [
+        {
+          "id": "ridge-discovery",
+          "lifeBefore": { "minYears": 2, "maxYears": 4, "context": "你在家乡生活、劳作，与家人和伙伴来往；长辈传授的本事也在平日里练习。" },
+          "kind": "scene",
+          "entry": "主角与伙伴尚未发现本次敌方渗透。",
+          "situation": "你与{{companion}}上山探路，风雨和浓雾使归路难辨。你们发现{{enemyScout}}带人越过哨线，正在标记通往{{pass}}的道路。",
+          "outcome": {
+            "result": "你们已经发现敌方侦察，敌人也开始搜山；能否把伙伴和消息带回守军成为眼前大事。"
+          }
+        },
+        {
+          "id": "ridge-warning",
+          "kind": "choice",
+          "entry": "已经发现搜山的敌方斥候，主角与伙伴仍未脱离这次危险。",
+          "situation": "敌方斥候搜山，伙伴就在身边，守军尚不知有人渗入。",
+          "question": "怎样带伙伴脱离搜山，并让守军得到消息？",
+          "stakes": "伙伴的安全、敌人的渗透与关城的警戒。",
+          "check": {
+            "stat": "intelligence",
+            "difficulty": 16
+          },
+          "options": [
+            {
+              "id": "safe",
+              "label": "沿沟退回",
+              "action": "带伙伴沿熟悉的沟道撤回巡哨范围，优先保住同行者。",
+              "success": {
+                "result": "你带伙伴平安回到守军，报信使敌军夜袭落空；撤退时记住的侧道后来被画成{{map}}。",
+                "grantItems": [
+                  "border-map"
+                ]
+              },
+              "failure": {
+                "result": "你们没能穿过封锁，被{{enemyScout}}俘获并带离山道；消息没有送达，家中必须面对孩子失踪的结果。",
+                "endsFlow": true
+              }
+            },
+            {
+              "id": "balanced",
+              "label": "分路传警",
+              "action": "由你引开追兵，让伙伴沿短路向守军传警。",
+              "success": {
+                "result": "伙伴把警报送到，你也借巡哨接应脱险；守军击退斥候，你把见到的通路画成{{map}}。",
+                "grantItems": [
+                  "border-map"
+                ]
+              },
+              "failure": {
+                "result": "分路时被敌人截断，你遭俘获；伙伴逃回家乡求援，守军尚未掌握敌人的完整通路。",
+                "endsFlow": true
+              }
+            },
+            {
+              "id": "risky",
+              "label": "夺取敌图",
+              "action": "潜近敌哨夺取侦察图，再带伙伴突围，暴露在敌人搜索最密的区域。",
+              "success": {
+                "result": "你夺到敌图并带伙伴突围，守军据此伏击斥候；战后你整理出可交付的{{map}}。",
+                "grantItems": [
+                  "border-map"
+                ]
+              },
+              "failure": {
+                "result": "夺图暴露，你和伙伴被追兵击伤并俘获；这次突围已经失败，后续处境是敌营中的囚徒。",
+                "endsFlow": true
+              }
+            }
+          ]
+        },
+        {
+          "id": "ridge-homecoming",
+          "kind": "scene",
+          "entry": "主角已从这次搜山中实际脱险并回到守军，未被俘。",
+          "situation": "你带着这次脱险实际留下的伤势和所得回到{{home}}。家人照料伤者，对你往后出行和从军各有态度；{{companion}}也因共同遇险改变了与你相处的方式。{{mentor}}把守军已经做出的应对带回家，你重新接上生活与操练。",
+          "outcome": {
+            "result": "主角与伙伴已经回到边地生活，遇敌造成的伤势、家人态度和共同经验成为此后从军的实际基础；这次山中遇险结束。",
+            "endsFlow": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "captive-return",
+      "actIds": [
+        "ancient.frontier-commander.service"
+      ],
+      "narrativeRole": "失败后的转向",
+      "label": "被俘后的归途",
+      "routing": "planned",
+      "assetRoles": ["home", "father", "mother", "companion", "mentor", "enemyScout"],
+      "entry": "上一组实际以被俘或失踪结束，主角仍然活着且尚有归途。",
+      "events": [
+        {
+          "id": "captive-way-out",
+          "kind": "choice",
+          "entry": "主角仍在敌营中，被俘尚未结束。",
+          "situation": "你被关在敌方临时营地，{{companion}}或{{mentor}}已经在外寻找机会；敌营即将转移。",
+          "question": "怎样离开敌营，结束这次被俘？",
+          "stakes": "你的生命、伙伴与家庭的负担。",
+          "check": {
+            "stat": "charisma",
+            "difficulty": 14
+          },
+          "options": [
+            {
+              "id": "safe",
+              "label": "争取赎回",
+              "action": "表明军户身份，争取由长辈联络换俘，接受家中付出赎价。",
+              "success": {
+                "result": "长辈促成换俘，你回到家乡，家中为赎价变得拮据；被俘结束，之后要带着这份负担继续生活。"
+              },
+              "failure": {
+                "result": "换俘未获敌方接受；趁守军袭营，长辈把你救回，家中有人受伤，你的被俘也在这场救援中结束。"
+              }
+            },
+            {
+              "id": "balanced",
+              "label": "联合脱逃",
+              "action": "联络其他俘虏，在营地转移时互相掩护逃回边境。",
+              "success": {
+                "result": "你和几名俘虏合力逃回守军，其中有人后来愿意与你同伍；逃亡结束，留下信任与伤势。"
+              },
+              "failure": {
+                "result": "脱逃被发现，同行者付出伤亡；你最终在边境交战中获救，必须承受没能保全所有人的结果。"
+              }
+            },
+            {
+              "id": "risky",
+              "label": "夺马冲营",
+              "action": "冒险夺马冲出敌营，争取将敌军动向一并带走。",
+              "success": {
+                "result": "你夺马突围并回到守军，消息促成一次反击；被俘至此结束，伤势需要后续恢复。"
+              },
+              "failure": {
+                "result": "夺马失败，你在追击中被杀，长辈只能接回死讯；军旅人生尚未开始便已经终结。",
+                "endsFlow": true
+              }
+            }
+          ]
+        },
+        {
+          "id": "captive-recovery",
+          "kind": "life",
+          "entry": "主角已经活着离开敌营，归途结束，伤势与家中代价尚待承受。",
+          "situation": "你回到{{home}}，家中按归来时真实的伤势、赎价或亲人损失重新安排生活。伤者休养，能劳动的人补上空缺；{{mentor}}调整操练，{{companion}}也带着自己经历的后果与你重逢。体力恢复与家人负担的变化构成这段日子。",
+          "outcome": {
+            "result": "你已经重新接上家中生活和从军准备，家人与同行者付出的代价仍然存在；被俘及归来后的安顿结束。",
+            "endsFlow": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "formal-enlistment",
+      "actIds": [
+        "ancient.frontier-commander.service"
+      ],
+      "narrativeRole": "本幕结果",
+      "label": "训练入伍",
+      "routing": "planned",
+      "assetRoles": ["pass", "home", "father", "mother", "mentor", "companion", "spear", "bow", "armor"],
+      "entryRequirements": { "physique": 20, "intelligence": 14 },
+      "preparation": "尚未正式入伍。在军户生活中劳作、奔走，跟长辈练持枪、举盾与射箭；从辨方向、选择山路和攻守游戏中学习判断。伙伴也各自成长，家中生活照常继续。",
+      "entry": "已具备边地经验和行动基础，实际仍未正式入伍。",
+      "events": [
+        {
+          "id": "recruit-training",
+          "lifeBefore": { "minYears": 2, "maxYears": 3, "context": "你尚未入伍，在{{home}}继续军户生活，承接此前的得失，与家人生活，跟长辈练习已有本事，身体渐渐长成。" },
+          "kind": "life",
+          "entry": "主角具备入组条件，尚未完成守军的新兵基础操练。",
+          "situation": "你与{{companion}}等适龄伙伴参加守军的新兵操练；{{mentor}}教你长兵配合、守夜、行军和军纪。让训练、关系与真实军旅生活构成这一阶段。",
+          "outcome": {
+            "result": "你完成新兵基础操练，能够在队列里配合同伍行动，生活已经从家中劳作转入军营。"
+          }
+        },
+        {
+          "id": "enlistment-duty",
+          "kind": "scene",
+          "entry": "已经完成新兵基础操练，尚未正式编入守军。",
+          "situation": "{{mentor}}把完成操练的你交入{{pass}}守军。你领到兵器与甲具，进到固定同伍和营舍，家中得知你正式服役；{{companion}}依照已经发生的经历与你同伍或另有去处。入伍当场落实身份、所属和职责。",
+          "outcome": {
+            "result": "你正式成为关城守军的士兵，有所属同伍、装备和服役职责。"
+          }
+        },
+        {
+          "id": "first-watch",
+          "kind": "scene",
+          "entry": "主角已经正式入伍，尚未以士兵身份完成第一次实际勤务。",
+          "situation": "你随同伍完成第一次关城值守和换防。风寒、疲劳与同伍配合考验操练所得，老兵承担自己的职责，也把属于你的哨位交到你手里。勤务结束后，你回到营舍，第一次以服役士兵的身份安排休息和家信。",
+          "outcome": {
+            "result": "你已经正式入伍并实际履行士兵职责，开始稳定的军旅生活；从戎得到实际结果。",
+            "endsFlow": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "company-training",
+      "actIds": [
+        "ancient.frontier-commander.command"
+      ],
+      "narrativeRole": "掌军起点",
+      "label": "从同伍到带队",
+      "routing": "planned",
+      "assetRoles": ["pass", "mentor", "companion", "ally", "spear", "bow", "armor", "command"],
+      "entryRequirements": { "physique": 24, "intelligence": 20 },
+      "preparation": "你仍是已入伍的士兵，在轮值、操练、随队巡防与休假探亲中积累。跟老兵练枪盾和弓弩，演练遇伏时选择掩护、换位和撤退方向；教习用不同地形检验你能否判断敌情、照应同伍。尚未接任带队职责。",
+      "entry": "已正式入伍，但尚未形成持续受主角指挥的部伍。",
+      "events": [
+        {
+          "id": "soldier-service",
+          "lifeBefore": { "minYears": 3, "maxYears": 5, "context": "你作为已入伍的士兵轮值、操练，随同伍起居，休假时与家人往来。" },
+          "kind": "life",
+          "entry": "主角已经入伍，尚未有独立带队职责。",
+          "situation": "承接第一幕的实际身份，写巡防、操练与守军生活。旧伙伴和长辈各自继续生活，主角在同伍中以行动积累信任。",
+          "outcome": {
+            "result": "你已积累扎实的士兵经历，能够协助操练和带领小队；别人愿意跟随有了实际来由。"
+          }
+        },
+        {
+          "id": "first-command",
+          "lifeBefore": { "minYears": 2, "maxYears": 4, "context": "你仍按士兵身份在军中服役，与熟悉的同伍轮值、操练，也有休息和探亲的日子，尚未取得常设带队任命。" },
+          "kind": "scene",
+          "entry": "主角已有实际士兵经历与同伍信任，尚未接到常设带队任命。",
+          "situation": "{{ally}}把一支老兵与新兵混编的小队交给你，授你队正职责。你接下所属士兵、营地与巡防范围；原同伍中有人服你，也有人凭自己的资历提出异议。你在第一次带队轮值中承担命令和照应部众的责任，旧伙伴也有了自己的位置。",
+          "outcome": {
+            "result": "你已经任队正并实际指挥一队，部众与职责明确，带队关系开始经受日常磨合。"
+          }
+        },
+        {
+          "id": "company-coordination",
+          "lifeBefore": { "minYears": 2, "maxYears": 3, "context": "你已经领有一队，在日常勤务和生活中与部众相处，履行已有职责。" },
+          "kind": "life",
+          "entry": "主角已实际领一队，部众尚未形成稳定协作。",
+          "situation": "你带队反复走过负责的巡防地段，让老兵教新兵接敌、掩护、行军和救护。有人擅弓，有人耐劳，有人只听旧日熟人的话；你通过实际分工和共同承担艰苦建立带队办法，{{companion}}也承担与其本事相称的职责。队伍在轮值与休整中逐渐能共同做事。",
+          "outcome": {
+            "result": "这一队已形成分工、协作和持续轮值能力，主角的队正职责有了实际部众支持；尚未因带起一队取得将军军职。",
+            "endsFlow": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "wolves-rescue",
+      "actIds": [
+        "ancient.frontier-commander.command"
+      ],
+      "narrativeRole": "带队实践",
+      "label": "狼谷接迁民",
+      "routing": "planned",
+      "assetRoles": ["river", "pass", "companion", "ally", "spear", "armor", "command"],
+      "entry": "已经带有小队，需要一次真正影响部众和边民的行动。",
+      "events": [
+        {
+          "id": "wolves-cutoff",
+          "lifeBefore": { "minYears": 1, "maxYears": 3, "context": "你带着现有小队轮值、操练，部众与各自家人照常生活，已有关系随岁月延续。" },
+          "kind": "scene",
+          "entry": "小队已能行动，尚未接到这次接回迁民的任务。",
+          "situation": "{{river}}附近的迁民被狼群与断路截住，敌骑又逼近侧翼。你接令带自己的小队赶去，{{companion}}与老兵分担警戒和救护。",
+          "outcome": {
+            "result": "你与部众已经抵达受困军民所在处，救援开始，撤离窗口正在缩小。"
+          }
+        },
+        {
+          "id": "wolves-breakout",
+          "kind": "choice",
+          "entry": "小队已经到场，迁民与伤兵仍困在狼谷。",
+          "situation": "迁民与伤兵无法快走，狼群压住山口，敌骑正在接近。",
+          "question": "怎样把军民与部众带出狼谷？",
+          "stakes": "被困者、你实际带领的士兵与边防通路。",
+          "check": {
+            "stat": "physique",
+            "difficulty": 25
+          },
+          "options": [
+            {
+              "id": "safe",
+              "label": "护住后撤",
+              "action": "结阵掩护军民沿旧路撤离，放弃不必要的辎重。",
+              "success": {
+                "result": "你带大多数军民与部众返回关城，丢弃的辎重确实损失；小队以完整救援获得军民信任。"
+              },
+              "failure": {
+                "result": "队列被冲散，你只能救回部分军民并带残余小队撤回；有人死亡，救援已经以损失结束，之后必须重整。"
+              }
+            },
+            {
+              "id": "balanced",
+              "label": "点烽火合围",
+              "action": "率小队守住险口并点烽火，引邻队接应，共同护送军民过谷。",
+              "success": {
+                "result": "你守住险口，邻队到来后击退狼群与敌骑，军民得救；部众真正经历协作作战。"
+              },
+              "failure": {
+                "result": "烽火接应未能及时赶到，你付出兵员伤亡才带幸存者退回；没有救出的人已成实际损失，不再原地等待补救。"
+              }
+            },
+            {
+              "id": "risky",
+              "label": "突击敌骑",
+              "action": "主动率精干兵员冲击敌骑侧翼，为迁民抢出完整通道。",
+              "success": {
+                "result": "突击打乱敌骑，你率部护送军民出谷；这场行动带来真实战果与部众威信。"
+              },
+              "failure": {
+                "result": "突击遭到包围，小队付出惨重伤亡；你带极少幸存者退回，原部伍的协作与信任遭到实质破坏。"
+              }
+            }
+          ]
+        },
+        {
+          "id": "wolves-return",
+          "kind": "life",
+          "entry": "狼谷救援已经以实际胜败结束，主角活着返回，军民伤亡与部伍状况已经确定。",
+          "situation": "这次实际救回的迁民进入关城，在可居的村舍重新落脚。你与{{companion}}协助他们恢复生计，船户和守军接上各自的生活；{{ally}}安排你实际带回的小队休整与轮值。这件事处理获救军民的归宿，部众与物资沿用救援已经确定的得失。",
+          "outcome": {
+            "result": "获救军民已经安顿，救援中已经确定的部众与物资得失保留，主角接回实际拥有的小队与军旅生活。",
+            "endsFlow": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "flood-rescue",
+      "actIds": [
+        "ancient.frontier-commander.command"
+      ],
+      "narrativeRole": "带队实践",
+      "label": "洪水渡口救援",
+      "routing": "planned",
+      "assetRoles": ["river", "pass", "companion", "ally", "spear", "armor", "command"],
+      "entry": "已经带有小队，当前世界卡适合河谷救援而非狼谷。",
+      "events": [
+        {
+          "id": "flood-isolation",
+          "lifeBefore": { "minYears": 1, "maxYears": 3, "context": "你带着现有小队轮值、操练，部众与各自家人照常生活，已有关系随岁月延续。" },
+          "kind": "scene",
+          "entry": "小队尚未接手本次洪水中的救援与渡口防守。",
+          "situation": "暴雨冲断{{river}}的堤路，迁民与另一支守军困在两岸。{{ally}}无力同时调来全部援兵，你的小队要与船户、工兵协作。",
+          "outcome": {
+            "result": "你已接手真实的救援与渡口防守，洪水和敌方游骑都在压缩行动机会。"
+          }
+        },
+        {
+          "id": "flood-crossing",
+          "kind": "choice",
+          "entry": "部众已到河岸，被困军民尚未脱离这次洪水与敌骑。",
+          "situation": "水位上涨，敌方游骑沿河岸逼近，被困者必须转移。",
+          "question": "怎样完成渡口救援？",
+          "stakes": "受困军民、船只、部众与边境渡口。",
+          "check": {
+            "stat": "intelligence",
+            "difficulty": 25
+          },
+          "options": [
+            {
+              "id": "safe",
+              "label": "分批接运",
+              "action": "组织船户分批接运，部众掩护两岸，接受物资损失。",
+              "success": {
+                "result": "军民被分批接回，你保住部众与渡口，损失了一部分粮械；协作救援的结果已经成立。"
+              },
+              "failure": {
+                "result": "最后几船来不及返回，你带幸存者撤离，部分军民死亡、物资流失；这次救援以沉重损失结束。"
+              }
+            },
+            {
+              "id": "balanced",
+              "label": "架索守渡",
+              "action": "让工兵架索、老兵守岸，你协调两岸同步撤离。",
+              "success": {
+                "result": "索桥架成，部众击退敌骑并救回军民；渡口得以继续使用，你的指挥得到实际验证。"
+              },
+              "failure": {
+                "result": "索桥被洪水冲断，你组织抢救后撤；一些士兵和百姓遇难，部伍此后需要休整。"
+              }
+            },
+            {
+              "id": "risky",
+              "label": "抢占敌岸",
+              "action": "率精干小队抢占敌哨控制的岸口，为全部撤离打开通路。",
+              "success": {
+                "result": "你攻下岸口并护送军民撤离，敌哨被拔除，救援和作战都形成真实成果。"
+              },
+              "failure": {
+                "result": "抢岸失败，部众遭夹击，只能放弃渡口带残余军民退回；严重损失迫使你重建队伍。"
+              }
+            }
+          ]
+        },
+        {
+          "id": "flood-resettlement",
+          "kind": "life",
+          "entry": "此次救援已经结束，主角与实际幸存者回到安全处。",
+          "situation": "洪水退后，你与守军把已经救回的人安置到关城与可居的村落。船户和工兵按救援实际留下的船只、岸口恢复渡河交通，获救者重新安排生活；{{companion}}与{{ally}}沿用已经确定的战果、部众和物资情况接回勤务。这件事处理退水后的人与渡口去处。",
+          "outcome": {
+            "result": "获救者得到安顿，渡口交通按实际保有的条件恢复，救援已经确定的得失保留；主角率现有部众回到军旅生活。",
+            "endsFlow": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "company-rebuild",
+      "actIds": [
+        "ancient.frontier-commander.command"
+      ],
+      "narrativeRole": "受挫后的发展",
+      "label": "重整部伍",
+      "routing": "planned",
+      "assetRoles": ["pass", "companion", "ally", "spear", "armor", "command"],
+      "entry": "上一组使部伍因实际伤亡或离队失去原有编制，或部众协作与信任已经破裂，主角仍有重建条件。完整小队的普通休整已在上一组事后生活中处理。",
+      "events": [
+        {
+          "id": "rebuild-grief",
+          "kind": "life",
+          "entry": "此前行动已经造成真实损失，幸存部众尚未完成伤亡后的安顿。",
+          "situation": "你与幸存者安葬阵亡同伍，探望伤者和亲属。有人仍愿跟随，有人因伤离开，有人把愤怒带到你面前；{{ally}}交代本部能留下与调离的实际兵力。你承担自己的责任，与仍活着的人重新确定彼此的关系。",
+          "outcome": {
+            "result": "死者与伤者的安顿已经处理，幸存者去留及主角能继续带领的力量确定，损失没有被抹去。"
+          }
+        },
+        {
+          "id": "rebuild-training",
+          "lifeBefore": { "minYears": 1, "maxYears": 2, "context": "此前伤亡已经安顿，你与幸存部众恢复日常生活，各自承受已经发生的损失。" },
+          "kind": "life",
+          "entry": "伤亡后的安顿已经结束，主角仍实际拥有可重整的部众。",
+          "situation": "你把实际留下的骨干和补入新兵重新编组，按此前失利暴露的问题改变操练。旧部带新兵熟悉地形和掩护，{{companion}}按当前能力分担训练；队伍从彼此不信任走到能共同轮值，主角也学会把权责交给部众。",
+          "outcome": {
+            "result": "现有部众重新形成协作，训练和带队办法因真实失利而改变，原先死亡与离队的人没有被补写回来。"
+          }
+        },
+        {
+          "id": "rebuild-defense",
+          "lifeBefore": { "minYears": 1, "maxYears": 2, "context": "你与重整后的部众继续日常勤务和操练，也照料各自的生活。" },
+          "kind": "scene",
+          "entry": "重整与操练已经完成，现有部众能再次共同执行勤务。",
+          "situation": "敌方游骑再次袭击边村，这次你按重整后的协作分工率部护住村民和退路。写实际交战与回应。",
+          "outcome": {
+            "result": "你在一次真实守卫中保住村民与部众，重建后的队伍重新具备行动能力，故事离开了失败现场。",
+            "endsFlow": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "border-campaign",
+      "actIds": [
+        "ancient.frontier-commander.command"
+      ],
+      "narrativeRole": "统军成长与本幕结果",
+      "label": "出击与成为将军",
+      "routing": "planned",
+      "assetRoles": ["pass", "river", "companion", "ally", "enemyScout", "command", "spear", "bow", "armor", "banner"],
+      "entryRequirements": { "physique": 28, "intelligence": 25 },
+      "preparation": "你已承担小队职责。操练中让骨干轮流领队，跟邻队演练枪盾掩护弓手、骑哨传警和遇袭换阵；复盘此前救援或作战的得失，学习在不同地形分配兵力。伤者休养、家人往来与同伴相处承接已有经历，新的出击尚未开始。",
+      "entry": "已实际带队并经历救援或作战，军镇需要合编邻堡部伍，对付据营出掠的敌骑。本组经历编练、实战、调整和出击后的军议；实际军功与统军表现决定职权，不预定授将结果。",
+      "events": [
+        {
+          "id": "campaign-formation",
+          "lifeBefore": { "minYears": 2, "maxYears": 4, "context": "你履行已有的小队职责，部众轮值操练，伤者休养，与家人和同伴的关系承接此前经历。" },
+          "kind": "life",
+          "entry": "本组开场，主角已有小队与骨干，邻堡兵尚未完成合编。",
+          "situation": "镇将命你以校尉身份合练邻堡数队。旧部熟悉你的号令，邻堡枪盾兵惯于守墙，弓手和骑哨各有旧习。{{companion}}接过一队的职责，{{ally}}借出教习并让本部参加合练。你带他们在关外沙地与{{river}}轮换掩护、接战和撤回，生活中也开始面对队官各自带人后的争执与担责。",
+          "outcome": {
+            "result": "数队完成合编与协同操练，枪盾、弓手和骑哨各有队官，你以校尉身份调度这支部伍；训练尚未代替实际战果。"
+          }
+        },
+        {
+          "id": "campaign-first-defense",
+          "lifeBefore": { "minYears": 1, "maxYears": 2, "context": "你与合编后的部伍日常驻守、操练，跟{{ally}}及各队骨干来往，部众有勤务也有休息。" },
+          "kind": "choice",
+          "entry": "部伍已经合编，尚未经历这次合军后的守渡实战。",
+          "situation": "敌骑越过山口，追赶来不及入城的边民到{{river}}。你率新编部伍抵达渡口，{{ally}}的邻军正在另一岸接应；敌骑分出一部绕向上游，试图冲散渡头。",
+          "question": "怎样率新编部伍打完这场守渡战？",
+          "stakes": "渡口边民的生死、部伍第一次协同实战和邻军的侧翼。",
+          "check": { "stat": "intelligence", "difficulty": 25 },
+          "options": [
+            {
+              "id": "safe", "label": "护送撤渡", "action": "枪盾守住渡头，弓手掩护边民渡河，逐队撤到邻军一岸。",
+              "success": { "result": "你守住渡头直到边民渡完，带部伍有序撤过河；敌骑未能破坏接应，渡口守卫取得实际战果。" },
+              "failure": { "result": "渡头防线被冲破，一批边民被掳，断后部众受损；你带余部渡河，邻军掩护收容，守渡失败已经落定。" }
+            },
+            {
+              "id": "balanced", "label": "分兵拒骑", "action": "你率枪盾兵稳住渡头，由伙伴领弓手和骑哨迎击绕行敌骑，与邻军夹住渡口两翼。",
+              "success": { "result": "两翼协同击退敌骑，边民和渡口都被保住；伙伴独立完成侧翼任务，部伍赢下第一次合军实战。" },
+              "failure": { "result": "侧翼交接失误，敌骑冲入渡头，掳走边民后退去；一队伤亡失散，伙伴带残部归来，主角承担这次分兵失利的后果。" }
+            },
+            {
+              "id": "risky", "label": "出渡截击", "action": "亲率精锐渡外迎击敌骑前部，依靠邻军接续，以暴露退路为代价夺回山口主动权。",
+              "success": { "result": "你击溃敌骑前部，与邻军夺回山口，边民安全入城；部伍在险境中取得进攻战果，也付出了伤亡。" },
+              "failure": { "result": "敌骑切断退路，你丢下辎重与伤亡部众突围；邻军救回幸存者，山口与渡外村落落入敌手，部伍已经遭受重创。" }
+            }
+          ]
+        },
+        {
+          "id": "campaign-consolidation",
+          "kind": "life",
+          "entry": "守渡战已经结束，尚未完成依据这次实战进行的部伍调整。",
+          "situation": "关内恢复轮值。各队从守渡实战带回不同的伤亡、经验和相互评价，你依据真实战况调整队官分工、接应和撤回的操练。{{companion}}开始独立训练本队，与{{ally}}的邻军共同演练两翼交接；主角必须把个人敢战变成部属能够独立承担的职责。",
+          "outcome": { "result": "实战暴露的协作问题完成调整，骨干能各领其队与邻军接应；已经发生的伤亡、失地和关系变化继续成立。" }
+        },
+        {
+          "id": "campaign-raid",
+          "lifeBefore": { "minYears": 2, "maxYears": 3, "context": "你与完成调整的部伍继续驻守，训练、轮值、休养和家庭生活承接此前实战的得失。" },
+          "kind": "choice",
+          "entry": "合军实战后的调整已完成，主角仍在军中承担指挥，尚未发动这次边外营垒行动。",
+          "situation": "敌骑依靠山口外的营垒出掠，骑哨沿河谷往返，狭窄营路连着草场与退路。镇将命你与{{ally}}出击，打掉这处袭扰支点。你以实际幸存部伍和已经取得的职责参战，邻军保有自己的兵力与指挥；此前守渡的胜负决定你们从哪一岸、凭什么阵地进入这场行动。",
+          "question": "如何率部打击这股持续袭扰的敌军？",
+          "stakes": "部伍存亡、边民安全与主角的实际战果。",
+          "check": {
+            "stat": "intelligence",
+            "difficulty": 25
+          },
+          "options": [
+            {
+              "id": "safe",
+              "label": "联防截击",
+              "action": "与邻军配合，在敌骑回撤通路设防，优先保护自己的部众。",
+              "success": {
+                "result": "你与邻军截败出营敌骑并夺取营垒通路，迫使营中守军撤走；袭扰支点被拔除，主角部众保存较好。"
+              },
+              "failure": {
+                "result": "敌骑绕开截击，你带部众退守；此次出击无功而返，敌营继续控制营路，邻军改为封锁近侧山道。"
+              }
+            },
+            {
+              "id": "balanced",
+              "label": "切断营路",
+              "action": "率主力牵制、分队断其运补，争取摧毁营垒。",
+              "success": {
+                "result": "敌营失援后被攻破，持续袭扰的敌骑撤走；你率领的部伍真正赢下一场协同作战。"
+              },
+              "failure": {
+                "result": "分队未能及时会合，断路部众被敌骑击散，你率余部撤回；攻营已经失败，伤亡与丢弃的军械实际损失，敌军开始加强营路守备。"
+              }
+            },
+            {
+              "id": "risky",
+              "label": "夜袭主帐",
+              "action": "率精锐深入敌营突袭主帐，以失去退路的风险争取决定性战果。",
+              "success": {
+                "result": "夜袭得手，敌方部众溃散，你带回俘虏与被掳边民；这次作战形成重大军功。"
+              },
+              "failure": {
+                "result": "夜袭中伏，你与主力被围歼，部曲不再存在，你也死于乱军；守边事业至此败亡。",
+                "endsFlow": true
+              }
+            }
+          ]
+        },
+        {
+          "id": "campaign-aftermath",
+          "kind": "scene",
+          "entry": "边外营垒行动已经结束，主角存活，尚未完成此次战后的休整与损失处置。",
+          "situation": "部伍结束出击回到{{pass}}。你和{{companion}}按这次出击已经确定的战果、部众与物资情况安排归营后的生活，镇将依现有兵力安排轮防与补给。邻军自行整顿，各队带着实际所得与失去的东西接回勤务，出击本身已经结束。",
+          "outcome": { "result": "这次出击后的归营休整已经完成，部众、战果和损失沿用已提交结果，各队按现有力量接回勤务；主角进入军议。" }
+        },
+        {
+          "id": "general-commission",
+          "kind": "settlement",
+          "entry": "本组出击已经结束，战后处置已落定，尚未依据本阶段实际功过完成镇将主持的军议。",
+          "situation": "镇将召集你与{{ally}}进行军议。军议处理本阶段已经发生的编练、守渡和出击功过，落实职权与赏罚；各队官承接实际任命。此事只处理功过与任职，不追加一场考验。",
+          "rules": [
+            { "id": "appoint-general", "condition": "主角在本阶段实际练成可独立行动的多队部伍，并在守渡或出击中取得成建制作战成果，已经表现出统领一处防区的能力；一次普通失利不抹去已成立的功绩。镇将有权任命本镇偏将。", "disposition": "镇将正式授主角偏将军职，交付一翼防区及其步骑部伍，赐{{banner}}行使常设指挥权；已经发生的伤亡与失利不被撤销。", "grantItems": ["command-banner"], "endsFlow": true },
+            { "id": "retain-command", "condition": "主角仍能带队，但本阶段实际成果尚不足以取得一处防区的独立指挥权；只有完成操练、无战果或连续普通失利，不构成授偏将的依据。", "disposition": "镇将留主角任校尉，继续指挥已经实际掌握的数队，未授偏将也未交将旗；本阶段军议已经结束。", "endsFlow": true },
+            { "id": "reduce-command", "condition": "本阶段实际严重指挥失误造成所属多队溃散或被夺走指挥权，主角尚能留在军中承担一队职责；普通单次失利本身不构成此处分。", "disposition": "镇将撤去主角校尉职责，降任队正，交还多队兵权，仅留下其实际所属的一队；军议处分已经落实。", "endsFlow": true }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "map-delivery",
+      "actIds": [
+        "ancient.frontier-commander.command",
+        "ancient.frontier-commander.frontier"
+      ],
+      "narrativeRole": "伏笔回收与额外收获",
+      "label": "交付边道图",
+      "routing": "planned",
+      "assetRoles": ["pass", "ally", "map", "blade"],
+      "entry": "手中确有早年侦察所得的边道图，守军正在准备边境行动；这组可用于回收早年伏笔。",
+      "events": [
+        {
+          "id": "map-handover",
+          "kind": "scene",
+          "entry": "主角实际持有尚未交付的边道图，邻军当前需要其中的通路。",
+          "situation": "你把实际持有的{{map}}交给{{ally}}，结合这些年真实地形变化说明侧道。写守军据图安排侧翼以及老经验终于产生的新用途。",
+          "outcome": {
+            "result": "{{map}}已交付守军并用于侧翼布防；你获赠{{blade}}，邻军也实际掌握了一条可以互援的通路。",
+            "consumeItems": [
+              "border-map"
+            ],
+            "grantItems": [
+              "service-blade"
+            ],
+            "endsFlow": true
+          }
+        }
+      ],
+      "requiresItems": [
+        "border-map"
+      ]
+    },
+    {
+      "id": "invasion-arrival",
+      "actIds": [
+        "ancient.frontier-commander.frontier"
+      ],
+      "narrativeRole": "大战展开",
+      "label": "邻城陷落与接防",
+      "routing": "planned",
+      "assetRoles": ["pass", "home", "father", "mother", "river", "enemyCommander", "companion", "ally", "command", "spear", "bow", "armor", "banner"],
+      "entry": "主角已经实际成为将军，外敌全面入境的威胁需要变成正在发生的战争。",
+      "events": [
+        {
+          "id": "neighbor-falls",
+          "lifeBefore": { "minYears": 4, "maxYears": 7, "context": "你按已经取得的军职守卫现有防区，部众轮换、操练和休假，旧同伴与家人也各自生活。" },
+          "kind": "scene",
+          "entry": "主角已经执掌实际防区，全面入侵尚未进入本幕的实际经历。",
+          "situation": "{{enemyCommander}}统合诸部正式入境，邻城在进攻中陷落。你率实际部伍接应退来的守军和逃民，{{ally}}接下伤兵并带来邻城失守的经过；人们失去的家园和仍在追来的敌骑，使{{pass}}从日常防区变成战线。",
+          "outcome": {
+            "result": "邻城已经陷落，残军与逃民被接入关城，敌军进入边境；主角的防区已经卷入全面战争。"
+          }
+        },
+        {
+          "id": "war-joint-defense",
+          "kind": "scene",
+          "entry": "邻城残军与军民已经抵达，关城尚未完成战时接防。",
+          "situation": "镇将命你守住{{pass}}一翼，{{ally}}守相邻防区。你把本部、退来的残军与可用的守城力量安排到各自能承担的位置，让熟悉敌情的人带路，给有伤与失去主将的人安置。邻军保留自己的指挥，你与他们约定接应和撤回的范围，部众开始在战时共同生活。",
+          "outcome": {
+            "result": "关城各防区与援助职责已经落实，残军有了实际去处，主角与邻军形成能够执行的协同守御。"
+          }
+        },
+        {
+          "id": "war-first-battle",
+          "kind": "scene",
+          "entry": "接防与协同已经落实，敌军先锋尚未与这套守御实际交战。",
+          "situation": "敌军先锋进攻{{pass}}外围，你与{{companion}}、{{ally}}各自率部协同，守住首次冲击并接回城外百姓。写真实战斗、伤亡和盟友的主动行动。",
+          "outcome": {
+            "result": "你率部打退先锋并接回百姓，部众与邻军付出实际伤亡；这一场战斗已经结束，敌军主力继续向关城推进。"
+          }
+        },
+        {
+          "id": "war-rotation",
+          "kind": "life",
+          "entry": "首次交战已经结束，关城仍在守军手中，全面战争继续。",
+          "situation": "首战过后，各队轮换回城休整。你与{{companion}}照料实际负伤的同伍，家人和逃民在关内承担生活，{{ally}}重新部署本部，敌军主力则占住关外道路。补充、休养与家人往来维持着守军，围困改变了大家的日常。",
+          "outcome": {
+            "result": "首战后的伤亡与轮换已经处置，关城形成战时生活，敌我主力及围困格局进入实际故事；尚未替决战写出胜负。",
+            "endsFlow": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "decisive-frontier-war",
+      "actIds": [
+        "ancient.frontier-commander.frontier"
+      ],
+      "narrativeRole": "大战决胜",
+      "label": "守关与破敌",
+      "routing": "planned",
+      "assetRoles": ["pass", "home", "father", "mother", "river", "enemyCommander", "companion", "ally", "command", "spear", "bow", "armor", "banner", "blade"],
+      "entry": "全面战争已经展开，双方主力和战争利害已实际进入故事。",
+      "events": [
+        {
+          "id": "war-encirclement",
+          "kind": "scene",
+          "entry": "双方主力已经进入战场，本次围关截援尚未实际展开。",
+          "situation": "{{enemyCommander}}把主力推进{{pass}}外，分兵截住援路并攻取外围据点。你率部接回暴露在外的同伍，与{{ally}}在敌军压迫下保持联系。关内军民进入围守，邻军也有自己的防线和伤亡；你必须以实际还能调动的力量面对这场大战。",
+          "outcome": {
+            "result": "敌军已经形成围关截援的态势，主角和邻军保有的阵地、部众与互援通路明确，决战取舍有了实际处境。"
+          }
+        },
+        {
+          "id": "war-decision",
+          "kind": "choice",
+          "entry": "围困与截援已经实际形成，主角尚未裁定本次决战行动。",
+          "situation": "{{enemyCommander}}分兵围关、截断援路，{{ally}}愿意与你协同行动，城中军民正在承受围困。",
+          "question": "如何结束这场威胁边境的大战？",
+          "stakes": "你的部曲、关城军民、边境存亡与战后秩序。",
+          "check": {
+            "stat": "intelligence",
+            "difficulty": 34
+          },
+          "options": [
+            {
+              "id": "safe",
+              "label": "守关待援",
+              "action": "依托关城组织守御，与邻军维持援路，承受较长围困来保存军民。",
+              "success": {
+                "result": "你与邻军守住关城和互援通路，敌军久攻不下后退离关城，双方停战；城门、关墙和原有防区仍由守军控制，军民在关内生活。实际付出的伤亡构成这场守御的代价。"
+              },
+              "failure": {
+                "result": "关城外线被突破，你带军民退守第二道防线并促成停战；保住幸存部众，失去的外线和伤亡构成这场守御的结果。"
+              }
+            },
+            {
+              "id": "balanced",
+              "label": "断粮合击",
+              "action": "你率精兵切断敌军物资通道，由{{ally}}与守军合击其主力。",
+              "success": {
+                "result": "你切断敌军补给并与邻军完成合围，{{enemyCommander}}败退，失地收复；敌军主力离开边境，决战取得决定性胜利。"
+              },
+              "failure": {
+                "result": "断粮分队失利，你带残部退回关城，敌军夺去外围阵地，盟军也受重创；战争尚未落定，接下来必须面对最后防线的存亡。",
+                "endsFlow": true
+              }
+            },
+            {
+              "id": "risky",
+              "label": "深入敌后",
+              "action": "率精锐深入敌后袭击主帅营地，以主力失去接应的风险争取彻底击溃敌军。",
+              "success": {
+                "result": "你率部击破敌军主帐，与正面守军夹击使敌军崩溃；敌军撤走，边境收复，深入敌后的决战已经结束。"
+              },
+              "failure": {
+                "result": "深入敌后中伏，主力覆灭，你战死，{{pass}}随后陷落；军事冒险已经导致部曲与边境同时败亡。",
+                "endsFlow": true
+              }
+            }
+          ]
+        },
+        {
+          "id": "war-reckoning",
+          "kind": "settlement",
+          "entry": "决战已经使战争停下，主角存活，实际战果与损失已确定，战后军议尚未处理。",
+          "situation": "镇将召集战后军议，依据本次实际守住或收复的防区、存活部众与主角担负的职责处理功过。镇将有权安排本镇防务与军内奖惩，封爵与朝廷官爵不在其权限内。",
+          "rules": [
+            { "id": "war-frontier-secured", "condition": "敌军已经被击退，主要防区守住或收复，主角实际保有指挥部众与守边能力。", "disposition": "镇将确认主角此次守边战功，保留其偏将军职和实际负责的一翼防区，按现有部众重新安排驻防；受创邻军与阵亡者同样按实际功过得到军内奖恤。" },
+            { "id": "war-limited-peace", "condition": "已经停战，军民和部分部众得以保全，但原防区的一部分实际失守，撤回者仍需守住新防线。", "disposition": "镇将依实际退守范围缩减并重定主角防区，由其率现存部众驻守新线；失地、伤亡与护回军民的功过分别落定，未收复之地不作胜功。" }
+          ]
+        },
+        {
+          "id": "war-homecoming",
+          "lifeBefore": { "minYears": 2, "maxYears": 4, "context": "战争已经停下，军议后的驻防安排照常执行。你与实际幸存者生活在战后的边地，伤者休养，军民恢复日常。" },
+          "kind": "life",
+          "entry": "战争已经停下，战后军议已处理，主角存活且军职与驻防去向确定。",
+          "situation": "你回到军议实际交付的驻地，带着幸存部众恢复轮值。军民按守住、收复或失去家园的实际结果重建生活，家人与旧同伴也各有归宿；{{companion}}与{{ally}}承接自己的伤势、功劳和去向。你在和平后的日常里承担这场战争留下的收获与缺失。",
+          "outcome": {
+            "result": "大战、战后军职与军民安顿均有实际结果，主角与重要同伴在战后有了去处；守边事业已经得到回答。",
+            "endsFlow": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "last-frontier-line",
+      "actIds": [
+        "ancient.frontier-commander.frontier"
+      ],
+      "narrativeRole": "败势中的最终取舍",
+      "label": "最后防线",
+      "routing": "planned",
+      "assetRoles": ["pass", "home", "father", "mother", "enemyCommander", "companion", "ally", "command", "spear", "armor", "banner"],
+      "entry": "大战失利但主角与部众仍存活，军民尚有退路；核心战争结果尚未落定。",
+      "events": [
+        {
+          "id": "last-defense",
+          "kind": "choice",
+          "entry": "上一场大战已经失利，战争仍未结束，主角与残部尚能作出最后行动。",
+          "situation": "敌军逼近最后防线，剩余部众不足以兼顾所有地区，军民的最终存亡就在眼前。",
+          "question": "最后怎样处置部众与军民？",
+          "stakes": "幸存者的生命、最后防线与主角守边事业的归宿。",
+          "check": {
+            "stat": "physique",
+            "difficulty": 30
+          },
+          "options": [
+            {
+              "id": "safe",
+              "label": "护民撤守",
+              "action": "优先护送军民撤往可守地区，放弃无法保全的旧防区。",
+              "success": {
+                "result": "你带军民撤至可守地区，保住幸存部众并缔结停战；旧地失守，撤守结束。"
+              },
+              "failure": {
+                "result": "撤离通路被截断，你与部曲覆灭，大批军民被掳；守边事业与最后防线已经彻底败亡。",
+                "endsFlow": true
+              }
+            },
+            {
+              "id": "balanced",
+              "label": "合军坚守",
+              "action": "集合残军与邻军守住最后要塞，争取一次有条件停战。",
+              "success": {
+                "result": "联军击退攻城军并迫使敌人停战，敌军退离城下，最后要塞的城门与城墙仍由你和邻军控制，军民留在要塞安顿；此前失去的外围地区仍在敌手，最后守御结束。"
+              },
+              "failure": {
+                "result": "联军未能守住要塞，你失去部曲并死于守城，最后防线陷落，战争以失败结束。",
+                "endsFlow": true
+              }
+            },
+            {
+              "id": "risky",
+              "label": "决死反击",
+              "action": "亲率仅存精锐冲击敌军薄弱处，以全军覆灭的风险争取翻转战局。",
+              "success": {
+                "result": "反击打乱敌军，邻军乘势收复防线，{{enemyCommander}}被迫撤退；残存军民得救，最后反击取得实际胜利。"
+              },
+              "failure": {
+                "result": "最后反击失败，你与部曲战死，边境陷落；已经没有仍在继续的守边事业。",
+                "endsFlow": true
+              }
+            }
+          ]
+        },
+        {
+          "id": "last-defense-reckoning",
+          "kind": "settlement",
+          "entry": "最后行动已经结束战争，主角存活，战后功过尚未处理。",
+          "situation": "镇将依据最后防线实际保住、收复或放弃的地区，以及撤回军民与部众的情况，处理本次战后职权。主角承担此前失利和最后行动各自的实际结果。",
+          "rules": [
+            { "id": "last-defense-recovered", "condition": "最后反击已使敌军撤走，实际收复防线，主角仍有可指挥的部众。", "disposition": "镇将确认反击战功，仍由主角以偏将统领实际收复的一翼防区；此前牺牲与失利不被撤销，现存部众按实情安排驻防与军内奖恤。" },
+            { "id": "last-defense-preserved", "condition": "最后守御或撤退保住部分军民并达成停战，原有部分地区仍已失守。", "disposition": "镇将确认保全部众与军民的成果，将主角职权限定到实际守住的城堡与驻防地域，现存残军在已确定的驻地轮值；交还或此前失去的地区不在其职权内，先前败绩保留。" }
+          ]
+        },
+        {
+          "id": "last-defense-resettlement",
+          "lifeBefore": { "minYears": 2, "maxYears": 4, "context": "战争已经停下，你与实际幸存者在军议确定的驻地生活，承受已经落定的损失，逐渐恢复日常。" },
+          "kind": "life",
+          "entry": "最后行动与战后军议已经完成，主角存活，驻防去处已经确定。",
+          "situation": "幸存者在实际守住或收复的地区重新落脚。你随现有部众驻守，照料本次战争留下的伤者，面对没有归来的同伍和失去旧居的家庭；{{companion}}与{{ally}}各自承担真实战后处境，主角也接回还能继续的家庭生活。",
+          "outcome": {
+            "result": "幸存军民、残部与主角的战后去向已经落实，守边事业按实际保全、失地或收复得到最终结果。",
+            "endsFlow": true
+          }
+        }
+      ]
+    }
+  ]
+}

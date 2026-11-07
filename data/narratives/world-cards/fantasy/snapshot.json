@@ -77,7 +77,7 @@
       "title": "修行世界的凡俗日常",
       "kind": "culture",
       "contextRole": "knowledge",
-      "content": "灵田、药铺、道馆、商队、巡夜、祭仪和城防让修行进入普通生活。低阶能力首先用来治病、护路、辨污染、修器或争取生计；宏大异变也应通过粮价、失踪、迁徙、师徒和家庭被人感知。",
+      "content": "灵田、药铺、道馆、商队、巡夜、祭仪和城防让修行进入普通生活。低阶能力首先用来治病、护路、辨污染、修器或争取生计；异变会影响粮价、人口迁徙、师徒和家庭生活。",
       "priority": 60,
       "placement": "scenario",
       "activation": { "keys": ["凡人", "药铺", "道馆", "商队", "巡夜", "灵田", "生计"], "scanDepth": 4, "tasks": ["background", "planning", "horizon", "rendering", "dynamic"] },

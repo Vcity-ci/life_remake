@@ -21,7 +21,7 @@ export type NarrativeThreadStatus = "seeded" | "escalating" | "climax" | "resolv
 export type EndingPolarity = "good" | "normal" | "bad";
 export type NarrativeEndingState = "open" | "eligible" | "locked" | "guiding" | "finished";
 
-/** Persisted life-level verdict used to render a concise ending without replaying the full plot ledger. */
+/** Legacy save display data; v17 never generates or supplies this verdict. */
 export interface NarrativeEndingBrief {
   polarity: EndingPolarity;
   lifeTheme: string;
@@ -269,6 +269,8 @@ export interface NarrativeEventBinding {
  * requirements; each world supplies its own dramatic meaning.
  */
 export interface NarrativeMainlineActDefinition {
+  objective?: string;
+  closureMeaning?: string;
   entryRequirements?: Partial<Record<StatKey, number>>;
   id: string;
   label: string;
@@ -321,10 +323,11 @@ export interface NarrativeFactionDefinition {
 /** Compact, always-on truths that make one world recognisable without prescribing a plot. */
 export interface NarrativeWorldCore {
   identity: string;
-  laws: string[];
+  /** Only setting-specific rules belong here; a world need not supply abstract laws. */
+  laws?: string[];
   powerStructure: string;
   everydayLife: string;
-  tone: string;
+
 }
 
 /** Concrete forces that can create people and pressure in a run; they are not story routes. */
@@ -368,20 +371,14 @@ export interface NarrativeStoryPackActDefinition {
   }>;
   entryRequirements: Partial<Record<StatKey, number>>;
   payoffMeaning: string;
-  /** Causal duties for the five engine beats. They guide progression without fixing events, ages, NPCs or places. */
-  beatOutline: {
-    setup: string;
-    escalation: string;
-    pressure: string;
-    climax: string;
-    payoff: string;
-  };
   focusForceIds?: string[];
   /** World-owned cards that are especially useful in this act. References are recall hints, never gates. */
   worldCardRefs?: string[];
 }
 
 export interface NarrativeStoryPackEndingDirections {
+  /** Distinguishes a temporary setback from an already-established ending. */
+  closureBoundary?: string;
   good: string[];
   normal: string[];
   bad: string[];
@@ -418,6 +415,81 @@ export interface NarrativeStoryPackDefinition {
   worldCardRefs?: string[];
   acts: [NarrativeStoryPackActDefinition, NarrativeStoryPackActDefinition, NarrativeStoryPackActDefinition];
   endingDirections: NarrativeStoryPackEndingDirections;
+  /** Authored complete-event branches, loaded with this immutable IF snapshot. */
+  eventFlowId?: string;
+  eventFlow?: NarrativeEventFlowDefinition;
+}
+
+export interface NarrativeEventResult {
+  /** The concrete outcome to be expressed in the result prose. */
+  result: string;
+  grantItems?: string[];
+  consumeItems?: string[];
+  /** This result concludes the current event group; the observer selects what follows. */
+  endsFlow?: boolean;
+}
+
+export type NarrativeEventNode = {
+  entry?: string;
+  /** Ordinary life before this unit starts, independent of attribute admission. */
+  lifeBefore?: { minYears: number; maxYears: number; context: string };
+} & (
+  | { id: string; kind: "life" | "scene"; situation: string; outcome: NarrativeEventResult }
+  | { id: string; kind: "choice"; situation: string; question: string; stakes: string;
+      check: { stat: StatKey; difficulty: number };
+      options: Array<{ id: DecisionType; label: string; action: string;
+        success: NarrativeEventResult; failure: NarrativeEventResult }> }
+  | { id: string; kind: "settlement"; situation: string;
+      /** World procedures applied to actual history by the narrator, not the routing planner. */
+      rules: Array<{ id: string; condition: string; disposition: string;
+        grantItems?: string[]; consumeItems?: string[]; endsFlow?: boolean }> });
+
+export interface NarrativeEventFlowGroup {
+  id: string;
+  actIds: string[];
+  narrativeRole: string;
+  label: string;
+  /** Story applicability, interpreted by the act organizer and closure observer. */
+  entry: string;
+  requiresItems?: string[];
+  /** Checked only before this group begins; never interrupts an admitted group. */
+  entryRequirements?: Partial<Stats>;
+  preparation?: string;
+  assetRoles?: string[];
+  /** Route complete units by their applicability; there is no authored result-to-node tree. */
+  routing?: "planned";
+  events: NarrativeEventNode[];
+}
+
+export interface NarrativeEventFlowDefinition {
+  id: string;
+  revision: string;
+  roles: Array<{ id: string; kind: "character" | "location" | "item" | "ability"; identity: string; name?: string }>;
+  originRoles?: string[];
+  items: Array<{ id: string; roleId: string; description: string }>;
+  groups: NarrativeEventFlowGroup[];
+}
+
+/** Gameplay routing and inventory, independent of display asset maintenance. */
+export interface NarrativeEventFlowState {
+  actId: string;
+  flowId?: string;
+  eventIndex: number;
+  bindings: Record<string, string>;
+  completed: Array<{ sourceEventId: string; actId: string;
+    flowId: string; nodeId: string; outcome: string; age: number }>;
+  completedFlows: Array<{ flowId: string; sourceEventId: string; actId: string }>;
+  admittedFlows?: string[];
+  /** Chosen once for the selected unit. Kept until routing selects another unit. */
+  lifeInterval?: { actId: string; flowId: string; nodeId: string; fromAge: number; throughAge: number };
+  ending?: { sourceEventId: string; polarity: EndingPolarity; evidence: string };
+}
+
+export interface NarrativeEventFlowSource {
+  flowId: string;
+  eventIndex: number;
+  nodeId: string;
+  outcome: string;
 }
 
 /** Immutable per-run copy. New authoring revisions affect new lives only. */
@@ -471,13 +543,13 @@ export type NarrativeWorldCardKind =
   | "practice"
   | "conflict"
   | "consequence"
-  | "motif"
-  | "style_example";
+  | "motif";
 
 export type NarrativeWorldCardPlacement = "world" | "scenario" | "example" | "author_note";
 export type NarrativeWorldCardSelectiveLogic = "and_any" | "and_all" | "not_any" | "not_all";
 
 export type NarrativeWorldCardTask =
+  | "origin"
   | "background"
   | "planning"
   | "horizon"
@@ -495,7 +567,7 @@ export interface NarrativeWorldCardDefinition {
   title?: string;
   kind: NarrativeWorldCardKind;
   /** Authored use in context assembly; omitted entries are domain knowledge. */
-  contextRole?: "foundation" | "situation" | "knowledge" | "style";
+  contextRole?: "foundation" | "situation" | "knowledge";
   content: string;
   priority: number;
   /** Controls prompt proximity without changing activation. */
@@ -511,7 +583,6 @@ export interface NarrativeWorldCardDefinition {
     /** Number of recent committed prose turns scanned for text triggers. */
     scanDepth?: number;
     actIds?: string[];
-    beats?: NarrativeBeat[];
     routeIds?: string[];
     factionIds?: string[];
     factStatuses?: StoryFactStatus[];
@@ -660,6 +731,7 @@ export interface NarrativeWorldProgression {
   gates?: Partial<Record<NarrativeProgressGateStage, NarrativeStatGate>>;
   /** Act order follows the selected IF story; weights still come from the world gates. */
   actGateThresholds?: Array<Record<NarrativeProgressGateStage, number>>;
+  choiceDifficulties?: number[];
   routes?: NarrativeRouteProgression[];
   completion: NarrativeCompletionRule;
   growthFocuses?: NarrativeGrowthFocusDefinition[];
@@ -704,13 +776,11 @@ export interface NarrativeWorldDefinition {
   version: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
   worldId: WorldId;
   storyBible: string;
-  styleRules: string[];
   worldCore?: NarrativeWorldCore;
   socialForces?: NarrativeSocialForceDefinition[];
   narrativePalette?: NarrativePalette;
   storyPatterns?: NarrativeStoryPatternDefinition[];
-  /** World-owned closing texture for the final renderer. */
-  endingGuide?: string;
+
   opening?: NarrativeOpeningDefinition;
   mainlineSkeleton?: NarrativeMainlineSkeleton;
   progression?: NarrativeWorldProgression;
@@ -765,28 +835,29 @@ export interface NarrativeRouteProgress {
   lastEventId?: string;
 }
 
-/** A concrete planned chapter, not an additional per-turn instruction. */
-export interface NarrativeActOutlineNode {
-  change: string;
-  /** Objects needed for this change; descriptions are needs, not newly registered assets. */
-  props: string[];
-  /** Revisable life scheduling, never admission or automatic beat completion. */
-  timeframe?: { fromAge: number; toAge: number };
-}
-
-/** Planned story development. These nodes describe intentions, never committed facts. */
+/** Immutable act background and IF-owned development and closure standards. */
 export interface NarrativeActOutline {
   actId: string;
   revision: number;
-  /** The act's playable world background, composed once from setting and route material. */
-  background: string;
-  beats: Record<Exclude<NarrativeBeat, "ending">, NarrativeActOutlineNode>;
+  /** Authored rules selected at act preparation; text is copied by the engine. */
+  worldRules?: Array<{ id: string; title: string; text: string }>;
+  situation: string;
+  actors: Array<{ name: string; identity: string; goal: string; forces: string; relationships: string }>;
+  locations: Array<{ name: string; conditions: string; resources: string; obstacles: string; connections: string }>;
+  pressures: Array<{ source: string; condition: string; development: string }>;
+  stakes: string[];
+  objective: string;
+  closureMeaning: string;
+  /** Run-local names for authored roles; no future branch is an actual fact. */
+  flowBindings?: Array<{ roleId: string; name: string }>;
+  eventFlows?: { openingFlowId: string; availableFlowIds: string[] };
 }
 
-/** The only dramatic beat currently owned by the engine for a world act. */
+/** Current world act, admission and its immutable card. */
 export interface NarrativeActRuntime {
   actId: string;
-  beat: Exclude<NarrativeBeat, "ending">;
+  /** Read-only legacy snapshot field. New runs do not set a beat. */
+  beat?: Exclude<NarrativeBeat, "ending">;
   enteredAge: number;
   lastAdvancedAge: number;
   selectedRouteIds: string[];
@@ -821,6 +892,7 @@ export interface NarrativeDynamicCharacter {
   description?: string;
   condition?: string;
   pendingDetails?: boolean;
+  retired?: boolean;
   relatedFactIds: string[];
   relatedRouteIds: string[];
   relationship?: NarrativeCharacterRelationship;
@@ -847,10 +919,11 @@ export interface NarrativeLocation extends NarrativeAssetLinks {
   name: string;
   description?: string;
   pendingDetails?: boolean;
+  retired?: boolean;
   spatialDescription?: string;
   parentLocationId?: string;
-  features?: Array<{ name: string; state: string }>;
-  actors?: Array<{ characterIds?: string[]; factionId?: string; organizationName?: string; relation: string }>;
+  features?: Array<{ id?: string; name: string; state: string }>;
+  actors?: Array<{ id?: string; characterIds?: string[]; factionId?: string; organizationName?: string; relation: string }>;
   introduced: NarrativeAssetMoment;
   lastSeen: NarrativeAssetMoment;
 }
@@ -860,6 +933,7 @@ export interface NarrativeAbility extends NarrativeAssetLinks {
   name: string;
   description?: string;
   pendingDetails?: boolean;
+  retired?: boolean;
   usage?: string;
   source?: string;
   mastery?: string;
@@ -881,7 +955,10 @@ export interface PublicNarrativeAssets {
 
 /** Changes describe accomplished events, never the unselected consequences of a choice. */
 export interface NarrativeAssetUpdates {
-  locations: Array<{ ref: string; name?: string; pendingDetails?: boolean; description?: string; spatialDescription?: string; parentLocationId?: string; features?: NarrativeLocation["features"]; actors?: NarrativeLocation["actors"]; current?: boolean }>;
+  locations: Array<{ ref: string; name?: string; pendingDetails?: boolean; description?: string; spatialDescription?: string; parentLocationId?: string; features?: NarrativeLocation["features"]; actors?: NarrativeLocation["actors"]; current?: boolean;
+    featureChanges?: Array<{ id: string; name?: string; state?: string; remove?: boolean }>;
+    actorChanges?: Array<{ id: string; characterIds?: string[]; factionId?: string; organizationName?: string; relation?: string; remove?: boolean }>;
+  }>;
   abilities: Array<{ ref: string; name?: string; pendingDetails?: boolean; description?: string; usage?: string; source?: string; mastery?: string }>;
 }
 
@@ -890,6 +967,11 @@ export interface NarrativeIdentityMerge {
   kind: "character" | "location" | "ability";
   sourceRef: string;
   targetRef: string;
+}
+
+export interface NarrativeAssetRetirement {
+  kind: "character" | "location" | "ability";
+  ref: string;
 }
 
 /** Assets actually visited or used during one rendered turn; this is not an archive mutation. */
@@ -989,6 +1071,8 @@ export interface NarrativeMemoryDigest {
   coveredEpisodeIds: string[];
   /** Story age covered by this summary; independent of retained raw episodes. */
   throughAge?: number;
+  /** Start of this independently compressed period. */
+  fromAge?: number;
   /** The origin profile was supplied when this run summary was authored. */
   originCovered?: boolean;
   summary: string;
@@ -1035,7 +1119,7 @@ export interface NarrativeAgentAttemptRecord {
   factionId?: string;
   horizonRevision?: number;
   digestRevision?: number;
-  continuityStatus?: "skipped" | "requested_empty" | "requested_changed";
+  continuityStatus?: "skipped" | "requested_empty" | "requested_changed" | "failed";
   /** The immutable route, fact and world-card selection shared by settlement and rendering. */
   briefId?: string;
   focusIds?: string[];
@@ -1063,7 +1147,7 @@ export interface NarrativeSceneState {
 export interface ActiveNarrativeScene {
   id: string;
   threadId: string;
-  phase: Exclude<NarrativeBeat, "ending">;
+  phase?: Exclude<NarrativeBeat, "ending">;
   openedAge: number;
   lastTouchedAge: number;
   mainlineActId?: string;
@@ -1076,19 +1160,20 @@ export interface NarrativeSceneClock {
   maxSameAgeTurns: number;
 }
 
-/** One generated opening passage plus the compact facts that remain in model context. */
+/** Legacy opening metadata, retained only for reading old records. */
 export interface NarrativeOriginProfile {
   summary: string;
   seedHints: string[];
 }
 
-export interface NarrativeBeatObservation {
-  decision: "hold" | "advance";
+export interface NarrativeActObservation {
+  decision: "ongoing" | "act_closed" | "run_ended";
   evidence?: string;
-  missing?: string;
+  endingPolarity?: EndingPolarity;
+  lifeStatus?: "alive" | "dead";
+  deathCause?: string;
   actId: string;
-  beat: Exclude<NarrativeBeat, "ending">;
-  observedEpisodeId?: string;
+  sourceEventId: string;
   createdAt: number;
 }
 
@@ -1109,7 +1194,7 @@ export interface CompletedNarrativeScene {
 }
 
 export interface NarrativeRunState {
-  version: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
+  version: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 16 | 17 | 18 | 19 | 20;
   enabled: boolean;
   opening?: NarrativeOpeningState;
   arcPhase: NarrativeArcPhase;
@@ -1135,6 +1220,8 @@ export interface NarrativeRunState {
       actId?: string;
       subject: string;
       narrative: string;
+      relatedIds?: string[];
+      flowId?: string;
     }>;
   };
   memoryEntries: NarrativeMemoryEntry[];
@@ -1146,7 +1233,8 @@ export interface NarrativeRunState {
   memoryDigests: NarrativeMemoryDigest[];
   worldCardActivations?: NarrativeWorldCardActivationState[];
   horizonPlan?: NarrativeHorizonPlan;
-  lastBeatObservation?: NarrativeBeatObservation;
+  lastActObservation?: NarrativeActObservation;
+  eventFlow?: NarrativeEventFlowState;
   agentAttempts: NarrativeAgentAttemptRecord[];
   components: NarrativeComponentRunState[];
   activeCharacterIds: string[];
@@ -1245,7 +1333,6 @@ export interface WorldConfig {
   id: WorldId;
   name: string;
   intro: string;
-  stylePrompt: string;
   milestoneAges?: number[];
   endAgeRange: {
     min: number;
@@ -1546,7 +1633,7 @@ export interface YearEvent {
 
 export interface ChoiceCheck {
   id: string;
-  stat: Exclude<StatKey, "physique">;
+  stat: StatKey;
   value: number;
   threshold: number;
   actId?: string;

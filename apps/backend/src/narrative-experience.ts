@@ -35,8 +35,10 @@ export function resolveNarrativeExperience(
       id: act.id,
       label: act.label,
       entryRequirements: { ...act.entryRequirements },
+      objective: act.objective,
+      closureMeaning: act.payoffMeaning,
       prompt: [
-        `${act.objective} 本幕收束应体现：${act.payoffMeaning}`,
+        act.objective,
         focus.length ? `可优先关联的世界力量：${focus.join("、")}。` : ""
       ].filter(Boolean).join(" "),
       readinessStage: readinessStages[index]
@@ -64,7 +66,7 @@ export function resolveNarrativeExperience(
     // World cards belong to the world snapshot. Story packs may only reference
     // them, which prevents the same lore from being repeated in two modules.
     worldCards: [...(world.worldCards ?? [])],
-    endingGuide: [world.endingGuide, `所选人生路线：${storyPack.name}。${storyPack.routePromise}`].filter(Boolean).join(" "),
+
     endingBlueprints
   };
   return validateNarrativeWorldFactContract(resolved) as ResolvedNarrativeExperience;

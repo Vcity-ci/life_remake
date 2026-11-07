@@ -3,13 +3,13 @@
   "cards": [
     {
       "id": "ancient.domain.jianghu.mastery_rules",
-      "title": "师承、技艺与门规",
-      "kind": "practice",
+      "title": "师承、技艺与传承",
+      "kind": "world_rule",
       "contextRole": "knowledge",
-      "content": "武艺、医术、轻身、暗器与江湖手段都通过反复练习和师承规矩获得。真正掌握本领意味着知道何时使用、如何留手，以及违背门规要承担什么。",
+      "content": "武馆可以公开授艺，入门弟子由师父收授本门技艺；被指定的传承人取得传授本门核心技艺和承接门务的权利。出师表示能够独立执业，不自行取得对同门的指挥权；代掌门务或接任掌门由门内原有主持者交付。\n\n已经学会的武艺不因离门而消失。门规影响成员身份、共享资源和传授本门秘技的权利；不以组织认可代替个人已经具备的行动能力。",
       "priority": 74,
       "placement": "scenario",
-      "activation": { "keys": ["师承", "武艺", "门规", "练功", "暗器", "轻功"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] }
+      "activation": { "keys": ["师承", "武艺", "门规", "练功", "暗器", "轻功"], "scanDepth": 5, "tasks": ["origin", "planning"] }
     },
     {
       "id": "ancient.domain.jianghu.challenge_duel",
@@ -26,7 +26,7 @@
       "title": "护送、追踪与救援",
       "kind": "practice",
       "contextRole": "knowledge",
-      "content": "镖路、寻人、护送与救援把技艺放进道路、时限和同行者的安全中。敌友可能在途中转换，完成委托也未必等于守住受托之人的真正利益。",
+      "content": "镖路、寻人、护送与救援涉及沿途道路、时限和同行者的安全。途中各方立场可能改变。",
       "priority": 72,
       "placement": "scenario",
       "activation": { "keys": ["护送", "镖局", "追踪", "寻人", "救援", "委托"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] }
@@ -36,7 +36,7 @@
       "title": "寻仇、夺宝与旧债",
       "kind": "conflict",
       "contextRole": "knowledge",
-      "content": "旧仇、失传本领、藏宝与门派遗物会把私人欲望变成多人争夺。线索可能真实也可能被利用，人物必须判断复仇是否仍指向原来的责任，以及宝物会改变谁的力量。",
+      "content": "旧仇、失传本领、藏宝与门派遗物牵涉不同人的利益。争夺者会利用线索，宝物和本领的归属影响各方力量。",
       "priority": 75,
       "placement": "scenario",
       "activation": { "keys": ["寻仇", "复仇", "夺宝", "秘笈", "遗物", "藏宝"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] }

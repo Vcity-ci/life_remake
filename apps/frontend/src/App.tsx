@@ -200,8 +200,8 @@ export default function App(): React.JSX.Element {
   );
   const visibleAssets = turns.length ? turns[turns.length - 1].narrativeAssetsSnapshot : run?.narrativeAssets;
   const activeDecision = useMemo<MilestoneChoice | undefined>(() => (
-    run?.pendingChoice ? undefined : [...turns].reverse().find((turn) => turn.choice && !turn.choiceOutcome)?.choice ?? run?.nextMilestoneChoice
-  ), [turns, run?.nextMilestoneChoice, run?.pendingChoice]);
+    run?.pendingChoice || run?.survivalCrisis ? undefined : [...turns].reverse().find((turn) => turn.choice && !turn.choiceOutcome)?.choice ?? run?.nextMilestoneChoice
+  ), [turns, run?.nextMilestoneChoice, run?.pendingChoice, run?.survivalCrisis]);
   const showActiveDecision = Boolean(activeDecision && (phaseOf(run) === "waiting_decision" || isGenerating));
   const activeSurvivalCrisis: SurvivalCrisis | undefined = run?.survivalCrisis;
   const decisionHistory = useMemo<DecisionHistoryGroup[]>(() => {
@@ -1419,7 +1419,7 @@ export default function App(): React.JSX.Element {
                     {isGenerating ? <span>正在结算...</span> : null}
                   </div>
                   <p>{activeDecision.background ?? "你来到抉择时刻："}</p>
-                  {activeDecision.check ? <small>检定依据：{statLabels[activeDecision.check.stat]} {activeDecision.check.value} ／ 本节拍门槛 {activeDecision.check.threshold}</small> : null}
+                  {activeDecision.check ? <small>检定依据：{statLabels[activeDecision.check.stat]} {activeDecision.check.value} ／ 检定难度 {activeDecision.check.threshold}</small> : null}
                   <div className="decision-options">
                     {activeDecision.options.map((opt) => (
                       <button key={opt.id} disabled={isStreaming || isGenerating} onClick={() => void onDecision(opt.id)}><strong>{opt.label}</strong><small>{opt.description}</small>{opt.probability !== undefined ? <small>成功率 {(opt.probability * 100).toFixed(1)}%</small> : null}</button>

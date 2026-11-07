@@ -23,7 +23,7 @@ function unique(values: Array<string | undefined>): string[] {
   return Array.from(new Set(values.filter((value): value is string => Boolean(value))));
 }
 
-/** Records references only after engine settlement, memory and assets have all succeeded. */
+/** Record the settled story source; display maintenance can complete or retry afterwards. */
 export function commitNarrativeEpisode(run: InternalRunState, draft: NarrativeCommitDraft): NarrativeEpisodeRecord {
   const memoryId = `memory:${draft.sourceEventId}`;
   const memory = run.narrative.memoryEntries.find((entry) => entry.id === memoryId);

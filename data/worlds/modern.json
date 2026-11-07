@@ -3,7 +3,6 @@
     "id": "modern",
     "name": "现代都市",
     "intro": "从校园成长走向选择、关系与成就的当代人生。",
-    "stylePrompt": "写实、细节生活化，重视成长中的选择、关系与长期后果。",
     "milestoneAges": [18, 25, 33, 45],
     "endAgeRange": {
       "min": 68,

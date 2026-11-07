@@ -33,7 +33,7 @@ function record(index: number, overrides: Partial<TurnRecord>): TurnRecord {
 
 function plan(storyHistory: ReturnType<typeof buildNarrativeStoryHistory>): NarrativePromptPlan {
   return {
-    task: "rendering", storyHistory, storyBible: "世界背景", styleRules: [], activeLore: [], plotEssentials: [],
+    task: "rendering", storyHistory, storyBible: "世界背景", activeLore: [], plotEssentials: [],
     activeThreads: [], activeCharacters: [], scene: "村落", authorNote: "", ending: ""
   };
 }
@@ -91,17 +91,36 @@ test("追加经历保留此前原文前缀，最新处境标记置后，诊断�
   const before = composeNarrativeContext({ plan: currentPlan(), task: "rendering", taskPrompt: "本轮任务" });
   state.episodes.push(second);
   const after = composeNarrativeContext({ plan: currentPlan(), task: "rendering", taskPrompt: "本轮任务" });
-  const previousProse = before.runtimeContext.slice(0, before.runtimeContext.indexOf("【最新已提交处境】"));
-  assert.ok(after.runtimeContext.startsWith(previousProse), "新增经历不移走旧段落前的标记而改写历史前缀");
+  const previousProse = before.messages.find((message) => message.content.startsWith("【故事历史】"))!.content.slice(0, before.messages.find((message) => message.content.startsWith("【故事历史】"))!.content.indexOf("【最新已提交处境】"));
+  assert.ok(after.messages.find((message) => message.content.startsWith("【故事历史】"))!.content.startsWith(previousProse), "新增经历不移走旧段落前的标记而改写历史前缀");
   assert.equal(before.stableContext, after.stableContext);
   for (const request of [before, after]) {
     assert.equal(request.renderedContext, request.messages.map((message) => message.content).join("\n"));
-    assert.ok(request.renderedContext.indexOf(first.storyDelta!) < request.renderedContext.indexOf("本轮召回材料"));
-    assert.ok(request.renderedContext.indexOf("本轮召回材料") < request.renderedContext.indexOf("本轮任务"));
+    assert.ok(request.renderedContext.indexOf(first.storyDelta!) < request.renderedContext.indexOf("本轮任务"));
+    assert.ok(!request.renderedContext.includes("本轮召回材料"));
     assert.equal(request.renderedContext.split(first.storyDelta!).length - 1, 1);
-    assert.ok(request.runtimeContext.endsWith("【最新已提交处境】见以上最后一段。"));
+    assert.ok(request.messages.find((message) => message.content.startsWith("【故事历史】"))!.content.endsWith("【最新已提交处境】见以上最后一段。"));
   }
-  assert.ok(after.runtimeContext.indexOf(second.storyDelta!) < after.runtimeContext.indexOf("【最新已提交处境】"));
+  assert.ok(after.messages.find((message) => message.content.startsWith("【故事历史】"))!.content.indexOf(second.storyDelta!) < after.messages.find((message) => message.content.startsWith("【故事历史】"))!.content.indexOf("【最新已提交处境】"));
+});
+
+test("结局取得同一份完整历史，不接收继续最后一场戏的最新处境标记", () => {
+  const episodes = [episode(1), episode(2), episode(3)];
+  const storyHistory = buildNarrativeStoryHistory({ episodes,
+    memoryDigests: [digest([episodes[0].id], "你已从军，开始带队。") ] });
+  const protagonist = { identity: "STABLE_PERSONA", currentState: "ONGOING_TRAINING_STATE" };
+  const rendering = composeNarrativeContext({ plan: { ...plan(storyHistory), protagonist }, task: "rendering", taskPrompt: "继续" });
+  const ending = composeNarrativeContext({ plan: { ...plan(storyHistory), protagonist, task: "ending" }, task: "ending", taskPrompt: "评价本局" });
+  for (const result of [rendering, ending]) {
+    assert.equal(result.renderedContext.split("你已从军，开始带队。").length - 1, 1);
+    assert.deepEqual(result.manifest.fragments.filter((entry) => entry.sourceType === "story-change").map((entry) => entry.sourceIds[0]),
+      episodes.slice(1).map((entry) => entry.id));
+  }
+  assert.match(rendering.renderedContext, /最新已提交处境/);
+  assert.doesNotMatch(ending.renderedContext, /最新已提交处境/);
+  assert.match(rendering.activeContext, /ONGOING_TRAINING_STATE/);
+  assert.doesNotMatch(ending.renderedContext, /ONGOING_TRAINING_STATE/);
+  assert.equal(ending.stableContext, rendering.stableContext);
 });
 
 test("历史去重依据已提交正文的精确身份，不因同龄、近似文本或只有用户消息而遗漏", () => {
@@ -152,17 +171,18 @@ test("角色背景由成功压缩替换原文，最新面板独立置后且保�
   const state = { episodes: [first, second], memoryDigests: [] as NarrativeMemoryDigest[] };
   const currentPlan = () => ({ ...plan(buildNarrativeStoryHistory(state, records)), protagonist: { identity: "", currentState: "当前年龄：1岁。当前能力基础：体魄=健壮。" }, origin: "边镇出生" });
   const before = composeNarrativeContext({ plan: currentPlan(), task: "rendering", taskPrompt: "写2岁的生活", conversation: conversation([first]) });
-  assert.match(before.runtimeContext, /玩家已选行动：先救人/);
-  assert.ok(before.runtimeContext.indexOf(first.storyDelta) < before.runtimeContext.indexOf("玩家已选行动：先救人"));
-  assert.ok(before.runtimeContext.indexOf("玩家已选行动：先救人") < before.runtimeContext.indexOf(second.storyDelta));
-  assert.match(before.runtimeContext, /同年返回营地/);
-  assert.doesNotMatch(before.runtimeContext, /当前年龄/);
+  assert.match(before.messages.find((message) => message.content.startsWith("【故事历史】"))!.content, /玩家已选行动：先救人/);
+  assert.ok(before.messages.find((message) => message.content.startsWith("【故事历史】"))!.content.indexOf(first.storyDelta) < before.messages.find((message) => message.content.startsWith("【故事历史】"))!.content.indexOf("玩家已选行动：先救人"));
+  assert.ok(before.messages.find((message) => message.content.startsWith("【故事历史】"))!.content.indexOf("玩家已选行动：先救人") < before.messages.find((message) => message.content.startsWith("【故事历史】"))!.content.indexOf(second.storyDelta));
+  assert.match(before.messages.find((message) => message.content.startsWith("【故事历史】"))!.content, /同年返回营地/);
+  assert.doesNotMatch(before.messages.find((message) => message.content.startsWith("【故事历史】"))!.content, /当前年龄/);
   assert.match(before.activeContext, /当前年龄：1岁/);
   assert.equal(before.historyMessages.length, 0);
   state.memoryDigests = [digest([first.id], "为救同袍放走追兵，因此被调往后营。")];
   const after = composeNarrativeContext({ plan: currentPlan(), task: "rendering", taskPrompt: "写2岁的生活" });
-  assert.match(after.stableContext, /为救同袍放走追兵/);
-  assert.doesNotMatch(after.runtimeContext, /救人还是追击|玩家已选行动：先救人/);
+  assert.match(after.messages.find((message) => message.content.startsWith("【故事历史】"))!.content, /为救同袍放走追兵/);
+  assert.doesNotMatch(after.stableContext, /为救同袍放走追兵/);
+  assert.doesNotMatch(after.messages.find((message) => message.content.startsWith("【故事历史】"))!.content, /救人还是追击|玩家已选行动：先救人/);
   assert.match(after.activeContext, /当前年龄：1岁/);
   assert.deepEqual(after.manifest.fragments.filter((entry) => entry.sourceType === "story-change").map((entry) => entry.sourceIds[0]), [second.id]);
 });
@@ -189,11 +209,11 @@ test("抉择情景、玩家已选行动和同年实际结果组成历史，未�
   for (const task of ["background", "rendering", "decision"] as const) {
     const request = composeNarrativeContext({ plan: { ...plan(history), task }, task, taskPrompt: "继续" });
     for (const text of [prose, background, "玩家已选行动：先救同袍", consequence]) {
-      assert.equal(request.runtimeContext.split(text).length - 1, 1);
+      assert.equal(request.messages.find((message) => message.content.startsWith("【故事历史】"))!.content.split(text).length - 1, 1);
     }
-    assert.ok(request.runtimeContext.indexOf(background) < request.runtimeContext.indexOf("玩家已选行动：先救同袍"));
-    assert.ok(request.runtimeContext.indexOf("玩家已选行动：先救同袍") < request.runtimeContext.indexOf(consequence));
-    assert.doesNotMatch(request.runtimeContext, /召来援手|全力追击|丢下伤员|可选行动/);
+    assert.ok(request.messages.find((message) => message.content.startsWith("【故事历史】"))!.content.indexOf(background) < request.messages.find((message) => message.content.startsWith("【故事历史】"))!.content.indexOf("玩家已选行动：先救同袍"));
+    assert.ok(request.messages.find((message) => message.content.startsWith("【故事历史】"))!.content.indexOf("玩家已选行动：先救同袍") < request.messages.find((message) => message.content.startsWith("【故事历史】"))!.content.indexOf(consequence));
+    assert.doesNotMatch(request.messages.find((message) => message.content.startsWith("【故事历史】"))!.content, /召来援手|全力追击|丢下伤员|可选行动/);
     assert.equal(request.historyMessages.length, 0);
   }
   assert.equal(restored.records[0].choice!.options.length, 3);

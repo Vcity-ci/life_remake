@@ -38,13 +38,6 @@
       "label": "相知",
       "objective": "建立一段足以改变人物生活安排的重要关系。",
       "payoffMeaning": "双方形成了愿意继续投入的关系与共同记忆。",
-      "beatOutline": {
-        "setup": "让一段相遇或既有关系显露改变人物生活的可能。",
-        "escalation": "通过共同经历、坦白与试探建立真实了解。",
-        "pressure": "让家庭经验、个人边界与现实安排考验靠近的意愿。",
-        "climax": "让双方对是否继续投入作出可观察的行动。",
-        "payoff": "确认关系形式、共同记忆与仍需学习面对的差异。"
-      },
       "worldCardRefs": [
         "modern.snapshot.family_care",
         "modern.snapshot.housing_and_mobility",
@@ -72,13 +65,6 @@
       "label": "相守",
       "objective": "在住处、工作、金钱、家庭和未来计划中实践承诺。",
       "payoffMeaning": "关系形成了可持续结构，或诚实地改变了原有形式。",
-      "beatOutline": {
-        "setup": "让住处、工作、金钱或家庭计划要求关系进入日常责任。",
-        "escalation": "通过协商分工、共同选择与冲突修复建立生活结构。",
-        "pressure": "让事业、双方家庭与个人愿望无法同时满足。",
-        "climax": "让人物完成一次决定关系能否持续的承诺或边界行动。",
-        "payoff": "固定可持续的关系结构，或诚实交代双方选择的新形式。"
-      },
       "worldCardRefs": [
         "modern.snapshot.housing_and_mobility",
         "modern.snapshot.transition_2027",
@@ -106,13 +92,6 @@
       "label": "相伴",
       "objective": "让关系面对疾病、照料、代际变化、远行或重大人生转折。",
       "payoffMeaning": "人物最终形成了关于爱、家庭与陪伴的完整答案。",
-      "beatOutline": {
-        "setup": "让疾病、照料、代际变化或远行检验长期关系。",
-        "escalation": "召回共同生活积累并让双方重新协商未来。",
-        "pressure": "迫使人物在自我生活、责任、失去与陪伴间取舍。",
-        "climax": "让人物完成一项定义此后家庭与关系的最终行动。",
-        "payoff": "交代陪伴方式、家庭形态、个人归宿与这段关系留下的意义。"
-      },
       "worldCardRefs": [
         "modern.snapshot.transition_2027",
         "modern.snapshot.family_care",
@@ -137,6 +116,7 @@
     }
   ],
   "endingDirections": {
+    "closureBoundary": "一次争吵、分离或关系形式改变不等于坏结局；控制、失信或推卸责任已使重要关系与自我破裂时可提前坏结局。关系虽有遗憾但仍有承担属于普通结局。",
     "good": [
       "建立有边界、有照料也允许彼此成长的长期关系",
       "即使关系形式改变，仍保有诚实、尊重与共同承担"

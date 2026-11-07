@@ -1,72 +1,74 @@
-import type { NarrativeActOutline, NarrativeBeat, NarrativeRunState } from "@reroll/shared";
+import type { NarrativeActOutline, NarrativeRunState } from "@reroll/shared";
+import { z } from "zod";
 
-export type NarrativeActBeat = Exclude<NarrativeBeat, "ending">;
-export const NARRATIVE_ACT_OUTLINE_BEATS: NarrativeActBeat[] = ["setup", "escalation", "pressure", "climax", "payoff"];
+const actHostingMaterialsSchema = z.object({
+  situation: z.string().trim().min(1),
+  actors: z.array(z.object({ name: z.string().min(1), identity: z.string().min(1), goal: z.string().min(1), forces: z.string().min(1), relationships: z.string().min(1) }).strict()),
+  locations: z.array(z.object({ name: z.string().min(1), conditions: z.string().min(1), resources: z.string().min(1), obstacles: z.string().min(1), connections: z.string().min(1) }).strict()),
+  pressures: z.array(z.object({ source: z.string().min(1), condition: z.string().min(1), development: z.string().min(1) }).strict()),
+  stakes: z.array(z.string().min(1)),
+  flowBindings: z.array(z.object({ roleId: z.string().min(1), name: z.string().min(1) }).strict()).optional(),
+  eventFlows: z.object({ openingFlowId: z.string().min(1), availableFlowIds: z.array(z.string().min(1)).min(1) }).strict().optional()
+}).strict();
+
+export const actPreparationSchema = actHostingMaterialsSchema.extend({
+  worldRuleRefs: z.array(z.string().trim().min(1))
+}).strict();
+
+const worldRuleSnapshotsSchema = z.array(z.object({
+  id: z.string().min(1), title: z.string().min(1), text: z.string().min(1)
+}).strict());
 
 export function narrativeOutlinePurpose(outline: NarrativeActOutline | undefined): "initial" | "execute" {
   return outline ? "execute" : "initial";
 }
 
-type OutlineNode = NarrativeActOutline["beats"][NarrativeActBeat];
-
-function record(value: unknown): Record<string, unknown> | undefined {
-  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : undefined;
-}
-
-function normalizeNode(value: unknown): OutlineNode | undefined {
-  const raw = record(value);
-  const change = typeof raw?.change === "string" ? raw.change.trim() : "";
-  if (!change || !Array.isArray(raw?.props) || raw.props.some((prop) => typeof prop !== "string" || !prop.trim())) return undefined;
-  const node: OutlineNode = { change, props: raw.props.map((prop: string) => prop.trim()) };
-  if (raw?.timeframe !== undefined && raw.timeframe !== null) {
-    const range = record(raw.timeframe);
-    if (!range || !Number.isInteger(range.fromAge) || !Number.isInteger(range.toAge) ||
-        Number(range.fromAge) < 0 || Number(range.toAge) < Number(range.fromAge)) return undefined;
-    node.timeframe = { fromAge: Number(range.fromAge), toAge: Number(range.toAge) };
-  }
-  return node;
-}
-
 export function normalizeNarrativeActOutline(value: unknown, actId?: string): NarrativeActOutline | undefined {
-  const raw = record(value);
-  const id = typeof raw?.actId === "string" ? raw.actId.trim() : "";
-  const background = typeof raw?.background === "string" ? raw.background.trim() : "";
-  const beats = record(raw?.beats);
-  if (!id || !background || (actId !== undefined && id !== actId) || !Number.isInteger(raw?.revision) || Number(raw?.revision) < 1 || !beats) return undefined;
-  const nodes = {} as NarrativeActOutline["beats"];
-  for (const beat of NARRATIVE_ACT_OUTLINE_BEATS) {
-    const node = normalizeNode(beats[beat]);
-    if (!node) return undefined;
-    nodes[beat] = node;
-  }
-  return { actId: id, revision: Number(raw!.revision), background, beats: nodes };
+  if (!value || typeof value !== "object" || Array.isArray(value)) return;
+  const raw = value as Record<string, unknown>;
+  if (typeof raw.actId !== "string" || !raw.actId.trim() || (actId !== undefined && raw.actId !== actId) ||
+      !Number.isInteger(raw.revision) || Number(raw.revision) < 1) return;
+  const preparation = actHostingMaterialsSchema.safeParse(Object.fromEntries(["situation", "actors", "locations", "pressures", "stakes", "flowBindings", "eventFlows"].map((key) => [key, raw[key]])));
+  if (!preparation.success || ["objective", "closureMeaning"].some((key) => typeof raw[key] !== "string" || !(raw[key] as string).trim())) return;
+  const rules = raw.worldRules === undefined ? undefined : worldRuleSnapshotsSchema.safeParse(raw.worldRules);
+  if (rules && !rules.success) return;
+  return { ...preparation.data, actId: raw.actId, revision: Number(raw.revision),
+    ...(rules?.success ? { worldRules: rules.data } : {}),
+    objective: raw.objective as string, closureMeaning: raw.closureMeaning as string };
 }
 
-/** Compose once per act. Choices change actual history rather than rewriting the card. */
-export function parseNarrativeActWorldCard(value: unknown, actId: string): NarrativeActOutline {
-  const outline = normalizeNarrativeActOutline({ ...record(value), actId, revision: 1 }, actId);
-  if (!outline) throw new Error("narrative_act_outline_invalid:background_and_five_beats_required");
-  return outline;
+/** Only hosting materials are model-authored; IF standards remain the authority. */
+export function parseNarrativeActWorldCard(
+  value: unknown, actId: string, standards: { objective: string; closureMeaning: string },
+  availableRules: NonNullable<NarrativeActOutline["worldRules"]> = []
+): NarrativeActOutline {
+  const raw = value && typeof value === "object" ? value as Record<string, unknown> : {};
+  const materials = actPreparationSchema.safeParse(raw);
+  if (!materials.success) throw new Error("narrative_act_outline_invalid:hosting_materials_required");
+  const ruleById = new Map(availableRules.map((rule) => [rule.id, rule]));
+  const { worldRuleRefs, ...hosting } = materials.data;
+  const worldRules = Array.from(new Set(worldRuleRefs)).map((id) => {
+    const rule = ruleById.get(id);
+    if (!rule) throw new Error("narrative_act_outline_invalid:world_rule_reference_invalid:" + id);
+    return { ...rule };
+  });
+  const card = normalizeNarrativeActOutline({ ...hosting, worldRules, ...standards, actId, revision: 1 }, actId);
+  if (!card) throw new Error("narrative_act_outline_invalid:hosting_materials_required");
+  return card;
 }
 
 export function commitNarrativeActOutline(state: NarrativeRunState, outline: NarrativeActOutline): void {
-  if (state.actRuntime?.actId === outline.actId) state.actRuntime.outline = structuredClone(outline);
+  if (state.actRuntime?.actId === outline.actId && !state.actRuntime.outline) state.actRuntime.outline = structuredClone(outline);
 }
 
-export function formatNarrativeActOutline(outline: NarrativeActOutline | undefined, currentBeat: NarrativeActBeat): string {
+/** Stable, role-specific projection; actual developments belong to history. */
+export function formatNarrativeActOutline(outline: NarrativeActOutline | undefined, includeClosure = false): string {
   if (!outline) return "";
-  return [`本幕世界卡：\n${outline.background}`, formatNarrativeActStory(outline, currentBeat)].join("\n");
-}
-
-export function formatNarrativeActStory(outline: NarrativeActOutline, currentBeat: NarrativeActBeat): string {
-  const current = NARRATIVE_ACT_OUTLINE_BEATS.indexOf(currentBeat);
-  return [
-    "本幕简要故事：实际经历与玩家决定是当前处境；以下节拍承接选定冲突，实际应对、成败与所得由游戏产生，已改变的条件不恢复。",
-    ...NARRATIVE_ACT_OUTLINE_BEATS.slice(current).map((beat, index) => {
-      const node = outline.beats[beat];
-      const status = index === 0 ? "当前阶段" : "未发生阶段";
-      const timeframe = node.timeframe ? `\n计划年龄：${node.timeframe.fromAge}—${node.timeframe.toAge}岁（参考安排，实际年龄以当前主角为准）` : "";
-      return `${beat}【${status}】应形成的改变：${node.change}\n所需对象：${node.props.join("；") || "按实际发展引入"}${timeframe}`;
-    })
-  ].join("\n");
+  return [outline.worldRules?.length ? "本幕适用的世界规则（幕初原文；此后的实际变化见故事历史）：\n" +
+      outline.worldRules.map((rule) => rule.title + "：" + rule.text).join("\n\n") : "",
+    "本幕起始局势与主持资料（开幕条件；此后的实际变化见故事历史）：\n" + outline.situation,
+    "行动方：" + JSON.stringify(outline.actors), "关键地点：" + JSON.stringify(outline.locations),
+    "持续压力：" + JSON.stringify(outline.pressures), "所涉利益：" + JSON.stringify(outline.stakes),
+    "本幕发展方向：" + outline.objective,
+    includeClosure ? "本幕收束含义：" + outline.closureMeaning : ""].filter(Boolean).join("\n");
 }

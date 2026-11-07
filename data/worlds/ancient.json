@@ -3,7 +3,6 @@
     "id": "ancient",
     "name": "古代王朝",
     "intro": "门第、礼法与权势交织的古典时代。",
-    "stylePrompt": "文风克制，重礼制、仕途、家国责任与名节。",
     "milestoneAges": [15, 20, 30, 40],
     "endAgeRange": {
       "min": 50,

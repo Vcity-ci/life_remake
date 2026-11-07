@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
+import { hostingFixture } from "./hosting-fixture.js";
 import test from "node:test";
 import type { DifficultyConfig, WorldConfig, NarrativeActOutline } from "@reroll/shared";
 import { createDefaultGameplayTuning } from "@reroll/shared";
 import { createRun, appendPublicTurnRecord, toClientRun, dynamicBackgroundAttributePolicy, type InternalRunState } from "../engine.js";
-import { ensureNarrativeActRuntime, ensureNarrativeRunState, refreshNarrativeActAdmission, narrativeActDeficits, advanceNarrativeActBeat, isNarrativeWorldStageReady, buildNarrativePromptPlan } from "../narrative.js";
+import { ensureNarrativeActRuntime, ensureNarrativeRunState, refreshNarrativeActAdmission, narrativeActDeficits, advanceNarrativeAct, isNarrativeWorldStageReady, buildNarrativePromptPlan } from "../narrative.js";
 import { loadNarrativeWorldDefinition } from "../content.js";
 import { loadNarrativeStoryPack, loadNarrativeStoryPacksForWorld } from "../story-packs.js";
 import { resolveNarrativeExperience } from "../narrative-experience.js";
@@ -15,7 +16,7 @@ import { stepRunSchema } from "../schema.js";
 import { composeNarrativeContext } from "./context/orchestrator.js";
 import type { NarrativeTurnEnvelope } from "./turn.js";
 
-const world: WorldConfig = { id: "ancient", name: "古代", intro: "边境", stylePrompt: "主持", milestoneAges: [], endAgeRange: { min: 100, max: 100 }, yearlyEventHints: [] };
+const world: WorldConfig = { id: "ancient", name: "古代", intro: "边境", milestoneAges: [], endAgeRange: { min: 100, max: 100 }, yearlyEventHints: [] };
 const difficulty: DifficultyConfig = { id: "test", name: "测试", description: "测试", yearlyVolatility: 0, growthBias: 0, riskRewardMultiplier: 1, failurePenaltyMultiplier: 1 };
 
 async function fixture(worldId = "ancient", packId = "ancient.frontier-commander") {
@@ -34,8 +35,7 @@ async function fixture(worldId = "ancient", packId = "ancient.frontier-commander
 }
 
 function outline(run: InternalRunState): NarrativeActOutline {
-  return parseNarrativeActWorldCard({ background: "敌方斥候正在探查关门，巡哨长辈能接应报信。", beats: Object.fromEntries(
-    ["setup", "escalation", "pressure", "climax", "payoff"].map((beat) => [beat, { change: `敌情与守军的实际处境发生改变：${beat}`, props: ["斥候", "巡哨长辈"], timeframe: null }])) }, run.narrative.actRuntime!.actId);
+  return parseNarrativeActWorldCard(hostingFixture("敌方斥候正在探查关门，巡哨长辈能接应报信。"), run.narrative.actRuntime!.actId, { objective: "守边", closureMeaning: "危机落定" });
 }
 
 function deferred<T>() {
@@ -74,7 +74,7 @@ test("关键属性不能互相抵消；达标后降属性和推进节拍不撤�
   run.narrative = ensureNarrativeRunState(JSON.parse(JSON.stringify(run.narrative)), true, 12);
   for (const beat of ["opening", "escalation", "pressure", "climax"] as const) assert.equal(isNarrativeWorldStageReady(run, definition, beat), true);
   run.narrative.actRuntime!.beat = "payoff";
-  run.narrative = advanceNarrativeActBeat(run.narrative, definition, 13).state;
+  run.narrative = advanceNarrativeAct(run.narrative, definition, 13).state;
   assert.equal(run.narrative.actRuntime!.admittedAtAge, undefined);
   assert.equal(refreshNarrativeActAdmission(run, definition), false);
   assert.equal(run.narrative.actRuntime!.outline, undefined);
@@ -135,7 +135,7 @@ test("缓冲两次即等待；查询不启动任务，失败重试和保存恢�
   assert.equal(applyActPreparationResult(run, actId, retryToken, outline(run)), true);
   assert.equal(actPreparationMode(run), "ready");
   run.narrative.actRuntime!.beat = "payoff";
-  run.narrative = advanceNarrativeActBeat(run.narrative, definition, run.age).state;
+  run.narrative = advanceNarrativeAct(run.narrative, definition, run.age).state;
   assert.equal(run.narrative.actRuntime!.preparation, undefined);
   assert.equal(applyActPreparationResult(run, actId, retryToken, outline(run)), false);
   assert.ok(stepRunSchema.safeParse({ runId: run.runId, action: "prepare_act" }).success);
@@ -167,16 +167,16 @@ test("未就绪的普通生活不调用规划；准备输入有不足项与流�
   run.narrative.actRuntime!.growthFocusId = run.narrative.actRuntime!.growthFocusOptions![1].id;
   assert.deepEqual(buildNarrativePromptPlan(run, definition, null, "rendering")!.protagonist, protagonistParts(run));
   assert.equal(toClientRun(run).protagonistIntroduction, protagonistIntroduction(run));
-  assert.ok(protagonistIntroduction(run).includes(run.narrative.opening!.profile!.summary));
+  assert.equal(Object.hasOwn(run.narrative.opening!, "profile"), false);
   const record = appendPublicTurnRecord(run, { entryId: "origin", age: 0, ageStage: { label: "幼年" }, kind: "origin", narrative: "你出生了。", statChanges: {} });
   const shown = record.protagonistIntroductionSnapshot;
   run.age = 30; run.stats.physique = 60;
   assert.equal(toClientRun(run).protagonistIntroduction, shown);
-  const prompt = dynamicNarrativeRenderPrompt({ act: envelope.act, beat: "setup", presentation: "summary", sceneAge: 3,
+  const prompt = dynamicNarrativeRenderPrompt({ act: envelope.act, presentation: "summary", sceneAge: 3,
     allowedTurnKinds: ["background"], backgroundAttributePolicy: dynamicBackgroundAttributePolicy(run),
     backgroundAgeRange: { fromAge: 1, toAge: 3 }, storyPatterns: [], socialForces: [], knownCharacters: [], statTiers: envelope.statTiers,
     growthFocus: { label: "协作互助", description: "通过合作学习" }, preparation: { mode: "prepare", deficits: [{ stat: "physique", label: "体魄", value: 5, target: 9 }] } }, 0);
   assert.ok(prompt.includes("体魄（现有5，所需9）"));
   assert.ok(protagonistParts(run).currentState.includes(run.narrative.actRuntime!.growthFocusOptions![1].description));
-  assert.ok(prompt.includes("1-3岁"));
+  assert.ok(prompt.includes("1—3岁"));
 });

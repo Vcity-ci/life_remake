@@ -1,7 +1,7 @@
 {
   "version": 1,
   "id": "ancient.court-minister",
-  "revision": "1.3.0",
+  "revision": "1.3.1",
   "worldId": "ancient",
   "name": "庙堂权臣",
   "tagline": "从入仕门径走入权力核心，决定辅政、摄政还是取而代之。",
@@ -37,13 +37,6 @@
       "label": "入局",
       "objective": "取得可以持续参与政务的职位、名望或政治关系。",
       "payoffMeaning": "人物获得真实的仕途入口和第一批政治资产。",
-      "beatOutline": {
-        "setup": "让人物看见朝局中的真实利益与进入庙堂的机会。",
-        "escalation": "通过施政、进言或结盟获得第一项职位与政治关系。",
-        "pressure": "让君命、派系立场与个人原则产生现实冲突。",
-        "climax": "让人物在一项政务或宫廷争端中公开承担立场与后果。",
-        "payoff": "确认人物的政治位置、盟友与对手，并留下继续入局的权责。"
-      },
       "worldCardRefs": [
         "ancient.snapshot.jingyuan_reform",
         "ancient.snapshot.central_figures",
@@ -71,13 +64,6 @@
       "label": "执衡",
       "objective": "经营门生故吏、财政军政或宫廷联盟，成为不可忽略的权力中心。",
       "payoffMeaning": "人物能够影响重要任命、政策或军政决定。",
-      "beatOutline": {
-        "setup": "让既有职位带来必须经营的派系、政策或宫廷关系。",
-        "escalation": "通过合纵连横、任用人才或推动政令建立权力网络。",
-        "pressure": "让盟友诉求、政策代价与君主疑心彼此冲突。",
-        "climax": "让人物主导一次改变朝局的施政、罢黜、廷争或权力反制。",
-        "payoff": "固定人物的中枢地位，并交代由此树立的政治秩序与宿敌。"
-      },
       "worldCardRefs": [
         "ancient.snapshot.central_figures",
         "ancient.snapshot.local_society",
@@ -105,13 +91,6 @@
       "label": "临极",
       "objective": "面对皇权反制、摄政、受禅或退让，决定最高权力的归属。",
       "payoffMeaning": "人物与皇权的最终关系及其制度后果得到回答。",
-      "beatOutline": {
-        "setup": "让皇权反制或政权危机从既有派系格局中发生。",
-        "escalation": "使人物调动门生、军政资源和公共名望争夺最终主动。",
-        "pressure": "迫使人物在忠诚、制度、亲近之人与自身权位间明确取舍。",
-        "climax": "让人物完成一次决定最高权力归属的公开政治行动。",
-        "payoff": "交代政权安排、制度遗产、主要关系与人物最终政治身份。"
-      },
       "worldCardRefs": [
         "ancient.snapshot.local_society",
         "ancient.snapshot.jingyuan_reform",
@@ -136,6 +115,7 @@
     }
   ],
   "endingDirections": {
+    "closureBoundary": "一次失宠、退让或罢职不等于覆灭；实际清算、背叛或失序已经终结政治道路时可提前坏结局。退居而保住部分政治成果属于普通结局。",
     "good": [
       "长期辅政或完成权力交接，使家族与制度获得稳定延续",
       "个人能力与政治成果相互印证"
@@ -149,6 +129,7 @@
     ]
   },
   "worldCardRefs": [
+    "ancient.domain.court.audience_appointment",
     "ancient.snapshot.jingyuan_reform",
     "ancient.snapshot.central_figures",
     "ancient.snapshot.local_society"

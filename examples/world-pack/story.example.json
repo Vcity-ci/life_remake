@@ -2,17 +2,11 @@
   "version": 10,
   "worldId": "my_world",
   "storyBible": "说明这个世界是什么、哪些力量影响日常，以及人物可以拥有多大的故事尺度。这里只定义世界，不预写玩家必走的剧情。",
-  "styleRules": [
-    "以第二人称写具体环境、人物行动和选择后果。",
-    "尊重人物人设、年龄、天赋和已经发生的经历。",
-    "普通岁月可以平静；关键场景应改变关系、能力、处境或责任。"
-  ],
+
   "worldCore": {
-    "identity": "这个世界不可替代的身份。",
-    "laws": ["世界规律一", "世界规律二", "世界规律三"],
+    "identity": "填写已有素材中的时代、地域与共同制度。",
     "powerStructure": "资源、力量和决定权由谁掌握。",
-    "everydayLife": "普通人怎样学习、工作、生活和往来。",
-    "tone": "叙事质感与允许出现的情绪尺度。"
+    "everydayLife": "普通人怎样学习、工作、生活和往来。"
   },
   "socialForces": [
     { "id": "my_world.community", "label": "共同体", "summary": "提供归处，也会提出责任。", "methods": ["支持", "约束", "交换"], "tensions": ["个人与共同体"] },
@@ -24,7 +18,7 @@
     "actionVocabulary": ["观察", "学习", "交涉", "行动", "拒绝", "承担"],
     "scalePossibilities": ["个人生活", "家庭与伙伴", "组织与地域", "世界性变化"]
   },
-  "endingGuide": "以人物实际留下的关系、成果、生活方式和代价评价这一生。",
+
   "opening": { "earlyLife": { "maxAge": 3 } },
   "worldCards": [],
   "progression": {

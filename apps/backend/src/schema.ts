@@ -87,7 +87,6 @@ const worldSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
   intro: z.string().min(1),
-  stylePrompt: z.string().min(1),
   milestoneAges: z.array(z.number().int().min(1).max(120)).min(1).optional(),
   endAgeRange: z.object({
     min: z.number().int().min(20).max(120),
@@ -329,14 +328,12 @@ const gameplayTuningSchema = z.object({
 });
 
 const promptPackSchema = z.object({
-  systemCore: z.string().min(1),
-  immersionRules: z.string().min(1),
   yearNormalRule: z.string().min(1),
   yearMinorRule: z.string().min(1),
   milestoneRule: z.string().min(1),
-  storyConstraint: z.string().min(1),
-  endingHint: z.string().min(1)
-}).catchall(z.string());
+  userInputGuardRule: z.string().min(1),
+  restrictedContentRule: z.string().min(1)
+}).strip();
 
 export const contentBundleSchema: z.ZodType<ContentBundle> = z.object({
   worlds: z.array(worldSchema).min(1),

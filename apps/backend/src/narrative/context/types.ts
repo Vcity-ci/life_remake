@@ -8,15 +8,14 @@ export type NarrativeContextSection =
   | "persona"
   | "protagonist"
   | "talents"
-  | "seedHints"
-  | "origin"
+
+
   | "world"
   | "worldSituation"
   | "actWorld"
   | "mainline"
   | "route"
   | "lore"
-  | "styleExamples"
   | "authorNote"
   | "characters"
   | "factDirectory"
@@ -112,7 +111,7 @@ export interface NarrativeContextProvider {
 }
 
 export interface NarrativeContextComposeInput {
-  planningPurpose?: "initial" | "execute";
+  planningPurpose?: "initial" | "execute" | "continuation";
   plan?: NarrativePromptPlan;
   task: NarrativeTask;
   taskPrompt: string;

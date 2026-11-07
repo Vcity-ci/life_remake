@@ -36,7 +36,7 @@
       "title": "改天后的世界",
       "kind": "consequence",
       "contextRole": "knowledge",
-      "content": "打破天命或旧规则会重新分配力量、风险与自由。真正的收束不仅说明人物是否超脱，还要呈现普通人、盟友、敌人和后来者如何生活在新规则之下。",
+      "content": "打破天命或旧规则会重新分配力量、风险与自由。普通人、盟友、敌人和后来者都受新规则影响。",
       "priority": 78,
       "placement": "scenario",
       "activation": { "keys": ["改天", "新规则", "超脱", "后来者", "天道", "世界改变"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] }

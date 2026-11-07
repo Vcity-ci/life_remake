@@ -1,8 +1,7 @@
 import { randomUUID } from "node:crypto";
 import seedrandom from "seedrandom";
-import type { ChoiceCheck, ChoiceRoll, DecisionType, NarrativeWorldDefinition } from "@reroll/shared";
+import type { ChoiceCheck, ChoiceRoll, DecisionType, NarrativeWorldDefinition, StatKey } from "@reroll/shared";
 import type { InternalRunState } from "./engine.js";
-import { resolveNarrativeStageGate } from "./narrative.js";
 
 export function choiceProbability(value: number, threshold: number, risk: number): number {
   const ratio = Math.max(0, value) / threshold;
@@ -10,20 +9,20 @@ export function choiceProbability(value: number, threshold: number, risk: number
   return opportunity + risk === 0 ? 0 : opportunity / (opportunity + risk);
 }
 
-export function prepareChoiceCheck(run: InternalRunState, world: NarrativeWorldDefinition): ChoiceCheck {
+export function prepareChoiceCheck(run: InternalRunState, world: NarrativeWorldDefinition, authored?: { stat: StatKey; difficulty: number }): ChoiceCheck {
   const id = `choice:${randomUUID()}`;
   const stats = ["family", "intelligence", "charisma", "fortune"] as const;
   const rng = seedrandom(`${run.seed}:${id}:attribute`);
-  const stat = stats[Math.floor(rng() * stats.length)]!;
-  const beat = run.narrative.actRuntime?.beat ?? "setup";
-  const stage = beat === "setup" ? "opening" : beat === "payoff" ? "climax" : beat;
-  const gate = resolveNarrativeStageGate(run, world, stage);
-  if (!gate || !Number.isFinite(gate.threshold) || gate.threshold <= 0) throw new Error("decision_gate_missing");
+  const stat = authored?.stat ?? stats[Math.floor(rng() * stats.length)]!;
+  const actId = run.narrative.actRuntime?.actId;
+  const actIndex = world.mainlineActs?.findIndex((act) => act.id === actId) ?? -1;
+  const threshold = authored?.difficulty ?? world.progression?.choiceDifficulties?.[actIndex];
+  if (!threshold || !Number.isFinite(threshold)) throw new Error("decision_difficulty_missing");
   return {
-    id, stat, value: run.stats[stat], threshold: gate.threshold,
-    actId: run.narrative.actRuntime?.actId, beat,
+    id, stat, value: run.stats[stat], threshold: threshold,
+    actId,
     probabilities: Object.fromEntries((["safe", "balanced", "risky"] as const).map((decision) => [
-      decision, choiceProbability(run.stats[stat], gate.threshold, run.tuningSnapshot.decision.profiles[decision].risk)
+      decision, choiceProbability(run.stats[stat], threshold, run.tuningSnapshot.decision.profiles[decision].risk)
     ])) as ChoiceCheck["probabilities"]
   };
 }
@@ -46,9 +45,3 @@ export function rollChoice(run: InternalRunState, decision: DecisionType): Choic
 export function canOpenChoiceSurvival(check: ChoiceCheck, roll: ChoiceRoll): boolean {
   return roll.decision === "risky" && !roll.success && check.value < check.threshold / 2;
 }
-
-export const choiceRewardGuide: Record<DecisionType, string> = {
-  safe: "稳健：争取有限成果或保全核心，失败承担较小损失或错失机会。",
-  balanced: "适中：争取正常推进和处境改善，失败承担中等代价。",
-  risky: "冒险：争取突破或关键机会，失败可能失去重要筹码。"
-};

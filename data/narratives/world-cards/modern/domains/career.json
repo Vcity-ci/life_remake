@@ -26,7 +26,7 @@
       "title": "扩张、管理与控制权",
       "kind": "institution",
       "contextRole": "knowledge",
-      "content": "业务扩张会带来招聘、流程、资金、质量和管理责任。创始人、骨干、投资者或组织高层对速度与方向可能意见不同，控制权必须以现实决策呈现。",
+      "content": "业务扩张会带来招聘、流程、资金、质量和管理责任。创始人、骨干、投资者或组织高层对速度与方向可能意见不同，控制权体现于实际决策权限。",
       "priority": 76,
       "placement": "scenario",
       "activation": { "keys": ["扩张", "管理", "招聘", "融资", "控制权", "流程"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] }

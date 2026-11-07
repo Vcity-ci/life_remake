@@ -1,4 +1,4 @@
-import { NARRATIVE_ABILITY_DEFINITION, type NarrativeTask } from "../narrative-prompts.js";
+import type { NarrativeTask } from "../narrative-prompts.js";
 
 export type NarrativeTaskIdentity = "planner" | "adjudicator" | "writer" | "extractor" | "curator";
 export type NarrativeInteractionState = "none" | "choice_pending" | "choice_resolved" | "ending_pending" | "ending_locked";
@@ -18,31 +18,34 @@ const identities: Record<NarrativeTask, NarrativeTaskIdentity> = {
   closure: "adjudicator", ending: "writer"
 };
 
-const instructions: Record<NarrativeTaskIdentity, string> = {
-  planner: "你组织游戏主持所需的材料，不写玩家正文。",
-  writer: "你是这一回合的人生叙事游戏主持人，以第二人称讲述。依据本幕选定的局势，推演行动与各方反应；各方有自己的目标和依靠，主角的状态与能力决定如何应对。玩家决定主角的重要行动与取舍。人物、地点和本领是行动条件，用它们推动故事，不介绍档案。历史承接已经形成的处境，实际结果优先于尚未发生的安排。",
-  adjudicator: "依据本次提供的实际经历与规则，通过工具提交判断。",
-  extractor: "你是叙事状态的维护者，不是作者。本批正文已经发生，你只使状态表与它一致。只写现在是什么，不转写动作、对话或经过；字段用状态话表达。只提交因本批正文改变的值，未变或判断不了的字段省略。新对象先登记身份和已知现状，资料不足保留 pendingDetails，不推测来历、用法或评价。",
-  curator: "将上一版记忆与新增的已发生正文贯通压缩，以重要年龄区间概括人物主要经历和因果，取代所覆盖原文。保留重要结果和仍在持续的问题，合并重复过程，不逐岁缩写，也不另行维护资产档案。"
+const host = "你是人生叙事游戏的主持人。依据本幕局势、当前人物和实际历史继续故事，推演主角行动、各方主动行动及其后果。需要玩家决定一件完整事件的关键取舍时，调用 render_choice_prose 并等待回答。";
+const duties: Partial<Record<NarrativeTask, string>> = {
+  origin: "写出符合这条 IF 入口的出生环境与家庭，给出一件相关实物和一条社会关系。天赋影响行事方式，不替换家庭身份与生计。停在出生时。",
+  background: "按给定年龄或区间写人物的日常生活，允许平静与积累。",
+  rendering: host,
+  dynamic: host,
+  decision: "依据已选行动和确定的检定结果，裁定并结束这次事件。",
+  ending: "用一段简短的文字总结并评价本局人生。",
+  continuity: "对照本批实际对话，判断相关对象是否仍有持续作用，并维护其现状。只提交真正改变的字段、条目或关系；合并同一身份，撤下没有持续作用的登记。未变或无依据的内容省略，不转写经过。",
+  curation: "将这一时期的正文压缩成简短的大事记，供后续续写。用两三句话概括重要转折与已经落定的结果，省略日常动作、对话和办理过程。不补充原文没有的事实。",
+  observation: "依据本幕目的、收束含义及 IF 整体方向与结局标准，判断实际历史应继续当前幕（ongoing）、结束本幕进入下一幕（act_closed），还是整局已经形成结局（run_ended）。收束提交实际结果依据；整局结束同时提交结局等级。局部受挫不自动判负，已经符合结局标准的实际结果也不因未来仍可能翻盘而强行继续。未来安排不是已发生的证据，最后一幕收束须同时判断整局结局。",
+  settlement: "根据本轮最终正文与属性规则提取实际变化。"
 };
 
-const registration = `${NARRATIVE_ABILITY_DEFINITION}正文涉及的新人物、地点、本领仅登记 ID 与名称；已有对象沿用目录完整 ID。assetActivity 记录实际抵达的地点和使用的本领；currentLocationId 或新地点的 current 标明停留位置。详情由连续性同步依据正文整理，无操作数组填 []。`;
-const routing: Partial<Record<NarrativeTask, string>> = {
-  planning: `幕初从素材选定本局具体局势与五节拍。幕内只依据本幕世界卡与实际进展召回资产和知识、交接时间。${NARRATIVE_ABILITY_DEFINITION}已有对象原样复制完整 ID，名称和说明用于理解；缺少时可提出用途。`,
-  origin: `${registration} 你在给这条 IF 线布置入口，不是写人物传记。家庭身份、生计与关系必须使进入第一幕核心场合可信。给出一件与本线相关的实物和一条社会关系作为后续把手；普通实物通过人物现状或地点设施承接，宝物沿用本领登记。天赋只影响做事方式，不替换家庭的社会位置和生计。停在出生时。`,
-  background: `${registration} 按给定年龄写这个世界中的日常生活。允许平静、安稳的一年。`,
-  rendering: `${registration} 围绕本轮承接的冲突，写清行动、各方回应与改变后的处境，再停在新处境或待选行动前。一轮可有连续动作，不必完成整拍。遇到需要玩家决定的重要行动或取舍，调用 render_choice_prose，不能替玩家回答。抉择应有真实后果；只有实际存在时才写期限。`,
-  dynamic: registration,
-  decision: `${registration} 写已选行动的实际结果，落实后果。`,
-  continuity: `sync_narrative_continuity 提交一个参数对象，无变化数组填 []。人物的身份、阵营、处境和关系维护当前值；地点维护性质、空间、设施资源与关联方现状；本领维护当前作用和使用条件，技艺另记简短熟练程度，宝物不填熟练程度；来历仅留简要信息。${NARRATIVE_ABILITY_DEFINITION} 事件仅登记持续事项、有效限制或重要结果，同一事项复用 ID，持续用 stay，实际结束用 finish。使用与到访只留活动记录，不自动建事件。未变字段省略；明确解除才用空字符串或 []。语义重复通过 identityMerges 保留一个 ID 后更新整合状态。pendingDetails 在本批实际揭示所需资料后才改为 false，不能为填满资料而补写。`,
-  observation: "只判断本拍的改变在实际正文里发生了没有。发生则 advance 并引正文作证；未发生则 hold 并说明缺少的反应、条件或代价。局部事情告一段落不等于本拍完成。成功、失败或付出代价都可能完成一拍。不要评价文笔或规划下一步。",
-  settlement: "仅根据本轮最终正文与属性规则结算实际变化。"
-};
-
-export function narrativeTaskContract(task: NarrativeTask): NarrativeTaskContract {
+export function narrativeTaskContract(task: NarrativeTask, planningPurpose?: "initial" | "execute" | "continuation", eventFlow = false, presetAssets = false): NarrativeTaskContract {
   const identity = identities[task];
+  let duty = task === "planning"
+    ? planningPurpose === "initial"
+      ? "依据 IF 素材与实际历史，为本幕准备可运行的局势。确定行动方的目的、力量和关系，组织关键地点、持续压力及所涉利益。压力说明无人干预时的世界发展；玩家行动与结果由实际游戏产生。"
+      : "从目录选择与当前局势相关的对象和知识引用。没有相关材料可以为空，无需安排剧情。"
+    : duties[task] ?? "依据本次实际材料与规则提交判断。";
+  if (eventFlow && task === "planning" && planningPurpose === "initial") duty = "依据 IF 素材组织本幕人物、地点、压力与利益。实际历史用于承接已形成的处境；压力来自各方目的、力量与既定局势。从人工事件组中选出本幕可用的组和开场组，绑定角色名称。事件组内的行动与结果骨架由素材提供，不另写事件树。";
+  if (task === "planning" && planningPurpose === "continuation") duty = "依据已提交结果与当前处境，从候选素材选择接续的事件单元或事件组。只提交路由身份，不改写材料、不裁定奖惩、不重新判断收束。";
+  if (eventFlow && (task === "rendering" || task === "dynamic")) duty = "你是人生叙事游戏的主持人。依据本幕局势、当前人物和实际历史，讲述本段事件中主角与各方的行动。已给定的本段结果由这次正文落实；开放抉择时停在玩家作答前。";
+  if (eventFlow && task === "observation") duty = "依据实际历史、本幕目的与收束标准判断整幕结果，事件组结束不等于本幕收束。尚未收束返回 ongoing；本幕结果已成立且还有下一幕时返回 act_closed；整局已符合 IF 结局标准时返回 run_ended，并确认结局等级与主角生死。";
+  if (presetAssets && task === "continuity") duty = "对照新增实际对话，只整理本批候选中的预设资产。记录它们已经改变的现状；没有出现或没有变化的对象省略，不整理经过，不增加候选以外的资产。";
   return { task, identity, usesNarratorVoice: identity === "writer",
     producesPlayerProse: identity === "writer",
     memoryAccess: identity === "extractor" ? "read_delta" : identity === "curator" ? "summarize" : "read",
-    systemInstruction: [instructions[identity], routing[task]].filter(Boolean).join("\n") };
+    systemInstruction: identity === "writer" ? `${duty}以第二人称“你”叙述玩家人物。` : duty! };
 }

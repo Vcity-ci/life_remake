@@ -13,16 +13,17 @@ export const relationshipStances = ["friendly", "guarded", "hostile", "indebted"
 export class NarrativeContinuityValidationError extends Error {
   constructor(readonly rule: string, readonly path: string) { super(rule); }
 }
-const factKinds = ["open_question", "stake", "commitment", "cost", "relationship_change", "experience"] as const;
+const factKinds = ["open_question", "stake", "commitment", "cost"] as const;
+const storedFactKinds = [...factKinds, "relationship_change", "experience"] as const;
 
 export function isNarrativeFactModelMutable(id: string): boolean {
   return id.startsWith("dynamic:") || id.startsWith("carry:") || /^act:.+:continuation$/.test(id);
 }
 
 /** The directory offered for maintenance uses the same ownership rule as the update contract. */
-export function narrativeContinuityFacts(facts: StoryFactRecord[], actId?: string): StoryFactRecord[] {
+export function narrativeContinuityFacts(facts: StoryFactRecord[], _actId?: string, involvedIds: readonly string[] = []): StoryFactRecord[] {
   return facts.filter((fact) => isNarrativeFactModelMutable(fact.id) && fact.status !== "blocked" &&
-    (fact.status === "open" || fact.actId === actId));
+    (fact.status === "open" || involvedIds.includes(fact.id)));
 }
 
 export function normalizeNarrativeHandoffFact(fact: StoryFactRecord): StoryFactRecord {
@@ -52,8 +53,8 @@ export function factUpdateContract(factIds: string[], sources: Array<NarrativeEv
       ...sourceProperty,
       ...linkProperties,
       factId: { type: "string", description: "使用本轮可更新事项中给出的事实 ID。" },
-      status: { type: "string", enum: ["stay", "finish"], description: "经历仍在持续为 stay；已经发生并结束为 finish，作为背景结果，不再待办。" },
-      summary: { type: "string", minLength: 1, description: "整合后的当前进展或实际结果，替换该事项原有表述，不追加逐年过程。" }
+      status: { type: "string", enum: ["stay", "finish"], description: "该 ID 的原事项仍待回答为 stay，已有实际结果为 finish；关联事项未结束不等于原事项未结束。" },
+      summary: { type: "string", minLength: 1, description: "只填写该事项的现状或结果，不吸收旁支任务，不记录办理经过。" }
     }
   }};
   return {
@@ -61,9 +62,9 @@ export function factUpdateContract(factIds: string[], sources: Array<NarrativeEv
     schema: {
       type: "object", additionalProperties: false,
       required: ["introduce", "updates"],
-      description: "维护需要独立保留的经历或事件；同一事项复用 ID，持续为 stay，结束为 finish。已结束事件可完善结果，不重新开放。已体现在人物、地点、本领字段中的变化不重复摘录成事件；普通使用、到访不自动建档。无变化填空数组。",
+      description: "仍有效的事项、承诺、限制或结果。同一事项复用 ID，无变化填空数组。",
       properties: {
-        introduce: { type: "array", items: {
+        introduce: { type: "array", description: "本批首次成立、超出当前现场仍有持续作用的未决事项、承诺、限制或伏笔。已有事项的变化使用 factUpdates；‘下一步怎么办’本身不是新事项。短期口头指示和已发生经历保留在正文，人物关系由关系字段维护。", items: {
           type: "object", additionalProperties: false, required: ["kind", "label", "status", "sourceEventId"],
           properties: { ...sourceProperty, ...linkProperties, kind: { type: "string", enum: factKinds }, label: { type: "string", minLength: 1 }, status: { type: "string", enum: ["stay", "finish"] }, priority: { type: "integer", minimum: 1, maximum: 4 } }
         }},
@@ -128,9 +129,9 @@ export function parseFactUpdates(raw: unknown, contract: ReturnType<typeof factU
   return {
     introduce: rows(source.introduce).map((entry) => {
       const row = object(entry), kind = text(row.kind);
-      if (!factKinds.includes(kind as typeof factKinds[number])) throw new Error("fact_kind_invalid");
+      if (!(stored ? storedFactKinds : factKinds).includes(kind as typeof factKinds[number])) throw new Error("fact_kind_invalid");
       if (row.priority !== undefined && (typeof row.priority !== "number" || !Number.isInteger(row.priority) || row.priority < 1 || row.priority > 4)) throw new Error("fact_priority_invalid");
-      return { kind: kind as typeof factKinds[number], label: text(row.label), priority: row.priority as number | undefined, ...(row.status !== undefined ? { status: state(row.status) } : {}), ...provenance(row), ...links(row), ...(typeof row.id === "string" ? { id: row.id } : {}) };
+      return { kind: kind as typeof storedFactKinds[number], label: text(row.label), priority: row.priority as number | undefined, ...(row.status !== undefined ? { status: state(row.status) } : {}), ...provenance(row), ...links(row), ...(typeof row.id === "string" ? { id: row.id } : {}) };
     }),
     touchFactIds: refs(source.touchFactIds, contract.factIds),
     resolveFactIds: refs(source.resolveFactIds, contract.mutableIds),
@@ -144,14 +145,14 @@ export function relationshipUpdatesSchema(_characterIds: string[]) {
     type: "object", additionalProperties: false, required: ["characterRef"],
     properties: {
       characterRef: { type: "string", description: "使用本轮可更新人物中给出的角色 ID。" },
-      pendingDetails: { type: "boolean", description: "资料不足保留 true；本批实际揭示必要身份与状态后才提交 false，省略保留。" },
+      pendingDetails: { type: "boolean", description: "已知资料不足，不代表必须补齐。省略保留。" },
       factionId: { type: "string", description: "当前所属阵营变化时填写本轮社会力量 ID；空字符串表示退出原阵营，省略保持最新归属。" },
       stance: { type: "string", enum: relationshipStances, description: "对主角的当前态度，变化时提交；与其他字段独立更新，省略保持最新值。" },
       summary: { type: "string", description: "与主角现在是什么关系，仅写关系状态，不转写交往经过。省略保留，空字符串清除。" },
       role: { type: "string", description: "当前身份或职位。省略保留，空字符串清除。" },
       status: { type: "string", enum: ["active", "resolved", "gone"], description: "人物仍在场、交往告一段落或已离场（包括死亡）。" },
       condition: { type: "string", description: "影响当前行动的个人处境，例如受伤、被扣押、失踪。省略保留，空字符串清除。" },
-      description: { type: "string", description: "人物的稳定特征；已知来历只留简要身份信息，不追加经历。省略保留，空字符串清除。" }
+      description: { type: "string", description: "稳定身份与特征。省略保留，空字符串清除。" }
     }
   }};
 }

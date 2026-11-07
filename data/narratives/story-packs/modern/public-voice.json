@@ -38,13 +38,6 @@
       "label": "发声",
       "objective": "围绕一个切身问题完成第一次有效表达或集体行动。",
       "payoffMeaning": "人物获得了真实回应，也进入了需要持续承担的公共关系。",
-      "beatOutline": {
-        "setup": "让一项切身问题使人物意识到私人忍耐已无法解决。",
-        "escalation": "通过调查、表达、求助或组织完成第一次有效行动。",
-        "pressure": "让机构回应、他人顾虑与个人风险考验继续发声。",
-        "climax": "让人物推动一次能获得真实回应的公共行动。",
-        "payoff": "确认协作者、对话对象与需要长期承担的公共关系。"
-      },
       "worldCardRefs": [
         "modern.snapshot.platform_reputation",
         "modern.snapshot.transition_2027",
@@ -72,13 +65,6 @@
       "label": "共事",
       "objective": "与不同立场的人建立协作，使诉求转化为可执行的改变。",
       "payoffMeaning": "人物不再只是表达者，而成为能推动现实进程的人。",
-      "beatOutline": {
-        "setup": "让初次回应暴露更复杂的利益与执行难题。",
-        "escalation": "通过协商、组织和公开沟通把诉求转化为方案。",
-        "pressure": "让不同立场、舆论误解与协作者分歧同时出现。",
-        "climax": "让人物推动一项改变现实进程的集体决定。",
-        "payoff": "固定合作机制、公共位置与人物必须负责的实际结果。"
-      },
       "worldCardRefs": [
         "modern.snapshot.transition_2027",
         "modern.snapshot.education_channels",
@@ -106,13 +92,6 @@
       "label": "担责",
       "objective": "让公共影响面对一次重大争议、危机或权力检验。",
       "payoffMeaning": "人物的公共角色及其实际影响获得长期评价。",
-      "beatOutline": {
-        "setup": "让重大争议或危机检验人物多年积累的公共信用。",
-        "escalation": "调动组织、制度渠道与公众沟通形成最终应对。",
-        "pressure": "迫使人物在效果、原则、盟友与私人代价间取舍。",
-        "climax": "让人物完成决定其公共角色与现实影响的行动。",
-        "payoff": "交代制度变化、受影响者、公共评价与人物回归的生活。"
-      },
       "worldCardRefs": [
         "modern.snapshot.education_channels",
         "modern.snapshot.platform_reputation",
@@ -137,6 +116,7 @@
     }
   ],
   "endingDirections": {
+    "closureBoundary": "一次争论失利、项目受阻或妥协不等于公共道路失败；失信已摧毁公共信任或长期冲突已耗尽自己并伤害保护对象时可提前坏结局。留下有限实际改变属于普通结局。",
     "good": [
       "以可靠行动建立公共信任并留下可持续改变",
       "在拥有影响力后仍尊重事实、程序与具体的人"

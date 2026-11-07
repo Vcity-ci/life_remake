@@ -6,7 +6,7 @@
       "title": "力量会留下痕迹",
       "kind": "world_rule",
       "contextRole": "foundation",
-      "content": "力量通过气息、体感、环境变化、施法步骤与事后损耗显现。功法、秘术和境界由本局生成并保持一致；强大不等于无代价，使用本领会改变局势、身体、关系或因果。",
+      "content": "力量通过气息、体感、环境变化、施法步骤与事后损耗显现。强大不等于无代价，使用本领会改变局势、身体、关系或因果。",
       "priority": 98,
       "activation": {
         "tasks": [
@@ -24,7 +24,7 @@
       "title": "未知之物自有规律",
       "kind": "world_rule",
       "contextRole": "foundation",
-      "content": "诡异、异族与禁地拥有自身规律、欲求和生存方式，不只是等待击杀的道具。人物先从迹象、禁忌、受害者或环境认识它们，再决定交涉、躲避、利用、封禁或对抗。",
+      "content": "诡异、异族与禁地拥有自身规律、欲求和生存方式，不只是等待击杀的道具。迹象、禁忌、受害者和环境能揭示其规律，为交涉、躲避、利用、封禁或对抗提供条件。",
       "priority": 95,
       "activation": {
         "tasks": [
@@ -103,7 +103,7 @@
       "title": "异族并非同一阵营",
       "kind": "faction",
       "contextRole": "knowledge",
-      "content": "不同异族拥有亲缘、语言、迁徙路线、领地和内部争执。边境冲突可能来自生存空间、资源、旧盟约或彼此误解，同族人物也会有相反选择；敌对者可以令人畏惧，但不能只作为没有生活的战斗目标。",
+      "content": "不同异族拥有亲缘、语言、迁徙路线、领地和内部争执。边境冲突可能来自生存空间、资源、旧盟约或彼此误解，同族人物也会有相反选择，敌对群体也有各自的生活。",
       "priority": 87,
       "placement": "scenario",
       "activation": {
@@ -163,7 +163,7 @@
       "title": "术法交锋的过程",
       "kind": "practice",
       "contextRole": "knowledge",
-      "content": "交锋由判断距离、护住要害、试探规则、调动本领和承受反击构成。阵法、法器、地形、同伴与敌人的目的都会改变局势；一击可以扭转场面，但胜负还要落实为伤势、退路、俘获、失去或新的立场。",
+      "content": "交锋由判断距离、护住要害、试探规则、调动本领和承受反击构成。阵法、法器、地形、同伴与敌人的目的都会改变局势；一击可以扭转场面，但胜负会改变伤势、退路、俘虏归属和各方立场。",
       "priority": 92,
       "placement": "scenario",
       "activation": {
@@ -248,64 +248,6 @@
         ]
       },
       "cooldownTurns": 3
-    },
-    {
-      "id": "fantasy.example.background",
-      "title": "奇幻普通人生段节奏",
-      "kind": "style_example",
-      "contextRole": "style",
-      "content": "此后几年，你在日常修习、谋生与行旅中逐渐理解这方世界。力量未必每年突飞猛进，但感官、本领、关系或对危险的认识会留下清楚变化，让下一次遭遇有了可以依靠的积累。",
-      "priority": 84,
-      "placement": "example",
-      "activation": {
-        "tasks": [
-          "background"
-        ]
-      },
-      "inclusionGroup": "fantasy.style.turn",
-      "cooldownTurns": 2
-    },
-    {
-      "id": "fantasy.example.choice",
-      "title": "奇幻抉择场景节奏",
-      "kind": "style_example",
-      "contextRole": "style",
-      "content": "你收住脚步，重新看向眼前的局势。几条路各有不同，下一步由你决定。",
-      "priority": 88,
-      "placement": "example",
-      "activation": {
-        "tasks": [
-          "rendering",
-          "dynamic"
-        ],
-        "beats": [
-          "pressure",
-          "climax"
-        ]
-      },
-      "inclusionGroup": "fantasy.style.turn",
-      "cooldownTurns": 2
-    },
-    {
-      "id": "fantasy.example.payoff",
-      "title": "奇幻收束节奏",
-      "kind": "style_example",
-      "contextRole": "style",
-      "content": "通过身体、关系、场所与秩序中的具体变化呈现力量与选择的后果。让本幕核心矛盾的实际结果承载收束，得失留下人物此后的生活余韵。",
-      "priority": 89,
-      "placement": "example",
-      "activation": {
-        "tasks": [
-          "rendering",
-          "dynamic",
-          "decision"
-        ],
-        "beats": [
-          "payoff"
-        ]
-      },
-      "inclusionGroup": "fantasy.style.turn",
-      "cooldownTurns": 2
     }
   ]
 }

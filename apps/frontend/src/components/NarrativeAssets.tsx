@@ -36,7 +36,7 @@ export function NarrativeAssetsArchive({ assets, characters = [] }: { assets?: P
       <div className="archive-index">
         {assets?.abilities.length ? assets.abilities.map((entry) => <details className="archive-entry ability-entry" key={entry.id}>
           <summary><span>{entry.name}</span><small>{entry.mastery}</small></summary>
-          <div className="archive-entry-content">{entry.mastery ? <p className="asset-mastery"><strong>程度：</strong>{entry.mastery}</p> : null}{entry.description ? <p>{entry.description}</p> : null}{entry.usage ? <p>{entry.usage}</p> : null}{entry.source ? <p className="asset-source">来处：{entry.source}</p> : null}<small>{momentLabel(entry.introduced)}记于此生</small></div>
+          <div className="archive-entry-content">{entry.mastery ? <p className="asset-mastery"><strong>状态：</strong>{entry.mastery}</p> : null}{entry.description ? <p>{entry.description}</p> : null}{entry.usage ? <p>{entry.usage}</p> : null}{entry.source ? <p className="asset-source">来处：{entry.source}</p> : null}<small>{momentLabel(entry.introduced)}记于此生</small></div>
         </details>) : <p className="archive-empty">本领与宝物尚待积累。</p>}
       </div>
     </details>

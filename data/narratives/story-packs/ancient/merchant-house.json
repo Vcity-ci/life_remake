@@ -1,7 +1,7 @@
 {
   "version": 1,
   "id": "ancient.merchant-house",
-  "revision": "1.3.0",
+  "revision": "1.3.1",
   "worldId": "ancient",
   "name": "商贾世家",
   "tagline": "以货物、信用与远路连接天下，让财富成为家业、地位或风暴。",
@@ -38,13 +38,6 @@
       "label": "立信",
       "objective": "取得第一份能够持续经营的本钱、技艺和信用关系。",
       "payoffMeaning": "人物拥有可延续的营生和第一条可靠网络。",
-      "beatOutline": {
-        "setup": "让人物从生活所需发现一项真实交易机会与风险。",
-        "escalation": "通过买卖、运输、借贷或手艺建立第一批信用关系。",
-        "pressure": "让行情、债务、同行竞争与家人需要同时逼近。",
-        "climax": "让人物完成一次足以决定营生存亡的交易或履约。",
-        "payoff": "确认可延续的本钱、信用网络与已结下的商业关系。"
-      },
       "worldCardRefs": [
         "ancient.snapshot.coastal_trade",
         "ancient.snapshot.nine_regions",
@@ -72,13 +65,6 @@
       "label": "通衢",
       "objective": "把经营扩展为跨地域或跨行业网络，并处理官商与行会关系。",
       "payoffMeaning": "人物成为能够调动资金、货物与消息的重要商人。",
-      "beatOutline": {
-        "setup": "让已有营生进入跨地商路、行会或官商关系。",
-        "escalation": "通过合伙、开拓、竞争或救市扩大网络与影响。",
-        "pressure": "让利润、信用、家族意见与权力索取相互冲突。",
-        "climax": "让人物调动资金与人脉应对一次网络级商业危机。",
-        "payoff": "重排商路、合作与对手关系，使人物成为重要主事者。"
-      },
       "worldCardRefs": [
         "ancient.snapshot.nine_regions",
         "ancient.snapshot.local_society",
@@ -106,13 +92,6 @@
       "label": "成业",
       "objective": "决定财富如何转化为家族地位、公共影响或新的生活道路。",
       "payoffMeaning": "商业成果及其与权力、家族的关系得到最终回答。",
-      "beatOutline": {
-        "setup": "让家业传承或政局变化检验人物建立的商业秩序。",
-        "escalation": "调动商路、家族与公共信用守住或改造事业。",
-        "pressure": "迫使人物在财富安全、亲近之人与公共责任间取舍。",
-        "climax": "让人物完成决定家业与地方经济走向的最终行动。",
-        "payoff": "交代财富去向、家族关系、公共影响与人物晚年位置。"
-      },
       "worldCardRefs": [
         "ancient.snapshot.local_society",
         "ancient.snapshot.coastal_trade",
@@ -137,6 +116,7 @@
     }
   ],
   "endingDirections": {
+    "closureBoundary": "一次亏损、失单或商路受阻不等于家业覆灭；清算吞并或信用与商路崩溃已经毁掉经营基础时可提前坏结局。放弃扩张而守住主要家业属于普通结局。",
     "good": [
       "建立可持续的商业与信用网络，并让家族或伙伴获得更稳定的未来",
       "财富转化为长期社会位置而非短暂数字"
@@ -150,6 +130,8 @@
     ]
   },
   "worldCardRefs": [
+    "ancient.domain.commerce.guild_competition",
+    "ancient.domain.commerce.succession_public",
     "ancient.snapshot.coastal_trade",
     "ancient.snapshot.nine_regions",
     "ancient.snapshot.local_society"

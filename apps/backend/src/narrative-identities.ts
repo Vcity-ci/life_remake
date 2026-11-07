@@ -69,6 +69,8 @@ export function applyNarrativeIdentityMerges(run: InternalRunState, changes: Nar
       const target = state.assets!.locations.find((entry) => entry.id === targetRef)!;
       if (source.introduced.age < target.introduced.age) target.introduced = { ...source.introduced };
       if (source.lastSeen.age > target.lastSeen.age) target.lastSeen = { ...source.lastSeen };
+      target.features = [...new Map([...(target.features ?? []), ...(source.features ?? [])].map((entry) => [entry.id, entry])).values()];
+      target.actors = [...new Map([...(target.actors ?? []), ...(source.actors ?? [])].map((entry) => [entry.id, entry])).values()];
       state.assets!.locations = state.assets!.locations.filter((entry) => entry.id !== sourceRef);
     } else {
       const source = state.dynamicCharacters.find((entry) => entry.id === sourceRef)!;
@@ -85,7 +87,7 @@ export function applyNarrativeIdentityMerges(run: InternalRunState, changes: Nar
     state.identityAliases[sourceRef] = targetRef;
   }
   if (!changed) return;
-  for (const key of ["dynamicCharacters", "assets", "assetBuffer", "memoryEntries", "episodes", "memoryDigests", "horizonPlan", "actCanon", "lastBeatObservation", "activeCharacterIds", "activeScene", "scene", "endingBrief", "agentAttempts"] as const) {
+  for (const key of ["dynamicCharacters", "assets", "assetBuffer", "memoryEntries", "episodes", "memoryDigests", "horizonPlan", "actCanon", "lastActObservation", "activeCharacterIds", "activeScene", "scene", "endingBrief", "agentAttempts"] as const) {
     Object.assign(state, { [key]: canonicalizeNarrativeReferences(state, state[key]) });
   }
   // Buffered objects are references to the current records, not saved revisions
@@ -101,7 +103,7 @@ export function applyNarrativeIdentityMerges(run: InternalRunState, changes: Nar
   }
   const digests = new Map<string, NarrativeRunState["memoryDigests"][number]>();
   for (const digest of state.memoryDigests) {
-    const id = digest.scopeId ? `${digest.scope}:${digest.scopeId}` : digest.scope;
+    const id = digest.id;
     const previous = digests.get(id);
     const latest = previous && previous.updatedAt > digest.updatedAt ? previous : digest;
     digests.set(id, { ...latest, id,
@@ -127,7 +129,19 @@ export function narrativeCharacterDirectory(state: NarrativeRunState) {
   }));
 }
 
-export function formatNarrativeIdentityDirectory(state: NarrativeRunState, compact = false): string {
+export function formatNarrativeIdentityDirectory(state: NarrativeRunState, compact = false, detailIds?: string[]): string {
+  if (!compact && detailIds) {
+    const selected = new Set(detailIds);
+    return formatNarrativeIdentityDirectory({
+      ...state,
+      dynamicCharacters: state.dynamicCharacters.filter((entry) => selected.has(entry.id)),
+      assets: { locations: state.assets?.locations.filter((entry) => selected.has(entry.id)) ?? [], abilities: state.assets?.abilities.filter((entry) => selected.has(entry.id)) ?? [] }
+    }) + "\n其余身份索引：\n" + formatNarrativeIdentityDirectory({
+      ...state,
+      dynamicCharacters: state.dynamicCharacters.filter((entry) => !selected.has(entry.id)),
+      assets: { locations: state.assets?.locations.filter((entry) => !selected.has(entry.id)) ?? [], abilities: state.assets?.abilities.filter((entry) => !selected.has(entry.id)) ?? [] }
+    }, true);
+  }
   if (!compact) return [
     "人物资产：" + JSON.stringify(state.dynamicCharacters.map(({ id, name, factionId, role, description, condition, status, relationship, pendingDetails }) => ({ id, name, factionId, role, description, condition, status, relationship, pendingDetails }))),
     "地点资产：" + JSON.stringify((state.assets?.locations ?? []).map(({ id, name, description, spatialDescription, parentLocationId, features, actors, pendingDetails }) => ({ id, name, description, spatialDescription, parentLocationId, features, actors, pendingDetails }))),

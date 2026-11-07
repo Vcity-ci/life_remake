@@ -36,7 +36,7 @@
       "title": "危机、转型与责任",
       "kind": "consequence",
       "contextRole": "knowledge",
-      "content": "产品事故、现金断裂、声誉危机或行业变化会迫使事业转型。人物要决定保护用户、员工、投资与个人生活的先后顺序，并让选择留下可追溯的结果。",
+      "content": "产品事故、现金断裂、声誉危机或行业变化会迫使事业转型。人物要决定保护用户、员工、投资与个人生活的先后顺序，并承担选择造成的后果。",
       "priority": 77,
       "placement": "scenario",
       "activation": { "keys": ["危机", "转型", "事故", "裁员", "声誉", "责任"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] }

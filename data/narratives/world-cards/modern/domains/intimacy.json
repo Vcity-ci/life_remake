@@ -36,7 +36,7 @@
       "title": "关系形式与共同答案",
       "kind": "consequence",
       "contextRole": "knowledge",
-      "content": "关系可以走向婚姻、长期伴侣、共同养育、分开或重新定义。成熟收束不要求某一种形式，而要说明双方怎样面对承诺、失去和共同留下的生活。",
+      "content": "关系可以走向婚姻、长期伴侣、共同养育、分开或重新定义。不同关系形式都涉及承诺、失去和共同生活的安排。",
       "priority": 74,
       "placement": "scenario",
       "activation": { "keys": ["伴侣", "分开", "共同养育", "重新定义", "陪伴", "关系形式"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] }

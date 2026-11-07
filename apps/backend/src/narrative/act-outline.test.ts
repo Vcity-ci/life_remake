@@ -1,92 +1,48 @@
 import assert from "node:assert/strict";
+import { hostingFixture } from "./hosting-fixture.js";
 import test from "node:test";
-import type { NarrativeActOutline, NarrativeWorldDefinition } from "@reroll/shared";
-import { parseNarrativeBeatObservation, narrativeTurnPlanningPrompt } from "../ai.js";
-import { narrativeObservationGap } from "./observation.js";
-import type { NarrativeTurnEnvelope } from "./turn.js";
-import { advanceNarrativeActBeat, createNarrativeRunState, ensureNarrativeActRuntime, ensureNarrativeRunState } from "../narrative.js";
-import {
-  parseNarrativeActWorldCard,
-  commitNarrativeActOutline,
-  formatNarrativeActOutline,
-  NARRATIVE_ACT_OUTLINE_BEATS
-} from "./act-outline.js";
-
-const world: NarrativeWorldDefinition = {
-  version: 10,
-  worldId: "ancient",
-  storyBible: "边军正在面对外敌入侵。",
-  styleRules: [],
-  mainlineActs: [
-    { id: "frontier", label: "守边", prompt: "击退敌军并决定战后去向。" },
-    { id: "capital", label: "入京", prompt: "带着守边所得面对朝局。" }
-  ],
-  threads: [],
-  characters: [],
-  lore: [],
-  eventBindings: [],
-  endingBlueprints: []
-};
-
-function firstOutline(): NarrativeActOutline {
-  const stories = ["发现敌军沿旧道逼近。", "组织村民撤离并建立哨线。", "援兵未至，守军必须决定守城还是突围。", "按照已选战略应对敌军主攻。", "战果落实，交代幸存者与部队的去向。"];
-  const beats = Object.fromEntries(NARRATIVE_ACT_OUTLINE_BEATS.map((beat, index) => [beat, {
-    change: stories[index], props: ["守军", "入侵敌军"], timeframe: null
-  }]));
-  return parseNarrativeActWorldCard({ background: "边军与沿旧道入侵的敌军相持，百姓面临迁离。", beats }, "frontier");
-}
-
-test("同一份故事大纲经保存恢复和节拍推进保留，没有重复任务副本", () => {
+import type { NarrativeWorldDefinition } from "@reroll/shared";
+import { parseNarrativeActObservation } from "../ai.js";
+import { advanceNarrativeAct, createNarrativeRunState, ensureNarrativeActRuntime, ensureNarrativeRunState } from "../narrative.js";
+import { parseNarrativeActWorldCard, commitNarrativeActOutline, formatNarrativeActOutline } from "./act-outline.js";
+const world: NarrativeWorldDefinition = { version: 10, worldId: "ancient", storyBible: "边防", threads: [], characters: [], lore: [], eventBindings: [], endingBlueprints: [],
+  mainlineActs: [{ id: "frontier", label: "守边", prompt: "守边" }, { id: "capital", label: "入京", prompt: "入京" }] };
+const standards = { objective: "守住边疆", closureMeaning: "外敌入侵已有实际结果" };
+test("模型具象化结构化主持资料，目的和收束含义保持 IF 原值", () => {
+  const card = parseNarrativeActWorldCard(hostingFixture("敌军逼近关门"), "frontier", standards);
+  assert.equal(card.objective, standards.objective); assert.equal(card.closureMeaning, standards.closureMeaning);
+  assert.throws(() => parseNarrativeActWorldCard({}, "frontier", standards), /narrative_act_outline_invalid/);
+  assert.throws(() => parseNarrativeActWorldCard({ ...hostingFixture("敌军逼近关门"), objective: "改写 IF 目的" }, "frontier", standards), /narrative_act_outline_invalid/);
+  assert.throws(() => parseNarrativeActWorldCard({ ...hostingFixture("敌军逼近关门"), closureMeaning: "另立收束标准" }, "frontier", standards), /narrative_act_outline_invalid/);
+  assert.doesNotMatch(formatNarrativeActOutline(card), /外敌入侵已有实际结果/);
+  assert.match(formatNarrativeActOutline(card, true), /外敌入侵已有实际结果/);
+});
+test("幕卡不可反复改写，保存恢复保留整幕卡，换幕清理旧卡", () => {
   const state = ensureNarrativeActRuntime(createNarrativeRunState(true), world, 12);
-  const outline = firstOutline();
-  commitNarrativeActOutline(state, outline);
-  const restored = ensureNarrativeRunState(JSON.parse(JSON.stringify(state)), true, 12);
-  assert.deepEqual(restored.actRuntime?.outline, outline);
-  assert.equal(Object.hasOwn(restored.actRuntime!, "stageTask"), false);
-  const advanced = advanceNarrativeActBeat(restored, world, 13).state;
-  assert.equal(advanced.actRuntime?.beat, "escalation");
-  assert.deepEqual(advanced.actRuntime?.outline, outline);
-});
-
-test("换幕不继承旧规划，正文看到的是当前及未来故事而非已发生事实", () => {
-  const state = ensureNarrativeActRuntime(createNarrativeRunState(true), world, 12);
-  const outline = firstOutline();
-  commitNarrativeActOutline(state, outline);
-  state.actRuntime!.beat = "payoff";
-  const next = advanceNarrativeActBeat(state, world, 20).state;
-  assert.equal(next.actRuntime?.actId, "capital");
-  assert.equal(next.actRuntime?.outline, undefined);
-  const text = formatNarrativeActOutline(outline, "pressure");
-  assert.ok(!text.includes(outline.beats.setup.change));
-  assert.match(text, /实际经历与玩家决定是当前处境/);
-  assert.match(text, /pressure【当前阶段】/);
-  assert.match(text, /climax【未发生阶段】/);
-});
-
-test("年龄安排保存在大纲中，不代替属性准入或自动完成阶段", () => {
-  const state = ensureNarrativeActRuntime(createNarrativeRunState(true), world, 16);
-  const outline = firstOutline();
-  outline.beats.setup.timeframe = { fromAge: 16, toAge: 20 };
-  commitNarrativeActOutline(state, outline);
-  const restored = ensureNarrativeRunState(JSON.parse(JSON.stringify(state)), true, 40);
-  assert.equal(ensureNarrativeActRuntime(restored, world, 40).actRuntime?.beat, "setup");
-  assert.deepEqual(restored.actRuntime?.outline?.beats.setup.timeframe, { fromAge: 16, toAge: 20 });
-});
-
-test("未落实改变经保存恢复交给同拍召回，推进后退出且不污染其他幕拍", () => {
-  const state = ensureNarrativeActRuntime(createNarrativeRunState(true), world, 20);
-  commitNarrativeActOutline(state, firstOutline());
-  const missing = "村民尚未得知撤离安排";
-  state.lastBeatObservation = parseNarrativeBeatObservation({ beatDecision: "hold", evidence: null, missing }, "frontier", "setup");
+  const card = parseNarrativeActWorldCard(hostingFixture("敌军逼近关门"), "frontier", standards);
+  commitNarrativeActOutline(state, card); commitNarrativeActOutline(state, { ...card, situation: "另写局势", revision: 2 });
   const restored = ensureNarrativeRunState(JSON.parse(JSON.stringify(state)), true, 20);
-  const run = { narrative: restored } as Parameters<typeof narrativeObservationGap>[0];
-  assert.equal(narrativeObservationGap(run, "frontier", "setup"), missing);
-  assert.equal(narrativeObservationGap(run, "frontier", "escalation"), undefined);
-  assert.equal(narrativeObservationGap(run, "capital", "setup"), undefined);
-  const input = { act: world.mainlineActs![0], beat: "setup", actOutline: restored.actRuntime!.outline,
-    currentAge: 20, focusReferences: [], socialForces: [], progressGap: narrativeObservationGap(run, "frontier", "setup") } as unknown as NarrativeTurnEnvelope;
-  assert.ok(narrativeTurnPlanningPrompt(input).includes(missing));
-  const advanced = advanceNarrativeActBeat(restored, world, 20).state;
-  assert.equal(advanced.lastBeatObservation, undefined);
-  assert.equal(advanced.actRuntime?.beat, "escalation");
+  assert.deepEqual(restored.actRuntime?.outline, card); assert.equal(restored.actRuntime?.beat, undefined);
+  const next = advanceNarrativeAct(restored, world, 20).state;
+  assert.equal(next.actRuntime?.actId, "capital"); assert.equal(next.actRuntime?.outline, undefined);
+});
+test("幕初只引用已供应规则，原文随幕卡保存且不被模型改写", () => {
+  const rule = { id: "world.rule", title: "军职", text: "第一段。\n\n第二段原文。" };
+  const card = parseNarrativeActWorldCard({ ...hostingFixture("关城局势"), worldRuleRefs: [rule.id, rule.id] }, "frontier", standards, [rule]);
+  assert.deepEqual(card.worldRules, [rule]);
+  rule.text = "配置后来修改";
+  assert.equal(card.worldRules![0].text, "第一段。\n\n第二段原文。");
+  const state = ensureNarrativeActRuntime(createNarrativeRunState(true), world, 12);
+  commitNarrativeActOutline(state, card);
+  const restored = ensureNarrativeRunState(JSON.parse(JSON.stringify(state)), true, 12);
+  assert.deepEqual(restored.actRuntime!.outline!.worldRules, card.worldRules);
+  assert.equal(formatNarrativeActOutline(card).split(card.worldRules![0].text).length - 1, 1);
+  assert.throws(() => parseNarrativeActWorldCard({ ...hostingFixture("关城局势"), worldRuleRefs: ["unavailable"] }, "frontier", standards, [rule]), /world_rule_reference_invalid/);
+});
+test("整幕观察没有 missing 反馈，收束必须给出实际结果依据", () => {
+  const ongoing = parseNarrativeActObservation({ decision: "ongoing", evidence: null }, "frontier", "scene:one");
+  assert.equal(ongoing.decision, "ongoing"); assert.equal(Object.hasOwn(ongoing, "missing"), false);
+  const closed = parseNarrativeActObservation({ decision: "act_closed", evidence: "敌军撤退，边境重开" }, "frontier", "scene:two");
+  assert.equal(closed.sourceEventId, "scene:two");
+  assert.throws(() => parseNarrativeActObservation({ decision: "act_closed", evidence: null }, "frontier", "scene:two"));
 });

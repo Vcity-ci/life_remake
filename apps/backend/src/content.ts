@@ -216,7 +216,7 @@ function mergeBuiltinCardCatalog(cards: BackgroundCard[], seedCards: BackgroundC
 
 function normalizeContentBundle(parsed: ContentBundle, seedCards: BackgroundCard[] = []): ContentBundle {
   return {
-    worlds: [...parsed.worlds].sort((a, b) => a.id.localeCompare(b.id)),
+    worlds: parsed.worlds.map((world) => { const { stylePrompt: _removed, ...rest } = world as typeof world & { stylePrompt?: string }; return rest; }).sort((a, b) => a.id.localeCompare(b.id)),
     cards: mergeBuiltinCardCatalog(parsed.cards, seedCards),
     difficulties: parsed.difficulties,
     promptPack: normalizePromptPack(parsed.promptPack),
@@ -476,7 +476,8 @@ export function validateNarrativeWorldFactContract(
     const core = definition.worldCore;
     const palette = definition.narrativePalette;
     if (!core?.identity?.trim() || !core.powerStructure?.trim() || !core.everydayLife?.trim() ||
-        !core.tone?.trim() || !core.laws?.length || !(definition.socialForces?.length) ||
+        (core.laws !== undefined && (!Array.isArray(core.laws) || core.laws.some((law) => typeof law !== "string" || !law.trim()))) ||
+        !(definition.socialForces?.length) ||
         !palette?.sceneModes?.length || !palette.conflictSources?.length ||
         !palette.actionVocabulary?.length || !palette.scalePossibilities?.length ||
         (definition.version === 9 && !(definition.storyPatterns?.length))) {
@@ -486,10 +487,9 @@ export function validateNarrativeWorldFactContract(
   const cardIds = new Set<string>();
   const cardKinds = new Set([
     "world_rule", "setting", "geography", "institution", "culture", "faction", "character", "location", "ability",
-    "social_role", "practice", "conflict", "consequence", "motif", "style_example"
+    "social_role", "practice", "conflict", "consequence", "motif"
   ]);
-  const cardTasks = new Set(["background", "planning", "horizon", "rendering", "dynamic", "decision"]);
-  const cardBeats = new Set(["setup", "escalation", "pressure", "climax", "payoff", "ending"]);
+  const cardTasks = new Set(["origin", "background", "planning", "horizon", "rendering", "dynamic", "decision"]);
   const factStatuses = new Set(["open", "resolved", "blocked"]);
   const cardPlacements = new Set(["world", "scenario", "example", "author_note"]);
   const selectiveLogics = new Set(["and_any", "and_all", "not_any", "not_all"]);
@@ -511,7 +511,7 @@ export function validateNarrativeWorldFactContract(
     if (!card.id?.trim() || cardIds.has(card.id) || card.id.includes("|") || !card.content?.trim() ||
         !Number.isFinite(card.priority) || card.priority < 0 || card.priority > 100 || !cardKinds.has(card.kind) ||
         (card.placement !== undefined && !cardPlacements.has(card.placement)) ||
-        (card.contextRole !== undefined && !["foundation", "situation", "knowledge", "style"].includes(card.contextRole)) ||
+        (card.contextRole !== undefined && !["foundation", "situation", "knowledge"].includes(card.contextRole)) ||
         (card.order !== undefined && !Number.isFinite(card.order)) ||
         (card.stickyTurns !== undefined && (!Number.isInteger(card.stickyTurns) || card.stickyTurns < 0 || card.stickyTurns > 8)) ||
         (card.cooldownTurns !== undefined && (!Number.isInteger(card.cooldownTurns) || card.cooldownTurns < 0 || card.cooldownTurns > 16)) ||
@@ -519,7 +519,6 @@ export function validateNarrativeWorldFactContract(
         (card.activation?.selectiveLogic !== undefined && !selectiveLogics.has(card.activation.selectiveLogic)) ||
         keys.some((key) => !validCardKey(key)) ||
         card.activation?.tasks?.some((task) => !cardTasks.has(task)) ||
-        card.activation?.beats?.some((beat) => !cardBeats.has(beat)) ||
         card.activation?.factStatuses?.some((status) => !factStatuses.has(status))) {
       throw new Error(`${definition.worldId}_world_card_definition_invalid:${card.id || "unknown"}`);
     }
@@ -550,6 +549,9 @@ export async function loadNarrativeWorldDefinition(worldId: string): Promise<Nar
     loadNarrativeWorldCardCatalog(worldId)
   ])
     .then(([definition, catalog, authoredWorldCards]) => {
+      const legacy = definition as NarrativeWorldDefinition & { endingGuide?: unknown };
+      delete legacy.endingGuide;
+      if (definition.worldCore) delete (definition.worldCore as unknown as Record<string, unknown>).tone;
       if (definition.version >= 10 && (definition.worldCards?.length ?? 0) > 0) {
         throw new Error(`${worldId}_inline_world_cards_not_supported`);
       }

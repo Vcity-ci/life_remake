@@ -1,15 +1,16 @@
 import { randomUUID } from "node:crypto";
+import { continuityDetailIds, retireNarrativeAssets } from "./asset-scope.js";
 import { prepareChoiceCheck, canOpenChoiceSurvival } from "../choice-check.js";
-import type { DecisionType, NarrativeAgentAttemptRecord, NarrativeAttributePolicy, NarrativeBeatObservation, NarrativeDecisionBrief, NarrativeFactResolution, NarrativeStoryPackSnapshot, NarrativeWorldDefinition, PublicMilestoneChoice, WorldConfig } from "@reroll/shared";
+import type { DecisionType, NarrativeAgentAttemptRecord, NarrativeAttributePolicy, NarrativeActObservation, NarrativeDecisionBrief, NarrativeStoryPackSnapshot, NarrativeWorldDefinition, PublicMilestoneChoice, WorldConfig } from "@reroll/shared";
 import {
   generateDynamicNarrativeScene,
   settleDynamicNarrativeScene,
   generateDirectedDecisionSettlement,
   generateEndingNarrative,
   generateNarrativeTurnPlan,
-  observeNarrativeBeat,
   renderDirectedDecisionNarrative,
   synchronizeNarrativeContinuity,
+  synchronizePresetEventAssets,
   buildNarrativeContinuityWriteSet,
   hasNarrativeContinuityWork,
   narrativeContinuityWritableSet,
@@ -19,7 +20,7 @@ import {
   type NarrativeContext
 } from "../ai.js";
 import { applyNarrativeFactUpdates, applyNarrativeRelationshipUpdates, resolveAgeStageByWorld, resolveNarrativeStatLabels, type InternalRunState } from "../engine.js";
-import { buildNarrativePromptPlan, narrativeDefaultAssetFocusIds, type NarrativePromptPlan } from "../narrative.js";
+import { buildNarrativePromptPlan, narrativeCurrentProtagonist, narrativeDefaultAssetFocusIds, type NarrativePromptPlan } from "../narrative.js";
 import { narrativeTurnPlanFocusIds, resolveNarrativeTurnTime, type NarrativeTurnTime, type NarrativeTurnEnvelope, type NarrativeTurnPlan } from "./turn.js";
 import { narrativeProtagonistAnchor } from "../narrative-characters.js";
 import type { NarrativeRoundHandoff } from "./handoff.js";
@@ -28,8 +29,9 @@ import { applyNarrativeIdentityMerges, canonicalizeNarrativeReferences } from ".
 import { acknowledgeNarrativeAssetBatch, narrativeAssetBatchReady, stageNarrativeAssetRound } from "./asset-buffer.js";
 import { applyNarrativeAssetActivity, applyNarrativeAssetUpdates, commitNarrativeAssets } from "../narrative-assets.js";
 import { formatNarrativeDialogue, formatNarrativeExperience } from "../narrative-memory.js";
-import { narrativeObservationGap, narrativeObservationHistory } from "./observation.js";
 import { committedNarrativeSequence } from "./history.js";
+import { currentEventFlowStep, eventFlowRenderInput, eventFlowResult, bindEventFlowText } from "./event-flow.js";
+import { usesPresetEventAssets, applyEventAssetChanges } from "./event-assets.js";
 
 export interface NarrativeAgentTurnInput {
   run: InternalRunState;
@@ -71,15 +73,10 @@ function createNarrativeTurnBrief(
       label: (entry.kind === "location" ? run.narrative.assets?.locations : run.narrative.assets?.abilities)?.find((asset) => asset.id === entry.id)?.name ?? entry.id,
       description: entry.text }))
   ];
-  const names = new Map([
-    ...materials.map((entry) => [entry.id, entry.label] as const),
-    ...(promptPlan.activeWorldCardSources ?? []).map((entry) => [entry.id, entry.title ?? entry.id] as const)
-  ]);
   return {
     id: `${attemptId}:brief`,
     handoff: { sourceEventId, characters: [] },
-    plan: { ...plan, materials,
-      recallUses: plan.recallUses?.map((use) => ({ ...use, label: names.get(use.ref) ?? use.label })) },
+    plan: { ...plan, materials },
     promptPlan,
     focusIds: Array.from(new Set([
       ...narrativeTurnPlanFocusIds(plan),
@@ -118,15 +115,19 @@ export async function runNarrativeAgentTurn(input: NarrativeAgentTurnInput): Pro
     source: envelope.source,
     stage: "prepare",
     actId: envelope.act.id,
-    beat: envelope.beat,
     digestRevision: run.narrative.memoryRevision
   });
 
   const backgroundOnly = envelope.capabilities.length === 1 && envelope.capabilities[0] === "background";
   const worldCardCandidates = context.narrativePlan?.activeWorldCardSources;
-  const choiceCheck = envelope.capabilities.includes("scene") ? prepareChoiceCheck(run, narrativeWorld) : undefined;
-  const plan = await generateNarrativeTurnPlan(run, world, { ...envelope, choiceCheck,
-    progressGap: narrativeObservationGap(run, envelope.act.id, envelope.beat) }, context);
+  const time = resolveNarrativeTurnTime(envelope);
+  const flowStep = backgroundOnly ? undefined : currentEventFlowStep(run);
+  const atSceneAge = { ...run, age: time.sceneAge, ageStage: resolveAgeStageByWorld(world, time.sceneAge) };
+  if (context.narrativePlan) context.narrativePlan.protagonist = narrativeCurrentProtagonist(atSceneAge, narrativeWorld);
+  const choiceCheck = flowStep
+    ? flowStep.event.kind === "choice" ? prepareChoiceCheck(atSceneAge, narrativeWorld, flowStep.event.check) : undefined
+    : envelope.capabilities.includes("scene") ? prepareChoiceCheck(atSceneAge, narrativeWorld) : undefined;
+  const plan = await generateNarrativeTurnPlan(run, world, { ...envelope, sceneAge: time.sceneAge }, context);
   appendAttempt(run, {
     callId: envelope.callId,
     attemptId,
@@ -134,7 +135,6 @@ export async function runNarrativeAgentTurn(input: NarrativeAgentTurnInput): Pro
     source: envelope.source,
     stage: "plan",
     actId: envelope.act.id,
-    beat: envelope.beat,
     routeId: plan.patternIds[0],
     factionId: plan.forceIds[0],
     horizonRevision: run.narrative.horizonPlan?.revision,
@@ -143,7 +143,6 @@ export async function runNarrativeAgentTurn(input: NarrativeAgentTurnInput): Pro
   });
 
   const renderTask = plan.turnKind === "background" ? "background" : "rendering";
-  const time = resolveNarrativeTurnTime(envelope, plan);
   const assetFocusIds = backgroundOnly
     ? narrativeDefaultAssetFocusIds(run.narrative, renderTask)
     : narrativeTurnPlanFocusIds(plan);
@@ -154,18 +153,21 @@ export async function runNarrativeAgentTurn(input: NarrativeAgentTurnInput): Pro
     factionIds: plan.forceIds,
     patternIds: plan.patternIds,
     focusIds: assetFocusIds,
-    semanticQuery: [plan.beatChange, ...(plan.recallUses ?? []).map((use) => use.purpose), ...(plan.assetNeeds ?? []).map((need) => need.purpose)].filter(Boolean).join("；"),
     worldCardCandidates: backgroundOnly ? undefined : worldCardCandidates
   });
   if (!promptPlan) throw new Error("narrative_agent_prompt_plan_missing");
   const sourceEventId = plan.turnKind === "background"
     ? `background:${time.backgroundAgeRange.fromAge}:${time.backgroundAgeRange.toAge}:${run.history.length + time.backgroundAgeRange.toAge - time.backgroundAgeRange.fromAge + 1}`
-    : `dynamic:${envelope.act.id}:${envelope.beat}:${time.sceneAge}:${run.history.length + 1}`;
+    : `dynamic:${envelope.act.id}:${time.sceneAge}:${run.history.length + 1}`;
   const brief = createNarrativeTurnBrief(attemptId, plan, promptPlan, sourceEventId, run);
   context.narrativePlan = brief.promptPlan;
   await input.onProgress?.("rendering");
-  const renderInput = { ...input.buildRenderInput(brief.plan, brief.promptPlan), ...time, choiceCheck, statTierLabels: resolveNarrativeStatLabels(run.stats, run.narrative.statTierConfig, run.narrative.statTierPresentation), handoff: brief.handoff, protagonistAnchor: narrativeProtagonistAnchor(run), plan: brief.plan };
+  const renderInput = { ...input.buildRenderInput(brief.plan, brief.promptPlan), ...time, choiceCheck,
+    flowEvent: flowStep ? eventFlowRenderInput(run, flowStep) : undefined,
+    statTierLabels: resolveNarrativeStatLabels(run.stats, run.narrative.statTierConfig, run.narrative.statTierPresentation), handoff: brief.handoff, protagonistAnchor: narrativeProtagonistAnchor(run), plan: brief.plan };
   let scene = await generateDynamicNarrativeScene(run, world, renderInput, context);
+  if (flowStep) scene.flowSource = { flowId: flowStep.flow.id, eventIndex: flowStep.eventIndex,
+    nodeId: flowStep.event.id, outcome: flowStep.event.kind === "settlement" ? "settlement:" + scene.resolutionId : "experience" };
   appendAttempt(run, {
     callId: envelope.callId,
     attemptId,
@@ -173,7 +175,6 @@ export async function runNarrativeAgentTurn(input: NarrativeAgentTurnInput): Pro
     source: plan.turnKind,
     stage: "render",
     actId: envelope.act.id,
-    beat: envelope.beat,
     routeId: scene.patternIds[0],
     factionId: scene.forceIds[0],
     horizonRevision: run.narrative.horizonPlan?.revision,
@@ -192,22 +193,8 @@ export async function runNarrativeAgentTurn(input: NarrativeAgentTurnInput): Pro
   if (scene.turnKind === "background") return { attemptId, plan, scene, time, worldCardIds: brief.worldCardIds };
   const synchronized = await synchronizeNarrativeAgentScene({ ...input, scene, plan, promptPlan, callId: envelope.callId, age: time.sceneAge, deferSync: true });
   scene = synchronized.scene;
-  if (!scene.createsDecision) {
-    const observation = await observeNarrativeBeat(run, world, {
-      callId: envelope.callId, actId: envelope.act.id, beat: envelope.beat,
-      recentStory: narrativeObservationHistory(run, {
-        actId: envelope.act.id, age: time.sceneAge, sourceEventId: scene.handoff!.sourceEventId, narrative: scene.narrative
-      }),
-      outline: run.narrative.actRuntime?.outline
-    }, context);
-    run.narrative.lastBeatObservation = observation;
-    scene.beatDecision = observation.decision;
-  } else {
-    scene.beatDecision = "hold";
-  }
-  const closesAct = !scene.createsDecision && envelope.beat === "payoff" && scene.beatDecision === "advance";
-  if (narrativeAssetBatchReady(run.narrative, closesAct)) await input.onProgress?.("syncing");
-  const batchResult = scene.createsDecision ? { status: "skipped" as const } : await synchronizeNarrativeAssetBatch(run, world, context, envelope.callId, narrativeWorld.socialForces, closesAct);
+  // The caller first commits prose, settlement and source before maintenance.
+  const batchResult = { status: "skipped" as const };
   scene = canonicalizeNarrativeReferences(run.narrative, scene);
   const continuityStatus = batchResult.status;
   appendAttempt(run, {
@@ -217,7 +204,6 @@ export async function runNarrativeAgentTurn(input: NarrativeAgentTurnInput): Pro
     source: plan.turnKind,
     stage: "sync",
     actId: envelope.act.id,
-    beat: envelope.beat,
     routeId: scene.patternIds[0],
     factionId: scene.forceIds[0],
     horizonRevision: run.narrative.horizonPlan?.revision,
@@ -262,33 +248,60 @@ export async function synchronizeNarrativeAssetBatch(
 ): Promise<{ status: NarrativeAgentAttemptRecord["continuityStatus"] }> {
   if (!narrativeAssetBatchReady(run.narrative, flush)) return { status: "skipped" };
   const batch = structuredClone(run.narrative.assetBuffer!);
-  const writeSet = {
-    factIds: narrativeContinuityFacts(run.story.factLedger?.facts ?? [], run.narrative.actRuntime?.actId).map((fact) => fact.id),
-    characterIds: run.narrative.dynamicCharacters.map((entry) => entry.id),
-    locationIds: run.narrative.assets?.locations.map((entry) => entry.id) ?? [],
-    abilityIds: run.narrative.assets?.abilities.map((entry) => entry.id) ?? []
-  };
-  const changes = await synchronizeNarrativeContinuity(run, world, {
-    callId, source: batch.rounds.at(-1)!.source, subject: "使资产当前状态与本批已发生经历一致，仅提交改变的值",
-    narrative: batch.rounds.map((round) => `【${round.sourceEventId}】\n${formatNarrativeExperience(round, round.narrative)}`).join("\n\n"),
-    eventSources: batch.rounds.map((round) => ({ sourceEventId: round.sourceEventId, age: round.age, actId: round.actId })),
-    writeSet, focusIds: [...writeSet.characterIds, ...writeSet.locationIds, ...writeSet.abilityIds],
-    continuityRequired: true, socialForces,
-    handoff: { sourceEventId: batch.rounds.at(-1)!.sourceEventId, characters: [] }
-  }, { ...context, conversation: undefined, narrativePlan: undefined });
-  applyNarrativeIdentityMerges(run, changes.identityMerges);
-  const canonical = canonicalizeNarrativeReferences(run.narrative, changes);
+  const attempts = context.continuityAttempts ??= new Set<string>();
+  const batchKey = run.runId + ":" + batch.rounds.map((round) => round.sourceEventId).join("|");
+  if (attempts.has(batchKey)) return { status: "skipped" };
+  attempts.add(batchKey);
+  try {
+    if (usesPresetEventAssets(run)) {
+      const changes = await synchronizePresetEventAssets(run, world, batch, context);
+      const changed = applyEventAssetChanges(run, batch, changes);
+      acknowledgeNarrativeAssetBatch(run.narrative, batch.rounds.map((round) => round.sourceEventId));
+      return { status: changed ? "requested_changed" : "requested_empty" };
+    }
+    const detailIds = continuityDetailIds(run);
+    const writeSet = {
+      factIds: narrativeContinuityFacts(run.story.factLedger?.facts ?? [], run.narrative.actRuntime?.actId,
+        batch.rounds.flatMap((round) => round.relatedIds ?? [])).map((fact) => fact.id),
+      characterIds: run.narrative.dynamicCharacters.map((entry) => entry.id),
+      locationIds: run.narrative.assets?.locations.map((entry) => entry.id) ?? [],
+      abilityIds: run.narrative.assets?.abilities.map((entry) => entry.id) ?? []
+    };
+    const changes = await synchronizeNarrativeContinuity(run, world, {
+      callId, source: batch.rounds.at(-1)!.source, subject: "本批实际对话",
+      narrative: batch.rounds.map((round) => `【${round.sourceEventId}】\n${formatNarrativeExperience(round, round.narrative)}`).join("\n\n"),
+      eventSources: batch.rounds.map((round) => ({ sourceEventId: round.sourceEventId, age: round.age, actId: round.actId })),
+      writeSet, focusIds: detailIds,
+      continuityRequired: true, socialForces,
+      handoff: { sourceEventId: batch.rounds.at(-1)!.sourceEventId, characters: [] }
+    }, { ...context, conversation: undefined, narrativePlan: undefined });
+    const status = applyNarrativeAssetBatch(run, batch, changes);
+    return { status };
+  } catch (error) {
+    console.error("[game-flow:continuity]", { runId: run.runId, callId, sourceEventIds: batch.rounds.map((round) => round.sourceEventId) }, error);
+    return { status: "failed" };
+  }
+}
+
+/** Validate/apply the complete delta on a private copy before publishing any mutation. */
+export function applyNarrativeAssetBatch(
+  run: InternalRunState, batch: NonNullable<InternalRunState["narrative"]["assetBuffer"]>,
+  changes: Awaited<ReturnType<typeof synchronizeNarrativeContinuity>>
+): "requested_changed" | "requested_empty" {
+  const draft = structuredClone(run);
+  applyNarrativeIdentityMerges(draft, changes.identityMerges);
+  const canonical = canonicalizeNarrativeReferences(draft.narrative, changes);
   const last = batch.rounds.at(-1)!;
   canonical.factUpdates = prepareNarrativeFactUpdates(run.runId, last.sourceEventId, canonical.factUpdates);
   const when = { age: last.age };
-  commitNarrativeAssets(run.narrative, applyNarrativeAssetUpdates(run.narrative.assets, canonical.assetUpdates, when), when);
-  const factIds = applyNarrativeFactUpdates(run, canonical.factUpdates, { sourceEventId: last.sourceEventId, actId: last.actId ?? run.narrative.actRuntime?.actId });
-  applyNarrativeRelationshipUpdates(run, canonical.relationshipUpdates, [], when);
-  acknowledgeNarrativeAssetBatch(run.narrative, batch.rounds.map((entry) => entry.sourceEventId));
-  return {
-    status: canonical.assetUpdates?.locations.length || canonical.assetUpdates?.abilities.length || changes.identityMerges?.length || canonical.relationshipUpdates?.length || factIds.length
-      ? "requested_changed" : "requested_empty"
-  };
+  commitNarrativeAssets(draft.narrative, applyNarrativeAssetUpdates(draft.narrative.assets, canonical.assetUpdates, when), when);
+  const factIds = applyNarrativeFactUpdates(draft, canonical.factUpdates, { sourceEventId: last.sourceEventId, actId: last.actId ?? draft.narrative.actRuntime?.actId });
+  applyNarrativeRelationshipUpdates(draft, canonical.relationshipUpdates, [], when);
+  retireNarrativeAssets(draft, canonical.retirements);
+  acknowledgeNarrativeAssetBatch(draft.narrative, batch.rounds.map((entry) => entry.sourceEventId));
+  for (const key of ["narrative", "story", "pendingDynamicScene", "choiceExecution", "nextMilestoneChoice"] as const) Object.assign(run, { [key]: draft[key] });
+  return canonical.assetUpdates?.locations.length || canonical.assetUpdates?.abilities.length || changes.identityMerges?.length || canonical.retirements?.length || canonical.relationshipUpdates?.length || factIds.length
+    ? "requested_changed" : "requested_empty";
 }
 
 export function commitNarrativeAgentTurn(run: InternalRunState, attemptId: string, episodeId: string): void {
@@ -301,7 +314,6 @@ export function commitNarrativeAgentTurn(run: InternalRunState, attemptId: strin
     source: previous.source,
     stage: "commit",
     actId: previous.actId,
-    beat: previous.beat,
     routeId: previous.routeId,
     factionId: previous.factionId,
     horizonRevision: previous.horizonRevision,
@@ -352,7 +364,7 @@ export async function runNarrativeAgentDecision(input: {
   context: NarrativeContext;
   callId: string;
   choice?: PublicMilestoneChoice;
-  decision: { decision: DecisionType; label: string; description: string; abilityRefs?: string[]; locationDirective?: NarrativeTurnPlan["locationDirective"]; decisionBrief?: NarrativeDecisionBrief; attributePolicy: NarrativeAttributePolicy; factResolutionModes?: NarrativeFactResolution[] };
+  decision: { decision: DecisionType; label: string; description: string; abilityRefs?: string[]; locationDirective?: import("@reroll/shared").MilestoneChoice["options"][number]["locationDirective"]; decisionBrief?: NarrativeDecisionBrief; attributePolicy: NarrativeAttributePolicy };
   onProgress?: (stage: "settling" | "rendering" | "syncing") => Promise<void> | void;
   onRendered?: (outcome: Omit<DirectedDecisionNarrativeOutcome, "effects">) => Promise<void> | void;
   onSettled?: () => Promise<void> | void;
@@ -378,7 +390,6 @@ export async function runNarrativeAgentDecision(input: {
     source: "decision",
     stage: "prepare",
     actId: input.run.narrative.actRuntime?.actId,
-    beat: input.run.narrative.actRuntime?.beat,
     horizonRevision: input.run.narrative.horizonPlan?.revision,
     digestRevision: input.run.narrative.memoryRevision,
     briefId,
@@ -387,8 +398,12 @@ export async function runNarrativeAgentDecision(input: {
   });
   await input.onProgress?.("rendering");
   const check = input.run.nextMilestoneChoice?.check;
+  const flowStep = currentEventFlowStep(input.run);
+  const selectedResult = flowStep && execution ? eventFlowResult(input.run,
+    execution.roll.decision + ":" + (execution.roll.success ? "success" : "failure")) : undefined;
   const rendered = execution?.rendered ?? await renderDirectedDecisionNarrative(input.run, input.world, {
     ...input.decision, check, roll: execution?.roll,
+    eventResult: selectedResult ? bindEventFlowText(selectedResult.result, input.run.narrative.eventFlow!.bindings) : undefined,
     allowSurvival: Boolean(check && execution && canOpenChoiceSurvival(check, execution.roll)),
     socialForces: input.narrativeWorld.socialForces
   }, input.context);
@@ -396,7 +411,7 @@ export async function runNarrativeAgentDecision(input: {
   await input.onRendered?.(rendered);
   appendAttempt(input.run, {
     callId: input.callId, attemptId, task: "decision", source: "decision", stage: "render",
-    actId: input.run.narrative.actRuntime?.actId, beat: input.run.narrative.actRuntime?.beat,
+    actId: input.run.narrative.actRuntime?.actId,
     briefId, focusIds: briefFocusIds, worldCardIds: briefWorldCardIds,
     contextFragmentIds: contextFragmentIds(input.context)
   });
@@ -415,10 +430,10 @@ export async function finishNarrativeAgentDecision(input: {
   callId: string; attemptId: string; choice?: PublicMilestoneChoice;
   decision: { label: string; description: string }; outcome: DirectedDecisionNarrativeOutcome;
   onAssetsSynced?: () => Promise<void> | void;
-}): Promise<NarrativeBeatObservation> {
+}): Promise<void> {
   const { run, outcome } = input;
   const runtime = input.run.narrative.actRuntime;
-  if (!runtime) throw new Error("decision_beat_observer_runtime_missing");
+  if (!runtime) throw new Error("decision_act_runtime_missing");
   if (!run.choiceExecution?.assetsSynced) {
     // A pending choice is never a separately completed experience in this batch.
     if (run.narrative.assetBuffer) run.narrative.assetBuffer.rounds = run.narrative.assetBuffer.rounds.filter((round) => round.sourceEventId !== run.pendingDynamicScene?.id);
@@ -436,35 +451,10 @@ export async function finishNarrativeAgentDecision(input: {
       ...(run.pendingDynamicScene.characterIds ?? []), ...(outcome.handoff?.characters ?? []).map((entry) => entry.characterRef)
     ]));
     run.narrative.assets = applyNarrativeAssetActivity(run.narrative.assets, outcome.assetActivity, { age: run.age });
-    await synchronizeNarrativeAssetBatch(run, input.world, input.context, input.callId, input.narrativeWorld.socialForces, true);
+    // Full result and finalization source are committed by the caller first.
     if (run.choiceExecution) run.choiceExecution.assetsSynced = true;
     await input.onAssetsSynced?.();
   }
-  if (run.survivalCrisis) return { decision: "hold", actId: runtime.actId, beat: runtime.beat, createdAt: Date.now() };
-  const observation = await observeNarrativeBeat(input.run, input.world, {
-    callId: input.callId, actId: runtime.actId, beat: runtime.beat,
-    recentStory: narrativeObservationHistory(input.run, {
-      actId: runtime.actId, age: input.run.age, sourceEventId: outcome.handoff!.sourceEventId, narrative: outcome.narrative,
-      decisionResult: run.choiceExecution?.roll ? (run.choiceExecution.roll.success ? "success" : "failure") : undefined,
-      selection: input.choice ? { choice: input.choice, label: input.decision.label, description: input.decision.description } : undefined
-    }),
-    outline: runtime.outline
-  }, input.context);
-  input.run.narrative.lastBeatObservation = observation;
-  appendAttempt(input.run, {
-    callId: input.callId,
-    attemptId: input.attemptId,
-    task: "decision",
-    source: "decision",
-    stage: "sync",
-    actId: input.run.narrative.actRuntime?.actId,
-    beat: input.run.narrative.actRuntime?.beat,
-    horizonRevision: input.run.narrative.horizonPlan?.revision,
-    digestRevision: input.run.narrative.memoryRevision,
-    continuityStatus: "requested_changed",
-    contextFragmentIds: contextFragmentIds(input.context)
-  });
-  return observation;
 }
 
 export async function runNarrativeAgentEnding(input: {
@@ -474,7 +464,7 @@ export async function runNarrativeAgentEnding(input: {
   callId: string;
   narrativeWorld?: NarrativeWorldDefinition | null;
 }): Promise<{ attemptId: string; narrative: string }> {
-  await synchronizeNarrativeAssetBatch(input.run, input.world, input.context, input.callId, input.narrativeWorld?.socialForces, true);
+  // Ending maintenance shares the caller's post-commit opportunity, not a second pre-render attempt.
   if (input.narrativeWorld) input.context.narrativePlan = buildNarrativePromptPlan(input.run, input.narrativeWorld, null, "ending");
   const attemptId = `attempt:${randomUUID()}`;
   appendAttempt(input.run, {
@@ -484,7 +474,6 @@ export async function runNarrativeAgentEnding(input: {
     source: "ending",
     stage: "prepare",
     actId: input.run.narrative.actRuntime?.actId,
-    beat: input.run.narrative.actRuntime?.beat,
     horizonRevision: input.run.narrative.horizonPlan?.revision,
     digestRevision: input.run.narrative.memoryRevision
   });
@@ -496,7 +485,6 @@ export async function runNarrativeAgentEnding(input: {
     source: "ending",
     stage: "render",
     actId: input.run.narrative.actRuntime?.actId,
-    beat: input.run.narrative.actRuntime?.beat,
     horizonRevision: input.run.narrative.horizonPlan?.revision,
     digestRevision: input.run.narrative.memoryRevision,
     contextFragmentIds: contextFragmentIds(input.context)

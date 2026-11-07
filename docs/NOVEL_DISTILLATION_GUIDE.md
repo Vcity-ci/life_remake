@@ -1,456 +1,68 @@
-# 小说蒸馏成新图配置操作文档
+# 从小说与设定整理游戏素材
 
-## v10 制作入口更新：2026-09-21 +08:00
+更新时间：2026-11-05。当前内容职责见 [世界卡规范](NARRATIVE_WORLD_CARD_DESIGN.md)，边镇路线的事件执行见 [版本 20](EVENT_FLOW_V20.md)。
 
-当前蒸馏分为两份互不重复的产物：
+本指南替代旧的世界线、阵营随机事件池、文风与五拍蒸馏步骤。旧版本可从 Git 查看，不再将多份旧方法并列为现行制作入口。
 
-- 基础世界包提取共同世界观：时代与秩序、社会力量、生活方式、能力边界、题材文风、成长／生存规则以及所有路线共用的按需世界卡。
-- IF 子世界包提取一条可以从头走到结局的人生脉络：路线承诺、可容纳不同人设的入口视角、三个递进阶段、长期 stakes 与三档结局方向。
+## 先取得真实材料
 
-路线不复刻原作逐章剧情，也不退回宽泛的“故事形态”。应提炼玩家代入该类小说人物后想完成的明确人生目标，再把具体 NPC、地点、能力、冲突和成败留给本局上下文生成。三幕只写 objective、dramaticQuestion、pressureDirection、payoffMeaning，不为五个拍点逐条制作事件。
+使用原创、授权或公版材料。长篇先按原有章节阅读并记录来源，不将未经授权的完整商业文本上传到模型。整理时保留原文事实和整理者判断的区别；缺失的信息不能以“更丰富”为由擅自补成设定。
 
-一份子世界包可以单独增删改；基础世界不登记子包，也不因某条路线存在而重复它的剧情提示。制作入口以 `examples/world-pack/story.example.json`、`story-pack.example.json`、`WORLD_PACK_GUIDE.txt` 与 `STORY_PACK_GUIDE.txt` 为准。下方 v9 及更早章节保留为历史方法。
+本轮古代素材只整理已有内容，暂不增加军屯新制度、诸部新派系或欠饷事件组。
 
-## v9 制作入口更新：2026-09-20 03:44 +08:00
-
-当前世界包不再蒸馏“玩家要走哪几条路线”，而是蒸馏可复用的世界规律与叙事能力：
-
-- 用 `worldCore` 提取题材身份、稳定规律和真正开放的可能性；不要写已经发生的本局事实。
-- 用 `socialForces` 提取会产生人物、资源、压力和反应的社会力量；不要把它们写成必须加入的互斥阵营。
-- 用 `narrativePalette` 提取生活、冲突、行动与反思的具体质感，帮助不同世界在隐藏名称后仍可区分。
-- 用 `storyPatterns` 提取可反复组合的故事形态，而不是原作情节梗概。Planner 每回合可选 0—2 项，也可完全依照本局事实推进。
-- 用 `worldCards` 保存需要按情景召回的制度、空间、文化、能力、冲突土壤与短表达样例。动态人物、地点、本领和事实应留给本局状态。
-- 三个结构槽只描述“接触世界—扩大影响—形成一生结果”的职责；具体戏剧问题由开局 `sessionPremise` 依据玩家人设、最终天赋和身世生成。
+## 从材料中识别什么
 
-下方 v6—v8 路线与静态事件制作方法保留为历史资料。制作新的 v9 包时以 `examples/world-pack/story.example.json` 和 `WORLD_PACK_GUIDE.txt` 为准。
-
-## 世界包制作入口更新：2026-09-10 00:26 +08:00
-
-当前动态叙事的制作方式以本节和 [世界包 JSON 说明](../examples/world-pack/WORLD_PACK_GUIDE.txt) 为准。下方早期的静态事件池蒸馏流程留作历史参考；当前扩展不要求为每条路线、每个拍点逐条编写事件。
-
-- 基础包负责前端名称、简介、基础文风和年龄段；v6 叙事包负责世界背景、文风、三幕中心、阵营、经历视角、Lore、成长／生存配置和三档结局。
-- 三幕分别写清本阶段人物面对的现实、形成的挑战及处理后的结果。前幕经验、关系和处境承接后幕，具体事件仍由模型生成。可采样长篇作品的阶段组织方式，不必把一份证据或同一个未解谜团贯穿全局。
-- 古代参考包强调案件入局、阵营立身、战乱担当；奇幻参考包强调成长入道、宗门历练、破境问道；现代参考包强调学习成长、选择迷茫、关系成就。题材通过对应世界包表达。
-- `routeArcs` 是始终可选的经历视角，`narrativeFactions` 提供互动组织与利益关系。人物、地点、本领和开放事实在对局中生成、持久化与召回。
-- 生活成长由背景工具承担，当前幕与节拍任务进入场景工具；世界知识按任务相关性召回。已收束事实以结果留存，避免作者把所有阶段都写成更大谜团的开端。
-- 从 `world.example.json` 与 `story.example.json` 成对复制；完整生存玩法配置可参考三个内置包的 `progression.survival`。模板不是全套玩法配置的自动导入器。
-- 新基础世界在首次初始化时进入内容仓储；已有安装需同步 worlds 列表。叙事包修改后需刷新后端进程缓存，详见 [配置指南](./CONFIG_GUIDE.md)。
+| 原文中的内容 | 整理结果 | 进入的位置 |
+| --- | --- | --- |
+| 时代、地理、制度、生活事实 | 已确认的世界设定 | worldCore 与局部资料卡 |
+| 起始政治与社会局势 | 开局时代切片 | storyBible 与局势卡 |
+| 某人或组织的身份、目的与力量 | 人物、势力资料 | 对应世界卡；幕初再选定本局具体配置 |
+| 一生的发展方向与结果尺度 | 入口、三幕目的、收束与结局标准 | IF 子世界包 |
+| 完整事件的行动、分支与后果 | 经确认的人工事件组 | 已配置事件组路线的 event-flows |
+| 原作主角已经经历的事情 | 参考原作组织方式 | 不直接登记为本局历史 |
+| 作者文风、意象、感官样例、道德评价 | 不制作全局写作指令 | 不供应运行请求 |
 
-内容制作不要求安装 SillyTavern，不依赖向量 RAG。当前使用人物、资产、事实与历史条目的本地结构化索引。
+世界规则保留素材中有确定内容的运行秩序，包括社会制度与超自然机制。军镇的存在是背景，军职对应的部伍、谁能授职与战功怎样兑现才是规则。全世界共同适用的简短规则可以放 laws，具体制度放对应的 world_rule 卡；原文没有时不擅自补造。不能把“消息重要”“承诺要兑现”等常识重新命名为世界规律。
 
-本文档说明如何把一部小说、设定集或长篇故事素材，借助 AI 蒸馏成本项目可用的新世界观配置。
+## 先厘清连通关系，再制作字段
 
-## 1. 前提
+阅读具体故事时，先辨明谁想得到什么、采取了什么行动，主角怎样参与，以及结果怎样改变后续处境。失败之后已经发生的损失、撤离或关系变化是结果；不能自动改成同一资格仍待证明。
 
-- 只处理你拥有使用权的文本：原创、授权、公版，或仅用于本地私有测试的素材。
-- 不建议把整部未授权商业小说直接上传到第三方模型。
-- 如果素材很长，先分章摘要，再让 AI 基于摘要与结构化笔记生成配置。
-- 目标不是复刻原作剧情，而是提取“世界规则、冲突结构、事件母题、人物命运感”，转成可随机运行的人生模拟地图。
+这些分析用于整理和确认素材，不作为每次正文必须逐项回答的新清单。不同任务只读取自身所需内容，不把同一段分析同时写进总览、角色档案和未来任务。
 
-## 2. 本项目需要的配置文件
-
-运行时最关键：
-
-- `storage/custom-content.json`
-  - 当前实际运行内容入口。
-  - 包含 `worlds`、`cards`、`difficulties`、`promptPack`、`gameplayTuning`。
-  - 修改后影响新开局，不回溯旧局。
-
-设定源与扩展入口：
-
-- `data/worlds/*.json`
-  - 世界基础配置种子。
-  - 当前已有 `storage/custom-content.json` 时，直接改这里通常不会影响运行。
-- `data/settings/worldlines/*.timeline.json`
-  - 世界线背景、核心冲突、秩序、禁忌。
-  - 当前 AI 摘要主要使用 `eraName`、`timeframe`、`coreConflict`、`socialOrder`、`taboos`。
-- `data/settings/factions/factions.json`
-  - 阵营价值观、行为方式、事件偏好、情报风格。
-- `data/events/faction-events.json`
-  - 各世界的阵营事件池，影响抉择背景和长期伏笔。
-- `data/talents/talent-cards.json`
-  - 天赋卡及 `promptHooks`，影响角色个人叙事倾向。
-- `skills/ai-gm/prompt-pack.json`
-  - 默认 prompt 资源。
-  - 运行时若已有 `storage/custom-content.json`，优先看 `storage/custom-content.json.promptPack`。
-
-## 3. 总流程
-
-1. 确认素材范围
-2. 分章做摘要
-3. 蒸馏世界观圣经
-4. 蒸馏阵营与事件池
-5. 蒸馏天赋卡与叙事钩子
-6. 生成项目 JSON 草案
-7. 人工校验字段与边界
-8. 写入 `storage/custom-content.json` 和 `data/*`
-9. 本地跑局验证
-10. 根据输出问题迭代 prompt 和事件池
-
-## 4. 第一步：把小说拆成结构化摘要
-
-长篇素材不要一次塞给 AI。建议按章节或每 1~3 万字分块处理。
-
-每个分块让 AI 输出：
-
-```text
-你是世界观蒸馏助手。请从以下章节中提取可用于人生模拟游戏的结构化信息。
-不要复述原文，不要输出长段剧情，只提炼规则、冲突、地点、阵营、事件母题。
-
-输出 JSON：
-{
-  "plotFacts": ["本段发生的关键事实，最多8条"],
-  "worldRules": ["世界运行规则，最多8条"],
-  "socialOrder": ["阶层、制度、资源分配方式，最多8条"],
-  "factions": [
-    {
-      "name": "阵营名",
-      "values": ["价值观"],
-      "behavior": "典型行动方式",
-      "conflicts": ["与谁冲突、为何冲突"]
-    }
-  ],
-  "eventSeeds": ["可随机化为年份事件或抉择事件的母题，最多12条"],
-  "tone": ["叙事语气关键词"],
-  "taboos": ["世界内禁忌或高风险行为"]
-}
-
-素材：
-<<<粘贴本章或本段摘要>>>
-```
-
-产物建议保存为临时文件，例如：
-
-```text
-drafts/novel-distill/chapter-001.json
-drafts/novel-distill/chapter-002.json
-```
-
-## 5. 第二步：合并成世界观圣经
-
-把所有章节摘要喂给 AI，让它合并去重。
-
-提示词：
-
-```text
-你是游戏世界观设计师。请把以下章节摘要合并成一个适合“AI人生重开器”的世界观圣经。
-目标是让随机年份叙事有清晰脉络，而不是复刻原作剧情。
-
-要求：
-1. 提炼稳定世界规则，不写具体原文桥段。
-2. 提炼可复用冲突，不依赖固定主角。
-3. 每个字段短句高密度，避免散文。
-4. 输出 JSON。
-
-输出结构：
-{
-  "worldId": "英文小写id",
-  "worldName": "中文世界名",
-  "intro": "一句话介绍",
-  "stylePrompt": "64字内文风和叙事重点",
-  "eraName": "时代名",
-  "timeframe": "时间范围或时代感",
-  "coreConflict": "核心冲突，120字内",
-  "socialOrder": "社会秩序，120字内",
-  "taboos": ["世界禁忌，3-8条"],
-  "yearlyEventHints": ["年份主题，5-8个"],
-  "mainlineStages": [
-    { "stage": "阶段名", "ageRange": "0-12", "goal": "该阶段主线压力" }
-  ],
-  "factionTone": "阵营互动总基调"
-}
-
-章节摘要：
-<<<粘贴所有章节摘要或摘要索引>>>
-```
-
-## 6. 第三步：生成项目文件草案
-
-### 6.1 生成 `worlds` 配置
-
-目标位置：
-
-- 新图种子：`data/worlds/{worldId}.json`
-- 当前运行：同步到 `storage/custom-content.json.worlds`
-
-字段模板：
-
-```json
-[
-  {
-    "id": "new_world",
-    "name": "新世界名",
-    "intro": "一句话介绍。",
-    "stylePrompt": "文风克制，强调秩序、代价、长期伏笔。",
-    "milestoneAges": [15, 20, 30, 40],
-    "endAgeRange": { "min": 55, "max": 85 },
-    "yearlyEventHints": ["主题一", "主题二", "主题三", "主题四", "主题五"]
-  }
-]
-```
-
-注意：
-
-- `milestoneAges` 当前不是主要抉择触发逻辑，真实触发看 `gameplayTuning.milestone`。
-- `yearlyEventHints` 会直接影响普通年标题主题。
-- `stylePrompt` 会进入 AI prompt，但会被压缩，必须短而密。
-
-### 6.2 生成 worldline
-
-目标位置：
-
-- `data/settings/worldlines/{worldId}.timeline.json`
-
-模板：
-
-```json
-[
-  {
-    "id": "new_world",
-    "eraName": "时代名",
-    "timeframe": "时代范围",
-    "coreConflict": "核心冲突，短句高密度。",
-    "socialOrder": "阶层、制度、资源和风险结构。",
-    "taboos": ["禁忌一", "禁忌二", "禁忌三"],
-    "mainlineStages": [
-      { "stage": "幼年", "ageRange": "0-12", "goal": "被秩序塑形，埋下身份压力。" },
-      { "stage": "青年", "ageRange": "13-29", "goal": "选择阵营或道路，第一次付出代价。" }
-    ],
-    "factionTone": "阵营都不纯善，行动更看重代价与资源。"
-  }
-]
-```
-
-注意：
-
-- 当前代码摘要主要使用 `eraName/timeframe/coreConflict/socialOrder/taboos`。
-- `mainlineStages` 可先写好，但若希望强力进入 prompt，需要后续扩展 `summarizeWorldline`。
-
-### 6.3 生成 factions
-
-目标位置：
-
-- `data/settings/factions/factions.json`
-
-模板：
-
-```json
-[
-  {
-    "id": "faction_id",
-    "name": "阵营名",
-    "values": ["秩序", "血统", "代价"],
-    "behavior": "通过婚盟、审判、资源封锁影响个人命运。",
-    "eventBias": ["家族联姻", "边地战事"],
-    "intelStyle": "消息常以密信、流言、账册异常出现。"
-  }
-]
-```
-
-设计标准：
-
-- 每个阵营必须有明确利益，不只是一句设定。
-- `behavior` 写“它如何改变玩家人生”。
-- `eventBias` 要能映射到 `yearlyEventHints` 或事件池。
-
-### 6.4 生成 faction-events
-
-目标位置：
-
-- `data/events/faction-events.json`
-
-模板：
-
-```json
-[
-  {
-    "worldId": "new_world",
-    "factionId": "faction_id",
-    "events": [
-      "你收到一封匿名密信，暗示家族账册里有不该存在的支出。",
-      "边地忽然传来征调令，熟人劝你趁乱换取一份军功。",
-      "旧日恩人要求你在公开场合为某个可疑人物作证。"
-    ]
-  }
-]
-```
-
-事件池写法：
-
-- 不写固定主角名。
-- 用第二人称可承接的事件种子。
-- 每条都要能自然变成 A/B/C 抉择。
-- 每个阵营至少 8-15 条事件，避免复读。
-
-### 6.5 生成 talent-cards
-
-目标位置：
-
-- `data/talents/talent-cards.json`
-- 若要运行卡池立即生效，也要同步到 `storage/custom-content.json.cards`。
-
-模板：
-
-```json
-[
-  {
-    "id": "t_hidden_lineage",
-    "name": "隐秘血脉",
-    "rarity": "rare",
-    "description": "你的出身被刻意遮掩，却总在关键场合引来注视。",
-    "modifiers": { "family": 1, "fortune": 1 },
-    "tags": ["lineage", "secret"],
-    "promptHooks": {
-      "narrativeBias": "让身份疑云在年份叙事中逐步显影。",
-      "eventAffinity": ["家族联姻", "朝堂倾轧"],
-      "riskTone": "秘密带来机会，也带来被利用的风险。"
-    }
-  }
-]
-```
-
-注意：
-
-- `storage/custom-content.json.cards` 当前不保存 `promptHooks`，只保存基础卡牌字段。
-- `promptHooks` 来自 `data/talents/talent-cards.json`，按已选卡进入 AI 上下文。
-- 如果新增卡牌 id，要保证 `storage/custom-content.json.cards` 和 `data/talents/talent-cards.json` 的 id 对得上。
-
-## 7. 第四步：生成 promptPack 建议
-
-目标位置：
-
-- `storage/custom-content.json.promptPack`
-- 可同步种子到 `skills/ai-gm/prompt-pack.json`
-
-提示词：
-
-```text
-请基于以下世界观圣经，为 AI 人生模拟生成 promptPack。
-要求短句高密度，适合每年生成 50-80 字中文叙事。
-必须强调：第二人称、不得改数值、不得跳出世界观、承接近期历史、避免复读。
-
-输出 JSON：
-{
-  "systemCore": "",
-  "immersionRules": "",
-  "yearNormalRule": "",
-  "yearMinorRule": "",
-  "milestoneRule": "",
-  "storyConstraint": "",
-  "endingHint": ""
-}
-
-世界观圣经：
-<<<粘贴世界观圣经>>>
-```
-
-建议：
-
-- `systemCore` 放硬规则。
-- `immersionRules` 放文风。
-- `yearNormalRule/yearMinorRule` 控制年份总结。
-- `milestoneRule` 只管抉择背景和 A/B/C。
-- `storyConstraint` 放主线承接规则。
-- `endingHint` 放结局回扣规则。
-
-## 8. 第五步：人工校验清单
-
-写入项目之前逐项检查：
-
-- `worldId` 在所有文件一致。
-- `storage/custom-content.json.worlds` 包含新世界。
-- `data/settings/worldlines/*.timeline.json` 中有同一个 `id`。
-- `data/events/faction-events.json` 中 `worldId` 匹配。
-- `factionId` 必须能在 `factions.json` 找到。
-- `cards[].modifiers` 只使用合法属性：`intelligence/charisma/family/fortune/physique`。
-- `storage/custom-content.json.cards` 和 `data/talents/talent-cards.json` 的卡牌 id 对齐。
-- `yearlyEventHints` 至少 5 个，避免普通年主题太窄。
-- 每个阵营事件池至少 8 条，避免抉择背景重复。
-- `promptPack` 不写长篇设定，写短规则。
-
-## 9. 第六步：写入与生效
-
-推荐做法：
-
-1. 先备份 `storage/custom-content.json`。
-2. 把新世界追加到 `storage/custom-content.json.worlds`。
-3. 把新卡牌追加到 `storage/custom-content.json.cards`。
-4. 把新世界线写入 `data/settings/worldlines/{worldId}.timeline.json`。
-5. 把阵营写入 `data/settings/factions/factions.json`。
-6. 把事件写入 `data/events/faction-events.json`。
-7. 把天赋钩子写入 `data/talents/talent-cards.json`。
-8. 重启后端，重新打开前端或刷新 bootstrap。
-
-说明：
-
-- 已进行中的对局不会回溯更新。
-- 新配置只影响新开局。
-- 如果只改 `data/worlds`，已有 `storage/custom-content.json` 时通常不会生效。
-
-## 10. 第七步：本地验证
-
-建议至少做三轮验证：
-
-1. JSON 校验
-   - 启动后端，看是否能正常 `/api/meta/bootstrap`。
-   - 如果 schema 不通过，后端会在管理保存或读取流程暴露错误。
-2. 小样本跑局
-   - 每个世界跑 3 局，每局推进到至少 15 岁。
-   - 观察普通年是否围绕同一世界规则。
-   - 观察抉择背景是否来自阵营事件，而不是泛泛而谈。
-3. 复读检查
-   - 连续记录 20 条年份文本。
-   - 标记重复开头、重复结尾、重复事件。
-   - 回头增加 `yearlyEventHints`、阵营事件池或收紧 `storyConstraint`。
-
-## 11. 常见问题
-
-### 11.1 改了 `data/worlds` 但游戏没变化
-
-原因：运行时优先读 `storage/custom-content.json`。  
-处理：同步修改 `storage/custom-content.json.worlds`，或重建 storage。
-
-### 11.2 世界线写得很长但 AI 没用上
-
-原因：当前摘要主要取 `eraName/timeframe/coreConflict/socialOrder/taboos`。  
-处理：把核心信息压进这些字段；或后续修改 `summarizeWorldline` 让 `mainlineStages` 进入 prompt。
-
-### 11.3 事件像随机段子，没有主线
-
-原因：事件池只写了孤立事件，没有阵营目标和长期代价。  
-处理：每条事件都绑定阵营利益、玩家代价、可回扣后果。
-
-### 11.4 人物线不贴合天赋
-
-原因：只改了卡牌数值，没有同步 `data/talents/talent-cards.json.promptHooks`。  
-处理：给每张核心天赋写 `narrativeBias/eventAffinity/riskTone`。
-
-### 11.5 输出像原小说复述
-
-原因：蒸馏提示词没有强调“提取规则，不复刻剧情”。  
-处理：在蒸馏阶段明确禁止输出原文句子、固定角色剧情和专名依赖。
-
-## 12. 推荐文件落地顺序
-
-1. `data/settings/worldlines/{worldId}.timeline.json`
-2. `data/settings/factions/factions.json`
-3. `data/events/faction-events.json`
-4. `data/talents/talent-cards.json`
-5. `storage/custom-content.json.worlds`
-6. `storage/custom-content.json.cards`
-7. `storage/custom-content.json.promptPack`
-8. 小样本跑局验证
-9. 再同步 `data/worlds/{worldId}.json` 作为种子备份
-
-这样做的好处是先保证 AI 上下文有主线和阵营，再让前端世界选项与开局卡池跟上。
-
-## 13. 叙事世界包落地补充（2026-08-21 01:29 +08:00，增量）
-
-本节补充当前已启用的世界包结构。它不改变前述蒸馏原则：提取可复用冲突与因果，不复刻原作剧情。
-
-1. 新世界需要单独新增 `data/narratives/{worldId}.story.json`。引擎不识别“古代权谋”“修仙”或“现代”的名称，只读取世界包数据。
-2. `mainlineActs` 描述该世界递进的独立高潮。每幕应提供世界层面的 `prompt`，可选 `introduceFactIds`、`requiredFactIds` 和 `resolveFactIds`；不要用年龄范围替代主线完成条件。
-3. `routeArcs` 描述角色经历视角，而不是六条互斥主线。每条路线至少提供 `directionId`、`summary`、`coreThreadIds` 与 `materialEventIds`；可补充人物、Lore、危机与回收方向。模型每回合可从全部路线中选择一条。
-4. 每条路线的素材要覆盖 `setup -> escalation -> pressure -> climax -> payoff`。这不是要求同一路线独占一幕：世界幕可由任一路线的 payoff 推进，未完成路线保留局部进度并进入下一幕上下文。
-5. `eventBindings` 只负责把已有事件素材关联到世界包叙事信息。事件的具体文本、数值后果和基础权重仍放在原事件数据，不要在模型提示词中复制整池素材。
-6. 结局蓝图应围绕所有世界幕的最终后果设计。属性、天赋、道具和历史代价用于决定好/坏结局及代价，不应直接以年龄或单一路线完成作为终局开关。
+静态知识允许提供方法，例如侦察、临阵配合、治疗或运输条件；它不负责预写玩家人生。需要新增具体冒险时，先提交可审核的内容和分支去向，获得确认后再制作事件组。
+
+## 确认真实运行入口
+
+- 基础世界：data/narratives/<worldId>.story.json。
+- 公共资料卡：data/narratives/world-cards/<worldId>/**/*.json。
+- IF：data/narratives/story-packs/**/*.json。
+- 已配置的人工事件组：data/narratives/event-flows/*.json。
+- 玩家世界列表种子：data/worlds/*.json；已有安装的列表还由内容仓储管理。
+
+不要把叙事世界卡写入 storage/custom-content.json.promptPack，也不通过旧 worldline、随机阵营事件池或额外文风字段迂回供应。
+
+边镇当前从事件组目录取事件，IF 的 adventureSeeds 不进入该路线幕初材料。只修改没有消费者的素材字段不能构成实际落地。其他路线尚未采用事件组时，按其现有消费者整理。
+
+## 清理已有资料的方法
+
+1. 阅读完整静态正文及实际请求，记录谁供应、供应在哪里、何时生效。
+2. 将重复事实归回对应资料；删掉没有具体世界信息的普遍判断。
+3. 删除作者式的手续顺序、必留余味、必生新问题和人物评价要求。
+4. 保留合法限制和真实后果，不能为了避免重复而删除整个题材知识。
+5. 保留未获批准的剧情提案，不将它们写入世界卡或事件组。
+6. 同步类型、校验、模板和指南，防止必填字段或旧样例促使后续重新补回。
+
+古代本轮的原文问题、43 张卡处置与范围边界见 [静态审计记录](ANCIENT_STATIC_CONTENT_REVIEW.md)。
+
+## 核对修改效果
+
+先检查 JSON 与引用，再核对最终请求中是否仍存在被删内容的其他供应来源。比较固定 system、工具和稳定材料，确认动态状态不会改变固定前缀。
+
+运行实例需要分别判断：素材是否到达、分支是否执行、实际正文是否形成变化、历史是否重复强化意象。完整结局或接口正确不能替代故事审读。类型检查、测试与模型跑局按用户授权执行，不以固定字数或关键词判定故事合格。
+
+## 可参考的组织方式
+
+- [Dungeon World 的 Fronts 原文](https://raw.githubusercontent.com/Sagelt/Dungeon-World/master/text/Fronts.xml)：通过行动方的动机、无人干预时的行动及后果准备局势。这里只参考内容组织，不移植其机制。
+- [The Alexandrian 的准备局势方法](https://thealexandrian.net/wordpress/4147/roleplaying-games/dont-prep-plots)：准备对手、地点和条件。这里不据此撤销项目已经确认的人工事件分支。
+- [《三国演义》第四十一回](https://zh.wikisource.org/wiki/三國演義/第041回)：失利、携民撤退、追击与救援连续改变局面。参考因果和人物行动，不把原作经历直接搬进本局。

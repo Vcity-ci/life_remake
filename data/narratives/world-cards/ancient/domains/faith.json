@@ -2,6 +2,16 @@
   "worldId": "ancient",
   "cards": [
     {
+      "id": "ancient.domain.faith.temple_property",
+      "title": "教门身份、庙产与护持",
+      "kind": "world_rule",
+      "contextRole": "knowledge",
+      "content": "教门成员的传法资格由本门师承授予，主持者掌管本处公共庙产、祭仪与救济安排。私人供养与交付教门的公共财物分别归属，受托管理不等于私人占有。\n\n护持者提供住处、药材或庇护时，按已经成立的约定取得相应服务；护持不自动让其成为传承人或掌门。离任交还公共职权，已经学会的医术与仪轨仍归人物掌握。",
+      "priority": 76,
+      "placement": "scenario",
+      "activation": { "keys": ["教门", "传承", "传法", "庙产", "寺观", "护持", "主持"], "scanDepth": 5, "tasks": ["origin", "planning"] }
+    },
+    {
       "id": "ancient.domain.faith.disaster_healing",
       "title": "灾异、疫病与救治",
       "kind": "practice",
@@ -36,7 +46,7 @@
       "title": "封禁、禁忌与危险传承",
       "kind": "conflict",
       "contextRole": "knowledge",
-      "content": "危险之物、禁地、秘术或有害习俗需要被封存、改造或公开。封禁需要可信的见证、守护者和代价，也可能因继承断裂、权贵觊觎或民众恐惧再次失控。",
+      "content": "封存、改造与公开是对危险之物、禁地、秘术或有害习俗的不同处置。守护者、传承、权贵觊觎与民众恐惧影响既有封禁。",
       "priority": 75,
       "placement": "scenario",
       "activation": { "keys": ["封印", "封禁", "禁忌", "秘术", "禁地", "传承"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] }

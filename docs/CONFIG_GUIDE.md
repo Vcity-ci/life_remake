@@ -1,5 +1,27 @@
 # 配置指南（v1.0.0）
 
+## 当前入口：2026-11-07
+
+边镇将帅运行版本 20、其他 IF 运行版本 18。当前职责和供应顺序见[架构](ARCHITECTURE.md)与[最新历史／接组规范](PERIOD_MEMORY_AND_EVENT_ROUTING.md)。组末观察只判断收束，后续组由独立规划选择；压缩只处理未覆盖时期正文，不配置旧人生摘要的反复改写。
+
+边镇素材 2.4.0 支持在事件单元上配置 `lifeBefore: { minYears, maxYears, context }`，只控制本单元开始前的普通生活。引擎选定并保存年数，规划不新增调度输出。配置示例、适用衔接与实际效果见[普通生活](ORDINARY_LIFE_INTERVALS.md)，旧局不自动套用新素材。
+
+本地 `.env`、运行配置、自定义内容、存档及验证抓包不入库；空密钥模板与公开前端 API 默认值保留。配置文件的 Git 边界见[文件清单](REPOSITORY_HYGIENE.md)，文档按[索引](README.md)区分现行与历史。下面各日期章节保留对应时期说明，不把旧文体、五拍或用途扩写重新当作当前配置入口。
+
+## 静态内容整理：2026-11-05
+
+当前静态内容边界见 [世界卡规范](NARRATIVE_WORLD_CARD_DESIGN.md)，边镇线采用运行版本 20，其余路线保留既有入口。worldCore.laws 可省略；仅有明确特殊世界规则时填写，不要求每个世界生成“资源决定权力”等常识。古代材料本轮撤掉四条抽象规律及一张通用权力卡，清理手续清单和作者指令，未新增设定或事件组。逐卡记录见 [审计清单](ANCIENT_STATIC_CONTENT_REVIEW.md)。
+
+下方运行版本 18 及日期章节保留其对应时期的配置说明，不作为恢复旧文体、表达样例或五拍逻辑的制作入口。
+
+## 当前规则：运行版本 18（2026-11-04）
+
+详见 [当前叙事规范](NARRATIVE_V18.md)。世界配置不再支持文体、文风与结局指导字段。主持资料采用五项结构化模型输出，目的和收束依据取自 IF。时间交接必填，换幕不覆盖。配置编辑不提供已退出的职责项。IF 的 `endingDirections.closureBoundary` 区分局部受挫与成立的提前结局，不改变各幕目标及既有等级标准。
+
+提示词包仅保留非叙事旧年度入口使用的 `yearNormalRule / yearMinorRule / milestoneRule` 与公共 `userInputGuardRule / restrictedContentRule`；当前 AI 叙事职责固定在任务合同中。旧键在规范化时丢弃，不另行映射。
+
+下列日期章节均为历史记录，与当前规范冲突时不适用。
+
 ## 当前内容配置：2026-09-21 +08:00
 
 | 内容 | 当前来源与作用 |
@@ -152,7 +174,7 @@
 - 因此幼年阶段仍受 `child` 上限约束（默认 `-2..2`）
 
 ## 6. promptPack 建议
-- `systemCore/immersionRules` 放全局硬约束
+- `systemCore` 放全局硬约束
 - `yearNormalRule/yearMinorRule` 控制年度文风
 - `milestoneRule` 只管抉择背景与 A/B/C 文案输出格式
 - `storyConstraint/endingHint` 负责主线收束

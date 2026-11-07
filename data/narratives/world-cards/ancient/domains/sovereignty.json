@@ -16,7 +16,7 @@
       "title": "据点、攻城与地盘",
       "kind": "conflict",
       "contextRole": "knowledge",
-      "content": "争夺县城、关隘、粮仓、渡口和交通线，意味着从流动作战转向治理人口与土地。攻取容易守住难，军事胜利会立刻带来税粮、治安和俘降问题。",
+      "content": "县城、关隘、粮仓、渡口和交通线是作战与驻守的据点，也关系当地人口与土地。治理涉及税粮、治安和俘降处置。",
       "priority": 76,
       "placement": "scenario",
       "activation": { "keys": ["据点", "县城", "关隘", "攻城", "地盘", "渡口"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] }
@@ -36,7 +36,7 @@
       "title": "名分、登基与分封",
       "kind": "institution",
       "contextRole": "knowledge",
-      "content": "最高权力需要军事实力之外的名分、礼仪、官署承认与地方响应。称王、登基、拥立或奉旧主都要安排功臣、宗室、士族和盟友，并承担分封与中央权力的张力。",
+      "content": "称王、登基、拥立与奉旧主涉及名分、礼仪、官署和地方响应。分封关系功臣、宗室、士族与盟友，也影响中央与地方的权力。",
       "priority": 78,
       "placement": "scenario",
       "activation": { "keys": ["登基", "称王", "拥立", "名分", "分封", "宗室"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] }
@@ -46,7 +46,7 @@
       "title": "战后治理与继承",
       "kind": "consequence",
       "contextRole": "knowledge",
-      "content": "定鼎之后仍需裁撤或安置军队、恢复生产、处理旧敌、兑现功臣、建立税制并安排继承。胜利者如何约束自己，比夺取天下更能决定新秩序能否延续。",
+      "content": "战后治理包括军队裁撤或安置、生产恢复、旧敌与功臣的处置、税制和继承。",
       "priority": 77,
       "placement": "scenario",
       "activation": { "keys": ["战后", "治理", "功臣", "税制", "继承", "裁军"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] }

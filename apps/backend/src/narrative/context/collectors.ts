@@ -47,8 +47,6 @@ const stableProvider: NarrativeContextProvider = {
     if (!plan?.task) return [];
     return [
       ...(plan.talents ?? []).flatMap((talent) => fragment({ id: narrativeContentId("talent", talent), layer: "stable", section: "talents", sourceType: "talent", priority: 90, content: talent })),
-      ...(plan.seedHints ?? []).flatMap((hint) => fragment({ id: narrativeContentId("seed-hint", hint), layer: "stable", section: "seedHints", sourceType: "seed-hint", priority: 35, content: hint })),
-      ...(plan.origin && !plan.protagonist && !plan.storyHistory?.summary?.originCovered ? fragment({ id: "stable:origin", layer: "stable", section: "origin", sourceType: "origin", priority: 85, content: plan.origin }) : []),
       ...(plan.worldCoreContext ? fragment({ id: "stable:world-core", layer: "stable", section: "world", sourceType: "world-core", priority: 98, content: plan.worldCoreContext, required: true }) : []),
       ...(plan.storyBible ? fragment({ id: "stable:world-snapshot", layer: "stable", section: "worldSituation", sourceType: "world-snapshot", priority: 96, content: plan.storyBible, required: true }) : []),
       ...(plan.actBackground ? fragment({ id: "stable:act-world", layer: "stable", section: "actWorld", sourceType: "act-world", priority: 100, content: plan.actBackground, required: true }) : [])
@@ -97,14 +95,11 @@ const loreProvider: NarrativeContextProvider = {
 const worldCardProvider: NarrativeContextProvider = {
   id: "world-cards",
   collect: ({ plan }) => !plan?.task ? [] : (plan.activeWorldCardSources ?? []).flatMap((card) => {
-    const role = card.contextRole ?? (card.placement === "example" ? "style" :
-      card.placement === "world" && card.activationReason === "constant" && card.stickyTurns === 0 && card.cooldownTurns === 0 ? "foundation" : "knowledge");
-    const target = role === "foundation"
+    const role = card.contextRole ?? (card.placement === "world" && card.activationReason === "constant" && card.stickyTurns === 0 && card.cooldownTurns === 0 ? "foundation" : "knowledge");
+    const target = card.kind === "world_rule" || role === "foundation"
       ? { layer: "stable" as const, section: "world" as const, priority: 86 }
       : role === "situation"
         ? { layer: "stable" as const, section: "worldSituation" as const, priority: 84 }
-      : role === "style"
-        ? { layer: "recall" as const, section: "styleExamples" as const, priority: 78 }
         : { layer: "recall" as const, section: "lore" as const, priority: 80 };
     return fragment({
       id: `recall:world-card:${card.id}|${card.stickyTurns}|${card.cooldownTurns}|${card.activationKind}`,
@@ -149,13 +144,13 @@ const storyHistoryProvider: NarrativeContextProvider = {
   id: "story-history",
   collect: ({ plan, historyMessages = [] }) => {
     if (!plan?.task) return [];
-    if (!plan.storyHistory) return !plan.protagonist && plan.effectiveBackground ? fragment({
+    if (!plan.storyHistory) return plan.effectiveBackground ? fragment({
       id: "runtime:effective-background", layer: "runtime", section: "storyHistory", sourceType: "effective-background", priority: 92,
       content: `人物重要经历（已发生的历史背景）：${plan.effectiveBackground}`, required: true
     }) : [];
     const projected = projectNarrativeStoryHistory(plan.storyHistory, historyMessages);
     return [
-      ...(projected.summary && !plan.protagonist ? fragment({
+      ...(projected.summary ? fragment({
         id: `runtime:story-summary:${projected.summary.id}`, layer: "runtime", section: "storyHistory", sourceType: "story-summary",
         sourceIds: projected.summary.coveredEpisodeIds, priority: 92,
         content: `人物重要经历（已压缩背景）：${projected.summary.text}`, required: true
@@ -166,7 +161,7 @@ const storyHistoryProvider: NarrativeContextProvider = {
         content: formatNarrativeExperience(episode, formatNarrativeDialogue({ ...episode, narrative: episode.narrative ?? "" })),
         required: true
       })),
-      ...(projected.changes.some((episode) => episode.id === plan.storyHistory!.latestSituationId) ? fragment({
+      ...(plan.task !== "ending" && projected.changes.some((episode) => episode.id === plan.storyHistory!.latestSituationId) ? fragment({
         id: "runtime:latest-situation", layer: "runtime", section: "storyHistory", sourceType: "latest-situation",
         priority: 92, content: "【最新已提交处境】见以上最后一段。", required: true
       }) : [])
@@ -176,17 +171,14 @@ const storyHistoryProvider: NarrativeContextProvider = {
 
 const protagonistProvider: NarrativeContextProvider = {
   id: "current-protagonist",
-  collect: ({ plan }) => {
+  collect: ({ plan, task }) => {
     if (!plan?.protagonist) return [];
-    const summary = plan.storyHistory?.summary;
     const parts = formatNarrativeProtagonistParts(plan);
     return [
       ...fragment({ id: "stable:protagonist", layer: "stable", section: "protagonist", sourceType: "protagonist-identity",
         priority: 100, required: true, content: parts.identity }),
-      ...fragment({ id: "stable:protagonist-experience", layer: "stable", section: "protagonist", sourceType: "story-summary",
-        sourceIds: summary?.coveredEpisodeIds ?? [], priority: 100, required: true, content: parts.experience }),
-      ...fragment({ id: "active:protagonist", layer: "active", section: "protagonist", sourceType: "protagonist",
-        priority: 100, required: true, content: parts.currentState })
+      ...(task === "ending" ? [] : fragment({ id: "active:protagonist", layer: "active", section: "protagonist", sourceType: "protagonist",
+        priority: 100, required: true, content: parts.currentState }))
     ];
   }
 };
@@ -249,7 +241,6 @@ const endingProvider: NarrativeContextProvider = {
   id: "ending",
   collect: ({ plan, task }) => !plan?.task || task !== "ending" ? [] : [
     ...(plan.ending ? fragment({ id: "active:ending-brief", layer: "active", section: "ending", sourceType: "ending-brief", priority: 100, content: plan.ending, required: true }) : []),
-    ...(plan.endingGuide ? fragment({ id: "active:ending-guide", layer: "active", section: "ending", sourceType: "ending-guide", priority: 90, content: `结局文风：${plan.endingGuide}` }) : [])
   ]
 };
 

@@ -9,8 +9,8 @@ const changeText = z.string().trim();
 const moment = z.object({ ageFrom: z.number().nonnegative().optional(), age: z.number().nonnegative() });
 const placeFields = {
   parentLocationId: changeText.optional(),
-  features: z.array(z.object({ name: text, state: text })).optional(),
-  actors: z.array(z.object({ characterIds: z.array(text).optional(), factionId: changeText.optional(), organizationName: changeText.optional(), relation: text })).optional()
+  features: z.array(z.object({ id: text.optional(), name: text, state: text })).optional(),
+  actors: z.array(z.object({ id: text.optional(), characterIds: z.array(text).optional(), factionId: changeText.optional(), organizationName: changeText.optional(), relation: text })).optional()
 };
 const location = z.object({ id: text, name: text, description: changeText.optional(), pendingDetails: z.boolean().optional(), spatialDescription: changeText.optional(), ...placeFields, introduced: moment, lastSeen: moment });
 const ability = z.object({
@@ -18,7 +18,10 @@ const ability = z.object({
   introduced: moment, updated: moment
 });
 const updates = z.object({
-  locations: z.array(z.object({ ref: text, name: text.optional(), pendingDetails: z.boolean().optional(), description: changeText.optional(), spatialDescription: changeText.optional(), ...placeFields, current: z.boolean().optional() })),
+  locations: z.array(z.object({ ref: text, name: text.optional(), pendingDetails: z.boolean().optional(), description: changeText.optional(), spatialDescription: changeText.optional(), ...placeFields, current: z.boolean().optional(),
+    featureChanges: z.array(z.object({ id: text, name: text.optional(), state: text.optional(), remove: z.boolean().optional() }).strict()).optional(),
+    actorChanges: z.array(z.object({ id: text, characterIds: z.array(text).optional(), factionId: changeText.optional(), organizationName: changeText.optional(), relation: text.optional(), remove: z.boolean().optional() }).strict()).optional()
+  })),
   abilities: z.array(z.object({
     ref: text, name: text.optional(), pendingDetails: z.boolean().optional(), description: changeText.optional(), usage: changeText.optional(), source: changeText.optional(), mastery: changeText.optional()
   }))
@@ -42,15 +45,15 @@ export function publicNarrativeAssetsSnapshot(raw?: NarrativeAssets): PublicNarr
   const assets = normalizeNarrativeAssets(raw);
   return structuredClone({
     currentLocationId: assets.currentLocationId,
-    locations: assets.locations.map(({ id, name, description, spatialDescription, parentLocationId, features, actors, introduced, lastSeen }) => ({ id, name, description, spatialDescription, parentLocationId, features, actors, introduced, lastSeen })),
-    abilities: assets.abilities.map(({ id, name, description, usage, source, mastery, introduced, updated }) => ({ id, name, description, usage, source, mastery, introduced, updated }))
+    locations: assets.locations.filter((entry) => !entry.retired).map(({ id, name, description, spatialDescription, parentLocationId, features, actors, introduced, lastSeen }) => ({ id, name, description, spatialDescription, parentLocationId, features, actors, introduced, lastSeen })),
+    abilities: assets.abilities.filter((entry) => !entry.retired).map(({ id, name, description, usage, source, mastery, introduced, updated }) => ({ id, name, description, usage, source, mastery, introduced, updated }))
   });
 }
 
 /** Planning sees current effects and conditions; acquisition histories stay in the archive. */
 export function narrativeAbilityDirectory(raw?: NarrativeAssets): Array<{ id: string; label: string }> {
   return normalizeNarrativeAssets(raw).abilities
-    .map((entry) => ({ id: entry.id, label: [narrativeAbilityLabel(entry), entry.description, entry.usage ? `使用：${entry.usage}` : ""].filter(Boolean).join("；") }));
+    .filter((entry) => !entry.retired).map((entry) => ({ id: entry.id, label: narrativeAbilityLabel(entry) }));
 }
 
 export function narrativeAbilityLabel(ability: Pick<NarrativeAbility, "name" | "mastery">): string {
@@ -84,7 +87,7 @@ export function narrativeLocationDirectory(raw?: NarrativeAssets, names: Narrati
   const assets = normalizeNarrativeAssets(raw);
   return assets.locations.map((entry) => ({
     id: entry.id,
-    label: `${narrativeLocationLabel(entry, { ...names, locations: names.locations ?? assets.locations })}${entry.id === assets.currentLocationId ? "（当前所在）" : ""}`
+    label: [entry.name, entry.parentLocationId ? "所属：" + (assets.locations.find((parent) => parent.id === entry.parentLocationId)?.name ?? entry.parentLocationId) : "", entry.id === assets.currentLocationId ? "当前所在" : ""].filter(Boolean).join("；")
   }));
 }
 
@@ -147,10 +150,25 @@ export function parseNarrativeAssetUpdates(raw: unknown, assets?: NarrativeAsset
 export function parseNarrativeAssetDeclarations(raw: unknown, assets: NarrativeAssets): NarrativeAssetUpdates | undefined {
   if (raw === undefined) return undefined;
   const parsed = assetDeclarations.parse(raw);
+  const identity = (entry: { ref: string; name?: string }, records: Array<{ id: string; name: string }>, prefix: string) => {
+    if (records.some((record) => record.id === entry.ref)) return entry.ref;
+    const matches = records.filter((record) => record.name === (entry.ref === "new" ? entry.name?.trim() : entry.ref));
+    if (matches.length === 1) return matches[0].id;
+    // The writer has names, not the display archive. An unregistered name is a
+    // candidate identity; it cannot be required to know whether an alias exists.
+    // Invented structured IDs still fail validation rather than becoming names.
+    return entry.ref === "new" || entry.ref.startsWith(prefix) ? entry.ref : "new";
+  };
   return parseNarrativeAssetUpdates({
-    locations: parsed.locations.map((entry) => assets.locations.some((record) => record.id === entry.ref)
-      ? { ref: entry.ref, ...(entry.current !== undefined ? { current: entry.current } : {}) } : entry),
-    abilities: parsed.abilities.map((entry) => assets.abilities.some((record) => record.id === entry.ref) ? { ref: entry.ref } : entry)
+    locations: parsed.locations.map((entry) => {
+      const ref = identity(entry, assets.locations, "location:");
+      return ref !== "new" ? { ref, ...(entry.current !== undefined ? { current: entry.current } : {}) }
+        : { ...entry, ref, name: entry.ref === "new" ? entry.name : entry.ref };
+    }),
+    abilities: parsed.abilities.map((entry) => {
+      const ref = identity(entry, assets.abilities, "ability:");
+      return ref !== "new" ? { ref } : { ...entry, ref, name: entry.ref === "new" ? entry.name : entry.ref };
+    })
   }, assets, true);
 }
 
@@ -159,8 +177,8 @@ export function narrativeAssetDeclarationsSchema(): Record<string, unknown> {
     type: "object", additionalProperties: false, required: ["ref"],
     anyOf: [{ properties: { ref: { const: "new" } }, required: ["name"] }, { properties: { ref: { not: { const: "new" } } } }],
     properties: {
-      ref: { type: "string", description: `已有${kind}完整 ID；新对象填 new，由引擎分配正式 ID。` },
-      name: { type: "string", minLength: 1, description: "新对象的名称。详细信息由连续性同步从正文提炼。" },
+      ref: { type: "string", description: `${kind}的准确名称或已知完整 ID；也可用 new＋name 登记。引擎复用唯一同名身份，未登记名称建立候选，歧义由后续整理判断。` },
+      name: { type: "string", minLength: 1, description: "对象名称。" },
       ...(current ? { current: { type: "boolean", description: "本段结束时实际所在地点。" } } : {})
     }
   } });
@@ -189,7 +207,7 @@ export function narrativeAssetUpdatesSchema(_assets?: NarrativeAssets): Record<s
           properties: {
             ref: { type: "string", description: "完整复制本局地点身份目录中的已有地点 ID，包含 location: 前缀；新建地点使用 new。" },
             name: { type: "string", minLength: 1, description: "地点的稳定名称；更正名称仍沿用同一 ID。" },
-            pendingDetails: { type: "boolean", description: "仅登记身份或资料尚不足为 true；本批已实际揭示必要资料才提交 false。省略保留。" },
+            pendingDetails: { type: "boolean", description: "已知资料不足为 true，不代表必须补齐。省略保留。" },
             description: { ...string, description: "地点是什么、用途与稳定背景；不包揽当前局势与到访经历。省略保留，空字符串清除。" },
             spatialDescription: { ...string, description: "地点在哪里、空间布局和通路。省略保留，空字符串清除。" },
             parentLocationId: { ...string, description: "所属的已有地点完整 ID；省略保留，空字符串解除归属。" },
@@ -211,10 +229,10 @@ export function narrativeAssetUpdatesSchema(_assets?: NarrativeAssets): Record<s
           properties: {
             ref: { type: "string", description: "完整复制本局本领身份目录中的已有本领 ID，包含 ability: 前缀；新建本领使用 new。" },
             name: { type: "string", minLength: 1, description: "本领的稳定、简短名称；首次登记或确需更正名称时填写，仍沿用同一 ID。" },
-            pendingDetails: { type: "boolean", description: "资料尚不足为 true；本批实际揭示必要能力或宝物资料才提交 false。省略保留。" },
-            description: { ...string, description: "这项技艺、能力或宝物是什么、能做什么；不编写使用履历。省略保留，空字符串清除。" },
+            pendingDetails: { type: "boolean", description: "已知资料不足为 true，不代表必须补齐。省略保留。" },
+            description: { ...string, description: "这项本领或宝物是什么。省略保留，空字符串清除。" },
             usage: { ...string, description: "当前使用方式、效果、适用条件与限制，宝物包括当前持有和使用条件；实际揭示或变化时填写，不罗列过去行动。" },
-            source: { ...string, description: "获得来历，供档案展示；不追加使用履历。省略保留，空字符串清除。" },
+            source: { ...string, description: "已知来源，仅供档案展示。省略保留，空字符串清除。" },
             mastery: { ...string, description: "仅技艺或能力填写当前掌握程度的简短称谓；宝物省略。省略保留，空字符串清除。" }
           }
         }
@@ -227,7 +245,24 @@ export function narrativeContinuityAssetContract(_assets: NarrativeAssets): {
   properties: Record<string, unknown>;
   required: string[];
 } {
-  const schema = narrativeAssetUpdatesSchema() as { properties: Record<string, unknown> };
+  const schema = narrativeAssetUpdatesSchema() as { properties: Record<string, any> };
+  const properties = schema.properties.locations.items.properties;
+  delete properties.features;
+  delete properties.actors;
+  const delta = (meaning: string, fields: Record<string, unknown>, requiredForNew: string[]) => ({
+    type: "array", description: meaning + "逐条差量；已有条目复制 id，新条目 id=new，移除使用 remove=true。省略字段保持原值。",
+    items: { type: "object", additionalProperties: false, required: ["id"], properties: {
+      id: { type: "string" }, remove: { type: "boolean" }, ...fields
+    }, anyOf: [
+      { properties: { id: { const: "new" } }, required: requiredForNew },
+      { properties: { id: { not: { const: "new" } } } }
+    ] }
+  });
+  properties.featureChanges = delta("当前设施、资源或障碍的状态。", { name: { type: "string" }, state: { type: "string" } }, ["name", "state"]);
+  properties.actorChanges = delta("当前与此地有关的人物、具名组织或势力的关系。", {
+    characterIds: { type: "array", items: { type: "string" } }, factionId: { type: "string" },
+    organizationName: { type: "string" }, relation: { type: "string" }
+  }, ["relation"]);
   return {
     properties: {
       locationUpdates: schema.properties.locations,
@@ -244,15 +279,48 @@ export function parseNarrativeContinuityAssetUpdates(
   for (const field of contract.required) {
     if (!Object.hasOwn(raw, field)) throw new Error(`${field}_required`);
   }
+  if (!Array.isArray(raw.locationUpdates) || raw.locationUpdates.some((entry: any) => entry && ("features" in entry || "actors" in entry))) throw new Error("location_entry_delta_required");
   const parsed = parseNarrativeAssetUpdates({
     locations: raw.locationUpdates,
     abilities: raw.abilityUpdates
   }, assets)!;
-  for (const entry of parsed.locations) for (const actor of entry.actors ?? []) {
+  for (const entry of parsed.locations) {
+    const known = assets.locations.find((location) => location.id === entry.ref);
+    for (const [changes, previous, required] of [
+      [entry.featureChanges, known?.features, ["name", "state"]],
+      [entry.actorChanges, known?.actors, ["relation"]]
+    ] as const) {
+      for (const change of changes ?? []) {
+        if (change.id === "new") {
+          if (change.remove || required.some((key) => !(change as Record<string, unknown>)[key])) throw new Error("location_entry_new_invalid");
+        } else if (!previous?.some((item) => item.id === change.id)) throw new Error("location_entry_reference_invalid");
+      }
+    }
+  }
+  for (const entry of parsed.locations) for (const actor of [...(entry.actors ?? []), ...(entry.actorChanges ?? [])]) {
     if (directory && actor.characterIds?.some((id) => !directory.characterIds.includes(id))) throw new Error("location_character_reference_invalid");
     if (directory && actor.factionId && !directory.factionIds.includes(actor.factionId)) throw new Error("location_faction_reference_invalid");
   }
   return parsed;
+}
+
+function applyEntryChanges<T extends { id?: string }>(previous: T[], changes: Array<{ id: string; remove?: boolean }>, required: string[], kind: string): T[] {
+  const result = structuredClone(previous);
+  for (const change of changes) {
+    const index = result.findIndex((item) => item.id === change.id);
+    if (change.id !== "new" && index < 0) throw new Error(kind + "_entry_reference_invalid");
+    if (change.remove) {
+      if (index < 0) throw new Error(kind + "_entry_reference_invalid");
+      result.splice(index, 1);
+      continue;
+    }
+    const { remove: _remove, ...fields } = change;
+    if (change.id === "new") {
+      if (required.some((key) => typeof (fields as any)[key] !== "string" || !(fields as any)[key].trim())) throw new Error(kind + "_entry_fields_required");
+      result.push({ ...fields, id: kind + ":" + randomUUID() } as T);
+    } else result[index] = { ...result[index], ...fields };
+  }
+  return result;
 }
 
 export interface NarrativeAssetApplication {
@@ -275,12 +343,17 @@ export function applyNarrativeAssetUpdates(
   for (const entry of normalized.locations) {
     const known = assets.locations.find((item) => item.id === entry.ref);
     const record: NarrativeLocation = known ?? { id: `location:${randomUUID()}`, name: text.parse(entry.name), pendingDetails: true, introduced: { ...when }, lastSeen: { ...when } };
+    const before = JSON.stringify(record);
     if (entry.name !== undefined) record.name = entry.name;
     for (const key of ["description", "spatialDescription", "parentLocationId"] as const) {
       if (entry[key] !== undefined) record[key] = entry[key] || undefined;
     }
-    if (entry.features !== undefined) record.features = structuredClone(entry.features);
-    if (entry.actors !== undefined) record.actors = structuredClone(entry.actors);
+    if (entry.features !== undefined) record.features = entry.features.map((item) => ({ ...item, id: item.id ?? "feature:" + randomUUID() }));
+    if (entry.actors !== undefined) record.actors = entry.actors.map((item) => ({ ...item, id: item.id ?? "actor:" + randomUUID() }));
+    if (entry.featureChanges) record.features = applyEntryChanges(record.features ?? [], entry.featureChanges, ["name", "state"], "feature");
+    if (entry.actorChanges) record.actors = applyEntryChanges(record.actors ?? [], entry.actorChanges, ["relation"], "actor");
+    const changed = !known || JSON.stringify(record) !== before;
+    if (changed) delete record.retired;
     if (entry.pendingDetails !== undefined) record.pendingDetails = entry.pendingDetails;
     if (!known) assets.locations.push(record);
     applied.locationIds.push(record.id);
@@ -291,10 +364,11 @@ export function applyNarrativeAssetUpdates(
     const record: NarrativeAbility = known ?? { id: `ability:${randomUUID()}`, name: text.parse(entry.name), pendingDetails: true, introduced: { ...when }, updated: { ...when } };
     let changed = !known;
     for (const key of ["name", "description", "usage", "mastery", "source"] as const) {
-      if (entry[key] !== undefined && record[key] !== entry[key]) changed = true;
+      if (entry[key] !== undefined && record[key] !== (entry[key] || undefined)) changed = true;
       if (entry[key] !== undefined) Object.assign(record, { [key]: entry[key] || undefined });
     }
     if (entry.pendingDetails !== undefined) record.pendingDetails = entry.pendingDetails;
+    if (changed) delete record.retired;
     if (changed) record.updated = { ...when };
     if (!known) assets.abilities.push(record);
     applied.abilityIds.push(record.id);

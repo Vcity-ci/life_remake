@@ -3,13 +3,13 @@
   "cards": [
     {
       "id": "ancient.domain.court.audience_appointment",
-      "title": "奏对、任免与入局",
-      "kind": "institution",
+      "title": "任官、科名与差遣",
+      "kind": "world_rule",
       "contextRole": "knowledge",
-      "content": "官员通过奏对、考课、举荐、科举、军功与临时差遣进入权力网络。一次任命既是机会，也是君主、上官、同僚和家族衡量人物立场的开始。",
+      "content": "书院提供学习和举荐，不直接授予官职。科举所得科名提供入仕资格，实职由朝廷按职缺授任；已有实任者在任命范围内行使职权。军功、荐举和临时差遣也是既有任用途径，不以重新参加科举才能办事。\n\n地方官掌本辖区税役、治安、赈济与诉讼，能调度所属差役与相应官署资源；边军由军职体系指挥。朝廷的专门差遣可以临时授予明确辖区和职司，其结束交还相应职权。",
       "priority": 73,
       "placement": "scenario",
-      "activation": { "keys": ["奏对", "任命", "举荐", "考课", "入仕", "差遣"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] }
+      "activation": { "keys": ["奏对", "任命", "举荐", "考课", "入仕", "差遣"], "scanDepth": 5, "tasks": ["origin", "planning"] }
     },
     {
       "id": "ancient.domain.court.faction_coalition",
@@ -46,7 +46,7 @@
       "title": "政变、清洗与权力交接",
       "kind": "consequence",
       "contextRole": "knowledge",
-      "content": "当常规程序失效，逼宫、政变、摄政、禅让、清洗或主动交权都可能出现。成败取决于名分、宿卫、官署执行、军队态度与地方响应，结果还必须回答新秩序如何运转。",
+      "content": "当常规程序失效，逼宫、政变、摄政、禅让、清洗或主动交权都可能出现。成败取决于名分、宿卫、官署执行、军队态度与地方响应，新的权力格局会改变秩序的运转。",
       "priority": 78,
       "placement": "scenario",
       "activation": { "keys": ["政变", "逼宫", "摄政", "禅让", "清洗", "交权"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] }

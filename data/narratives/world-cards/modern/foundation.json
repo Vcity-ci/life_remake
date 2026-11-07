@@ -6,7 +6,7 @@
       "title": "人生没有唯一答案",
       "kind": "world_rule",
       "contextRole": "foundation",
-      "content": "都市人生没有唯一成功模板。学历、职业、亲密关系、家庭责任、技艺、社群与独立生活都可以成为成果；叙事按人物实际愿望衡量选择，不默认升职、婚姻或财富就是终点。",
+      "content": "都市人生没有唯一成功模板。学历、职业、亲密关系、家庭责任、技艺、社群与独立生活都可以成为成果。",
       "priority": 98,
       "activation": {
         "tasks": [
@@ -24,7 +24,7 @@
       "title": "选择落在现实安排里",
       "kind": "world_rule",
       "contextRole": "foundation",
-      "content": "现实压力通过时间、收入、住处、通勤、照料、制度流程与沟通成本进入选择。让机会和代价落到具体安排，但不把人生写成简历或指标清单。",
+      "content": "现实压力通过时间、收入、住处、通勤、照料、制度流程与沟通成本进入选择。机会与代价会改变人物的具体生活安排。",
       "priority": 94,
       "activation": {
         "tasks": [
@@ -186,64 +186,6 @@
           "decision"
         ]
       },
-      "cooldownTurns": 2
-    },
-    {
-      "id": "modern.example.background",
-      "title": "现代普通人生段节奏",
-      "kind": "style_example",
-      "contextRole": "style",
-      "content": "那几年，学习、工作、住处与身边人的变化慢慢重排了你的生活。并非每一年都有戏剧性转折，一项习惯、一段关系或一次小小成果，也会让你更清楚什么值得继续投入。",
-      "priority": 84,
-      "placement": "example",
-      "activation": {
-        "tasks": [
-          "background"
-        ]
-      },
-      "inclusionGroup": "modern.style.turn",
-      "cooldownTurns": 2
-    },
-    {
-      "id": "modern.example.choice",
-      "title": "现代抉择场景节奏",
-      "kind": "style_example",
-      "contextRole": "style",
-      "content": "信息已经摆在眼前。你暂且停下手里的事，考虑接下来要怎样回应。",
-      "priority": 87,
-      "placement": "example",
-      "activation": {
-        "tasks": [
-          "rendering",
-          "dynamic"
-        ],
-        "beats": [
-          "pressure",
-          "climax"
-        ]
-      },
-      "inclusionGroup": "modern.style.turn",
-      "cooldownTurns": 2
-    },
-    {
-      "id": "modern.example.payoff",
-      "title": "现代收束节奏",
-      "kind": "style_example",
-      "contextRole": "style",
-      "content": "从日常安排、关系距离与未来能够做的事呈现选择的后果。以本幕核心矛盾的实际结果收束，让得到与失去落进生活细节，留下人物继续生活的余韵。",
-      "priority": 88,
-      "placement": "example",
-      "activation": {
-        "tasks": [
-          "rendering",
-          "dynamic",
-          "decision"
-        ],
-        "beats": [
-          "payoff"
-        ]
-      },
-      "inclusionGroup": "modern.style.turn",
       "cooldownTurns": 2
     }
   ]

@@ -36,7 +36,7 @@
       "title": "共同边界与新秩序",
       "kind": "consequence",
       "contextRole": "knowledge",
-      "content": "长期共处需要划定领地、混居规则、司法、祭仪和资源共享方式。新秩序可以是联盟、自治、联邦或保持距离的和平，但必须让双方普通人看见如何生活。",
+      "content": "长期共处需要划定领地、混居规则、司法、祭仪和资源共享方式。新秩序可以是联盟、自治、联邦或保持距离的和平，不同安排会影响双方普通人的生计与往来。",
       "priority": 75,
       "placement": "scenario",
       "activation": { "keys": ["共处", "自治", "边界", "混居", "联盟", "新秩序"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] }

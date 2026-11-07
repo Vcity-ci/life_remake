@@ -36,7 +36,7 @@
       "title": "留下、返回与再次远行",
       "kind": "consequence",
       "contextRole": "knowledge",
-      "content": "长期归处可以是扎根一城、回到故乡、在多地生活或不断迁移。收束应说明人物保住了哪些关系与生活方式，也承认选择排除了哪些可能。",
+      "content": "长期归处可以是扎根一城、回到故乡、在多地生活或不断迁移。定居或迁移会改变长期关系与生活方式，也使另一些生活选择变得困难。",
       "priority": 74,
       "placement": "scenario",
       "activation": { "keys": ["扎根", "归处", "留下", "返回", "远行", "生活方式"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] }

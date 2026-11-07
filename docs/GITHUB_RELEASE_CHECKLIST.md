@@ -1,96 +1,54 @@
-# GitHub 上传前检查清单（v0.8.1）
+# 提交前核对
 
-## 内容包发布核对补充：2026-09-21 +08:00
+更新于 2026-11-06。当前文件边界及验证脚本见[仓库文件与验证记录](REPOSITORY_HYGIENE.md)。
 
-- 当前古代、现代、奇幻均为 v10 基础世界，各自提供六条 IF 子世界包，共十八条可选路线。
-- 发布前同时校验 `data/narratives/*.story.json` 与 `data/narratives/story-packs/**/*.json`，并确认每条路线的 `worldId`、三幕命名空间和社会力量引用有效。
-- 社区扩展需要同时提供[基础世界模板](../examples/world-pack/WORLD_PACK_GUIDE.txt)与[IF 路线模板](../examples/world-pack/STORY_PACK_GUIDE.txt)。
+## 源码与本地文件
 
-## 文档发布核对补充：2026-09-10 00:26 +08:00
+- 提交 `.ts/.tsx` 源码、手写声明、静态世界与事件组、回归及回放脚本、说明文档和选定的文档图片。
+- 不提交依赖、构建产物、相邻生成的 `.js/.d.ts`、缓存、日志、`storage/`、`Material/` 或真实密钥。
+- 保留空密钥 `apps/backend/.env.example` 和仅包含公开地址的两份前端环境默认值。
+- 不用全局 `*.txt`、`*.json`、`*.d.ts` 隐藏素材、模板或手写类型。
+- 本次 20 个已跟踪生成物及两份本地代理偏好已取消跟踪，本地文件保留；删除记录与新忽略规则一起提交。
 
-- 对外功能以当前 [README](../README.md) 和各 docs 顶部增量记录为准；早期随机事件、古代唯一世界、双向结局描述不应再作为发布摘要。
-- 当前仓库包含古代、奇幻、现代三个 v9 世界包；扩展入口为 [世界包模板与说明](../examples/world-pack/WORLD_PACK_GUIDE.txt)。
-- 数据库与前端 UX 交互是后续 issue 方向，不应在发布说明中写成已交付功能。
-- 本轮没有执行发布、部署或构建；以下原检查清单保留。
+## 检查实际暂存内容
 
-本清单用于在上传仓库到 GitHub 前做一次“安全 + 可复现”检查。
-
-## 1. 必做检查
-
-1. 检查是否误提交密钥或本地环境文件
-- 不应上传：
-  - `apps/backend/.env`
-  - 任意包含真实 key/token 的文件
-- 仓库中仅保留：
-  - `apps/backend/.env.example`（空 key 占位）
-
-2. 检查是否误提交运行时数据
-- 当前 `.gitignore` 已忽略 `storage/`
-- 上传前确认没有强制追踪 `storage/*`
-
-3. 检查是否误提交依赖与构建产物
-- 根目录已忽略 `node_modules`、`dist`
-- 额外注意：`apps/frontend/node_modules/.vite/` 属于子目录缓存，不应入库
-
-4. 检查启动配置一致性
-- `apps/backend/.env.example` 使用 `DEPLOY_MODE`
-- 若本地 `apps/backend/.env` 使用了其他变量名（如 `REROLL_RUNTIME_MODE`），需对齐后再使用
-
-## 2. 推荐检查命令（PowerShell）
-
-在项目根目录执行：
+在仓库根目录执行：
 
 ```powershell
-# 查看未提交文件
 git status --short
-
-# 检查可能的密钥痕迹（排除依赖与构建目录）
-rg -n --hidden -g '!node_modules/**' -g '!apps/frontend/dist/**' -g '!apps/backend/dist/**' -e "(api[_-]?key|secret|token|password|CLOUD_MODEL_API_KEY|OPENAI|Authorization|Bearer|sk-[A-Za-z0-9])"
-
-# 检查绝对路径/本地路径痕迹
-rg -n --hidden -g '!node_modules/**' -g '!apps/frontend/dist/**' -g '!apps/backend/dist/**' -e "C:\\Users\\|D:\\|/Users/|/home/|file://|vscode://"
+git diff --cached --stat
+git ls-files -ci --exclude-standard
+git diff --check
+git diff --cached --check
 ```
 
-## 3. 当前项目已确认项（本次审计）
+`git ls-files -ci --exclude-standard` 应无输出。忽略规则不会自动影响已跟踪文件，发现例外时逐项确认并仅取消跟踪，避免删除本地存档。
 
-1. `.gitignore` 已忽略：
-- `node_modules`
-- `dist`
-- `.env`
-- `storage`
+可核对具体规则：
 
-2. 未发现真实 key 文本（仅占位字段）
-- `CLOUD_MODEL_API_KEY=` 仍为空占位
-
-3. 发现需人工确认项
-- `apps/backend/.env` 存在本地调试配置：
-  - `DEBUG_MODEL_CALLS=1`
-  - `REROLL_RUNTIME_MODE=cloud`
-- 该文件不应上传，上传前确保不被追踪
-
-## 4. 上传前最终动作
-
-1. 若存在被追踪的本地文件，先移除追踪再提交：
 ```powershell
-git rm --cached apps/backend/.env
+git check-ignore --no-index -v Material/ak.txt storage/anonymous-game-store.json apps/frontend/src/App.js
 ```
 
-2. 提交文档与代码：
+同时检查 TypeScript 源码、后端手写声明、`data/`、`scripts/`、模板与 docs 仍可正常入库。不要强制添加整个本地记录目录。
+
+## 功能与资料交接
+
+- 类型、工具声明、解析、暂存、保存恢复与实际消费者成组提交。
+- 边镇事件骨架及 IF 同时提交；幕初、独立接组与观察职责不能缺其中一部分。
+- 当前文档明确版本 20 与其他 IF 版本 18 的不同实现，不把基础世界内容版本 10 当作运行协议。
+- 不把旧验收中的五拍、资产用途提炼或旧摘要供应恢复成现行规则。
+- 确认文档中的本地抓包引用只作本机证据，公开结论不依赖仓库包含这些产物。
+
+验证命令：
+
 ```powershell
-git add .
-git commit -m "chore: prepare repo for GitHub release"
+npm test -w @reroll/backend
+npm run build
 ```
 
-3. 推送到远程：
-```powershell
-git remote add origin <你的仓库地址>
-git branch -M main
-git push -u origin main
-```
+本轮仅更新忽略规则、索引与文档，没有重新调用模型或推进玩家局。既有 269 项回归和整局证据见[最新验证记录](PERIOD_MEMORY_AND_EVENT_ROUTING.md)；今后修改运行代码应重新运行相关检查。
 
-## 5. 当前叙事改动提交检查（2026-08-21 01:29 +08:00，增量）
+## 提交范围
 
-- v9 世界核心、本局前提、故事形态／社会力量与节拍观察涉及 `packages/shared/src/index.ts`、`apps/backend/src/ai.ts`、`apps/backend/src/narrative.ts`、`apps/backend/src/narrative/runtime.ts`、`apps/backend/src/engine.ts` 和 `apps/backend/src/index.ts`；提交时应确保契约、编排与状态迁移一起进入版本库。
-- 回归测试位于 `apps/backend/src/engine.test.ts`，覆盖世界级门槛、三段五拍、可选故事素材、情景世界卡和世界级三档结局。
-- 文档同步包含架构、技术、使用、配置、蒸馏、变更与开发日志；`docs/DEPLOYMENT.md` 不属于本次叙事变更范围。
-- 发布前至少执行 `npm run test -w @reroll/backend` 与 `npm run build -w @reroll/backend`。若共享包 `dist` 被本地进程占用，不要强制杀进程；先确认源码和后端类型构建结果，再在空闲时重建共享产物。
+先检查实际差异再选择暂存文件。本轮没有自动 commit、push、创建发布或部署；发布与存档备份是独立操作，Git 不能代替运行数据备份。

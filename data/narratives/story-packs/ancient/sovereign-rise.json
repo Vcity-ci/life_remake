@@ -1,7 +1,8 @@
 {
   "version": 1,
   "id": "ancient.sovereign-rise",
-  "revision": "1.3.1",
+  "revision": "2.0.0",
+  "eventFlowId": "ancient.sovereign-rise",
   "worldId": "ancient",
   "name": "布衣逐鹿",
   "tagline": "从乱世低处聚集人心与力量，最终回答天下归于何人。",

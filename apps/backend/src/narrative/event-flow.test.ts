@@ -10,13 +10,13 @@ import { ensureNarrativeActRuntime, ensureNarrativeRunState, buildNarrativePromp
 import { generateDynamicNarrativeScene, generateNarrativeActWorldCard, observeNarrativeAct, planNextEventFlow, planNextEventUnit, dynamicNarrativeRenderPrompt, type NarrativeContext } from "../ai.js";
 import { prepareChoiceCheck, rollChoice } from "../choice-check.js";
 import { currentEventFlowStep, eventFlowRoles, eventFlowRenderInput, eventFlowResult, applyEventFlowResultItems,
-  availableNextEventFlows, availableNextEventUnits, validateEventFlowPreparation, validateNarrativeEventFlow } from "./event-flow.js";
+  availableNextEventFlows, availableNextEventUnits, validateEventFlowBindings, validateNarrativeEventFlow } from "./event-flow.js";
 import { prepareEventFlowEntry, prepareEventFlowLifeInterval } from "./event-flow.js";
 import { eventAssetCandidates, applyEventAssetChanges } from "./event-assets.js";
 import { stageNarrativeAssetRound } from "./asset-buffer.js";
 import { runNarrativeAgentTurn, synchronizeNarrativeAssetBatch } from "./runtime.js";
 import { commitNarrativeActOutline, parseNarrativeActWorldCard } from "./act-outline.js";
-import { finishPendingNarrativeActEvent } from "./finalization.js";
+import { ensureCurrentEventFlow, finishPendingNarrativeActEvent } from "./finalization.js";
 import { hostingFixture } from "./hosting-fixture.js";
 import { dynamicSceneAttributePolicy } from "../engine.js";
 
@@ -264,15 +264,16 @@ async function fixture(actIndex = 0, flowId?: string) {
   run.narrative.actRuntime!.actId = act.id; run.narrative.actRuntime!.admittedAtAge = 20;
   const groups = pack.eventFlow!.groups.filter(group => group.actIds.includes(act.id));
   commitNarrativeActOutline(run.narrative, parseNarrativeActWorldCard({ ...hostingFixture(),
-    flowBindings: eventFlowRoles(pack.eventFlow!, act.id).map(role => ({ roleId: role.id, name: "实名" + role.id })),
-    eventFlows: { openingFlowId: flowId ?? groups[0].id, availableFlowIds: groups.map(group => group.id) }
+    flowBindings: eventFlowRoles(pack.eventFlow!, act.id).map(role => ({ roleId: role.id, name: "实名" + role.id }))
   }, act.id, { objective: act.objective!, closureMeaning: act.closureMeaning! }));
+  run.narrative.eventFlow = { actId: act.id, eventIndex: 0, bindings: {},
+    flowId: flowId ?? groups[0].id, completed: [], completedFlows: [] };
   return { run, definition, act, pack };
 }
 
 test("事件素材按可复用组加载，幕初绑定持久化，正文只取得当前经历且不取得未来结果", async () => {
   const { run, definition, pack } = await fixture(0, "ridge-scouts");
-  validateEventFlowPreparation(run, run.narrative.actRuntime!.outline!);
+  validateEventFlowBindings(run, run.narrative.actRuntime!.outline!);
   const first = currentEventFlowStep(run)!;
   assert.equal(first.event.id, "ridge-discovery");
   assert.ok(!JSON.stringify(first.flow).includes('"next"'));
@@ -289,7 +290,7 @@ test("事件素材按可复用组加载，幕初绑定持久化，正文只取�
   assert.deepEqual(restored.storyPackSnapshot.eventFlow, pack.eventFlow);
   const card = structuredClone(run.narrative.actRuntime!.outline!);
   card.flowBindings![0].name = "另一个名字";
-  assert.throws(() => validateEventFlowPreparation(run, card), /binding_changed/);
+  assert.throws(() => validateEventFlowBindings(run, card), /binding_changed/);
   const withoutExit = structuredClone(pack.eventFlow!);
   withoutExit.groups[0].events.forEach(event => {
     if (event.kind === "life" || event.kind === "scene") delete event.outcome.endsFlow;
@@ -312,8 +313,7 @@ test("换幕只请求新名称，既有绑定由引擎复用；两种 provider �
       const roleLine = task.split("\n").find((line: string) => line.includes(marker))!;
       assert.deepEqual(JSON.parse(roleLine.slice(roleLine.indexOf(marker) + marker.length)), [fresh]);
       assert.ok(content.includes("已有名称由引擎复用"));
-      const args = { ...hostingFixture(), flowBindings: [{ roleId: fresh.id, name: "新名字" }],
-        eventFlows: { openingFlowId: "invasion-arrival", availableFlowIds: ["invasion-arrival", "decisive-frontier-war"] } };
+      const args = { ...hostingFixture(), flowBindings: [{ roleId: fresh.id, name: "新名字" }] };
       return apiPath === "/responses" ? { output: [{ type: "function_call", name: "plan_act_world_card", arguments: JSON.stringify(args), call_id: "plan" }] }
         : reply("plan_act_world_card", args);
     };
@@ -378,10 +378,11 @@ test("交付只改玩法库存一次；观察失败重试不丢道具结果、�
   const { run, definition } = await fixture(1, "map-delivery");
   // Bind identities before granting a legitimately owned item from an earlier result.
   run.narrative.eventFlow = { actId: run.narrative.actRuntime!.actId, eventIndex: 0, bindings: Object.fromEntries(
-    run.narrative.actRuntime!.outline!.flowBindings!.map(binding => [binding.roleId, binding.name])), completed: [], completedFlows: [] };
-  assert.throws(() => validateEventFlowPreparation(run, run.narrative.actRuntime!.outline!, true), /opening_item_missing/);
+    run.narrative.actRuntime!.outline!.flowBindings!.map(binding => [binding.roleId, binding.name])),
+    flowId: "map-delivery", completed: [], completedFlows: [] };
+  assert.throws(() => currentEventFlowStep(run), /event_flow_active_group_invalid/);
   applyEventFlowResultItems(run, { result: "早年实际侦察所得", grantItems: ["border-map"] });
-  validateEventFlowPreparation(run, run.narrative.actRuntime!.outline!, true);
+  validateEventFlowBindings(run, run.narrative.actRuntime!.outline!);
   const step = currentEventFlowStep(run)!;
   advanceWithDynamicNarrativeScene(run, world, definition, { patternIds: [], forceIds: [], participants: [],
     narrative: "你已把边道图交给邻军，获赠佩刀。", nextClock: "hold", attributeOutcome: { effects: [] },
@@ -403,7 +404,8 @@ test("交付只改玩法库存一次；观察失败重试不丢道具结果、�
 test("接组失败后保留收束观察，恢复只重试独立规划；无候选不会逼观察器改判收束", async (t) => {
   const { run, definition } = await fixture(1, "map-delivery");
   run.narrative.eventFlow = { actId: run.narrative.actRuntime!.actId, eventIndex: 0, bindings: Object.fromEntries(
-    run.narrative.actRuntime!.outline!.flowBindings!.map(binding => [binding.roleId, binding.name])), completed: [], completedFlows: [] };
+    run.narrative.actRuntime!.outline!.flowBindings!.map(binding => [binding.roleId, binding.name])),
+    flowId: "map-delivery", completed: [], completedFlows: [] };
   applyEventFlowResultItems(run, { result: "实际侦察所得", grantItems: ["border-map"] });
   const step = currentEventFlowStep(run)!;
   advanceWithDynamicNarrativeScene(run, world, definition, { patternIds: [], forceIds: [], participants: [],
@@ -428,7 +430,10 @@ test("接组失败后保留收束观察，恢复只重试独立规划；无候�
   assert.equal(restored.items.length, 1);
   assert.equal(restored.narrative.sceneClock.mode, "hold");
   const noCandidates = structuredClone(run);
-  noCandidates.narrative.actRuntime!.outline!.eventFlows!.availableFlowIds = [step.flow.id];
+  const actId = noCandidates.narrative.actRuntime!.actId;
+  noCandidates.narrative.eventFlow!.completedFlows = noCandidates.storyPackSnapshot!.eventFlow!.groups
+    .filter(group => group.actIds.includes(actId) && group.id !== step.flow.id)
+    .map(group => ({ flowId: group.id, sourceEventId: "test", actId }));
   calls.length = 0;
   await assert.rejects(finishPendingNarrativeActEvent(noCandidates, world, definition, context, async () => {}), /event_flow_candidates_empty/);
   assert.deepEqual(calls, [], "候选缺失是接组问题，不能用纠正请求重做收束判断");
@@ -694,4 +699,302 @@ test("旧顺序组快照不随新素材切换为规划路由", async () => {
   await finishPendingNarrativeActEvent(restored, world, definition, context, async () => {});
   assert.equal(currentEventFlowStep(restored)!.event.id, "childhood-drills");
   assert.equal(restored.storyPackSnapshot.eventFlow.groups[0].routing, undefined);
+});
+
+test("首组由幕内路由在需要时选择，世界卡不预选且重复调用不重复请求", async (t) => {
+  const { run, act, pack } = await fixture(0);
+  run.narrative.version = 20;
+  run.narrative.eventFlow = { actId: act.id, eventIndex: 0, bindings: {}, completed: [], completedFlows: [] };
+  const requests: any[] = [];
+  t.mock.method(OpenAI.Chat.Completions.prototype, "create", async (payload: any) => {
+    requests.push(payload);
+    assert.equal(payload.tools[0].function.name, "plan_next_event_flow");
+    const text = JSON.stringify(payload.messages);
+    assert.ok(!text.includes("人工事件组"));
+    assert.ok(!text.includes("候选素材，尚未发生"));
+    assert.ok(text.includes("后续候选（尚未发生）"));
+    return reply("plan_next_event_flow", { nextFlowId: "border-childhood" });
+  });
+  assert.ok(!("eventFlows" in run.narrative.actRuntime!.outline!));
+  await ensureCurrentEventFlow(run, world, pack.eventFlow, { ...context }, async () => {});
+  assert.equal(run.narrative.eventFlow!.flowId, "border-childhood");
+  assert.equal(currentEventFlowStep(run)!.event.id, "childhood-games");
+  await ensureCurrentEventFlow(run, world, pack.eventFlow, { ...context }, async () => {});
+  assert.equal(requests.length, 1);
+});
+
+test("旧世界卡的 openingFlowId 迁移到运行态一次，规范化后不再保留名单", async () => {
+  const { run, act } = await fixture(0);
+  const legacy = JSON.parse(JSON.stringify(run.narrative));
+  legacy.actRuntime.outline.eventFlows = { openingFlowId: "ridge-scouts", availableFlowIds: ["ridge-scouts"] };
+  legacy.eventFlow = { actId: act.id, eventIndex: 0, bindings: {}, completed: [], completedFlows: [] };
+  const restored = ensureNarrativeRunState(legacy, true);
+  assert.equal(restored.eventFlow!.flowId, "ridge-scouts");
+  assert.ok(!("eventFlows" in restored.actRuntime!.outline!));
+});
+
+test("江湖宗师事件组覆盖三幕，首组属于第一幕并可进入首个单元", async () => {
+  const base = (await loadNarrativeWorldDefinition("ancient"))!;
+  const pack = (await loadNarrativeStoryPack(base, "ancient.jianghu-master"))!;
+  assert.ok(pack.eventFlow);
+  const actIds = pack.acts.map((act) => act.id);
+  for (const actId of actIds) {
+    assert.ok(pack.eventFlow!.groups.some((group) => group.actIds.includes(actId)), actId);
+  }
+  assert.ok(pack.eventFlow!.groups[0].actIds.includes(actIds[0]));
+  const definition = resolveNarrativeExperience(base, pack);
+  const tuning = createDefaultGameplayTuning();
+  tuning.bootstrap.selectedCardMin = 0;
+  const run = createRun({ world, difficulty, tuning, cards: [], narrativeEnabled: true, storyPack: pack }, {
+    clientId: "jianghu-flow", worldId: world.id, storyPackId: pack.id, difficultyId: difficulty.id,
+    personaPrompt: "山脚村镇的少年，跟着师父学剑。", talentPointTotal: 25,
+    stats: { intelligence: 5, charisma: 5, family: 5, fortune: 5, physique: 5 }, selectedCardIds: []
+  });
+  run.age = 20;
+  run.narrative.version = 20;
+  run.narrative = ensureNarrativeActRuntime(run.narrative, definition, 20);
+  const act = definition.mainlineActs![0];
+  run.narrative.actRuntime!.actId = act.id;
+  run.narrative.actRuntime!.admittedAtAge = 20;
+  commitNarrativeActOutline(run.narrative, parseNarrativeActWorldCard({
+    ...hostingFixture(),
+    flowBindings: eventFlowRoles(pack.eventFlow!, act.id).map((role) => ({ roleId: role.id, name: `实名${role.id}` }))
+  }, act.id, { objective: act.objective!, closureMeaning: act.closureMeaning! }));
+  const opening = pack.eventFlow!.groups.find((group) => group.actIds.includes(act.id))!;
+  run.narrative.eventFlow = { actId: act.id, eventIndex: 0, bindings: {}, flowId: opening.id, completed: [], completedFlows: [] };
+  const step = currentEventFlowStep(run)!;
+  assert.equal(step.flow.id, opening.id);
+  assert.ok(step.event.entry);
+  const actGroupIds = new Set(pack.eventFlow!.groups.filter((group) => group.actIds.includes(act.id)).map((group) => group.id));
+  assert.ok(availableNextEventFlows(run).every((group) => group.id !== opening.id));
+  assert.ok(availableNextEventFlows(run).every((group) => actGroupIds.has(group.id)));
+});
+
+test("江湖宗师按边境线生命周期补齐缺位与厚度", async () => {
+  const base = (await loadNarrativeWorldDefinition("ancient"))!;
+  const pack = (await loadNarrativeStoryPack(base, "ancient.jianghu-master"))!;
+  const flow = pack.eventFlow!;
+  assert.equal(flow.groups.length, 12);
+  assert.equal(flow.groups.reduce((total, group) => total + group.events.length, 0), 37);
+  const actIds = pack.acts.map((act) => act.id);
+  assert.deepEqual(actIds.map((actId) => flow.groups.filter((group) => group.actIds.includes(actId)).length), [3, 5, 4]);
+  for (const group of flow.groups) {
+    const events = group.events as any[];
+    const exits = (event: any) => event.kind === "choice"
+      ? event.options.some((option: any) => option.success.endsFlow || option.failure.endsFlow)
+      : event.kind === "settlement"
+        ? event.rules.some((rule: any) => rule.endsFlow)
+        : Boolean(event.outcome.endsFlow);
+    assert.ok(exits(events[events.length - 1]), group.id + " exit");
+    for (const event of events.slice(0, -1)) assert.ok(!exits(event), group.id + ":" + event.id);
+  }
+  assert.ok(flow.groups.find((group) => group.id === "sect-rebuild")?.actIds.includes(actIds[1]));
+  assert.ok(flow.groups.find((group) => group.id === "last-sect-line")?.actIds.includes(actIds[2]));
+  for (const [groupId, eventId] of [
+    ["official-arrest", "yamen-visit"], ["official-arrest", "arrest-aftermath"],
+    ["tournament", "tournament-aftermath"], ["sect-siege", "siege-pressure"], ["sect-siege", "siege-aftermath"]
+  ]) {
+    assert.ok(flow.groups.find((group) => group.id === groupId)!.events.some((event) => event.id === eventId), groupId + ":" + eventId);
+  }
+  const testEvent = flow.groups.find((group) => group.id === "apprentice-test")!.events.find((event) => event.id === "sect-test") as any;
+  assert.ok(testEvent.lifeBefore);
+  const verdict = flow.groups.find((group) => group.id === "apprentice-test")!.events.find((event) => event.id === "sect-verdict") as any;
+  assert.ok(verdict.rules.every((rule: any) => rule.endsFlow));
+  assert.ok(!JSON.stringify(verdict).includes("不放你独行"));
+  const escort = flow.groups.find((group) => group.id === "jianghu-first-errand")!.events.find((event) => event.id === "errand-escort") as any;
+  assert.ok(escort.outcome.grantItems?.includes("escort-letter"));
+  const amnesty = flow.groups.find((group) => group.id === "amnesty-offer")!.events[0] as any;
+  assert.ok(amnesty.options.every((option: any) => option.id !== "safe" || !option.success.consumeItems));
+  assert.ok(flow.roles.some((role) => role.id === "father") && flow.roles.some((role) => role.id === "mother"));
+  assert.ok(flow.originRoles?.includes("father") && flow.originRoles?.includes("mother"));
+  assert.ok(flow.groups.find((group) => group.id === "jianghu-first-errand")!.assetRoles?.includes("father"));
+});
+
+test("庙堂权臣按生命周期覆盖三幕、失败后续与道具链路", async () => {
+  const base = (await loadNarrativeWorldDefinition("ancient"))!;
+  const pack = (await loadNarrativeStoryPack(base, "ancient.court-minister"))!;
+  const flow = pack.eventFlow!;
+  assert.equal(flow.groups.length, 14);
+  assert.equal(flow.groups.reduce((total, group) => total + group.events.length, 0), 43);
+  const actIds = pack.acts.map((act) => act.id);
+  assert.deepEqual(actIds.map((actId) => flow.groups.filter((group) => group.actIds.includes(actId)).length), [5, 5, 4]);
+  for (const group of flow.groups) {
+    const events = group.events as any[];
+    const exits = (event: any) => event.kind === "choice"
+      ? event.options.some((option: any) => option.success.endsFlow || option.failure.endsFlow)
+      : event.kind === "settlement"
+        ? event.rules.some((rule: any) => rule.endsFlow)
+        : Boolean(event.outcome.endsFlow);
+    assert.ok(exits(events[events.length - 1]), group.id + " exit");
+    for (const event of events.slice(0, -1)) assert.ok(!exits(event), group.id + ":" + event.id);
+  }
+  const networkIds = new Set(flow.groups.filter((group) => group.actIds.includes(actIds[1])).map((group) => group.id));
+  for (const id of ["river-works", "faction-struggle", "palace-plot", "faction-purge", "policy-power"]) {
+    assert.ok(networkIds.has(id), id);
+  }
+  const grants = new Set<string>();
+  const consumes = new Set<string>();
+  for (const group of flow.groups) {
+    for (const event of group.events as any[]) {
+      const results = event.kind === "choice" ? event.options.flatMap((option: any) => [option.success, option.failure])
+        : event.kind === "settlement" ? event.rules : [event.outcome];
+      for (const result of results) {
+        for (const id of result.grantItems ?? []) grants.add(id);
+        for (const id of result.consumeItems ?? []) consumes.add(id);
+      }
+    }
+  }
+  assert.ok(grants.has("recommendation-letter") && consumes.has("recommendation-letter"));
+  assert.ok(grants.has("official-seal") && grants.has("memorial-draft"));
+  assert.ok(flow.originRoles?.includes("father") && flow.originRoles?.includes("mother") && flow.originRoles?.includes("mentor"));
+  const entry = flow.groups.find((group) => group.id === "bureaucrat-entry")!;
+  assert.ok(entry.assetRoles?.includes("father") && entry.assetRoles?.includes("mother"));
+  const basics = entry.events.find((event) => event.id === "entry-basics") as any;
+  assert.ok(basics.lifeBefore);
+  const verdict = flow.groups.find((group) => group.id === "first-post")!.events.find((event) => event.id === "post-verdict") as any;
+  assert.ok(verdict.rules.every((rule: any) => rule.endsFlow));
+});
+
+test("商贾世家按生命周期覆盖三幕、商路行会行为与道具链路", async () => {
+  const base = (await loadNarrativeWorldDefinition("ancient"))!;
+  const pack = (await loadNarrativeStoryPack(base, "ancient.merchant-house"))!;
+  const flow = pack.eventFlow!;
+  assert.equal(flow.groups.length, 14);
+  assert.equal(flow.groups.reduce((total, group) => total + group.events.length, 0), 43);
+  const actIds = pack.acts.map((act) => act.id);
+  assert.deepEqual(actIds.map((actId) => flow.groups.filter((group) => group.actIds.includes(actId)).length), [5, 5, 4]);
+  for (const group of flow.groups) {
+    const events = group.events as any[];
+    const exits = (event: any) => event.kind === "choice"
+      ? event.options.some((option: any) => option.success.endsFlow || option.failure.endsFlow)
+      : event.kind === "settlement"
+        ? event.rules.some((rule: any) => rule.endsFlow)
+        : Boolean(event.outcome.endsFlow);
+    assert.ok(exits(events[events.length - 1]), group.id + " exit");
+    for (const event of events.slice(0, -1)) assert.ok(!exits(event), group.id + ":" + event.id);
+  }
+  const creditIds = new Set(flow.groups.filter((group) => group.actIds.includes(actIds[0])).map((group) => group.id));
+  for (const id of ["middleman-dispute", "road-blockade", "credit-collapse", "credit-established"]) assert.ok(creditIds.has(id), id);
+  const networkIds = new Set(flow.groups.filter((group) => group.actIds.includes(actIds[1])).map((group) => group.id));
+  for (const id of ["guild-war", "ferry-rights", "state-gray-trade", "guild-sanction", "trade-network"]) assert.ok(networkIds.has(id), id);
+  const grants = new Set<string>();
+  const consumes = new Set<string>();
+  for (const group of flow.groups) {
+    for (const event of group.events as any[]) {
+      const results = event.kind === "choice" ? event.options.flatMap((option: any) => [option.success, option.failure])
+        : event.kind === "settlement" ? event.rules : [event.outcome];
+      for (const result of results) {
+        for (const id of result.grantItems ?? []) grants.add(id);
+        for (const id of result.consumeItems ?? []) consumes.add(id);
+      }
+    }
+  }
+  assert.ok(grants.has("trade-contract") && consumes.has("trade-contract"));
+  assert.ok(grants.has("account-ledger") && consumes.has("account-ledger"));
+  assert.ok(grants.has("house-seal"));
+  assert.ok(flow.originRoles?.includes("father") && flow.originRoles?.includes("mother") && flow.originRoles?.includes("partner"));
+  const entry = flow.groups.find((group) => group.id === "first-contract")!;
+  assert.ok(entry.assetRoles?.includes("father") && entry.assetRoles?.includes("mother"));
+  const basics = entry.events.find((event) => event.id === "contract-basics") as any;
+  assert.ok(basics.lifeBefore);
+  const established = flow.groups.find((group) => group.id === "credit-established")!;
+  const establishedExit = established.events[established.events.length - 1] as any;
+  assert.equal(establishedExit.id, "established-aftermath");
+  assert.ok(establishedExit.outcome.endsFlow);
+});
+
+test("方术教门按生命周期覆盖三幕、疫病教团行为与道具链路", async () => {
+  const base = (await loadNarrativeWorldDefinition("ancient"))!;
+  const pack = (await loadNarrativeStoryPack(base, "ancient.mystic-order"))!;
+  const flow = pack.eventFlow!;
+  assert.equal(flow.groups.length, 14);
+  assert.equal(flow.groups.reduce((total, group) => total + group.events.length, 0), 43);
+  const actIds = pack.acts.map((act) => act.id);
+  assert.deepEqual(actIds.map((actId) => flow.groups.filter((group) => group.actIds.includes(actId)).length), [5, 5, 4]);
+  for (const group of flow.groups) {
+    const events = group.events as any[];
+    const exits = (event: any) => event.kind === "choice"
+      ? event.options.some((option: any) => option.success.endsFlow || option.failure.endsFlow)
+      : event.kind === "settlement"
+        ? event.rules.some((rule: any) => rule.endsFlow)
+        : Boolean(event.outcome.endsFlow);
+    assert.ok(exits(events[events.length - 1]), group.id + " exit");
+    for (const event of events.slice(0, -1)) assert.ok(!exits(event), group.id + ":" + event.id);
+  }
+  const inheritanceIds = new Set(flow.groups.filter((group) => group.actIds.includes(actIds[0])).map((group) => group.id));
+  for (const id of ["plague-village", "false-elixir", "heresy-trial", "lineage-recognized"]) assert.ok(inheritanceIds.has(id), id);
+  const influenceIds = new Set(flow.groups.filter((group) => group.actIds.includes(actIds[1])).map((group) => group.id));
+  for (const id of ["court-debate", "popular-movement", "seal-taboo", "suppression", "influence-established"]) assert.ok(influenceIds.has(id), id);
+  const grants = new Set<string>();
+  const consumes = new Set<string>();
+  for (const group of flow.groups) {
+    for (const event of group.events as any[]) {
+      const results = event.kind === "choice" ? event.options.flatMap((option: any) => [option.success, option.failure])
+        : event.kind === "settlement" ? event.rules : [event.outcome];
+      for (const result of results) {
+        for (const id of result.grantItems ?? []) grants.add(id);
+        for (const id of result.consumeItems ?? []) consumes.add(id);
+      }
+    }
+  }
+  assert.ok(grants.has("medical-scroll"));
+  assert.ok(grants.has("remedy-formula") && consumes.has("remedy-formula"));
+  assert.ok(grants.has("faith-seal"));
+  assert.ok(flow.originRoles?.includes("father") && flow.originRoles?.includes("mother") && flow.originRoles?.includes("mentor"));
+  const entry = flow.groups.find((group) => group.id === "first-rite")!;
+  assert.ok(entry.assetRoles?.includes("father") && entry.assetRoles?.includes("mother"));
+  const basics = entry.events.find((event) => event.id === "rite-basics") as any;
+  assert.ok(basics.lifeBefore);
+  const lineage = flow.groups.find((group) => group.id === "lineage-recognized")!;
+  const lineageExit = lineage.events[lineage.events.length - 1] as any;
+  assert.equal(lineageExit.id, "lineage-aftermath");
+  assert.ok(lineageExit.outcome.endsFlow);
+});
+
+test("布衣逐鹿按生命周期覆盖三幕、军阀联盟行为与道具链路", async () => {
+  const base = (await loadNarrativeWorldDefinition("ancient"))!;
+  const pack = (await loadNarrativeStoryPack(base, "ancient.sovereign-rise"))!;
+  const flow = pack.eventFlow!;
+  assert.equal(flow.groups.length, 14);
+  assert.equal(flow.groups.reduce((total, group) => total + group.events.length, 0), 43);
+  const actIds = pack.acts.map((act) => act.id);
+  assert.deepEqual(actIds.map((actId) => flow.groups.filter((group) => group.actIds.includes(actId)).length), [5, 5, 4]);
+  for (const group of flow.groups) {
+    const events = group.events as any[];
+    const exits = (event: any) => event.kind === "choice"
+      ? event.options.some((option: any) => option.success.endsFlow || option.failure.endsFlow)
+      : event.kind === "settlement"
+        ? event.rules.some((rule: any) => rule.endsFlow)
+        : Boolean(event.outcome.endsFlow);
+    assert.ok(exits(events[events.length - 1]), group.id + " exit");
+    for (const event of events.slice(0, -1)) assert.ok(!exits(event), group.id + ":" + event.id);
+  }
+  const foundationIds = new Set(flow.groups.filter((group) => group.actIds.includes(actIds[0])).map((group) => group.id));
+  for (const id of ["stronghold", "first-followers", "scattered-band", "base-established"]) assert.ok(foundationIds.has(id), id);
+  const contentionIds = new Set(flow.groups.filter((group) => group.actIds.includes(actIds[1])).map((group) => group.id));
+  for (const id of ["warlord-alliance", "siege", "betrayal", "lost-territory", "contender"]) assert.ok(contentionIds.has(id), id);
+  const grants = new Set<string>();
+  const consumes = new Set<string>();
+  for (const group of flow.groups) {
+    for (const event of group.events as any[]) {
+      const results = event.kind === "choice" ? event.options.flatMap((option: any) => [option.success, option.failure])
+        : event.kind === "settlement" ? event.rules : [event.outcome];
+      for (const result of results) {
+        for (const id of result.grantItems ?? []) grants.add(id);
+        for (const id of result.consumeItems ?? []) consumes.add(id);
+      }
+    }
+  }
+  assert.ok(grants.has("alliance-pact") && consumes.has("alliance-pact"));
+  assert.ok(grants.has("grain-ledger") && consumes.has("grain-ledger"));
+  assert.ok(grants.has("command-tally"));
+  assert.ok(flow.originRoles?.includes("father") && flow.originRoles?.includes("mother") && flow.originRoles?.includes("elder"));
+  const entry = flow.groups.find((group) => group.id === "refugee-crossing")!;
+  assert.ok(entry.assetRoles?.includes("father") && entry.assetRoles?.includes("elder"));
+  const basics = entry.events.find((event) => event.id === "crossing-basics") as any;
+  assert.ok(basics.lifeBefore);
+  const baseGroup = flow.groups.find((group) => group.id === "base-established")!;
+  const baseExit = baseGroup.events[baseGroup.events.length - 1] as any;
+  assert.equal(baseExit.id, "base-aftermath");
+  assert.ok(baseExit.outcome.endsFlow);
 });

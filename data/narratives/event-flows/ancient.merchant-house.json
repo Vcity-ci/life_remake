@@ -1,0 +1,1354 @@
+{
+  "id": "ancient.merchant-house",
+  "revision": "1.0.0",
+  "originRoles": [
+    "home",
+    "father",
+    "mother",
+    "partner",
+    "token"
+  ],
+  "roles": [
+    {
+      "id": "home",
+      "kind": "location",
+      "identity": "主角家族的祖宅、铺面与乡里"
+    },
+    {
+      "id": "market",
+      "kind": "location",
+      "identity": "集市、牙行与零散买卖的场所"
+    },
+    {
+      "id": "road",
+      "kind": "location",
+      "identity": "商路、渡口、关津与车队往来的通道"
+    },
+    {
+      "id": "warehouse",
+      "kind": "location",
+      "identity": "货栈、仓房与存放货物的地点"
+    },
+    {
+      "id": "guild",
+      "kind": "location",
+      "identity": "行会、商会与同行议事的场所"
+    },
+    {
+      "id": "father",
+      "kind": "character",
+      "identity": "主角家中执掌门户与生意的父亲"
+    },
+    {
+      "id": "mother",
+      "kind": "character",
+      "identity": "主角家中操持家务与亲族往来的母亲"
+    },
+    {
+      "id": "partner",
+      "kind": "character",
+      "identity": "父辈旧交、掌柜或与主角合伙经营的人"
+    },
+    {
+      "id": "clerk",
+      "kind": "character",
+      "identity": "账房、掌柜或熟悉货价与账目的伙计"
+    },
+    {
+      "id": "caravan",
+      "kind": "character",
+      "identity": "船主、脚夫或常走商路的运输伙伴"
+    },
+    {
+      "id": "official",
+      "kind": "character",
+      "identity": "税关官吏、市舶官或管着商路通行的人"
+    },
+    {
+      "id": "rival",
+      "kind": "character",
+      "identity": "同行中与主角争货源、争商路或争行会位置的对手"
+    },
+    {
+      "id": "patron",
+      "kind": "character",
+      "identity": "大客户、地方官或能决定特许与订单的人"
+    },
+    {
+      "id": "contract",
+      "kind": "item",
+      "identity": "写清货物、价钱与交期的契书"
+    },
+    {
+      "id": "ledger",
+      "kind": "item",
+      "identity": "记录本金、赊欠与分成的账册"
+    },
+    {
+      "id": "seal",
+      "kind": "item",
+      "identity": "商号印与家族经营的信用凭证"
+    },
+    {
+      "id": "token",
+      "kind": "item",
+      "identity": "家族传下的算盘、信物或旧商号凭据"
+    },
+    {
+      "id": "trade",
+      "kind": "ability",
+      "identity": "议价、辨货与判断行情的本领"
+    },
+    {
+      "id": "logistics",
+      "kind": "ability",
+      "identity": "组织运输、仓储与交期的本领"
+    },
+    {
+      "id": "credit",
+      "kind": "ability",
+      "identity": "融资、赊欠与维持信用的本领"
+    },
+    {
+      "id": "network",
+      "kind": "ability",
+      "identity": "客户、牙人、船主与官面上的关系"
+    }
+  ],
+  "items": [
+    {
+      "id": "trade-contract",
+      "roleId": "contract",
+      "description": "第一笔生意签下的契书，能证明货源、价钱与交期。"
+    },
+    {
+      "id": "account-ledger",
+      "roleId": "ledger",
+      "description": "记录本金、赊欠与分成的账册，也是家族生意的底账。"
+    },
+    {
+      "id": "house-seal",
+      "roleId": "seal",
+      "description": "商号印，代表家族生意在行会、税关与客户面前的信用。"
+    }
+  ],
+  "groups": [
+    {
+      "id": "first-contract",
+      "actIds": [
+        "ancient.merchant-house.credit"
+      ],
+      "narrativeRole": "立信起点",
+      "label": "第一笔小生意",
+      "entry": "尚未独立经营，只在家族铺面与集市之间帮忙，第一次接一笔能承担的小生意。",
+      "routing": "planned",
+      "assetRoles": [
+        "home",
+        "market",
+        "father",
+        "mother",
+        "partner",
+        "clerk",
+        "caravan",
+        "contract",
+        "ledger",
+        "trade",
+        "credit"
+      ],
+      "events": [
+        {
+          "id": "contract-basics",
+          "kind": "life",
+          "entry": "还没有独立经手过一笔完整的买卖。",
+          "lifeBefore": {
+            "minYears": 2,
+            "maxYears": 4,
+            "context": "你在{{home}}的铺面里帮忙，跟{{father}}认货、跟{{mother}}对账。{{partner}}来家里谈生意时，你替他们端茶、记数。"
+          },
+          "situation": "你在{{home}}长大，父亲教你辨货与议价，母亲教你账目与人情。{{partner}}说集市上有一批布和盐要转手，本钱不大，正适合你第一次独立经手。",
+          "outcome": {
+            "result": "你熟悉了货价、账目和集市的规矩，也知道了第一笔生意要靠什么取信于人。"
+          }
+        },
+        {
+          "id": "contract-first-deal",
+          "kind": "scene",
+          "entry": "第一批货还没有成交，买方和货源都在等。",
+          "situation": "{{market}}的牙人把布价压得很低，{{clerk}}说本钱只够吃下这批货的一半。{{partner}}替你牵了线，{{caravan}}答应先运货后结账。买方要一个交期，父亲让你自己签契。",
+          "outcome": {
+            "result": "你签下第一份{{contract}}，把本金和分成记进{{ledger}}。货还没有到手，交期和风险已经落在你身上。",
+            "grantItems": [
+              "trade-contract",
+              "account-ledger"
+            ]
+          }
+        },
+        {
+          "id": "contract-choice",
+          "kind": "choice",
+          "entry": "货已经订下，交期、货损和买方的压价同时压过来。",
+          "situation": "{{caravan}}说路上涨水，可能要误期；买方要求降价，否则转去{{rival}}的铺子；{{clerk}}算过账，误期就要赔一笔。",
+          "question": "保交期、保价钱，还是先保住信用？",
+          "stakes": "第一笔生意的利润、家族本钱，以及你在集市上的信用。",
+          "check": {
+            "stat": "family",
+            "difficulty": 12
+          },
+          "options": [
+            {
+              "id": "safe",
+              "label": "保交期",
+              "action": "加钱让{{caravan}}绕路，先把货按期送到。",
+              "success": {
+                "result": "货按期到了，利润被运费吃掉一半，买方却记住了你能守约。{{father}}说这趟不算白做。"
+              },
+              "failure": {
+                "result": "绕路还是误了期，你赔了一笔，买方转去了{{rival}}那边。第一笔生意以亏本收场。"
+              }
+            },
+            {
+              "id": "balanced",
+              "label": "保价钱",
+              "action": "和买方谈一个折中价，把交期往后挪两日。",
+              "success": {
+                "result": "买方接受了折中，货晚到两日，利润薄但没赔。你在集市上有了一个能说话的名声。"
+              },
+              "failure": {
+                "result": "买方表面答应，转头压了尾款。你保住了价钱，却第一次知道口头约定不算数。"
+              }
+            },
+            {
+              "id": "risky",
+              "label": "先保信用",
+              "action": "宁可赔本也按期交货，把这一单做成招牌。",
+              "success": {
+                "result": "你赔了本钱，却按期交了货。买方把下一单也给了你，{{partner}}说这叫“先立信，再立价”。"
+              },
+              "failure": {
+                "result": "赔本交货后，买方并没有续单。家里本钱紧了一截，{{father}}让你先别急着再签。"
+              }
+            }
+          ]
+        },
+        {
+          "id": "contract-aftermath",
+          "kind": "life",
+          "entry": "第一笔生意已经结束，家里和集市都要一个交代。",
+          "situation": "货款结清或赔了出去，{{home}}的账上有了第一笔自己经手的进出。{{father}}让你把得失写进{{ledger}}，{{partner}}问你要不要接着做下一单。{{market}}上已经有人知道你的名字。",
+          "outcome": {
+            "result": "你有了第一份可以延续的营生和第一批客户，也知道了本钱、交期和信用各自的分量。",
+            "endsFlow": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "middleman-dispute",
+      "actIds": [
+        "ancient.merchant-house.credit"
+      ],
+      "narrativeRole": "立信行为 A",
+      "label": "牙人与货款",
+      "entry": "已经有一笔生意和客户，牙人扣住货款或抬价，买卖卡在中间。",
+      "routing": "planned",
+      "assetRoles": [
+        "market",
+        "home",
+        "clerk",
+        "partner",
+        "caravan",
+        "rival",
+        "contract",
+        "ledger",
+        "trade"
+      ],
+      "events": [
+        {
+          "id": "middleman-arrives",
+          "kind": "scene",
+          "entry": "货款还没有结清，牙人开始改口。",
+          "situation": "{{market}}的牙人说买方压价，货款要扣一成。{{clerk}}翻出契书，发现牙人把交期和货色都写模糊了。{{rival}}的人在旁边等着接手这批货。",
+          "outcome": {
+            "result": "契书上有漏洞，牙人手里有货款，{{rival}}等着捡便宜；你必须决定先保哪一头。"
+          }
+        },
+        {
+          "id": "middleman-choice",
+          "kind": "choice",
+          "entry": "牙人扣着货款，契书又不够清楚。",
+          "situation": "{{clerk}}要你去行会告牙人，{{partner}}说可以私下让一步、保住以后的货源，{{rival}}提出低价收走这批货。",
+          "question": "告到行会、私下让步，还是低价转手？",
+          "stakes": "这批货的本钱、以后还能不能走这个牙人的路子，以及你在集市上的信用。",
+          "check": {
+            "stat": "charisma",
+            "difficulty": 13
+          },
+          "options": [
+            {
+              "id": "safe",
+              "label": "告到行会",
+              "action": "拿契书去{{guild}}评理，让牙人按原价结账。",
+              "success": {
+                "result": "行会判你占理，牙人补了货款，却从此不再替你牵线。你保住了本钱，失去了一条货源。"
+              },
+              "failure": {
+                "result": "行会偏着老牙人，货款只追回一半。你得了教训，也知道了行会里谁说了算。"
+              }
+            },
+            {
+              "id": "balanced",
+              "label": "私下让步",
+              "action": "让出一成货款，换牙人以后继续供货。",
+              "success": {
+                "result": "牙人收了让步，往后给你的货价低了一线。你少赚一笔，却保住了一条长期的路。"
+              },
+              "failure": {
+                "result": "牙人收了让步却仍把好货留给{{rival}}。你既没保住钱，也没保住货源。"
+              }
+            },
+            {
+              "id": "risky",
+              "label": "低价转手",
+              "action": "把货低价转给{{rival}}，先收回本钱再找新路。",
+              "success": {
+                "result": "你收回了本钱，{{rival}}拿了货却没想到你转头就找上了 {{caravan}} 的新路子。"
+              },
+              "failure": {
+                "result": "{{rival}}压价压到本钱以下，你为了脱手只能认亏。集市上开始有人说你撑不住了。"
+              }
+            }
+          ]
+        },
+        {
+          "id": "middleman-aftermath",
+          "kind": "life",
+          "entry": "牙人的事已经了结，货款和货源都要重新排。",
+          "situation": "货款到账或亏了出去，{{clerk}}把这一笔记进{{ledger}}。{{partner}}替你重新找牙人，{{caravan}}说下次可以直接走他的路子。{{home}}里父亲问你这回学到什么。",
+          "outcome": {
+            "result": "你保住了或失去了一条货源，也知道了契书、行会和私下让步各自的代价。",
+            "endsFlow": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "road-blockade",
+      "actIds": [
+        "ancient.merchant-house.credit"
+      ],
+      "narrativeRole": "立信行为 B",
+      "label": "封路与货损",
+      "entry": "已经有一批货在路上，商路被封锁或货损，交期和本钱同时受压。",
+      "routing": "planned",
+      "assetRoles": [
+        "road",
+        "warehouse",
+        "caravan",
+        "official",
+        "clerk",
+        "partner",
+        "contract",
+        "logistics"
+      ],
+      "events": [
+        {
+          "id": "road-arrives",
+          "kind": "scene",
+          "entry": "货还在路上，前方传来封路的消息。",
+          "situation": "{{caravan}}传回消息，{{road}}的关津临时加税，山路又被雨水冲断。{{warehouse}}里的货只够交一半，{{official}}说交钱可以放行。{{clerk}}算过，绕路或交税都会亏。",
+          "outcome": {
+            "result": "货、交期和本钱都卡在{{road}}上；你必须决定交税、绕路，还是让货先压在{{warehouse}}。"
+          }
+        },
+        {
+          "id": "road-choice",
+          "kind": "choice",
+          "entry": "封路和货损已经发生，买方还在等交期。",
+          "situation": "{{official}}要一笔过路钱，{{caravan}}说可以走旧山道但风险大，{{clerk}}建议先交一半货、另一半等路通。",
+          "question": "交税放行、绕旧道，还是分批交货？",
+          "stakes": "这批货的本钱、买方的交期，以及{{caravan}}和伙计的安全。",
+          "check": {
+            "stat": "family",
+            "difficulty": 14
+          },
+          "options": [
+            {
+              "id": "safe",
+              "label": "交税放行",
+              "action": "按{{official}}的价交过路钱，先把货送过去。",
+              "success": {
+                "result": "货按时到了，过路钱吃掉大半利润。{{official}}记住你识相，往后这条路的税却只会涨。"
+              },
+              "failure": {
+                "result": "交了钱仍被扣了两日，买方扣了尾款。你保住了货，却没保住这一单的利润。"
+              }
+            },
+            {
+              "id": "balanced",
+              "label": "分批交货",
+              "action": "先交一半货稳住买方，另一半等路通再送。",
+              "success": {
+                "result": "买方收下一半，答应等另一半。你保住了客户，也保住了货，只是账期拖长。"
+              },
+              "failure": {
+                "result": "买方等不及，把另一半订单转给了{{rival}}。你保住了货，失去了一半生意。"
+              }
+            },
+            {
+              "id": "risky",
+              "label": "绕旧山道",
+              "action": "让{{caravan}}走旧山道，避开税关。",
+              "success": {
+                "result": "车队从旧山道绕过去，货按时到了，税也避开了。{{caravan}}说这条路以后还能走，但要担风险。"
+              },
+              "failure": {
+                "result": "旧山道塌方，货损了一半，{{caravan}}也伤了人。你省下税钱，却赔了货和人情。"
+              }
+            }
+          ]
+        },
+        {
+          "id": "road-aftermath",
+          "kind": "life",
+          "entry": "货已经送到或损失，商路和伙计都要安顿。",
+          "situation": "货交到买方手里，{{warehouse}}空了一半。{{caravan}}带着伤或平安回来，{{clerk}}把这一趟的账记清。{{official}}那边也递话，说下次过路钱要提前备。",
+          "outcome": {
+            "result": "你知道了商路上的税、路和货损各自怎么吃利润，也知道了哪些人下次还要用。",
+            "endsFlow": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "credit-collapse",
+      "actIds": [
+        "ancient.merchant-house.credit"
+      ],
+      "narrativeRole": "立信失败后续",
+      "label": "失信与破产",
+      "entry": "上一组使你失信、赔本或破产，但仍有家族铺面、客户或手艺可以重整。",
+      "routing": "planned",
+      "assetRoles": [
+        "home",
+        "market",
+        "clerk",
+        "partner",
+        "caravan",
+        "rival",
+        "ledger",
+        "credit"
+      ],
+      "events": [
+        {
+          "id": "collapse-grief",
+          "kind": "life",
+          "entry": "失信或破产已经发生，债主和家里还没有安顿。",
+          "situation": "你回到{{home}}，父亲把铺面的钥匙收走，母亲把能当的东西列成单子。{{clerk}}把{{ledger}}摊开，欠谁、欠多少一笔笔念。{{rival}}的人在门外看笑话。",
+          "outcome": {
+            "result": "债务和失信的后果已经落到家里；你还剩下的客户、手艺和关系被重新盘清。"
+          }
+        },
+        {
+          "id": "collapse-rebuild",
+          "kind": "life",
+          "entry": "家里的底已经盘清，你仍有人可以重新联络。",
+          "situation": "你带着{{ledger}}去找{{partner}}和{{caravan}}，一家家说明欠账和还法。{{mother}}替你走动亲族，{{clerk}}帮你把还能做的生意列出来。",
+          "outcome": {
+            "result": "你重新有了可以周转的小本钱和几个还愿意给你货的人；失信没有被抹去，路却重新接上。"
+          }
+        },
+        {
+          "id": "collapse-return",
+          "kind": "scene",
+          "entry": "重整已经完成，集市上出现一桩没人敢接的小生意。",
+          "situation": "{{market}}上有一批急货没人敢接，{{partner}}把你的名字递过去。你带着清算过的账和新的小本钱，重新站到牙人和客户面前。",
+          "outcome": {
+            "result": "你用一桩小生意重新证明了自己，失信的旧账仍在，营生却重新有了入口。",
+            "endsFlow": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "credit-established",
+      "actIds": [
+        "ancient.merchant-house.credit"
+      ],
+      "narrativeRole": "本幕结果",
+      "label": "立信与商号",
+      "entry": "已经有稳定的客户、货源或一次重整，家族要给你一个正式的商号位置。",
+      "routing": "planned",
+      "assetRoles": [
+        "home",
+        "market",
+        "guild",
+        "father",
+        "mother",
+        "partner",
+        "clerk",
+        "seal",
+        "ledger"
+      ],
+      "events": [
+        {
+          "id": "established-arrives",
+          "kind": "scene",
+          "entry": "商号的位置还没有定，家里和行会都在等。",
+          "situation": "{{guild}}要各家报商号与经营范围，{{father}}让你自己拿主意。{{partner}}愿意把一部分客户交给你，{{clerk}}说本钱和账已经够立一个单独的号。{{rival}}的商号也在报。",
+          "outcome": {
+            "result": "你有了立商号的资格，但接多少客户、挂谁的名、欠谁的人情，还要看最后怎么定。"
+          }
+        },
+        {
+          "id": "established-verdict",
+          "kind": "settlement",
+          "entry": "商号的处置已经到最后一层，家族与行会要给出正式结果。",
+          "situation": "{{home}}的正堂里，{{father}}把{{seal}}和{{ledger}}摆在案上。{{partner}}和{{clerk}}站在两侧，{{guild}}的文书也在桌上。你能拿到多少本钱、挂谁的名号，取决于这一路的信用与关系。",
+          "rules": [
+            {
+              "id": "independent",
+              "condition": "信用与客户都立住，家族愿意让你独立开号。",
+              "disposition": "你拿到{{seal}}和独立的本钱，商号挂你的名，{{partner}}把一部分客户正式交给你。你在集市上有了自己的位置。",
+              "grantItems": [
+                "house-seal"
+              ]
+            },
+            {
+              "id": "family-branch",
+              "condition": "信用有了，但家族仍要保留控制。",
+              "disposition": "你拿到{{seal}}，商号却仍挂在家族名下。你有了经营权，重大决定还要经过{{father}}。",
+              "grantItems": [
+                "house-seal"
+              ]
+            },
+            {
+              "id": "clerk-post",
+              "condition": "信用或本钱不足，家族只让你先做掌柜或分号管事。",
+              "disposition": "你没有独立商号，只做了家族分号的管事。{{partner}}让你先攒客户，{{rival}}已经抢在前面。"
+            }
+          ]
+        },
+        {
+          "id": "established-aftermath",
+          "kind": "life",
+          "entry": "商号的位置已经定下，家族和客户都要重新排。",
+          "situation": "{{home}}的铺面换了匾或添了分号，{{clerk}}把新的账本立起来。{{partner}}带客户来道贺，{{mother}}问你要不要把家眷也接来。{{rival}}的商号在同一条街上。",
+          "outcome": {
+            "result": "你有了自己的营生和第一批稳定客户，也知道了商号背后是家族、行会和人情三本账。",
+            "endsFlow": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "guild-war",
+      "actIds": [
+        "ancient.merchant-house.network"
+      ],
+      "narrativeRole": "通衢行为 A",
+      "label": "行会与特许",
+      "entry": "已经有自己的商号，行会围绕一项特许或货源分成两派。",
+      "routing": "planned",
+      "assetRoles": [
+        "guild",
+        "market",
+        "warehouse",
+        "rival",
+        "partner",
+        "official",
+        "contract",
+        "trade",
+        "network"
+      ],
+      "events": [
+        {
+          "id": "guild-start",
+          "kind": "life",
+          "entry": "特许还没有定，行会里已经开始走动。",
+          "situation": "{{guild}}要重新分一项货源或渡口特许，{{rival}}联合了几家老商号，{{partner}}让你先摸清各家的底。{{official}}那边也在等谁出价。",
+          "outcome": {
+            "result": "你摸清了行会里的票数、货源和官面上的价码，也知道了这一局不只是比本钱。"
+          }
+        },
+        {
+          "id": "guild-crisis",
+          "kind": "scene",
+          "entry": "特许之争已经摊到行会桌面，{{rival}}先出了招。",
+          "situation": "{{rival}}提出联合压价，把你排除在货源之外。{{partner}}说可以联合几家小商号对抗，{{official}}暗示交一笔捐就能拿到官面上的支持。",
+          "outcome": {
+            "result": "你必须决定联合、让利，还是走官面；行会的票数和货源都在这一局里。"
+          }
+        },
+        {
+          "id": "guild-choice",
+          "kind": "choice",
+          "entry": "行会投票在即，{{rival}}和{{official}}都在等你的选择。",
+          "situation": "{{partner}}要你联合小商号，{{clerk}}建议让出一部分货源换平安，{{official}}把捐纳的数目写在纸上。{{contract}}还在你手里，可以作为谈判的凭据。",
+          "question": "联合对抗、让利求和，还是走官面拿特许？",
+          "stakes": "货源与渡口特许、行会里的位置，以及你和{{rival}}的长期关系。",
+          "check": {
+            "stat": "charisma",
+            "difficulty": 18
+          },
+          "options": [
+            {
+              "id": "safe",
+              "label": "联合小商号",
+              "action": "用{{contract}}和客户关系联合几家小商号，在行会里对抗{{rival}}。",
+              "success": {
+                "result": "小商号站到你这边，{{rival}}的联合被拆开，特许分了一部分给你。你成了行会里不能忽略的一票。",
+                "consumeItems": [
+                  "trade-contract"
+                ]
+              },
+              "failure": {
+                "result": "小商号临时退缩，{{rival}}拿下特许。{{contract}}用掉了，你在行会里被压了一头。",
+                "consumeItems": [
+                  "trade-contract"
+                ]
+              }
+            },
+            {
+              "id": "balanced",
+              "label": "让利求和",
+              "action": "让出一部分货源给{{rival}}，换他不把你排除在外。",
+              "success": {
+                "result": "{{rival}}收了让利，不再压你。你保住了货源，却在行会里坐到了第二排。"
+              },
+              "failure": {
+                "result": "{{rival}}拿了让利仍把你排除在核心货源外。你既没保住面子，也没保住里子。"
+              }
+            },
+            {
+              "id": "risky",
+              "label": "走官面",
+              "action": "交捐纳拿官面上的特许，绕过行会投票。",
+              "success": {
+                "result": "{{official}}给了你特许，{{rival}}的联合被官面压下去。你赢了这一局，也成了行会里靠官面吃饭的人。"
+              },
+              "failure": {
+                "result": "捐纳交了，特许却被上头收回，{{rival}}趁机说你坏行会规矩。你在官面和行会两边都失了分。"
+              }
+            }
+          ]
+        },
+        {
+          "id": "guild-aftermath",
+          "kind": "life",
+          "entry": "特许已经定下，行会与官面都要重新排。",
+          "situation": "{{guild}}的座次换了，{{warehouse}}的货源也重新分。{{partner}}把新的合作条件带来，{{official}}的捐纳文书还在案上。{{rival}}没有再来，但两家的账已经记下。",
+          "outcome": {
+            "result": "你有了更大的货源或更稳的官面关系，也知道了行会里的位置要靠票数、货源和人情一起撑。",
+            "endsFlow": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "ferry-rights",
+      "actIds": [
+        "ancient.merchant-house.network"
+      ],
+      "narrativeRole": "通衢行为 B",
+      "label": "渡口与商路",
+      "entry": "已经有跨地生意，渡口或商路的控制权影响整条运输线。",
+      "routing": "planned",
+      "assetRoles": [
+        "road",
+        "warehouse",
+        "caravan",
+        "official",
+        "partner",
+        "rival",
+        "ledger",
+        "logistics"
+      ],
+      "events": [
+        {
+          "id": "ferry-arrives",
+          "kind": "scene",
+          "entry": "渡口的归属还没有定，商队都在等。",
+          "situation": "{{road}}的渡口被{{rival}}的人先占了，{{caravan}}说再拖下去货要烂在{{warehouse}}。{{official}}说渡口归官，可以竞价。{{partner}}问你敢不敢接。",
+          "outcome": {
+            "result": "渡口、商队和官面都压在你面前；接与不接，决定你能否把生意扩到对岸。"
+          }
+        },
+        {
+          "id": "ferry-choice",
+          "kind": "choice",
+          "entry": "渡口竞价在即，{{rival}}和{{official}}都在等你的价。",
+          "situation": "{{rival}}已经出了价，{{official}}说可以分期交，{{caravan}}愿意把船队押给你。{{clerk}}提醒你，接过渡口就要养船、养人、担风险。",
+          "question": "竞价接渡口、与{{rival}}合股，还是只做租用？",
+          "stakes": "渡口控制权、现金流，以及整条商路的运输成本。",
+          "check": {
+            "stat": "family",
+            "difficulty": 18
+          },
+          "options": [
+            {
+              "id": "safe",
+              "label": "只做租用",
+              "action": "不接渡口，只和{{rival}}谈一个长期租用的价。",
+              "success": {
+                "result": "你拿到了稳定的租用价，货能过河，利润薄但风险小。{{rival}}拿了大头，你保住了商路。"
+              },
+              "failure": {
+                "result": "{{rival}}临时抬价，你的货又压了一程。你保住了本钱，却失去了交期。"
+              }
+            },
+            {
+              "id": "balanced",
+              "label": "合股接渡",
+              "action": "与{{rival}}合股接过渡口，按出资分账。",
+              "success": {
+                "result": "你们合股接过渡口，成本分摊，货也顺了。{{rival}}成了合伙人，也成了随时会翻脸的伙伴。"
+              },
+              "failure": {
+                "result": "合股后{{rival}}在账上做手脚，你出了钱却没拿到该有的分成。渡口接了，关系也裂了。"
+              }
+            },
+            {
+              "id": "risky",
+              "label": "独力竞价",
+              "action": "押上商号的本钱，独力把渡口竞下来。",
+              "success": {
+                "result": "你竞下渡口，整条商路的成本握在自己手里。{{rival}}被你挤到对岸，{{caravan}}的船队也归你调度。"
+              },
+              "failure": {
+                "result": "竞价过高，现金流被渡口拖住。{{rival}}在旁边等你周转不灵，{{clerk}}开始劝你卖船。"
+              }
+            }
+          ]
+        },
+        {
+          "id": "ferry-aftermath",
+          "kind": "life",
+          "entry": "渡口已经有了结果，船队和现金流都要重新排。",
+          "situation": "渡口换了大旗，{{caravan}}带着船队来报账。{{clerk}}把租用、合股或竞价的账记进{{ledger}}，{{official}}的税单也到了。{{partner}}问你要不要趁势再开一条商路。",
+          "outcome": {
+            "result": "你有了更长的商路或更稳的运输，也知道了渡口背后是现金流、船队和官面三笔账。",
+            "endsFlow": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "state-gray-trade",
+      "actIds": [
+        "ancient.merchant-house.network"
+      ],
+      "narrativeRole": "通衢行为 C",
+      "label": "官商与灰色贸易",
+      "entry": "商路已经打通，官面上有人递来一桩不能见光的买卖。",
+      "routing": "planned",
+      "assetRoles": [
+        "official",
+        "market",
+        "warehouse",
+        "guild",
+        "partner",
+        "rival",
+        "ledger",
+        "network"
+      ],
+      "events": [
+        {
+          "id": "gray-arrives",
+          "kind": "scene",
+          "entry": "官面上的买卖还没有接下来，风险也没有说透。",
+          "situation": "{{official}}把一桩军需或专卖的差事递到你手里，货可以走{{warehouse}}，账却要走另一本。{{partner}}说这是大机会，{{clerk}}提醒你，出了事商号要顶。{{rival}}也在打听这桩买卖。",
+          "outcome": {
+            "result": "你摸清了这桩买卖的利、风险和官面上的靠山，也知道一旦接了就退不出去。"
+          }
+        },
+        {
+          "id": "gray-choice",
+          "kind": "choice",
+          "entry": "官商买卖在眼前，{{official}}要你给一个准话。",
+          "situation": "{{official}}要你垫本钱、走私账，{{partner}}说可以拉{{rival}}一起分担，{{clerk}}建议只做明面上的那一半。",
+          "question": "全接、拉人分担，还是只做明面？",
+          "stakes": "一桩大生意的利润、商号的安危，以及你与官面、行会的关系。",
+          "check": {
+            "stat": "charisma",
+            "difficulty": 19
+          },
+          "options": [
+            {
+              "id": "safe",
+              "label": "只做明面",
+              "action": "只接明面上的运输和仓储，不碰私账。",
+              "success": {
+                "result": "你赚了一份稳当的运输钱，{{official}}嫌你胆小，却没有把柄。商号保住了，大钱让别人赚了。"
+              },
+              "failure": {
+                "result": "{{official}}把明面生意也转给了{{rival}}。你保住了商号，却失去了官面上的门路。"
+              }
+            },
+            {
+              "id": "balanced",
+              "label": "拉人分担",
+              "action": "拉{{rival}}和{{partner}}一起接，风险分摊。",
+              "success": {
+                "result": "几家一起接，利润分了，风险也分了。{{official}}满意，{{rival}}却开始打探你那一份账。"
+              },
+              "failure": {
+                "result": "{{rival}}把私账的事捅了出去，你被牵连。{{official}}先保自己，你成了顶账的人。"
+              }
+            },
+            {
+              "id": "risky",
+              "label": "全接私账",
+              "action": "独力接整桩买卖，把私账握在自己手里。",
+              "success": {
+                "result": "你吃下整桩买卖，利润和官面关系都归你。{{official}}成了你的靠山，{{rival}}只能看着。"
+              },
+              "failure": {
+                "result": "私账被查，商号被罚，{{official}}翻脸不认。你保住了命，却赔进去大半本钱。"
+              }
+            }
+          ]
+        },
+        {
+          "id": "gray-verdict",
+          "kind": "settlement",
+          "entry": "官商买卖已经做完或出事，官面要给出处置。",
+          "situation": "{{official}}把账合上，{{guild}}那边也听到了风声。{{clerk}}把明账和私账分开摆，{{partner}}问商号还能不能撑。你的商号、本钱和官面关系，都等这一道处置。",
+          "rules": [
+            {
+              "id": "protected",
+              "condition": "买卖做完，私账没有留下把柄，官面仍愿意护你。",
+              "disposition": "{{official}}把后续的官商差事继续交给你，商号的本钱和门路都涨了一截。你成了官面上的人，也被同行盯得更紧。",
+              "endsFlow": true
+            },
+            {
+              "id": "exposed",
+              "condition": "私账露了风声，但商号还能撑住。",
+              "disposition": "{{official}}与你切割，商号被罚了一笔。你保住了铺面和伙计，官面上的门路却断了。",
+              "endsFlow": true
+            },
+            {
+              "id": "seized",
+              "condition": "私账被查实，商号被牵连。",
+              "disposition": "商号被查封，货被没收，{{official}}把责任推给你。你保住了性命，本钱和信用却去了大半。",
+              "endsFlow": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "guild-sanction",
+      "actIds": [
+        "ancient.merchant-house.network"
+      ],
+      "narrativeRole": "通衢失败后续",
+      "label": "行会制裁",
+      "entry": "上一组使你被行会制裁、商路被封或商号受罚，但仍有客户、伙计或家族可以重整。",
+      "routing": "planned",
+      "assetRoles": [
+        "home",
+        "guild",
+        "market",
+        "clerk",
+        "partner",
+        "caravan",
+        "ledger",
+        "credit"
+      ],
+      "events": [
+        {
+          "id": "sanction-grief",
+          "kind": "life",
+          "entry": "行会制裁已经落下，伙计和债主还没有安顿。",
+          "situation": "{{guild}}的告示贴在{{market}}口，你的商号被停了行会里的买卖。{{clerk}}把{{ledger}}摊开，伙计的工钱和债主的账都压在手上。{{partner}}来问还能不能撑。",
+          "outcome": {
+            "result": "制裁的损失已经落到商号、伙计和债主身上；你还剩下的客户和货源被重新盘清。"
+          }
+        },
+        {
+          "id": "sanction-rebuild",
+          "kind": "life",
+          "entry": "伙计和账已经盘清，你仍有人可以重新联络。",
+          "situation": "你带着{{ledger}}去找{{caravan}}和几个老客户，一家家说明情况。{{clerk}}替你重新排货源，{{partner}}愿意拿自己的名号替你担保一部分。",
+          "outcome": {
+            "result": "你重新有了可以周转的小本钱和几个还愿意给你货的人；制裁没有被抹去，路却重新接上。"
+          }
+        },
+        {
+          "id": "sanction-return",
+          "kind": "scene",
+          "entry": "重整已经完成，行会外出现一桩没人敢接的急单。",
+          "situation": "{{market}}上有一批急货，行会里的人都不敢接。{{partner}}把你的名字递过去，{{caravan}}愿意先运。你带着清算过的账重新站到客户面前。",
+          "outcome": {
+            "result": "你用一桩急单重新证明了自己，制裁的旧账仍在，商号却重新有了入口。",
+            "endsFlow": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "trade-network",
+      "actIds": [
+        "ancient.merchant-house.network"
+      ],
+      "narrativeRole": "本幕结果",
+      "label": "跨地商网",
+      "entry": "已经有货源、渡口或官面关系，商号要决定是否把生意扩成跨地网络。",
+      "routing": "planned",
+      "assetRoles": [
+        "road",
+        "warehouse",
+        "guild",
+        "caravan",
+        "partner",
+        "official",
+        "seal",
+        "ledger",
+        "network"
+      ],
+      "events": [
+        {
+          "id": "network-arrives",
+          "kind": "scene",
+          "entry": "跨地商网还没有铺开，各路人马都在等你的方案。",
+          "situation": "{{partner}}把几地的掌柜和船主带到{{home}}，{{caravan}}说可以开两条新商路。{{official}}要你先交一笔保证金，{{guild}}要你说明分号怎么挂。{{rival}}已经在另一条路上布了人。",
+          "outcome": {
+            "result": "商网的路线、分号和保证金都摆在桌上；你要决定铺多大、让谁进来。"
+          }
+        },
+        {
+          "id": "network-choice",
+          "kind": "choice",
+          "entry": "跨地商网的方案在眼前，{{partner}}和{{official}}各有一份条件。",
+          "situation": "{{partner}}要你把分号交给老伙计，{{official}}要派官面上的账房，{{rival}}提出互换商路、各让一半。{{clerk}}说本钱只够先开两条路。",
+          "question": "自铺分号、让官面入股，还是与{{rival}}互换商路？",
+          "stakes": "商网的规模、控制权，以及本钱和官面上的风险。",
+          "check": {
+            "stat": "family",
+            "difficulty": 20
+          },
+          "options": [
+            {
+              "id": "safe",
+              "label": "自铺分号",
+              "action": "用老伙计开两条分号，慢慢把商网铺开。",
+              "success": {
+                "result": "两条分号立住，货源和客户都稳了。商网不大，却是你自己的。"
+              },
+              "failure": {
+                "result": "分号开得太急，本钱周转不灵，一条分号关了门。你保住了主号，商网却停在一半。"
+              }
+            },
+            {
+              "id": "balanced",
+              "label": "让官面入股",
+              "action": "让{{official}}派账房入股，用官面关系换商路保护。",
+              "success": {
+                "result": "官面入了股，商路一路畅通，商网扩到三地。你有了靠山，也把一部分控制权交了出去。"
+              },
+              "failure": {
+                "result": "官面账房把利润截走大半，{{official}}还不断加派差事。商网铺开了，商号却成了官面的钱袋。"
+              }
+            },
+            {
+              "id": "risky",
+              "label": "互换商路",
+              "action": "与{{rival}}互换商路，各让一半，换他不再挡路。",
+              "success": {
+                "result": "两条商路互换，{{rival}}不再挡道，你的商网扩到对岸。你们成了半盟友，也随时可能再翻脸。"
+              },
+              "failure": {
+                "result": "{{rival}}在换路时做了手脚，你让出去的是好路，换回来的是烂路。商网没铺成，还赔了本钱。"
+              }
+            }
+          ]
+        },
+        {
+          "id": "network-verdict",
+          "kind": "settlement",
+          "entry": "商网的方案已经定下，行会与官面要给出正式结果。",
+          "situation": "{{guild}}和{{official}}的文书都到了，{{partner}}把各地分号的账摆在案上。{{clerk}}问你要不要把{{seal}}用到新分号上。商网的规模和控制权，等这一道处置。",
+          "rules": [
+            {
+              "id": "network-expanded",
+              "condition": "商网铺开，货源、船队和分号都能运转。",
+              "disposition": "商号升成跨地商网，你成了行会里能调动资金、货物和消息的人。分号与船队都挂你的印。",
+              "grantItems": [
+                "house-seal"
+              ]
+            },
+            {
+              "id": "network-limited",
+              "condition": "商网只铺开一部分，或控制权被官面/合伙人分走。",
+              "disposition": "商网停在两三地，你保住了主号和大部分客户。{{official}}或{{rival}}分走了一部分，你仍是行会里的一号人物。",
+              "grantItems": [
+                "house-seal"
+              ]
+            },
+            {
+              "id": "network-stalled",
+              "condition": "商网没有铺成，本钱或官面关系出了缺口。",
+              "disposition": "分号关的关、并的并，商网退回主号。你保住了铺面和伙计，扩张暂时停了。"
+            }
+          ]
+        },
+        {
+          "id": "network-aftermath",
+          "kind": "life",
+          "entry": "商网已经铺开或退回，家族、伙计和官面都要重新排。",
+          "situation": "{{home}}的商号换了新匾，各地分号的掌柜来报账。{{partner}}问下一步往哪走，{{clerk}}把新账记进{{ledger}}。{{official}}的保证金和{{rival}}的商路都还在桌上。",
+          "outcome": {
+            "result": "你有了跨地商网或更稳的主号，也知道了商网背后是分号、船队、官面和行会四本账。",
+            "endsFlow": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "state-monopoly",
+      "actIds": [
+        "ancient.merchant-house.legacy"
+      ],
+      "narrativeRole": "成业行为 A",
+      "label": "专卖与官商",
+      "entry": "商网已经立住，朝廷要推一项专卖或官营，商号必须选位置。",
+      "routing": "planned",
+      "assetRoles": [
+        "official",
+        "guild",
+        "warehouse",
+        "partner",
+        "rival",
+        "ledger",
+        "network"
+      ],
+      "events": [
+        {
+          "id": "monopoly-arrives",
+          "kind": "scene",
+          "entry": "专卖的文书还没有落到商号头上。",
+          "situation": "{{official}}把专卖的条款带到{{guild}}，说朝廷要盐、铁或粮的专营。{{partner}}说这是把生意做大的机会，{{rival}}已经在走官面的门路。{{clerk}}算过，接专卖要压上大半本钱。",
+          "outcome": {
+            "result": "专卖的利、风险和官面条件都摆开；你要决定接、不接，还是联合行会另提方案。"
+          }
+        },
+        {
+          "id": "monopoly-choice",
+          "kind": "choice",
+          "entry": "专卖在即，{{official}}和{{rival}}都在等你的答复。",
+          "situation": "{{official}}要你独家承接，{{partner}}建议联合行会分摊，{{rival}}提出合股。{{clerk}}提醒你，专卖一旦接了，商号就不再只是自己的。",
+          "question": "独家承接、联合行会，还是与{{rival}}合股？",
+          "stakes": "商号的规模、官面关系，以及家族对本钱和方向的控制。",
+          "check": {
+            "stat": "family",
+            "difficulty": 21
+          },
+          "options": [
+            {
+              "id": "safe",
+              "label": "联合行会",
+              "action": "联合行会几家分摊专卖，降低本钱压力。",
+              "success": {
+                "result": "行会几家共同承接，商号分到一份稳当的专卖份额。你保住了本钱，也把官面的风险分了出去。"
+              },
+              "failure": {
+                "result": "行会内部争份额，专卖被{{rival}}抢走大半。你保住了商号，却失去了官面的门路。"
+              }
+            },
+            {
+              "id": "balanced",
+              "label": "与{{rival}}合股",
+              "action": "与{{rival}}合股承接专卖，各出一半本钱。",
+              "success": {
+                "result": "两家合股接下专卖，商号的本钱和官面关系都涨了一截。{{rival}}成了合伙人，也成了最了解你底细的人。"
+              },
+              "failure": {
+                "result": "{{rival}}在账上做手脚，专卖的利润被他截走。你出了本钱，却只拿到小半。"
+              }
+            },
+            {
+              "id": "risky",
+              "label": "独家承接",
+              "action": "压上大半本钱，独家承接专卖。",
+              "success": {
+                "result": "你独家接下专卖，商号一跃成为官面倚重的大商。{{official}}成了你的靠山，{{rival}}只能看着。"
+              },
+              "failure": {
+                "result": "专卖的摊子铺得太大，本钱周转不灵，官面又临时加派。你保住了商号，却欠下一大笔官债。"
+              }
+            }
+          ]
+        },
+        {
+          "id": "monopoly-verdict",
+          "kind": "settlement",
+          "entry": "专卖的承接已经定下，官面要给一个正式结果。",
+          "situation": "{{official}}把专卖的印信和账册摆在案上，{{guild}}的同行也在等。{{clerk}}把本钱、官债和分成的账摊开。你的商号与家族，都等这一道处置。",
+          "rules": [
+            {
+              "id": "monopoly-held",
+              "condition": "专卖接住，本钱和官面关系都撑得住。",
+              "disposition": "商号拿到专卖的正式份额，成为官面倚重的大商。你的家族与本钱都上了一个台阶，也被绑进了官面的账。",
+              "endsFlow": true
+            },
+            {
+              "id": "monopoly-shared",
+              "condition": "专卖被行会或合伙人分走一部分。",
+              "disposition": "商号保住了一份专卖，也保住了一部分自主。你没有独大，却仍在行会里站着。",
+              "endsFlow": true
+            },
+            {
+              "id": "monopoly-lost",
+              "condition": "专卖没有接住，或本钱被官债拖垮。",
+              "disposition": "专卖落到{{rival}}或官面手里，商号退回原来的生意。你保住了铺面，却失去了最好的一次扩张。",
+              "endsFlow": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "famine-relief",
+      "actIds": [
+        "ancient.merchant-house.legacy"
+      ],
+      "narrativeRole": "成业行为 B",
+      "label": "战灾与赈济",
+      "entry": "战灾或荒年冲击供应，商号手里有货，民众缺必需品。",
+      "routing": "planned",
+      "assetRoles": [
+        "home",
+        "market",
+        "warehouse",
+        "official",
+        "partner",
+        "caravan",
+        "ledger",
+        "credit"
+      ],
+      "events": [
+        {
+          "id": "relief-arrives",
+          "kind": "choice",
+          "entry": "灾荒已经压到城下，商号仓里还有货。",
+          "situation": "战灾或荒年让粮价翻了几倍，{{warehouse}}里还压着一批粮。{{official}}要你平价出粮，{{partner}}说可以囤到价更高，{{caravan}}说外地的粮还能运进来但要冒风险。",
+          "question": "平价赈济、囤货待价，还是冒险运粮？",
+          "stakes": "灾民的性命、商号的利润，以及官面和民间对商号的看法。",
+          "check": {
+            "stat": "charisma",
+            "difficulty": 20
+          },
+          "options": [
+            {
+              "id": "safe",
+              "label": "平价赈济",
+              "action": "按官面的平价出粮，先稳住城下灾民。",
+              "success": {
+                "result": "城下灾民吃上了粮，{{official}}给了商号一块义商匾。利润薄了，名声和官面关系却立住了。"
+              },
+              "failure": {
+                "result": "平价出粮没能压住粮价，商号赔了本钱，灾民仍不够吃。你得了名声，却亏了家底。"
+              }
+            },
+            {
+              "id": "balanced",
+              "label": "冒险运粮",
+              "action": "让{{caravan}}从外地运粮进来，平抑粮价。",
+              "success": {
+                "result": "外地的粮运进来，粮价回落，商号赚了一份辛苦钱。{{official}}和灾民都记你的好。"
+              },
+              "failure": {
+                "result": "粮队在路上被乱兵截了，本钱赔进去大半。城下粮价仍高，商号成了被骂的那一家。"
+              }
+            },
+            {
+              "id": "risky",
+              "label": "囤货待价",
+              "action": "把粮压在{{warehouse}}里，等粮价再涨。",
+              "success": {
+                "result": "粮价又涨了一截，商号赚了一大笔。{{official}}没有明说，民间的骂声却记在了你头上。"
+              },
+              "failure": {
+                "result": "官面开仓平抑粮价，你囤的粮砸在手里。{{official}}借机查你的仓，商号赔了本钱又坏了名声。"
+              }
+            }
+          ]
+        },
+        {
+          "id": "relief-aftermath",
+          "kind": "life",
+          "entry": "灾荒已经过去或仍在，商号和家族都要面对后果。",
+          "situation": "城下的粥棚撤了，{{warehouse}}里的粮清空或压着。{{official}}送来匾或罚单，{{partner}}把这一笔记进{{ledger}}。{{home}}里母亲问，这样的年景还要不要再来一次。",
+          "outcome": {
+            "result": "赈济或囤货的后果落在商号的名声、本钱和官面关系上；你知道了财富在灾年里的分量。",
+            "endsFlow": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "confiscation",
+      "actIds": [
+        "ancient.merchant-house.legacy"
+      ],
+      "narrativeRole": "成业败势",
+      "label": "抄家与清算",
+      "entry": "官面或权贵要清算商号，你还有一次保存家人、伙计或本钱的选择。",
+      "routing": "planned",
+      "assetRoles": [
+        "home",
+        "warehouse",
+        "official",
+        "partner",
+        "clerk",
+        "caravan",
+        "ledger",
+        "seal"
+      ],
+      "events": [
+        {
+          "id": "confiscation-choice",
+          "kind": "choice",
+          "entry": "抄家的文书已经到门口，商号还有一次处置的机会。",
+          "situation": "{{official}}带着文书封了{{warehouse}}，{{partner}}说可以把一部分货转到外地，{{clerk}}把{{ledger}}和{{seal}}藏在你面前。父亲让你先保人，母亲让你先保祖宅。",
+          "question": "保人、保货，还是把账册交出去换一个从轻？",
+          "stakes": "家族与伙计的安危、商号还能不能留下一点本钱，以及你会不会被牵连下狱。",
+          "check": {
+            "stat": "charisma",
+            "difficulty": 21
+          },
+          "options": [
+            {
+              "id": "safe",
+              "label": "交账保人",
+              "action": "把{{ledger}}交给{{official}}，换家人和伙计不被下狱。",
+              "success": {
+                "result": "账册交出去，家人和伙计保住了，商号被查封大半。你失去了本钱，保住了人。",
+                "consumeItems": [
+                  "account-ledger"
+                ]
+              },
+              "failure": {
+                "result": "账册交出去，{{official}}仍把父亲扣下。家人散了一部分，商号也没保住。",
+                "consumeItems": [
+                  "account-ledger"
+                ]
+              }
+            },
+            {
+              "id": "balanced",
+              "label": "转货保本",
+              "action": "让{{partner}}把一部分货转到外地，留下一点重新起步的本钱。",
+              "success": {
+                "result": "一部分货转了出去，家人被安顿到外地。商号没了，本钱还在，你还有重新做生意的可能。"
+              },
+              "failure": {
+                "result": "转货被{{official}}截住，家人和本钱都没保住。你只身脱身，商号彻底清空。"
+              }
+            },
+            {
+              "id": "risky",
+              "label": "保祖宅争产",
+              "action": "拿{{seal}}和旧契书去争祖宅与一部分家产，跟官面对簿。",
+              "success": {
+                "result": "你争回了祖宅和一小部分家产，商号被没收。家族有了落脚处，你却在官面上留下了案底。"
+              },
+              "failure": {
+                "result": "对簿失败，祖宅也被没收。家族散了，你成了没有根的人。"
+              }
+            }
+          ]
+        },
+        {
+          "id": "confiscation-verdict",
+          "kind": "settlement",
+          "entry": "抄家已经执行，官面要给出最后处置。",
+          "situation": "{{home}}的门口贴着封条，{{official}}把处置文书念完。{{partner}}和{{clerk}}在门外等，父亲或母亲被放回或仍被扣。你的家族、本钱和性命，都等这一道处置。",
+          "rules": [
+            {
+              "id": "preserved-family",
+              "condition": "你的选择保住了家人和一部分本钱。",
+              "disposition": "商号被抄，家人被放回，一部分本钱转到外地。你还有重新起步的可能，商号的名字却没了。"
+            },
+            {
+              "id": "preserved-person",
+              "condition": "你保住了自己，但家族或商号付出大半。",
+              "disposition": "你只身或带少数人脱身，祖宅和商号都被没收。你活着，却要从头再来。"
+            },
+            {
+              "id": "lost-all",
+              "condition": "你的选择失败，清算扩大到家族和伙计。",
+              "disposition": "商号、祖宅和本钱都被没收，家人下狱或流放。你失去了可以重新起步的一切。"
+            }
+          ]
+        },
+        {
+          "id": "confiscation-aftermath",
+          "kind": "life",
+          "entry": "抄家已经结束，家人和伙计要在新的地方活下去。",
+          "situation": "外地的旧宅或亲友家里，母亲把最后一点盘缠分成几份，父亲把祖谱交给还愿意跟的人。{{partner}}或{{clerk}}偶尔捎来消息，商号的名字已经换了主人。",
+          "outcome": {
+            "result": "你在清算后的地方重新安顿，家族、伙计和自己的去留都有了实际结果；商号的门关上了，日子还要继续。",
+            "endsFlow": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "succession-final",
+      "actIds": [
+        "ancient.merchant-house.legacy"
+      ],
+      "narrativeRole": "本幕结果",
+      "label": "继承与成业",
+      "entry": "商号与家族的财富已经走到最后一步，继承、转让或散伙要有一个回答。",
+      "routing": "planned",
+      "assetRoles": [
+        "home",
+        "guild",
+        "father",
+        "mother",
+        "partner",
+        "clerk",
+        "seal",
+        "ledger",
+        "credit"
+      ],
+      "events": [
+        {
+          "id": "succession-verdict",
+          "kind": "settlement",
+          "entry": "继承或转让的方案还没有定，家族与行会都在等。",
+          "situation": "{{home}}的正堂里，{{father}}和{{mother}}把{{seal}}、{{ledger}}和祖产单子摆在案上。{{partner}}和{{clerk}}各有一份方案：把商号传给族人、交给伙计，还是拆成几份。行会的文书也在桌上。",
+          "rules": [
+            {
+              "id": "inherit",
+              "condition": "家族内部能达成一致，商号与本钱足以延续。",
+              "disposition": "商号传给下一代或族人，你保留了大部分本钱与行会位置。家族有了稳定的未来，你也退到幕后。"
+            },
+            {
+              "id": "transfer",
+              "condition": "家族无人能接，或你选择把商号交给更合适的人。",
+              "disposition": "商号交给{{partner}}或老伙计，家族保留一部分股份。生意延续了，名字却换了。"
+            },
+            {
+              "id": "dissolve",
+              "condition": "商号已经无法维持，或家族选择分产散伙。",
+              "disposition": "商号拆成几份，伙计各奔前程。你保住了家族的一份本钱，也接受了生意到此为止。"
+            }
+          ]
+        },
+        {
+          "id": "succession-homecoming",
+          "kind": "life",
+          "entry": "继承或转让已经定下，你要回到家族与自己的日子里。",
+          "situation": "{{home}}的铺面换了匾或关了门，{{partner}}和{{clerk}}各自来送。{{father}}或{{mother}}把旧账本收进箱子，{{caravan}}说以后还愿意走你的路。你把{{seal}}和{{ledger}}交给该交的人。",
+          "outcome": {
+            "result": "商号、家族与本钱有了最终去向；无论延续、转让还是散伙，这一生的生意账都已经落下。",
+            "endsFlow": true
+          }
+        }
+      ]
+    }
+  ]
+}

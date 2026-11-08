@@ -7,8 +7,7 @@ const actHostingMaterialsSchema = z.object({
   locations: z.array(z.object({ name: z.string().min(1), conditions: z.string().min(1), resources: z.string().min(1), obstacles: z.string().min(1), connections: z.string().min(1) }).strict()),
   pressures: z.array(z.object({ source: z.string().min(1), condition: z.string().min(1), development: z.string().min(1) }).strict()),
   stakes: z.array(z.string().min(1)),
-  flowBindings: z.array(z.object({ roleId: z.string().min(1), name: z.string().min(1) }).strict()).optional(),
-  eventFlows: z.object({ openingFlowId: z.string().min(1), availableFlowIds: z.array(z.string().min(1)).min(1) }).strict().optional()
+  flowBindings: z.array(z.object({ roleId: z.string().min(1), name: z.string().min(1) }).strict()).optional()
 }).strict();
 
 export const actPreparationSchema = actHostingMaterialsSchema.extend({
@@ -28,7 +27,7 @@ export function normalizeNarrativeActOutline(value: unknown, actId?: string): Na
   const raw = value as Record<string, unknown>;
   if (typeof raw.actId !== "string" || !raw.actId.trim() || (actId !== undefined && raw.actId !== actId) ||
       !Number.isInteger(raw.revision) || Number(raw.revision) < 1) return;
-  const preparation = actHostingMaterialsSchema.safeParse(Object.fromEntries(["situation", "actors", "locations", "pressures", "stakes", "flowBindings", "eventFlows"].map((key) => [key, raw[key]])));
+  const preparation = actHostingMaterialsSchema.safeParse(Object.fromEntries(["situation", "actors", "locations", "pressures", "stakes", "flowBindings"].map((key) => [key, raw[key]])));
   if (!preparation.success || ["objective", "closureMeaning"].some((key) => typeof raw[key] !== "string" || !(raw[key] as string).trim())) return;
   const rules = raw.worldRules === undefined ? undefined : worldRuleSnapshotsSchema.safeParse(raw.worldRules);
   if (rules && !rules.success) return;
@@ -42,7 +41,12 @@ export function parseNarrativeActWorldCard(
   value: unknown, actId: string, standards: { objective: string; closureMeaning: string },
   availableRules: NonNullable<NarrativeActOutline["worldRules"]> = []
 ): NarrativeActOutline {
-  const raw = value && typeof value === "object" ? value as Record<string, unknown> : {};
+  // The act card no longer owns event-flow selection. Ignore a legacy or
+  // model-supplied list instead of letting the strict schema reject the card.
+  const raw = value && typeof value === "object" && !Array.isArray(value)
+    ? { ...(value as Record<string, unknown>) }
+    : {};
+  delete raw.eventFlows;
   const materials = actPreparationSchema.safeParse(raw);
   if (!materials.success) throw new Error("narrative_act_outline_invalid:hosting_materials_required");
   const ruleById = new Map(availableRules.map((rule) => [rule.id, rule]));

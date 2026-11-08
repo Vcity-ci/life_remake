@@ -1,0 +1,1375 @@
+{
+  "id": "ancient.court-minister",
+  "revision": "1.0.0",
+  "originRoles": [
+    "home",
+    "father",
+    "mother",
+    "mentor",
+    "token"
+  ],
+  "roles": [
+    {
+      "id": "home",
+      "kind": "location",
+      "identity": "主角家族的宅邸、乡里与祖产"
+    },
+    {
+      "id": "court",
+      "kind": "location",
+      "identity": "朝堂、官署与议政场所"
+    },
+    {
+      "id": "local",
+      "kind": "location",
+      "identity": "县衙、州府与地方政务现场"
+    },
+    {
+      "id": "palace",
+      "kind": "location",
+      "identity": "宫禁、内廷与密议之地"
+    },
+    {
+      "id": "faction",
+      "kind": "location",
+      "identity": "某一派系的门庭、集会处与私邸"
+    },
+    {
+      "id": "father",
+      "kind": "character",
+      "identity": "主角家中承担门户与教养的父亲"
+    },
+    {
+      "id": "mother",
+      "kind": "character",
+      "identity": "主角家中操持家务与亲族往来的母亲"
+    },
+    {
+      "id": "mentor",
+      "kind": "character",
+      "identity": "座师、荐举恩主或早年提携主角的前辈"
+    },
+    {
+      "id": "rival",
+      "kind": "character",
+      "identity": "同僚中与主角争位、争政策或争圣眷的政敌"
+    },
+    {
+      "id": "emperor",
+      "kind": "character",
+      "identity": "掌握最高权柄、在集权与制衡间取舍的君主"
+    },
+    {
+      "id": "eunuch",
+      "kind": "character",
+      "identity": "掌内廷消息与门禁的近臣"
+    },
+    {
+      "id": "clerk",
+      "kind": "character",
+      "identity": "熟悉律令、账册与公文程序的书吏或幕僚"
+    },
+    {
+      "id": "patron",
+      "kind": "character",
+      "identity": "地方官、上官或一方藩镇中能决定差遣的人"
+    },
+    {
+      "id": "seal",
+      "kind": "item",
+      "identity": "证明官职与差遣的官印"
+    },
+    {
+      "id": "memorial",
+      "kind": "item",
+      "identity": "可以直达御前或廷议的奏疏与条陈"
+    },
+    {
+      "id": "recommendation",
+      "kind": "item",
+      "identity": "荐书、门生帖或进入仕途的引荐文书"
+    },
+    {
+      "id": "token",
+      "kind": "item",
+      "identity": "家族或师门传下的信物，用于证明出身与关系"
+    },
+    {
+      "id": "statecraft",
+      "kind": "ability",
+      "identity": "政务、理财、河工与地方治理的实际本领"
+    },
+    {
+      "id": "rhetoric",
+      "kind": "ability",
+      "identity": "廷议、奏对与派系谈判中的辞令"
+    },
+    {
+      "id": "network",
+      "kind": "ability",
+      "identity": "门生、故吏与同僚关系的经营能力"
+    },
+    {
+      "id": "law",
+      "kind": "ability",
+      "identity": "律令、刑名与公文程序的掌握"
+    }
+  ],
+  "items": [
+    {
+      "id": "recommendation-letter",
+      "roleId": "recommendation",
+      "description": "座师或家族旧交写下的荐书，能换来一次差遣或科场资格。"
+    },
+    {
+      "id": "memorial-draft",
+      "roleId": "memorial",
+      "description": "经过反复修改的奏疏，可在廷议中提出一项政策或弹劾一人。"
+    },
+    {
+      "id": "official-seal",
+      "roleId": "seal",
+      "description": "朝廷颁发的官印，证明实际差遣与品级。"
+    }
+  ],
+  "groups": [
+    {
+      "id": "bureaucrat-entry",
+      "actIds": [
+        "ancient.court-minister.entry"
+      ],
+      "narrativeRole": "入局起点",
+      "label": "县衙里的第一件差事",
+      "entry": "尚未取得正式官职，只在家族与地方官署之间读书、帮忙，第一次接触真实政务。",
+      "routing": "planned",
+      "assetRoles": [
+        "home",
+        "father",
+        "mother",
+        "mentor",
+        "clerk",
+        "patron",
+        "local",
+        "recommendation",
+        "statecraft",
+        "law"
+      ],
+      "events": [
+        {
+          "id": "entry-basics",
+          "kind": "life",
+          "entry": "还没有离开家族与乡里，只在读书和家务之间打转。",
+          "lifeBefore": {
+            "minYears": 2,
+            "maxYears": 4,
+            "context": "你在{{home}}读书、帮父亲处理田产与亲族往来，偶尔替母亲抄账。{{mentor}}来家里讲学时，你替他研墨、整理公文。"
+          },
+          "situation": "你在{{home}}长大，父亲教你门户与人情，母亲教你账目与亲族分寸。{{mentor}}说你有做事的底子，缺的是一次真正落到手里的差事。{{local}}的县衙近来缺人抄录，{{mentor}}替你递了话。",
+          "outcome": {
+            "result": "你熟悉了公文格式、田产账目和乡里人情，也知道{{local}}的差事不是只靠读书就能办成。"
+          }
+        },
+        {
+          "id": "entry-first-case",
+          "kind": "scene",
+          "entry": "第一次进{{local}}县衙帮忙，还没有独立处理过政务。",
+          "situation": "{{local}}县衙里堆着灾情呈报和税册。{{patron}}让你替{{clerk}}整理赈济名册，{{mentor}}在旁边看着。你发现名册上有几十户被重复勾销，另一批真正断粮的农户却没有登记。{{clerk}}低声说，这是前任书吏留下的手尾。",
+          "outcome": {
+            "result": "你把重复和遗漏一一标出，{{mentor}}替你向{{patron}}讨了一个正式差遣。临行前他把一封{{recommendation}}交给你，说往后能不能站稳，要看你自己。",
+            "grantItems": [
+              "recommendation-letter"
+            ]
+          }
+        },
+        {
+          "id": "entry-choice",
+          "kind": "choice",
+          "entry": "名册的问题已经摊在桌上，{{patron}}要你给一个处置。",
+          "situation": "{{patron}}要把名册原样报上去，说往后追查也查不到你头上；{{clerk}}劝你先补上断粮户，别把前任的账翻出来；{{mentor}}则让你自己决定要不要把重复勾销的事写进呈文。",
+          "question": "按上官的意思报，先补漏洞，还是把旧账翻出来？",
+          "stakes": "县衙差遣、{{mentor}}的举荐，以及你在地方官场的第一份名声。",
+          "check": {
+            "stat": "intelligence",
+            "difficulty": 12
+          },
+          "options": [
+            {
+              "id": "safe",
+              "label": "按上官意思",
+              "action": "照{{patron}}的意思报册，只把断粮户悄悄补进去。",
+              "success": {
+                "result": "册子报上去没有出事，断粮户也补了。{{patron}}认你懂事，{{clerk}}却记住你没有替他把旧账说清。",
+                "endsFlow": true
+              },
+              "failure": {
+                "result": "补进去的户数与税册对不上，{{patron}}被上头问了一句，回头把责任压到你身上。你第一次知道“照意思办”也会留下把柄。",
+                "endsFlow": true
+              }
+            },
+            {
+              "id": "balanced",
+              "label": "先补漏洞",
+              "action": "不翻旧账，但把断粮户和重复勾销分批补正，给上官留一个能交差的说法。",
+              "success": {
+                "result": "你把册子补得能对上，也把最难看的几笔压在附页。{{patron}}没有夸你，却把下一件差事也交给了你。",
+                "endsFlow": true
+              },
+              "failure": {
+                "result": "补正拖过了期限，{{patron}}被上头催问，{{clerk}}把责任推给你。你保住了名册，却没有保住差事。",
+                "endsFlow": true
+              }
+            },
+            {
+              "id": "risky",
+              "label": "翻出旧账",
+              "action": "把重复勾销和侵吞的线索写成呈文，直接递到州府。",
+              "success": {
+                "result": "州府派人复核，{{patron}}被问话，{{mentor}}的荐书让你没有被一起清出去。你得了名声，也结下了第一桩官场仇。",
+                "endsFlow": true
+              },
+              "failure": {
+                "result": "呈文被{{patron}}截下，{{mentor}}替你赔了人情。差事没了，你却看清了县衙里谁在护谁。",
+                "endsFlow": true
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "relief-case",
+      "actIds": [
+        "ancient.court-minister.entry"
+      ],
+      "narrativeRole": "入局行为 A",
+      "label": "决口与赈济",
+      "entry": "已经有了一次县衙差事，堤岸决口，赈济被截在县门。",
+      "routing": "planned",
+      "assetRoles": [
+        "local",
+        "home",
+        "patron",
+        "clerk",
+        "mentor",
+        "clerk",
+        "statecraft",
+        "law"
+      ],
+      "events": [
+        {
+          "id": "relief-arrives",
+          "kind": "scene",
+          "entry": "灾情已经报上来，赈济还没有发下去。",
+          "situation": "{{local}}外的堤岸决口，灾民挤在县门外。{{patron}}说上头拨的粮还在路上，{{clerk}}翻出旧例，说没有勘验文书不能开仓。{{mentor}}让你先去看灾情，不要只听衙门里的说法。",
+          "outcome": {
+            "result": "你亲眼看见断粮的灾民和空着的仓廪，也看见{{patron}}手里那份迟迟不发的勘验文书。"
+          }
+        },
+        {
+          "id": "relief-choice",
+          "kind": "choice",
+          "entry": "灾民等不到粮，仓廪和文书都在你眼前。",
+          "situation": "{{patron}}要你按旧例等勘验，{{clerk}}说可以先借县仓的粮、事后补文，{{mentor}}提醒你：开仓救急会得罪上头，不开仓会死人。",
+          "question": "等文书、借仓粮，还是绕过县衙直接报州府？",
+          "stakes": "灾民的性命、{{patron}}的官位，以及你刚拿到的差遣。",
+          "check": {
+            "stat": "intelligence",
+            "difficulty": 14
+          },
+          "options": [
+            {
+              "id": "safe",
+              "label": "等勘验",
+              "action": "按旧例等勘验文书，先维持县门秩序。",
+              "success": {
+                "result": "文书两日后到，赈济发下去时已经有人饿死。{{patron}}保住了程序，你保住了差遣，却记住了县门外的那几具尸首。"
+              },
+              "failure": {
+                "result": "文书迟迟不到，灾民冲了县门。{{patron}}把维持不力的责任推给你，你的差遣停了一半。"
+              }
+            },
+            {
+              "id": "balanced",
+              "label": "借仓粮",
+              "action": "先借县仓的粮救急，同时补文上报，把责任分在自己和{{patron}}之间。",
+              "success": {
+                "result": "灾民吃上了粥，{{patron}}虽然不满，却不得不在补文上署名。你得了民心，也把上官绑上了同一条船。"
+              },
+              "failure": {
+                "result": "借粮被上头认定为擅动仓廪，{{patron}}把责任推给你，{{mentor}}替你周旋才免了革职。灾民活了，你的仕途却停了一拍。"
+              }
+            },
+            {
+              "id": "risky",
+              "label": "直报州府",
+              "action": "绕过县衙，把灾情和侵吞线索直接报到州府。",
+              "success": {
+                "result": "州府开仓赈济，{{patron}}被查，{{mentor}}替你稳住荐书。你得了能吏之名，也成了县衙里最不受欢迎的人。"
+              },
+              "failure": {
+                "result": "州府把呈文打回县里，{{patron}}先一步把仓廪的账做平。你被安了一个越级生事的由头，差遣被撤。"
+              }
+            }
+          ]
+        },
+        {
+          "id": "relief-aftermath",
+          "kind": "life",
+          "entry": "赈济已经结束，县衙与灾民都要一个后续。",
+          "situation": "灾民陆续返乡，{{local}}的仓廪空了一半。{{patron}}在衙门里重新排差遣，{{mentor}}让你把这次赈济的得失落成文字。{{home}}那边也托人问你，是否得罪了不该得罪的人。",
+          "outcome": {
+            "result": "赈济的后果落在你的差遣、名声和官场关系上；你开始明白，救人和做官不是同一件事。",
+            "endsFlow": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "exam-case",
+      "actIds": [
+        "ancient.court-minister.entry"
+      ],
+      "narrativeRole": "入局行为 B",
+      "label": "科场与荐举",
+      "entry": "已经有荐书和一次实务经历，科场或荐举的门开在眼前。",
+      "routing": "planned",
+      "assetRoles": [
+        "local",
+        "home",
+        "mentor",
+        "rival",
+        "patron",
+        "recommendation",
+        "rhetoric",
+        "law"
+      ],
+      "events": [
+        {
+          "id": "exam-arrives",
+          "kind": "scene",
+          "entry": "科场或荐举的名额还没有定下。",
+          "situation": "{{mentor}}把{{recommendation}}递上去，说今年只有一个荐举名额。{{rival}}也在争，他家与{{patron}}有旧。{{clerk}}悄悄告诉你，考卷的誊录房里有人能递条子。",
+          "outcome": {
+            "result": "名额、荐书和条子都摆在眼前；你必须在才学、关系和底线之间选一条路。"
+          }
+        },
+        {
+          "id": "exam-choice",
+          "kind": "choice",
+          "entry": "荐举名额只有一个，{{rival}}和条子都在等你。",
+          "situation": "{{mentor}}要你凭文章去争，{{patron}}暗示可以替你说话，{{clerk}}把条子的价码说得很轻。{{rival}}已经在誊录房外等人。",
+          "question": "凭文章、走关系，还是把条子的事捅出去？",
+          "stakes": "入仕名额、{{mentor}}的名声，以及你以后在科场和官场里的位置。",
+          "check": {
+            "stat": "charisma",
+            "difficulty": 14
+          },
+          "options": [
+            {
+              "id": "safe",
+              "label": "凭文章",
+              "action": "不递条子，把{{recommendation}}用在正途，凭文章和实务去争。",
+              "success": {
+                "result": "你的文章和县衙实务被{{mentor}}一起递上去，名额落到你头上。{{rival}}不服，却挑不出错。",
+                "consumeItems": [
+                  "recommendation-letter"
+                ]
+              },
+              "failure": {
+                "result": "文章过了，名额却被{{rival}}家走关系拿走。{{recommendation}}用掉了，你只得到一个候补。",
+                "consumeItems": [
+                  "recommendation-letter"
+                ]
+              }
+            },
+            {
+              "id": "balanced",
+              "label": "走关系",
+              "action": "让{{patron}}替你说话，但把条件问清楚，不留把柄。",
+              "success": {
+                "result": "{{patron}}替你把名额争下来，也把一件事记在你头上。你入了仕途，却从第一天起就欠着一笔人情。"
+              },
+              "failure": {
+                "result": "{{patron}}收了你的礼却没有办成，{{rival}}拿了名额。你欠了人情，还落了一个候补。"
+              }
+            },
+            {
+              "id": "risky",
+              "label": "揭条子",
+              "action": "把誊录房递条子的证据交给{{mentor}}，让科场重查。",
+              "success": {
+                "result": "科场重查，{{rival}}被除名，你以实务补入。{{mentor}}保住了清名，你也成了科场里被记住的人。"
+              },
+              "failure": {
+                "result": "证据被压下，{{rival}}家反咬你诬告。{{mentor}}替你担了部分名声，名额还是没有你的份。"
+              }
+            }
+          ]
+        },
+        {
+          "id": "exam-aftermath",
+          "kind": "life",
+          "entry": "科场或荐举已经有了结果，你要接住它带来的关系。",
+          "situation": "名额定了，{{mentor}}让你去谢座师，{{patron}}那边也等着你表态。{{rival}}没有再来，但两家的旧怨已经结下。{{home}}里父亲问你要不要摆酒，母亲只问你以后还回不回家。",
+          "outcome": {
+            "result": "你有了入仕的资格，也有了第一批同僚、恩主和政敌；往后每一步都要在这些人之间走。",
+            "endsFlow": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "career-setback",
+      "actIds": [
+        "ancient.court-minister.entry"
+      ],
+      "narrativeRole": "入局失败后续",
+      "label": "被贬与去职",
+      "entry": "上一组使你被贬、夺职或失去荐举资格，但你仍有家族、师门或地方关系可以重整。",
+      "routing": "planned",
+      "assetRoles": [
+        "home",
+        "mother",
+        "father",
+        "mentor",
+        "clerk",
+        "local",
+        "patron",
+        "statecraft",
+        "law"
+      ],
+      "events": [
+        {
+          "id": "setback-grief",
+          "kind": "life",
+          "entry": "去职或贬谪已经发生，家里和旧部还没有安顿。",
+          "situation": "你回到{{home}}，父亲没有问官场细节，母亲把旧账翻出来算家里的底。{{mentor}}托人带话，说这次不是才学不够，是站错了地方。旧部有的来送，有的已经改投。",
+          "outcome": {
+            "result": "去职的损失已经落到家中和旧部身上；你还剩下的关系、名声和本事被重新盘清。"
+          }
+        },
+        {
+          "id": "setback-rebuild",
+          "kind": "life",
+          "entry": "家里的底已经盘清，你仍有人可以重新联络。",
+          "situation": "你把{{mentor}}的旧信、{{clerk}}的公文底稿和家里的田产账目摆在一起，重新排能走的路。{{mother}}替你走动亲族，{{father}}把祖产里能动的部分交给你。",
+          "outcome": {
+            "result": "你重新有了可以动用的关系、盘缠和一份能拿得出手的实务记录；去职没有被抹去，路却重新接上。"
+          }
+        },
+        {
+          "id": "setback-return",
+          "kind": "scene",
+          "entry": "重整已经完成，地方上出现一桩需要人办的实务。",
+          "situation": "{{local}}又出了事：河工、税案或赈济缺一个能办事的人。{{patron}}不便出面，{{mentor}}把你的名字递了上去。你带着去职的旧账重新走进衙门。",
+          "outcome": {
+            "result": "你在一桩实际政务中重新证明了自己，去职的旧账仍在，仕途却重新有了入口。",
+            "endsFlow": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "first-post",
+      "actIds": [
+        "ancient.court-minister.entry"
+      ],
+      "narrativeRole": "本幕结果",
+      "label": "第一任差遣",
+      "entry": "已经有实务、名声或关系，朝廷或上官要给你一个正式差遣。",
+      "routing": "planned",
+      "assetRoles": [
+        "court",
+        "local",
+        "mentor",
+        "patron",
+        "clerk",
+        "rival",
+        "seal",
+        "recommendation"
+      ],
+      "events": [
+        {
+          "id": "post-arrives",
+          "kind": "scene",
+          "entry": "差遣的文书还没有落到你手里。",
+          "situation": "{{court}}的选官文书下到{{local}}，{{mentor}}替你争到一个位置，{{patron}}也在推自己的人。{{rival}}的名字和你的名字并排写着。{{clerk}}把委任状和官印的规矩一条条说给你听。",
+          "outcome": {
+            "result": "差遣已经有了着落，但你接的是哪一处、向谁负责、有没有实权，还要看最后一道处置。"
+          }
+        },
+        {
+          "id": "post-verdict",
+          "kind": "settlement",
+          "entry": "差遣的处置已经到最后一层，{{court}}要给出正式任命。",
+          "situation": "选官文书摆在案上，{{mentor}}和{{patron}}各推一个人，{{rival}}在门外等消息。你能接到的位置，取决于这一路的实务、关系和上头的取舍。",
+          "rules": [
+            {
+              "id": "appoint",
+              "condition": "实务与关系都立住，{{mentor}}或{{patron}}愿意为你担保。",
+              "disposition": "你接到一个有实权的差遣，领到{{seal}}，可以独立处理一县或一司的政务。{{rival}}没有争到位置，却记住了你。",
+              "grantItems": [
+                "official-seal"
+              ],
+              "endsFlow": true
+            },
+            {
+              "id": "retain",
+              "condition": "差遣有了，但上头仍要留一手，只给你副职或偏远小县。",
+              "disposition": "你领到{{seal}}，却只是副手或边远小县。你入了仕途，实权还在别人手里。",
+              "grantItems": [
+                "official-seal"
+              ],
+              "endsFlow": true
+            },
+            {
+              "id": "reassign",
+              "condition": "关系或实务不足以争到位置，{{court}}把你放到闲职或候补。",
+              "disposition": "你没有拿到实权差遣，只得到候补或闲职。{{mentor}}让你先别急，{{rival}}却已经走在你前面。",
+              "endsFlow": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "river-works",
+      "actIds": [
+        "ancient.court-minister.network"
+      ],
+      "narrativeRole": "执衡行为 A",
+      "label": "河工与库银",
+      "entry": "已经有正式差遣，接手一项河工或财政事务。",
+      "routing": "planned",
+      "assetRoles": [
+        "local",
+        "court",
+        "clerk",
+        "patron",
+        "mentor",
+        "rival",
+        "statecraft",
+        "law"
+      ],
+      "events": [
+        {
+          "id": "works-start",
+          "kind": "life",
+          "entry": "河工或财政的摊子还没有铺开。",
+          "situation": "你到{{local}}接手河工，库银只够一半，工役已经征了。{{clerk}}把旧账摊开，{{patron}}要你先保漕运，{{mentor}}让你别只看眼前这一段堤。",
+          "outcome": {
+            "result": "你摸清了河工的钱、人和工期，也看见旧账里几笔说不清的开支。"
+          }
+        },
+        {
+          "id": "works-crisis",
+          "kind": "scene",
+          "entry": "河工已经开始，河道再涨，库银见底。",
+          "situation": "汛期提前，堤岸又出一处渗水。{{clerk}}说只能停一段工，{{patron}}要你先保城，{{rival}}在朝里递话，说你虚耗库银。",
+          "outcome": {
+            "result": "你必须决定先保哪一段、向谁要钱，以及要不要把旧账翻出来。"
+          }
+        },
+        {
+          "id": "works-choice",
+          "kind": "choice",
+          "entry": "河工、库银和朝里的弹劾同时压过来。",
+          "situation": "{{patron}}要你加征一笔临时税，{{clerk}}说可以借商人的银、拿盐引抵，{{mentor}}让你把旧账和侵吞一起报上去。",
+          "question": "加征、借银，还是翻旧账？",
+          "stakes": "堤岸能否保住、百姓负担、{{patron}}与朝中同僚的态度。",
+          "check": {
+            "stat": "intelligence",
+            "difficulty": 17
+          },
+          "options": [
+            {
+              "id": "safe",
+              "label": "加征保堤",
+              "action": "按{{patron}}的意思加征临时税，先把最险的堤段保住。",
+              "success": {
+                "result": "堤保住了，百姓多交了一笔税。{{patron}}认你能办事，{{mentor}}却提醒你这笔账迟早要还。"
+              },
+              "failure": {
+                "result": "加征激起民怨，堤只保住一半。{{rival}}借机上弹劾，你的差遣第一次出现裂缝。"
+              }
+            },
+            {
+              "id": "balanced",
+              "label": "借银抵盐",
+              "action": "向商人借银，用盐引和未来漕运抵账，不上加征。",
+              "success": {
+                "result": "商人出了银，堤保住大半，盐引把账挂到明年。{{patron}}没有加征的骂名，你欠下商人一笔要还的人情。"
+              },
+              "failure": {
+                "result": "商人临时反悔，堤工停了两日。{{clerk}}替你补了缺口，{{rival}}却把“借银”说成“勾结商贾”。"
+              }
+            },
+            {
+              "id": "risky",
+              "label": "翻旧账",
+              "action": "把河工旧账和侵吞线索报上去，用追回的银补堤。",
+              "success": {
+                "result": "旧账追回一笔银，堤工续上，{{patron}}被问话。你得了能吏之名，也把地方官场得罪了一圈。"
+              },
+              "failure": {
+                "result": "旧账被{{patron}}先一步做平，你的呈文成了“生事”。堤勉强保住，差遣却被削了实权。"
+              }
+            }
+          ]
+        },
+        {
+          "id": "works-aftermath",
+          "kind": "life",
+          "entry": "河工已经有了结果，地方与朝里都要一个交代。",
+          "situation": "堤岸保住了或没保住，{{local}}的百姓和工役各自散去。{{patron}}在衙门里重新排账，{{mentor}}让你把这次河工的得失写清楚。{{rival}}的弹劾还压在朝里。",
+          "outcome": {
+            "result": "河工的后果落在你的差遣、名声和地方关系上；你也第一次摸到“做事”和“做官”之间的缝。",
+            "endsFlow": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "faction-struggle",
+      "actIds": [
+        "ancient.court-minister.network"
+      ],
+      "narrativeRole": "执衡行为 B",
+      "label": "人事与派系",
+      "entry": "已经有实权差遣，朝中围绕一项任命或政策分成两派。",
+      "routing": "planned",
+      "assetRoles": [
+        "court",
+        "faction",
+        "mentor",
+        "rival",
+        "patron",
+        "eunuch",
+        "network",
+        "rhetoric"
+      ],
+      "events": [
+        {
+          "id": "faction-arrives",
+          "kind": "scene",
+          "entry": "任命或政策还没有定，两派都在拉人。",
+          "situation": "{{court}}里为一个人事缺争了半月。{{mentor}}这一派要推自己人，{{rival}}背後有内廷{{eunuch}}递话。{{patron}}让你先别表态，{{clerk}}却把两边的价码都摆给了你。",
+          "outcome": {
+            "result": "你手里的一票或一份奏疏，足以让一边多一分胜算；两边都在等你。"
+          }
+        },
+        {
+          "id": "faction-choice",
+          "kind": "choice",
+          "entry": "两派都在等你表态，{{mentor}}和{{rival}}各有一份人情。",
+          "situation": "{{mentor}}要你按政策立场选人，{{rival}}许你一个位置，{{eunuch}}让人带话，说内廷记得谁帮过忙。",
+          "question": "跟座师、倒向政敌，还是两不相帮？",
+          "stakes": "你在朝中的位置、{{mentor}}这一派的成败，以及{{rival}}会不会把你当成敌人。",
+          "check": {
+            "stat": "charisma",
+            "difficulty": 18
+          },
+          "options": [
+            {
+              "id": "safe",
+              "label": "跟座师",
+              "action": "按{{mentor}}的意思投票或上奏，站定自己这一派。",
+              "success": {
+                "result": "{{mentor}}这一派赢了这一局，你得了实缺，也正式成了{{rival}}的靶子。"
+              },
+              "failure": {
+                "result": "{{mentor}}这一派输了，你被调去闲职。{{rival}}没有赶尽杀绝，却把你的名字记在了另一边。"
+              }
+            },
+            {
+              "id": "balanced",
+              "label": "两不相帮",
+              "action": "不公开站队，只按政策本身说话，给自己留退路。",
+              "success": {
+                "result": "两边都没有把你当成自己人，却都还需要你办事。你保住了位置，也失去了靠山。"
+              },
+              "failure": {
+                "result": "两边都认为你不可信，任命落定后你被架空。{{mentor}}没有怪你，{{rival}}却开始试探你的底线。"
+              }
+            },
+            {
+              "id": "risky",
+              "label": "倒向政敌",
+              "action": "接受{{rival}}的条件，带着自己的班底倒向另一边。",
+              "success": {
+                "result": "{{rival}}赢了这一局，你得了实缺，{{mentor}}那一派把你除名。你往上走了一步，也失去了旧日的座师。"
+              },
+              "failure": {
+                "result": "{{rival}}用完你就把你推出去顶账，{{mentor}}不再替你说话。你在两派之间都没有了位置。"
+              }
+            }
+          ]
+        },
+        {
+          "id": "faction-aftermath",
+          "kind": "life",
+          "entry": "人事已经定下，朝中的格局和你的位置都变了。",
+          "situation": "任命文书发下来，{{court}}里换了一批人。{{mentor}}或{{rival}}各自收拾局面，{{clerk}}把新的座次和门生名单理给你。{{home}}里父亲托人问你，这次站队值不值。",
+          "outcome": {
+            "result": "你在朝中有了更清楚的位置，也有了更清楚的敌人；门生、故吏和旧交开始按新的座次重新排。",
+            "endsFlow": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "palace-plot",
+      "actIds": [
+        "ancient.court-minister.network"
+      ],
+      "narrativeRole": "执衡行为 C",
+      "label": "内廷密议",
+      "entry": "已经有资格进入内廷议事，宫禁里正在酝酿一件不能公开的事。",
+      "routing": "planned",
+      "assetRoles": [
+        "palace",
+        "court",
+        "emperor",
+        "eunuch",
+        "mentor",
+        "rival",
+        "memorial",
+        "rhetoric"
+      ],
+      "events": [
+        {
+          "id": "palace-arrives",
+          "kind": "scene",
+          "entry": "内廷的门禁已经为你开了一条缝，事情还没有摊开。",
+          "situation": "{{eunuch}}把你引进{{palace}}偏殿，{{emperor}}没有露面，只让人传话问你对一桩旧案怎么看。{{mentor}}警告你，内廷的问话从来不是只问一件事。",
+          "outcome": {
+            "result": "你听出了旧案背后牵着储位、兵权和一桩被压下的密旨；你现在必须决定知道多少、说多少。"
+          }
+        },
+        {
+          "id": "palace-choice",
+          "kind": "choice",
+          "entry": "内廷要你在一份密议上表态，{{emperor}}和{{eunuch}}都在看。",
+          "situation": "{{eunuch}}要你把旧案说成地方官擅权，{{mentor}}让你只讲程序、不碰储位，{{rival}}已经先递了一份奏疏。",
+          "question": "顺着内廷、只讲程序，还是把密旨的事挑明？",
+          "stakes": "你在君心中的位置、{{mentor}}这一派的安全，以及会不会被卷进储位之争。",
+          "check": {
+            "stat": "charisma",
+            "difficulty": 19
+          },
+          "options": [
+            {
+              "id": "safe",
+              "label": "顺着内廷",
+              "action": "按{{eunuch}}的意思把旧案说成地方擅权，不碰储位。",
+              "success": {
+                "result": "{{emperor}}没有表态，{{eunuch}}却把你记成了可用的人。你保住了位置，也把一桩旧案压了下去。"
+              },
+              "failure": {
+                "result": "地方官背后也有人，旧案压不住，反而烧回你身上。{{eunuch}}先一步撇清，你成了替罪的人。"
+              }
+            },
+            {
+              "id": "balanced",
+              "label": "只讲程序",
+              "action": "只按律令和公文程序回话，不替任何一方定性。",
+              "success": {
+                "result": "{{emperor}}问不出把柄，{{mentor}}这一派没有被卷进去。你没有得到宠信，也没有失去位置。"
+              },
+              "failure": {
+                "result": "{{eunuch}}嫌你滑不留手，{{rival}}趁机把“首鼠两端”的话递上去。你保住了清白，却失去了内廷的门路。"
+              }
+            },
+            {
+              "id": "risky",
+              "label": "挑明密旨",
+              "action": "把密旨和储位的事当面挑明，逼{{emperor}}给一个明确态度。",
+              "success": {
+                "result": "{{emperor}}没有当场发作，事后却把你当成敢说话的人。你得了君心，也被{{eunuch}}和{{rival}}同时记恨。"
+              },
+              "failure": {
+                "result": "{{emperor}}只问了一句“谁告诉你的”，{{eunuch}}就把你请出了内廷。你知道了不该知道的事，却没有了说话的位置。"
+              }
+            }
+          ]
+        },
+        {
+          "id": "palace-verdict",
+          "kind": "settlement",
+          "entry": "密议已经结束，内廷要给出一个处置。",
+          "situation": "{{palace}}的偏殿里只剩{{eunuch}}和你。{{emperor}}的旨意没有明发，只让内廷传话；{{mentor}}在外头等，{{rival}}的奏疏还压在案上。",
+          "rules": [
+            {
+              "id": "trusted",
+              "condition": "你在密议中没有失去君心，也没有把内廷的底交出去。",
+              "disposition": "{{eunuch}}把一道内廷的差事交给你，{{emperor}}在下次廷议中点了你的名。你进了核心，也进了更深的局。",
+              "endsFlow": true
+            },
+            {
+              "id": "shelved",
+              "condition": "你没有站错，但也没有让内廷满意。",
+              "disposition": "旨意没有落到你头上，内廷的门暂时关上。你保住了位置，却只能在外朝继续等。",
+              "endsFlow": true
+            },
+            {
+              "id": "suspected",
+              "condition": "你在密议中露了底，或让{{eunuch}}觉得不可控。",
+              "disposition": "内廷没有明发处置，却把你从核心议事中剔了出去。{{mentor}}让你先收敛，{{rival}}已经闻到了味道。",
+              "endsFlow": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "faction-purge",
+      "actIds": [
+        "ancient.court-minister.network"
+      ],
+      "narrativeRole": "执衡失败后续",
+      "label": "党争与清洗",
+      "entry": "上一组使你的派系失势、同僚被清洗或你被夺去实权，但你仍有旧部、门生或地方关系可以重整。",
+      "routing": "planned",
+      "assetRoles": [
+        "home",
+        "court",
+        "faction",
+        "mentor",
+        "rival",
+        "clerk",
+        "network",
+        "law"
+      ],
+      "events": [
+        {
+          "id": "purge-grief",
+          "kind": "life",
+          "entry": "清洗已经发生，旧部和门生还没有安顿。",
+          "situation": "{{court}}的旨意下来，{{mentor}}被贬，你的几个门生被外放。你回到{{home}}，父亲把旧日的名帖收进箱子，母亲问要不要把族里的人也送走。{{clerk}}带来消息，说{{rival}}还在查你的旧账。",
+          "outcome": {
+            "result": "清洗的损失已经落到师门、门生和家族身上；你还剩下的关系与能做的事被重新盘清。"
+          }
+        },
+        {
+          "id": "purge-rebuild",
+          "kind": "life",
+          "entry": "旧部已经安顿，你仍有人可以重新联络。",
+          "situation": "你把被外放的门生、旧日的同僚和地方上的故吏一一写信联络。{{clerk}}替你整理名册，{{mother}}替你走动亲族，{{father}}把家里还能动的关系交给你。",
+          "outcome": {
+            "result": "你重新有了一张能用的关系网和一批还愿意替你办事的人；清洗没有被抹去，路却重新接上。"
+          }
+        },
+        {
+          "id": "purge-return",
+          "kind": "scene",
+          "entry": "重整已经完成，朝中或地方出现一桩只有你能办的事。",
+          "situation": "河工、边饷或一桩旧案把{{rival}}也难住了，{{patron}}把你的名字重新递上去。你带着被清洗过的班底回到{{court}}或{{local}}。",
+          "outcome": {
+            "result": "你在一桩实际政务中重新站住，清洗的旧账仍在，朝中的位置却重新开了口。",
+            "endsFlow": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "policy-power",
+      "actIds": [
+        "ancient.court-minister.network"
+      ],
+      "narrativeRole": "本幕结果",
+      "label": "施政与联盟",
+      "entry": "已经有实权、班底和一次可以推行的政策，朝中要看你能否把事办成。",
+      "routing": "planned",
+      "assetRoles": [
+        "court",
+        "local",
+        "mentor",
+        "rival",
+        "emperor",
+        "clerk",
+        "patron",
+        "memorial",
+        "statecraft",
+        "network"
+      ],
+      "events": [
+        {
+          "id": "policy-arrives",
+          "kind": "scene",
+          "entry": "政策已经拟好，还没有过廷议。",
+          "situation": "你手里的{{memorial}}写着一项新政：清丈、税改或河工。{{mentor}}这一派愿意联署，{{rival}}在廷议前放话，说这项新政会动到军镇和士族的根。{{emperor}}没有表态。",
+          "outcome": {
+            "result": "政策、联署和反对的声音都摆到了廷议前；你要决定推多快、让多少。"
+          }
+        },
+        {
+          "id": "policy-choice",
+          "kind": "choice",
+          "entry": "廷议在即，{{rival}}和{{emperor}}都在等你的方案。",
+          "situation": "{{mentor}}要你一次推到底，{{clerk}}建议先在一地试行，{{rival}}提出一个删去核心条款的折中。{{emperor}}只问了一句：办成了，谁受益；办砸了，谁担责。",
+          "question": "全推、先试行，还是接受折中？",
+          "stakes": "新政能否落地、{{mentor}}这一派的政治资本，以及你在君心与士族之间的位置。",
+          "check": {
+            "stat": "intelligence",
+            "difficulty": 20
+          },
+          "options": [
+            {
+              "id": "safe",
+              "label": "先试行",
+              "action": "先在一州试行，拿实际成效再推全国。",
+              "success": {
+                "result": "一州试行出了成效，{{emperor}}准了扩推，{{rival}}不好再公开反对。你走得慢，却把新政的根扎住了。"
+              },
+              "failure": {
+                "result": "试行州出了纰漏，{{rival}}拿它当例子把新政拖住。你保住了部分条款，却失去了最好的时机。"
+              }
+            },
+            {
+              "id": "balanced",
+              "label": "接受折中",
+              "action": "删去最激进的条款，换{{rival}}不公开反对。",
+              "success": {
+                "result": "新政削去一角后过了廷议，{{mentor}}不满，{{rival}}没有再挡。你办成了一部分事，也欠了盟友一个解释。"
+              },
+              "failure": {
+                "result": "折中版被两边都当成退让，{{mentor}}这一派离心，{{rival}}却仍不满足。新政没有落地，你的班底先散了。"
+              }
+            },
+            {
+              "id": "risky",
+              "label": "一次推到底",
+              "action": "借{{emperor}}和{{mentor}}的支持，把新政一次推到全国。",
+              "success": {
+                "result": "新政在全国推开，{{emperor}}当廷褒奖，{{mentor}}这一派声势大振。你也成了士族和军镇共同记恨的人。"
+              },
+              "failure": {
+                "result": "地方抵制、军镇反弹，新政只推行了一半。{{emperor}}没有替你担责，{{rival}}开始清算你的班底。"
+              }
+            }
+          ]
+        },
+        {
+          "id": "policy-verdict",
+          "kind": "settlement",
+          "entry": "廷议已经结束，新政要有一个实际结果。",
+          "situation": "{{court}}的廷议散后，{{emperor}}把后续交给中书和{{local}}。{{mentor}}这一派等你拿结果，{{rival}}在查新政的漏洞。{{clerk}}把各州的回文整理成册。",
+          "rules": [
+            {
+              "id": "policy-enacted",
+              "condition": "新政在多数州落地，实际成效能被朝廷看见。",
+              "disposition": "{{emperor}}准新政继续推行，你的班底和门生得到实缺。你成了朝中不可忽略的一派，也被推到更高一层的争斗里。",
+              "grantItems": [
+                "memorial-draft"
+              ]
+            },
+            {
+              "id": "policy-limited",
+              "condition": "新政只在部分州落地，或核心条款被削。",
+              "disposition": "新政留下一半，你的实权没有更大，却也没有被收回。{{mentor}}让你先守住这一半，等下一次。",
+              "grantItems": [
+                "memorial-draft"
+              ]
+            },
+            {
+              "id": "policy-failed",
+              "condition": "新政被抵制或出了事故，朝廷需要有人担责。",
+              "disposition": "新政被叫停，你被削去一部分实权。{{rival}}没有赶尽杀绝，却把下一次廷议的主导权拿走了。"
+            }
+          ]
+        },
+        {
+          "id": "policy-aftermath",
+          "kind": "life",
+          "entry": "新政已经有了结果，朝局与你的班底都要重新排。",
+          "situation": "新政的成效或失败传回{{court}}，门生和旧部各自找路。{{mentor}}让你把这一局的得失写进私记，{{rival}}开始重新排座次。{{home}}里父亲问你这回又得罪了谁。",
+          "outcome": {
+            "result": "你有了可以继续推行的政策资本，也有了更清楚的敌人；门生、故吏和家族都按新的局面重新站队。",
+            "endsFlow": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "regency-crisis",
+      "actIds": [
+        "ancient.court-minister.sovereignty"
+      ],
+      "narrativeRole": "临极行为 A",
+      "label": "皇权与摄政",
+      "entry": "已经有足以影响朝局的位置，君主集权或摄政之争迫近。",
+      "routing": "planned",
+      "assetRoles": [
+        "court",
+        "palace",
+        "emperor",
+        "eunuch",
+        "mentor",
+        "rival",
+        "seal",
+        "rhetoric"
+      ],
+      "events": [
+        {
+          "id": "regency-arrives",
+          "kind": "scene",
+          "entry": "皇权与摄政的冲突还没有摊到明面。",
+          "situation": "{{emperor}}要收兵权，{{eunuch}}在内廷串联，{{mentor}}让你先看清哪一边真能定局。{{rival}}已经把自己的门生塞进兵部。",
+          "outcome": {
+            "result": "你手里的一票、一份奏疏或一道人事，足以让一边多一分胜算；两边都在等你。"
+          }
+        },
+        {
+          "id": "regency-choice",
+          "kind": "choice",
+          "entry": "皇权与摄政两派都在等你表态。",
+          "situation": "{{emperor}}要你支持收权，{{eunuch}}许你摄政后的位置，{{mentor}}让你守住制度、不替任何一方火中取栗。",
+          "question": "支持君主、倒向摄政，还是守住制度？",
+          "stakes": "最高权力的归属、你与皇权的关系，以及{{mentor}}这一派的安全。",
+          "check": {
+            "stat": "charisma",
+            "difficulty": 22
+          },
+          "options": [
+            {
+              "id": "safe",
+              "label": "支持君主",
+              "action": "按{{emperor}}的意思支持收权，把兵权收回中枢。",
+              "success": {
+                "result": "收权成功，{{emperor}}把你留在中枢，{{eunuch}}失势。你得了君心，也成了宗室和军镇眼里的靶子。"
+              },
+              "failure": {
+                "result": "收权激起兵镇反弹，{{emperor}}退了一步，把你推出去安抚各方。你保住了性命，失去了中枢的位置。"
+              }
+            },
+            {
+              "id": "balanced",
+              "label": "守住制度",
+              "action": "不替任何一方定局，只按祖制和程序办事。",
+              "success": {
+                "result": "你用程序把两边的火暂时压住，{{emperor}}和{{eunuch}}都没有赢。你保住了位置，也失去了被任何一方当成自己人的机会。"
+              },
+              "failure": {
+                "result": "两边都嫌你碍事，联手把你调离中枢。{{mentor}}替你保住名声，实权却没了。"
+              }
+            },
+            {
+              "id": "risky",
+              "label": "倒向摄政",
+              "action": "接受{{eunuch}}的条件，支持摄政，换一个从龙之功。",
+              "success": {
+                "result": "摄政定局，你得了拥立之功，{{mentor}}这一派却被清算。你上了最高一层，也背上了背主的名字。"
+              },
+              "failure": {
+                "result": "{{emperor}}先一步动手，{{eunuch}}倒台，你被当成同党。{{mentor}}救不了你，你从云端跌回地方。"
+              }
+            }
+          ]
+        },
+        {
+          "id": "regency-verdict",
+          "kind": "settlement",
+          "entry": "皇权与摄政的胜负已经分明，朝廷要给出处置。",
+          "situation": "{{court}}的旨意发下来，{{emperor}}或摄政的人坐在上位。{{mentor}}在外头等，{{rival}}已经递了新的奏疏。你的去留与实权，要看这一局的定论。",
+          "rules": [
+            {
+              "id": "regent-power",
+              "condition": "你支持的一方定局，且你在其中出了力。",
+              "disposition": "你进入中枢，拿到更大的实权与一枚新的官印。{{mentor}}或{{rival}}各自退场，你知道自己已经站在最高处的边缘。",
+              "grantItems": [
+                "official-seal"
+              ],
+              "endsFlow": true
+            },
+            {
+              "id": "regent-shelved",
+              "condition": "你守住位置，但没有成为定局的一方。",
+              "disposition": "你保住官位，却被排除在核心之外。{{mentor}}让你先等，{{rival}}开始接手你原来的班底。",
+              "endsFlow": true
+            },
+            {
+              "id": "regent-fallen",
+              "condition": "你站错一边，或在定局中被当成代价。",
+              "disposition": "你被夺去实权，贬到地方或闲职。{{mentor}}若还在，会替你留一条后路；若不在，你只能自己走。",
+              "endsFlow": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "coup-transfer",
+      "actIds": [
+        "ancient.court-minister.sovereignty"
+      ],
+      "narrativeRole": "临极行为 B",
+      "label": "政变与交接",
+      "entry": "朝局已经走到政变、受禅或权力交接的前夜，你必须在其中选一个位置。",
+      "routing": "planned",
+      "assetRoles": [
+        "palace",
+        "court",
+        "emperor",
+        "eunuch",
+        "mentor",
+        "rival",
+        "seal",
+        "memorial",
+        "network"
+      ],
+      "events": [
+        {
+          "id": "coup-arrives",
+          "kind": "scene",
+          "entry": "宫禁和兵权都在调动，政变还没有发动。",
+          "situation": "{{palace}}的门禁换了人，{{eunuch}}把一封密诏交到你手里，{{mentor}}让你想清楚：一旦动手，就没有回头路。{{rival}}已经带兵守住了宫门。",
+          "outcome": {
+            "result": "政变或交接已经箭在弦上；你手里的密诏、官印和班底，足以改变哪一边先动手。"
+          }
+        },
+        {
+          "id": "coup-choice",
+          "kind": "choice",
+          "entry": "政变在即，{{emperor}}、{{eunuch}}和{{mentor}}各有一条路。",
+          "situation": "{{eunuch}}要你按密诏拥立新君，{{mentor}}要你保住旧君和制度，{{rival}}的兵已经封了宫门。你只有一次选择的机会。",
+          "question": "参与政变、阻止政变，还是带人退出去？",
+          "stakes": "最高权力的归属、你与旧君/新君的关系，以及整个家族和班底的生死。",
+          "check": {
+            "stat": "charisma",
+            "difficulty": 23
+          },
+          "options": [
+            {
+              "id": "safe",
+              "label": "参与拥立",
+              "action": "按{{eunuch}}的密诏参与拥立，换从龙之功。",
+              "success": {
+                "result": "新君登位，你得了首功，{{mentor}}这一派被清算。你站上了最高处，也成了旧君余党最恨的人。"
+              },
+              "failure": {
+                "result": "政变走漏，{{rival}}先封了宫门，你被当成同党拿下。{{mentor}}用最后的体面替你换了一条流放的路。"
+              }
+            },
+            {
+              "id": "balanced",
+              "label": "阻止政变",
+              "action": "把密诏交给{{mentor}}，联合旧臣保住宫门与制度。",
+              "success": {
+                "result": "宫门守住，政变被压下去，{{emperor}}保住了位子。你得了忠名，也把{{eunuch}}和背后的势力彻底得罪。"
+              },
+              "failure": {
+                "result": "{{rival}}的兵先动手，宫门失守。你护着{{emperor}}退到偏殿，政变还是成了，你被列进清算名单。"
+              }
+            },
+            {
+              "id": "risky",
+              "label": "带人退出",
+              "action": "不参与任何一方，带家族和班底退出京城，保存实力。",
+              "success": {
+                "result": "你带着家族和门生退到地方，京城谁胜谁负都与你暂时无关。你保住了人，也失去了中枢的位置。"
+              },
+              "failure": {
+                "result": "退路被{{rival}}截断，家族和班底被扣。你被迫在最后一刻表态，却已经没有任何筹码。"
+              }
+            }
+          ]
+        },
+        {
+          "id": "coup-verdict",
+          "kind": "settlement",
+          "entry": "政变或交接已经结束，新朝要给出处置。",
+          "situation": "{{palace}}的血已经擦干，新君或旧君坐在上位。{{mentor}}、{{rival}}和{{eunuch}}各有下场。你的官职、家族和旧部，都等这一道旨意。",
+          "rules": [
+            {
+              "id": "founding-merit",
+              "condition": "你在政变或交接中站对了位置，且实际出了力。",
+              "disposition": "新朝给你首功，你进入中枢，家族和门生都得了安置。{{mentor}}若还在，会提醒你别重复旧人的路。",
+              "grantItems": [
+                "official-seal"
+              ]
+            },
+            {
+              "id": "preserved",
+              "condition": "你没有站到最前，但保住了家族、班底和一条退路。",
+              "disposition": "新朝没有清算你，也没有重用你。你保住了一部分实权，退到地方或闲职，等着下一次。"
+            },
+            {
+              "id": "purged",
+              "condition": "你站错一边，或在政变中失去了筹码。",
+              "disposition": "你被夺去官职，家族受牵连，门生散去。{{mentor}}若还在，会替你留一条活路；若不在，你只能自己走。"
+            }
+          ]
+        },
+        {
+          "id": "coup-aftermath",
+          "kind": "life",
+          "entry": "新朝已经定下，你要接住家族、旧部和自己的去留。",
+          "situation": "京城换了主人，{{home}}里父亲把旧朝的官服收进箱子，母亲问要不要把族里人送回乡下。{{mentor}}或{{rival}}各自有了下场，{{clerk}}把新的官场座次理给你。",
+          "outcome": {
+            "result": "你在新朝的位置、家族的安危和旧部的去留都已经落定；这一局让你站到了最高处，或让你看清了最高处的代价。",
+            "endsFlow": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "purge-exile",
+      "actIds": [
+        "ancient.court-minister.sovereignty"
+      ],
+      "narrativeRole": "临极败势",
+      "label": "清洗与流放",
+      "entry": "政争或交接失败，你被清洗、下狱或流放，但仍有家族、旧部或一命可以收束。",
+      "routing": "planned",
+      "assetRoles": [
+        "home",
+        "local",
+        "mentor",
+        "rival",
+        "father",
+        "mother",
+        "clerk",
+        "law",
+        "network"
+      ],
+      "events": [
+        {
+          "id": "exile-choice",
+          "kind": "choice",
+          "entry": "清算已经落到你头上，你还有最后一次选择。",
+          "situation": "{{rival}}的人围了{{home}}，{{mentor}}托人带话让你认罪保命，{{clerk}}把一条去地方的路和一份旧部的名单交给你。父亲没有说话，母亲在收拾行装。",
+          "question": "认罪保命、带旧部出走，还是把最后的证据交出去？",
+          "stakes": "你的性命、家族的安全，以及旧部和门生会不会被一起清算。",
+          "check": {
+            "stat": "charisma",
+            "difficulty": 21
+          },
+          "options": [
+            {
+              "id": "safe",
+              "label": "认罪保命",
+              "action": "按{{rival}}的条件认罪，换家族和旧部一条活路。",
+              "success": {
+                "result": "你被流放，家族没有被抄，旧部大多保住。{{mentor}}在送行时只说了一句“活着就好”。"
+              },
+              "failure": {
+                "result": "认罪后{{rival}}仍抄了家，旧部被牵连。你保住一命，却失去了家族和门生。"
+              }
+            },
+            {
+              "id": "balanced",
+              "label": "带人出走",
+              "action": "带家族和愿意走的旧部退到地方，保存实力。",
+              "success": {
+                "result": "你带人退到边远地方，旧部散了一部分，核心还在。京城的事暂时与你无关，你保住了人。"
+              },
+              "failure": {
+                "result": "出走路被截，家族被扣，旧部离散。你只身脱身，成了没有根基的人。"
+              }
+            },
+            {
+              "id": "risky",
+              "label": "交出证据",
+              "action": "把{{rival}}和背后势力的证据交给还能主持公道的人，拼最后一把。",
+              "success": {
+                "result": "证据递到该到的人手里，{{rival}}被查，你的罪名减轻。你保住了命和部分名声，却再也回不到中枢。"
+              },
+              "failure": {
+                "result": "证据被压下，{{rival}}反手把罪名坐实。你被下狱，家族和门生一起受牵连。"
+              }
+            }
+          ]
+        },
+        {
+          "id": "exile-verdict",
+          "kind": "settlement",
+          "entry": "最后一次选择已经做出，朝廷要给出最终处置。",
+          "situation": "{{local}}的官差在门外等，{{rival}}的文书已经写好。你的家族、旧部和自己的性命，都等这一道处置。",
+          "rules": [
+            {
+              "id": "exile-preserved",
+              "condition": "你的选择保住了家族和部分旧部，罪名没有扩大。",
+              "disposition": "你被流放或贬到边远地方，家族没有被抄，旧部大多保住。你还有一线可以重新做人的余地。"
+            },
+            {
+              "id": "exile-broken",
+              "condition": "你的选择只保住了自己，家族或旧部付出代价。",
+              "disposition": "你保住一命，家族被抄或旧部离散。你活着离开京城，却已经没有可以回去的地方。"
+            },
+            {
+              "id": "exile-lost",
+              "condition": "你的选择失败，清算扩大到家族和门生。",
+              "disposition": "你被下狱或处死，家族和门生一起受牵连。这一局以你的失败收束，旧朝不再有你的位置。"
+            }
+          ]
+        },
+        {
+          "id": "exile-aftermath",
+          "kind": "life",
+          "entry": "处置已经落定，你或你的家族要在新的地方活下去。",
+          "situation": "流放路上或地方旧宅里，母亲把最后一点盘缠分成几份，父亲把祖谱交给还愿意跟的人。{{mentor}}或旧部的信偶尔送到，{{clerk}}替你打听京城的消息。",
+          "outcome": {
+            "result": "你在失败后的地方重新安顿，家族、旧部和自己的去留都有了实际结果；中枢的门关上了，日子还要继续。",
+            "endsFlow": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "final-order",
+      "actIds": [
+        "ancient.court-minister.sovereignty"
+      ],
+      "narrativeRole": "本幕结果",
+      "label": "制度与去留",
+      "entry": "最高权力的归属已经落定，你与皇权、制度和家族的关系要有一个最终回答。",
+      "routing": "planned",
+      "assetRoles": [
+        "court",
+        "palace",
+        "home",
+        "emperor",
+        "mentor",
+        "rival",
+        "clerk",
+        "seal",
+        "memorial"
+      ],
+      "events": [
+        {
+          "id": "order-verdict",
+          "kind": "settlement",
+          "entry": "新朝或旧朝的最后一道旨意还没有下。",
+          "situation": "{{court}}的廷议上，{{emperor}}或摄政要处置你这一路的人和事。{{mentor}}的旧部、{{rival}}的余党、你的家族和门生都在等。你可以辅政、交权，也可以让制度把你推到一个不能回头的位置。",
+          "rules": [
+            {
+              "id": "regency",
+              "condition": "你在政争中保住了位置，且朝中仍需要你维持制度。",
+              "disposition": "你以辅政或首辅的身份留下，制度按你的方案延续，家族和门生得到安置；你也知道下一场争斗已经在路上。"
+            },
+            {
+              "id": "retire",
+              "condition": "你保住了家族与名声，但不再适合留在中枢。",
+              "disposition": "你交还官印，退到地方或乡里。制度留下了一部分，你留下了家族和门生；京城的事不再由你决定。"
+            },
+            {
+              "id": "fall",
+              "condition": "你在最后的处置中失去筹码，或新朝需要一个人来承担旧账。",
+              "disposition": "你被夺去官职，家族受牵连。你留下或失去的制度成为后人评说的对象，你自己退出了这场棋局。"
+            }
+          ]
+        },
+        {
+          "id": "order-homecoming",
+          "kind": "life",
+          "entry": "最后的处置已经落定，你要回到家族与自己的日子里。",
+          "situation": "{{home}}的门前，父亲或母亲在等，旧部和门生各自来送。{{mentor}}若还在，会问你这一路值不值；{{rival}}若还在，也不会再说什么。你把官印、奏疏和旧信收进箱子。",
+          "outcome": {
+            "result": "你与皇权、制度和家族的关系有了最终回答；无论辅政、退隐还是获罪，这一生的政治账都已经落下。",
+            "endsFlow": true
+          }
+        }
+      ]
+    }
+  ]
+}

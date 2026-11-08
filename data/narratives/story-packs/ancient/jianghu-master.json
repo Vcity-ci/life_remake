@@ -1,7 +1,8 @@
 {
   "version": 1,
   "id": "ancient.jianghu-master",
-  "revision": "1.3.1",
+  "revision": "2.0.0",
+  "eventFlowId": "ancient.jianghu-master",
   "worldId": "ancient",
   "name": "江湖宗师",
   "tagline": "以技艺、师承和恩仇行走秩序边缘，决定力量最终归于何处。",

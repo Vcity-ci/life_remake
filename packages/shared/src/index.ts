@@ -850,7 +850,6 @@ export interface NarrativeActOutline {
   closureMeaning: string;
   /** Run-local names for authored roles; no future branch is an actual fact. */
   flowBindings?: Array<{ roleId: string; name: string }>;
-  eventFlows?: { openingFlowId: string; availableFlowIds: string[] };
 }
 
 /** Current world act, admission and its immutable card. */

@@ -10,6 +10,7 @@
 | [分时段记忆与独立接组](PERIOD_MEMORY_AND_EVENT_ROUTING.md) | 最新上游提示词溯源、摘要替换与职责拆分；包含完整出生请求原文 |
 | [事件组实现](EVENT_FLOW_IMPLEMENTATION.md) | 人工骨架、幕初具象化、节点检定与结果交接 |
 | [边镇事件组推广](FRONTIER_EVENT_ROLLOUT.md) | 用户认可后推广到三幕 13 组，单元分工、出口与实际验证 |
+| [古代 IF 事件组推广](ANCIENT_EVENT_FLOW_ROLLOUT.md) | 江湖宗师试点结构与其余古代 IF 的横向扩充约定 |
 | [事件之间的普通生活](ORDINARY_LIFE_INTERVALS.md) | 素材配置生活范围，引擎保存并执行；属性达标后也能经历日常 |
 | [出击与成为将军试点](FRONTIER_CAMPAIGN_PILOT.md) | 已获用户认可的单元路由、规则论功行赏、完整试点与历史问题 |
 | [版本 20 角色卡与组前准备](EVENT_FLOW_V20.md) | 准入、预设资产范围、展示维护及已知问题 |

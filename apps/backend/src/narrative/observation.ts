@@ -39,3 +39,15 @@ export function narrativeObservationHistory(
   }
   return [summary?.text, ...history, formatNarrativeExperience(current, formatNarrativeDialogue({ narrative: current.narrative, decisionResult: current.decisionResult }))].filter(Boolean).join("\n\n");
 }
+
+/** Committed, uncovered experiences only; used when routing before a current passage exists. */
+export function narrativeCommittedHistory(run: InternalRunState): string {
+  const history = buildNarrativeStoryHistory(run.narrative, run.turnRecords);
+  const episodes = history.episodes.flatMap((entry) => {
+    const episode = run.narrative.episodes.find((candidate) => candidate.id === entry.id);
+    if (!episode) return [];
+    const text = formatNarrativeDialogue(narrativeExperienceContent(run.narrative, episode, run.turnRecords));
+    return text ? [formatNarrativeExperience(episode, text)] : [];
+  });
+  return [history.summary?.text, ...episodes].filter(Boolean).join("\n\n");
+}

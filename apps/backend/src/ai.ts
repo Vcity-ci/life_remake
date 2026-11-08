@@ -20,7 +20,7 @@ import type { NarrativeAssetActivity, NarrativeAssets, NarrativeAssetUpdates } f
 import { narrativeAbilityDirectory, narrativeAssetDeclarationsSchema, narrativeAssetUpdatesSchema, narrativeContinuityAssetContract, narrativeLocationDirectory, normalizeNarrativeAssetActivity, parseNarrativeAssetUpdates, parseNarrativeAssetDeclarations, parseNarrativeContinuityAssetUpdates } from "./narrative-assets.js";
 import { narrativeTurnPlanFocusIds, recentCommittedNarrativeChanges, type NarrativeHorizonInput, type NarrativeSocialForceReference, type NarrativeTurnEnvelope, type NarrativeTurnPlan } from "./narrative/turn.js";
 import { parseNarrativeActWorldCard, formatNarrativeActOutline } from "./narrative/act-outline.js";
-import { eventFlowCatalog, eventFlowRoles, validateEventFlowPreparation, type EventFlowRenderInput } from "./narrative/event-flow.js";
+import { eventFlowRoles, validateEventFlowBindings, type EventFlowRenderInput } from "./narrative/event-flow.js";
 import { committedNarrativeSequence } from "./narrative/history.js";
 import {
   prepareNarrativeMemoryCuration,
@@ -540,7 +540,7 @@ export function nextEventFlowTool() {
 export async function planNextEventFlow(
   run: InternalRunState, world: WorldConfig,
   input: { callId: string; actId: string; outline: NarrativeActOutline; recentStory: string;
-    previous: { id: string; label: string; narrativeRole: string; result: string };
+    previous?: { id: string; label: string; narrativeRole: string; result: string };
     candidates: Array<{ id: string; label: string; narrativeRole: string; entry: string }> },
   ctx: NarrativeContext
 ): Promise<string> {
@@ -550,10 +550,10 @@ export async function planNextEventFlow(
   taskContext.narrativePlan!.actBackground = formatNarrativeActOutline(input.outline);
   const result = await requestNarrativeOutcomeTool(run, world, taskContext, nextEventFlowTool(), [
     "当前人物状态：" + JSON.stringify({ age: run.age, stats: run.stats }),
-    "上一事件组及确定结果：" + JSON.stringify(input.previous),
+    input.previous ? "上一事件组及确定结果：" + JSON.stringify(input.previous) : "",
     "实际历史：\n" + input.recentStory,
     "后续候选（尚未发生）：" + JSON.stringify(input.candidates)
-  ].join("\n"), {
+  ].filter(Boolean).join("\n"), {
     task: "planning", planningPurpose: "continuation", callId: input.callId + ":next-flow", actId: input.actId,
     parseResult: (raw) => {
       if (typeof raw.nextFlowId !== "string" || !input.candidates.some((group) => group.id === raw.nextFlowId)) {
@@ -607,7 +607,7 @@ function narrativeTurnReferenceCatalog(input: NarrativeTurnEnvelope) {
 export function narrativeTurnPlanTools(input: NarrativeTurnEnvelope): Record<string, unknown>[] {
   if (!input.actOutline) return [{ type: "function", function: {
     name: "plan_act_world_card", description: "本幕稳定的主持资料。",
-    parameters: { type: "object", additionalProperties: false, required: ["situation", "actors", "locations", "pressures", "stakes", "worldRuleRefs", ...(input.eventFlowPreparation ? ["flowBindings", "eventFlows"] : [])],
+    parameters: { type: "object", additionalProperties: false, required: ["situation", "actors", "locations", "pressures", "stakes", "worldRuleRefs", ...(input.eventFlowPreparation ? ["flowBindings"] : [])],
       properties: {
         worldRuleRefs: { type: "array", items: { type: "string" }, description: "从已提供的世界规则目录选择本幕适用的完整 ID；规则原文由引擎保存，不改写规则。没有适用规则时填 []。" },
         situation: { type: "string", minLength: 1 },
@@ -618,10 +618,7 @@ export function narrativeTurnPlanTools(input: NarrativeTurnEnvelope): Record<str
         ...(input.eventFlowPreparation ? {
           flowBindings: { type: "array", description: "只为需要具象化的角色绑定本局名称，包括尚未出现的道具名称；没有新角色时填 []。已有名称由引擎复用，不重复提交；名称绑定不表示道具已取得。", items: {
             type: "object", additionalProperties: false, required: ["roleId", "name"], properties: { roleId: { type: "string" }, name: { type: "string" } }
-          } },
-          eventFlows: { type: "object", additionalProperties: false, required: ["openingFlowId", "availableFlowIds"],
-            description: "本幕开场组与可用事件组。相同叙事地位可选适合本局的一组，保留不同地位的成长、失败后续和本幕结果组。这里只引用骨架，不写事件树。",
-            properties: { openingFlowId: { type: "string", description: "本幕开场组；其 requiresItems 必须已在实际库存中。" }, availableFlowIds: { type: "array", items: { type: "string" } } } }
+          } }
         } : {})
       } }
   } }];
@@ -642,8 +639,7 @@ export function narrativeTurnPlanningPrompt(input: NarrativeTurnEnvelope, plan?:
       .filter((card) => card.kind === "world_rule").map((card) => ({ id: card.id, title: card.title }))),
     input.eventFlowPreparation ? "需要具象化的角色：" + JSON.stringify(input.eventFlowPreparation.roles) : "",
     input.eventFlowPreparation ? "已成立的名称绑定：" + JSON.stringify(input.eventFlowPreparation.existingBindings) : "",
-    input.eventFlowPreparation ? "实际持有的事件道具（候选素材不是已取得物品）：" + JSON.stringify(input.eventFlowPreparation.inventory) : "",
-    input.eventFlowPreparation ? "人工事件组（候选素材，尚未发生）：" + JSON.stringify(input.eventFlowPreparation.groups) : ""
+    input.eventFlowPreparation ? "实际持有的事件道具（候选素材不是已取得物品）：" + JSON.stringify(input.eventFlowPreparation.inventory) : ""
   ].filter(Boolean).join("\n");
   return [
     "本段年龄：" + input.sceneAge + "岁",
@@ -665,8 +661,7 @@ export async function generateNarrativeActWorldCard(
   const planningInput: NarrativeTurnEnvelope = { ...input, ...(definition ? { eventFlowPreparation: {
     roles: roles.filter((role) => !existingBindings[role.id]), existingBindings,
     inventory: definition.items.filter((item) => run.items.some((owned) => owned.id === run.storyPackSnapshot!.id + ":item:" + item.id))
-      .map((item) => ({ id: item.id, name: run.items.find((owned) => owned.id === run.storyPackSnapshot!.id + ":item:" + item.id)!.name })),
-    groups: eventFlowCatalog(definition, input.act.id)
+      .map((item) => ({ id: item.id, name: run.items.find((owned) => owned.id === run.storyPackSnapshot!.id + ":item:" + item.id)!.name }))
   } } : {}) };
   const result = await requestNarrativeOutcomeTool(run, world, ctx, narrativeTurnPlanTools(planningInput),
     narrativeTurnPlanningPrompt(planningInput, ctx.narrativePlan), {
@@ -681,7 +676,7 @@ export async function generateNarrativeActWorldCard(
             ...Object.entries(existingBindings).map(([roleId, name]) => ({ roleId, name })),
             ...(card.flowBindings ?? [])
           ];
-          validateEventFlowPreparation(run, card, true); return card;
+          validateEventFlowBindings(run, card); return card;
         } catch { throw invalidNarrativeOutcome("narrative_act_outline_invalid", { rule: "invalid_value", path: "hostingMaterials", received: raw }); }
       }
     });

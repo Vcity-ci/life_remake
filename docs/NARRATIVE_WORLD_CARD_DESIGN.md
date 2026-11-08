@@ -37,9 +37,9 @@ storyBible 提供开局时代切片。具体人物目标放入人物或势力卡
 
 ## 当前实际供应
 
-身世与幕初规划通过现有世界材料入口取得共同设定、开局局势及匹配的静态卡。边镇路线的幕初规划额外取得人工事件组目录和名称绑定角色；不再同时供应 IF 的另一套 adventureSeeds。
+身世与幕初规划通过现有世界材料入口取得共同设定、开局局势及匹配的静态卡。边镇路线的幕初规划额外取得事件组角色目录用于名称绑定，不取得事件组或事件单元执行目录；不再同时供应 IF 的另一套 adventureSeeds。
 
-边镇幕初模型选出本幕可用事件组和开场组，组织 situation、actors、locations、pressures、stakes；objective 和 closureMeaning 取自 IF。世界卡整幕固定，后来的变化由实际历史承接。
+边镇幕初模型组织 situation、actors、locations、pressures、stakes 并绑定角色名称，不选事件组或开场组；objective 和 closureMeaning 取自 IF。世界卡整幕固定，后来的变化由实际历史承接；事件组在需要时由幕内路由选择。
 
 幕初请求中，候选规则原文位于稳定世界设定，目录只列 ID 和标题。模型通过 worldRuleRefs 选择适用规则；引擎只接受本次实际供应且 kind=world_rule 的引用，并将对应 id、title、text 保存为幕卡 worldRules。模型不重抄规则，不从未供应的全库补取。
 

@@ -31,7 +31,6 @@ export interface NarrativeTurnEnvelope {
     roles: Array<{ id: string; kind: string; identity: string }>;
     existingBindings: Record<string, string>;
     inventory: Array<{ id: string; name: string }>;
-    groups: Array<{ id: string; label: string; narrativeRole: string; entry: string; requiresItems: string[]; events: Array<{ kind: string; situation: string }> }>;
   };
   callId: string;
   source: NarrativeTurnSource;

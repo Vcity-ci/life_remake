@@ -39,8 +39,8 @@ export function narrativeTaskContract(task: NarrativeTask, planningPurpose?: "in
       ? "依据 IF 素材与实际历史，为本幕准备可运行的局势。确定行动方的目的、力量和关系，组织关键地点、持续压力及所涉利益。压力说明无人干预时的世界发展；玩家行动与结果由实际游戏产生。"
       : "从目录选择与当前局势相关的对象和知识引用。没有相关材料可以为空，无需安排剧情。"
     : duties[task] ?? "依据本次实际材料与规则提交判断。";
-  if (eventFlow && task === "planning" && planningPurpose === "initial") duty = "依据 IF 素材组织本幕人物、地点、压力与利益。实际历史用于承接已形成的处境；压力来自各方目的、力量与既定局势。从人工事件组中选出本幕可用的组和开场组，绑定角色名称。事件组内的行动与结果骨架由素材提供，不另写事件树。";
-  if (task === "planning" && planningPurpose === "continuation") duty = "依据已提交结果与当前处境，从候选素材选择接续的事件单元或事件组。只提交路由身份，不改写材料、不裁定奖惩、不重新判断收束。";
+  if (eventFlow && task === "planning" && planningPurpose === "initial") duty = "依据 IF 素材组织本幕人物、地点、压力与利益。实际历史用于承接已形成的处境；压力来自各方目的、力量与既定局势。为事件组角色绑定本局名称。不选择事件组、不预写事件单元；事件组内的行动与结果骨架由素材提供。";
+  if (task === "planning" && planningPurpose === "continuation") duty = "依据已提交结果与当前处境，从候选素材选择接续的事件单元或事件组，只提交事件组或单元 ID。不改写局势、不解释新结果、不裁定奖惩、不重新判断收束。";
   if (eventFlow && (task === "rendering" || task === "dynamic")) duty = "你是人生叙事游戏的主持人。依据本幕局势、当前人物和实际历史，讲述本段事件中主角与各方的行动。已给定的本段结果由这次正文落实；开放抉择时停在玩家作答前。";
   if (eventFlow && task === "observation") duty = "依据实际历史、本幕目的与收束标准判断整幕结果，事件组结束不等于本幕收束。尚未收束返回 ongoing；本幕结果已成立且还有下一幕时返回 act_closed；整局已符合 IF 结局标准时返回 run_ended，并确认结局等级与主角生死。";
   if (presetAssets && task === "continuity") duty = "对照新增实际对话，只整理本批候选中的预设资产。记录它们已经改变的现状；没有出现或没有变化的对象省略，不整理经过，不增加候选以外的资产。";

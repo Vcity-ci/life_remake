@@ -1,7 +1,8 @@
 {
   "version": 1,
   "id": "ancient.merchant-house",
-  "revision": "1.3.1",
+  "revision": "2.0.0",
+  "eventFlowId": "ancient.merchant-house",
   "worldId": "ancient",
   "name": "商贾世家",
   "tagline": "以货物、信用与远路连接天下，让财富成为家业、地位或风暴。",

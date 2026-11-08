@@ -55,7 +55,7 @@ import { generateNarrativeTurn } from "./narrative-provider.js";
 import { commitNarrativeEpisode, runNarrativeTurnTransaction } from "./narrative/commit.js";
 import { narrativeTurnCapabilities, narrativeTurnKindsForReadiness, recentCommittedNarrativeChanges, type NarrativeTurnEnvelope } from "./narrative/turn.js";
 import { commitNarrativeAgentTurn, runNarrativeAgentDecision, finishNarrativeAgentDecision, runNarrativeAgentEnding, runNarrativeAgentTurn, synchronizeNarrativeAgentScene, synchronizeNarrativeAssetBatch } from "./narrative/runtime.js";
-import { finishPendingNarrativeActEvent } from "./narrative/finalization.js";
+import { ensureCurrentEventFlow, finishPendingNarrativeActEvent } from "./narrative/finalization.js";
 import { prepareChoiceCheck, rollChoice } from "./choice-check.js";
 import { approveStoryClosure, approveStoryIntent } from "./tool-gateway.js";
 import { providerLimits } from "./constants.js";
@@ -1244,6 +1244,10 @@ async function generateDirectedSegmentForRunUnsafe(options: DirectedSegmentOptio
   };
   const earlyLife = isNarrativeEarlyLife(narrativeWorld, run.age);
   const currentActReady = Boolean(runtime.outline) && refreshNarrativeActAdmission(narrativeSource, narrativeWorld);
+  if (currentActReady) {
+    await ensureCurrentEventFlow(run, world, run.storyPackSnapshot?.eventFlow, narrativeCtx,
+      () => saveRun(structuredClone(run), sessionId));
+  }
   const previousLifeInterval = run.narrative.eventFlow?.lifeInterval;
   const lifeInterval = currentActReady ? prepareEventFlowLifeInterval(run) : undefined;
   const groupPreparation = currentActReady ? prepareEventFlowEntry(run) : undefined;

@@ -1,9 +1,39 @@
-import type { NarrativeWorldDefinition, WorldConfig } from "@reroll/shared";
+import type { NarrativeEventFlowDefinition, NarrativeWorldDefinition, WorldConfig } from "@reroll/shared";
 import { observeNarrativeAct, planNextEventFlow, planNextEventUnit, type NarrativeContext } from "../ai.js";
 import { finalizeNarrativeActEvent, type InternalRunState } from "../engine.js";
-import { narrativeObservationHistory } from "./observation.js";
+import { narrativeCommittedHistory, narrativeObservationHistory } from "./observation.js";
 import { synchronizeNarrativeAssetBatch } from "./runtime.js";
 import { currentEventFlowStep, eventFlowResult, applyEventFlowResultItems, availableNextEventFlows, availableNextEventUnits, bindEventFlowText } from "./event-flow.js";
+
+/**
+ * Opens the first event group only when the act is ready and no group is active.
+ * The act card deliberately holds no flow selection.
+ */
+export async function ensureCurrentEventFlow(
+  run: InternalRunState, world: WorldConfig, definition: NarrativeEventFlowDefinition | undefined,
+  context: NarrativeContext, checkpoint: () => Promise<void>
+): Promise<void> {
+  if (run.narrative.version !== 20 || !definition) return;
+  const runtime = run.narrative.actRuntime;
+  if (!runtime?.outline || runtime.admittedAtAge === undefined) return;
+  const state = run.narrative.eventFlow ??= { actId: runtime.actId, eventIndex: 0, bindings: {}, completed: [], completedFlows: [] };
+  if (state.actId !== runtime.actId) {
+    state.actId = runtime.actId; state.flowId = undefined; state.eventIndex = 0; state.lifeInterval = undefined;
+  }
+  if (state.flowId) return;
+  Object.assign(state.bindings, Object.fromEntries((runtime.outline.flowBindings ?? []).map((binding) => [binding.roleId, binding.name])));
+  const candidates = availableNextEventFlows(run).map(({ id, label, narrativeRole, entry }) => ({
+    id, label, narrativeRole, entry: bindEventFlowText(entry, state.bindings)
+  }));
+  if (!candidates.length) throw new Error("event_flow_candidates_empty");
+  state.flowId = await planNextEventFlow(run, world, {
+    callId: `flow-open:${run.runId}:${runtime.actId}`,
+    actId: runtime.actId, outline: runtime.outline,
+    recentStory: narrativeCommittedHistory(run), candidates
+  }, context);
+  state.eventIndex = 0;
+  await checkpoint();
+}
 
 /** Resume only the recorded event; this never generates prose or rolls again. */
 export async function finishPendingNarrativeActEvent(

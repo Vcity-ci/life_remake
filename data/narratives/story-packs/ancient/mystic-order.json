@@ -1,7 +1,8 @@
 {
   "version": 1,
   "id": "ancient.mystic-order",
-  "revision": "1.3.1",
+  "revision": "2.0.0",
+  "eventFlowId": "ancient.mystic-order",
   "worldId": "ancient",
   "name": "方术教门",
   "tagline": "以医术、经典、仪式与灾异解释影响人心，也承受信仰进入权力后的代价。",

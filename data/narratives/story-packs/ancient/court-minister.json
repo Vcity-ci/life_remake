@@ -1,7 +1,8 @@
 {
   "version": 1,
   "id": "ancient.court-minister",
-  "revision": "1.3.1",
+  "revision": "2.0.0",
+  "eventFlowId": "ancient.court-minister",
   "worldId": "ancient",
   "name": "庙堂权臣",
   "tagline": "从入仕门径走入权力核心，决定辅政、摄政还是取而代之。",

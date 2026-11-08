@@ -33,6 +33,21 @@ test("幕初与召回使用固定独立工具，统一引用按目录真实类�
   assert.deepEqual(parseNarrativeTurnPlan({ recallRefs: [] }, "recall_scene_assets", input).recallRefs, []);
   assert.throws(() => parseNarrativeTurnPlan({ recallRefs: [{ ref: "other-world", purpose: "未知对象" }] }, "recall_scene_assets", input));
 });
+test("幕初工具只承担世界卡与名称绑定，不接收事件组或单元目录", () => {
+  const input = { ...envelope(), eventFlowPreparation: {
+    roles: [{ id: "role.a", kind: "character", identity: "边将" }],
+    existingBindings: {},
+    inventory: []
+  } };
+  const tool = narrativeTurnPlanTools(input)[0].function as any;
+  assert.deepEqual(tool.parameters.required,
+    ["situation", "actors", "locations", "pressures", "stakes", "worldRuleRefs", "flowBindings"]);
+  assert.ok(!("eventFlows" in tool.parameters.properties));
+  const prompt = narrativeTurnPlanningPrompt(input);
+  assert.ok(prompt.includes("需要具象化的角色"));
+  assert.ok(!prompt.includes("人工事件组"));
+  assert.ok(!prompt.includes("候选素材，尚未发生"));
+});
 test("三个题材按职责供应同一幕卡，召回不带收束判据和逐拍任务", async (t) => {
   for (const [worldId, packId] of [["ancient", "ancient.frontier-commander"], ["fantasy", "fantasy.sect-ascendant"], ["modern", "modern.career-maker"]]) await t.test(worldId, async () => {
     const base = (await loadNarrativeWorldDefinition(worldId))!, pack = (await loadNarrativeStoryPack(base, packId))!;

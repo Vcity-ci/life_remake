@@ -58,6 +58,9 @@ export function validateNarrativeEventFlow(raw: unknown, pack: Pick<NarrativeSto
     if (group.routing === "planned" && !hasExit) throw new Error("event_flow_exit_missing");
   }
   if (pack.acts.some((act) => !flow.groups.some((group) => group.actIds.includes(act.id)))) throw new Error("event_flow_act_empty");
+  // `eventFlowRoles` grants originRoles to the act that owns the first group.
+  // Keep the authored order contract explicit: the first group is the opening act.
+  if (!flow.groups[0].actIds.includes(pack.acts[0].id)) throw new Error("event_flow_first_group_act_invalid");
   return flow;
 }
 
@@ -72,12 +75,12 @@ export function eventFlowRoles(definition: NarrativeEventFlowDefinition, actId: 
 export function eventFlowCatalog(definition: NarrativeEventFlowDefinition, actId: string) {
   return definition.groups.filter((group) => group.actIds.includes(actId)).map((group) => ({
     id: group.id, label: group.label, narrativeRole: group.narrativeRole, entry: group.entry,
-    requiresItems: group.requiresItems ?? [], events: group.events.map((event) => ({ id: event.id,
-      kind: event.kind, situation: event.situation, ...(event.entry ? { entry: event.entry } : {}) }))
+    requiresItems: group.requiresItems ?? []
   }));
 }
 
-export function validateEventFlowPreparation(run: InternalRunState, card: NarrativeActOutline, preparing = false): void {
+/** The act card owns run-local role names only; flow selection is a routing concern. */
+export function validateEventFlowBindings(run: InternalRunState, card: NarrativeActOutline): void {
   const definition = run.narrative.version >= 19 ? run.storyPackSnapshot?.eventFlow : undefined;
   if (!definition) return;
   const bindings = card.flowBindings ?? [];
@@ -89,11 +92,6 @@ export function validateEventFlowPreparation(run: InternalRunState, card: Narrat
     const previous = run.narrative.eventFlow?.bindings[binding.roleId];
     if (previous && previous !== binding.name) throw new Error("event_flow_binding_changed");
   }
-  const selection = card.eventFlows;
-  const valid = new Set(definition.groups.filter((group) => group.actIds.includes(card.actId)).map((group) => group.id));
-  if (!selection || !selection.availableFlowIds.length || new Set(selection.availableFlowIds).size !== selection.availableFlowIds.length ||
-      selection.availableFlowIds.some((id) => !valid.has(id)) || !selection.availableFlowIds.includes(selection.openingFlowId)) throw new Error("event_flow_selection_invalid");
-  if (preparing && definition.groups.find((group) => group.id === selection.openingFlowId)!.requiresItems?.some((id) => !hasEventFlowItem(run, id))) throw new Error("event_flow_opening_item_missing");
 }
 
 export function bindEventFlowText(text: string, bindings: Record<string, string>): string {
@@ -119,15 +117,16 @@ export function currentEventFlowStep(run: InternalRunState): EventFlowStep | und
   const definition = run.narrative.version >= 19 ? run.storyPackSnapshot?.eventFlow : undefined;
   const runtime = run.narrative.actRuntime;
   if (!definition || !runtime?.outline || runtime.admittedAtAge === undefined) return;
-  validateEventFlowPreparation(run, runtime.outline);
+  validateEventFlowBindings(run, runtime.outline);
   const state = run.narrative.eventFlow ??= { actId: runtime.actId, eventIndex: 0, bindings: {}, completed: [], completedFlows: [] };
   Object.assign(state.bindings, Object.fromEntries(runtime.outline.flowBindings!.map((binding) => [binding.roleId, binding.name])));
   if (state.actId !== runtime.actId) {
     state.actId = runtime.actId; state.flowId = undefined; state.eventIndex = 0; state.lifeInterval = undefined;
   }
-  state.flowId ??= runtime.outline.eventFlows!.openingFlowId;
+  // A group is opened only by the in-act router. No act card pre-selects it.
+  if (!state.flowId) return undefined;
   const flow = definition.groups.find((group) => group.id === state.flowId && group.actIds.includes(runtime.actId));
-  if (!flow || !runtime.outline.eventFlows!.availableFlowIds.includes(flow.id) ||
+  if (!flow ||
       state.completedFlows.some((entry) => entry.flowId === flow.id) ||
       (!state.completed.some((entry) => entry.flowId === flow.id) &&
         flow.requiresItems?.some((id) => !hasEventFlowItem(run, id)))) throw new Error("event_flow_active_group_invalid");
@@ -227,9 +226,8 @@ export function availableNextEventUnits(run: InternalRunState, step: EventFlowSt
 export function availableNextEventFlows(run: InternalRunState) {
   const definition = run.storyPackSnapshot!.eventFlow!;
   const state = run.narrative.eventFlow!;
-  const allowed = new Set(run.narrative.actRuntime!.outline!.eventFlows!.availableFlowIds);
   const completed = new Set(state.completedFlows.map((entry) => entry.flowId));
-  return eventFlowCatalog(definition, state.actId).filter((group) => allowed.has(group.id) &&
+  return eventFlowCatalog(definition, run.narrative.actRuntime!.actId).filter((group) =>
     group.id !== state.flowId && !completed.has(group.id) && group.requiresItems.every((id) => hasEventFlowItem(run, id)));
 }
 

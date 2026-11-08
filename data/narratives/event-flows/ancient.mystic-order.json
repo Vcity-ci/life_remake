@@ -1,0 +1,1363 @@
+{
+  "id": "ancient.mystic-order",
+  "revision": "1.0.0",
+  "originRoles": [
+    "home",
+    "father",
+    "mother",
+    "mentor",
+    "token"
+  ],
+  "roles": [
+    {
+      "id": "home",
+      "kind": "location",
+      "identity": "主角家族所在的乡里、旧宅与祖居"
+    },
+    {
+      "id": "temple",
+      "kind": "location",
+      "identity": "师门道观、寺观或收治病人的道场"
+    },
+    {
+      "id": "court",
+      "kind": "location",
+      "identity": "朝堂、官府与辩经议礼的场所"
+    },
+    {
+      "id": "market",
+      "kind": "location",
+      "identity": "集市、疫村与民间信众聚集的地方"
+    },
+    {
+      "id": "shrine",
+      "kind": "location",
+      "identity": "教团法坛、香堂与信众议事之处"
+    },
+    {
+      "id": "father",
+      "kind": "character",
+      "identity": "主角家中承担生计与门风的父亲"
+    },
+    {
+      "id": "mother",
+      "kind": "character",
+      "identity": "主角家中操持家务与亲族往来的母亲"
+    },
+    {
+      "id": "mentor",
+      "kind": "character",
+      "identity": "传医术、仪式或经典给主角的师父"
+    },
+    {
+      "id": "patient",
+      "kind": "character",
+      "identity": "求医的病家、受灾的乡民或需要救治的信众"
+    },
+    {
+      "id": "rival",
+      "kind": "character",
+      "identity": "卖假药的术士、教内争位的对手或敌视教门的官员"
+    },
+    {
+      "id": "official",
+      "kind": "character",
+      "identity": "管着地方治安、疫病与教门禁令的官吏"
+    },
+    {
+      "id": "courtier",
+      "kind": "character",
+      "identity": "朝中主持礼制、正统与灾异解释的官员"
+    },
+    {
+      "id": "follower",
+      "kind": "character",
+      "identity": "跟随主角学医、受戒或入教的弟子与信众"
+    },
+    {
+      "id": "scripture",
+      "kind": "item",
+      "identity": "师门医书、经卷或记载验方的旧册"
+    },
+    {
+      "id": "remedy",
+      "kind": "item",
+      "identity": "可以救急的药方、药材或制备好的丸散"
+    },
+    {
+      "id": "seal",
+      "kind": "item",
+      "identity": "证明传承身份的法印或教门印信"
+    },
+    {
+      "id": "token",
+      "kind": "item",
+      "identity": "师门传下的法器、药囊或信物"
+    },
+    {
+      "id": "healing",
+      "kind": "ability",
+      "identity": "辨症、用药、隔离与救治的实际医术"
+    },
+    {
+      "id": "ritual",
+      "kind": "ability",
+      "identity": "斋醮、祈禳、安神与仪式主持的本领"
+    },
+    {
+      "id": "doctrine",
+      "kind": "ability",
+      "identity": "经典、讲经、辩经与解释灾异的能力"
+    },
+    {
+      "id": "network",
+      "kind": "ability",
+      "identity": "教团、信众、药商与官面上的关系"
+    }
+  ],
+  "items": [
+    {
+      "id": "medical-scroll",
+      "roleId": "scripture",
+      "description": "师门传下的医书与验方，记录辨症、用药和隔离的方法。"
+    },
+    {
+      "id": "remedy-formula",
+      "roleId": "remedy",
+      "description": "可以救急的药方与备好的药材，能在疫病或伤情中派上用场。"
+    },
+    {
+      "id": "faith-seal",
+      "roleId": "seal",
+      "description": "教门与师门承认的传承法印，用于主持仪式和证明身份。"
+    }
+  ],
+  "groups": [
+    {
+      "id": "first-rite",
+      "actIds": [
+        "ancient.mystic-order.inheritance"
+      ],
+      "narrativeRole": "受法起点",
+      "label": "第一次救治",
+      "entry": "尚未独立行医或主持仪式，只在师门与乡里之间帮忙，第一次面对真实的病患。",
+      "routing": "planned",
+      "assetRoles": [
+        "home",
+        "temple",
+        "market",
+        "father",
+        "mother",
+        "mentor",
+        "patient",
+        "scripture",
+        "remedy",
+        "healing",
+        "ritual"
+      ],
+      "events": [
+        {
+          "id": "rite-basics",
+          "kind": "life",
+          "entry": "还没有独立辨症或主持过一场救治。",
+          "lifeBefore": {
+            "minYears": 2,
+            "maxYears": 4,
+            "context": "你在{{home}}帮父母做家务，常去{{temple}}替{{mentor}}晒药、抄经。{{patient}}来求医时，你在旁边看师父辨症。"
+          },
+          "situation": "你在{{home}}长大，父亲教你识人，母亲教你照料病人。{{mentor}}说你记性好、心也细，但还没有独立面对过一场病。{{market}}那边传来消息，有几个村子闹起了怪病。",
+          "outcome": {
+            "result": "你熟悉了常见药材、辨症方法和师门的规矩，也知道怪病不是只靠念经就能治好。"
+          }
+        },
+        {
+          "id": "rite-first-case",
+          "kind": "scene",
+          "entry": "第一次跟着{{mentor}}去{{market}}看诊，病家还没有脱险。",
+          "situation": "{{market}}外的村子里，几户人家上吐下泻，{{patient}}的孩子已经昏迷。{{mentor}}让你先辨症、再决定用哪张方。{{rival}}的假药摊子也在村口，说他的符水能治百病。",
+          "outcome": {
+            "result": "你按{{mentor}}教的辨症用了药，孩子的烧退了些。{{mentor}}把{{scripture}}和一份{{remedy}}交给你，说往后要自己判断。",
+            "grantItems": [
+              "medical-scroll",
+              "remedy-formula"
+            ]
+          }
+        },
+        {
+          "id": "rite-choice",
+          "kind": "choice",
+          "entry": "病家还没有完全脱险，{{rival}}的假药和师门的规矩撞在一起。",
+          "situation": "{{patient}}的家人想请{{rival}}来做法事，说符水便宜又灵。{{mentor}}让你按医书继续治，{{rival}}却当众说你那套太慢。病人已经等不起。",
+          "question": "按医书治、让{{rival}}插手，还是当众拆穿假药？",
+          "stakes": "病人的性命、{{mentor}}的名声，以及你在乡里第一次被记住的方式。",
+          "check": {
+            "stat": "intelligence",
+            "difficulty": 12
+          },
+          "options": [
+            {
+              "id": "safe",
+              "label": "按医书治",
+              "action": "不理{{rival}}，按{{scripture}}的方子继续救治。",
+              "success": {
+                "result": "病人稳住，{{mentor}}在乡里替你说了话。{{rival}}的符水没人再信，你却知道他不会就此罢手。"
+              },
+              "failure": {
+                "result": "病情反复，{{patient}}的家人转去求{{rival}}。你保住了医书，却第一次被人质疑“太慢”。"
+              }
+            },
+            {
+              "id": "balanced",
+              "label": "让{{rival}}插手",
+              "action": "让{{rival}}做一场法事稳住病人，你继续用药。",
+              "success": {
+                "result": "法事稳住人心，药也起了效，病人脱险。{{rival}}得了面子，你得了里子；{{mentor}}却提醒你，符水治不了下一次。"
+              },
+              "failure": {
+                "result": "{{rival}}的符水耽误了用药，病人险死还生。{{patient}}的家人把责任推给你，{{mentor}}替你挡了大部分。"
+              }
+            },
+            {
+              "id": "risky",
+              "label": "拆穿假药",
+              "action": "当众拆穿{{rival}}的符水，让乡里看清真假。",
+              "success": {
+                "result": "你当众验出符水里的东西，{{rival}}被赶出村子。病人按你的方子脱险，你得了名声，也结了第一个仇。"
+              },
+              "failure": {
+                "result": "{{rival}}反咬你断人财路，乡里半信半疑。病人虽然脱险，你的名声却先坏了一半。"
+              }
+            }
+          ]
+        },
+        {
+          "id": "rite-aftermath",
+          "kind": "life",
+          "entry": "第一次救治已经结束，师门和乡里都要一个后续。",
+          "situation": "病人陆续好转或留下后患，{{temple}}里多了几个来求医的人。{{mentor}}让你把这次辨症和用药记进{{scripture}}，{{mother}}问你要不要搬去道观住。{{rival}}的摊子还在别处开着。",
+          "outcome": {
+            "result": "你有了独立辨症的第一份经验，也有了第一批病人和第一个对手；师门开始把更重的救治交给你。",
+            "endsFlow": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "plague-village",
+      "actIds": [
+        "ancient.mystic-order.inheritance"
+      ],
+      "narrativeRole": "受法行为 A",
+      "label": "疫村",
+      "entry": "已经有独立救治的经验，一个村子爆发疫病，官府和乡民都在等。",
+      "routing": "planned",
+      "assetRoles": [
+        "market",
+        "temple",
+        "home",
+        "mentor",
+        "patient",
+        "official",
+        "follower",
+        "remedy",
+        "healing",
+        "ritual"
+      ],
+      "events": [
+        {
+          "id": "plague-arrives",
+          "kind": "scene",
+          "entry": "疫病已经在村子里扩散，还没有隔离。",
+          "situation": "{{market}}外的村子接连死人，{{official}}封了村口却不肯派人进去。{{patient}}来求{{mentor}}，{{mentor}}让你带药和{{follower}}先去看。{{rival}}在村外卖“防疫符”，价钱越抬越高。",
+          "outcome": {
+            "result": "你看见疫病的传播、村口的封锁和{{rival}}的符水摊；你必须决定先进村、先隔离，还是先揭穿假药。"
+          }
+        },
+        {
+          "id": "plague-choice",
+          "kind": "choice",
+          "entry": "疫村已经封了，病人和健康人挤在一起。",
+          "situation": "{{official}}要你只在外头施药，{{mentor}}让你进村辨症、分病区，{{rival}}说符水能保平安。{{follower}}愿意跟你进去，{{remedy}}只够救一半人。",
+          "question": "进村救治、在外施药，还是先夺下{{rival}}的符水摊？",
+          "stakes": "疫村的人命、药够不够，以及官面对教门的看法。",
+          "check": {
+            "stat": "intelligence",
+            "difficulty": 14
+          },
+          "options": [
+            {
+              "id": "safe",
+              "label": "在外施药",
+              "action": "按{{official}}的要求在村外设药棚，只救能出来的人。",
+              "success": {
+                "result": "药棚稳住了一部分病人，村内仍有人死。{{official}}认你守规矩，{{mentor}}却问你，里面的人怎么办。"
+              },
+              "failure": {
+                "result": "村内疫情扩大，冲破了封锁。你保住了药棚，却没能保住村子，官面把责任推给教门。"
+              }
+            },
+            {
+              "id": "balanced",
+              "label": "进村分治",
+              "action": "带{{follower}}进村，按病情分区，用{{remedy}}先救重病。",
+              "success": {
+                "result": "你把病人分开，重病先用{{remedy}}，轻病隔离。疫势被压住，{{official}}不得不承认教门救了村子。",
+                "consumeItems": [
+                  "remedy-formula"
+                ]
+              },
+              "failure": {
+                "result": "{{follower}}也染了病，{{remedy}}不够分。你救回一部分人，却没能压住疫势，村子和教门都伤了元气。",
+                "consumeItems": [
+                  "remedy-formula"
+                ]
+              }
+            },
+            {
+              "id": "risky",
+              "label": "夺符水摊",
+              "action": "当众夺下{{rival}}的符水摊，把真药分给村民。",
+              "success": {
+                "result": "你夺下符水摊，当众验出假药，村民转向教门求药。疫势被压住，{{rival}}却把仇记到了官面。"
+              },
+              "failure": {
+                "result": "{{rival}}先报官，说你聚众抢摊。{{official}}借机封了{{temple}}的药棚，疫村没救成，教门先被盯上。"
+              }
+            }
+          ]
+        },
+        {
+          "id": "plague-aftermath",
+          "kind": "life",
+          "entry": "疫病已经退去或还在，村子与教门都要安顿。",
+          "situation": "村口的封锁撤了或还在，{{patient}}和{{follower}}各自养病。{{official}}在村外立了碑或贴了告示，{{mentor}}让你把这次的方子和失误记进{{scripture}}。{{temple}}里多了来求医的人。",
+          "outcome": {
+            "result": "疫村的生死、教门的名声和官面的态度都落定；你知道了医术能救人，也能把教门推到官面面前。",
+            "endsFlow": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "false-elixir",
+      "actIds": [
+        "ancient.mystic-order.inheritance"
+      ],
+      "narrativeRole": "受法行为 B",
+      "label": "假药与神迹",
+      "entry": "教门已经有了一些名声，{{rival}}用假药或假神迹骗取信众。",
+      "routing": "planned",
+      "assetRoles": [
+        "market",
+        "temple",
+        "shrine",
+        "rival",
+        "patient",
+        "official",
+        "follower",
+        "remedy",
+        "ritual",
+        "doctrine"
+      ],
+      "events": [
+        {
+          "id": "elixir-arrives",
+          "kind": "scene",
+          "entry": "假药的案子还没有查清，信众已经有人受害。",
+          "situation": "{{rival}}在{{market}}卖“长生丹”，几个信众吃了之后病倒。{{patient}}的家人来找{{temple}}，{{official}}却不想管这种“愿买愿卖”的事。{{follower}}说再不管，教门也会被当成一伙。",
+          "outcome": {
+            "result": "假药的来源、受害的信众和官面的态度都摆开；你必须决定报官、私查，还是当众验药。"
+          }
+        },
+        {
+          "id": "elixir-choice",
+          "kind": "choice",
+          "entry": "假药已经害人，{{rival}}还在卖。",
+          "situation": "{{official}}要你拿出证据才肯抓人，{{mentor}}让你先救病人、别急着结仇，{{rival}}放出话说教门嫉妒他“神迹”。{{follower}}已经把几个受害人聚在{{shrine}}。",
+          "question": "报官、私查，还是当众验药？",
+          "stakes": "受害信众的性命、教门的名声，以及{{rival}}背后有没有官面靠山。",
+          "check": {
+            "stat": "intelligence",
+            "difficulty": 15
+          },
+          "options": [
+            {
+              "id": "safe",
+              "label": "先救病人",
+              "action": "把受害人接进{{temple}}救治，暂不碰{{rival}}。",
+              "success": {
+                "result": "受害人被救回，{{rival}}却继续卖药。教门得了仁名，假药还在害人。"
+              },
+              "failure": {
+                "result": "病人救回一部分，{{rival}}反说教门“抢病人”。官面没有插手，假药的祸还在。"
+              }
+            },
+            {
+              "id": "balanced",
+              "label": "私查来源",
+              "action": "让{{follower}}暗查{{rival}}的药源，拿到证据再报官。",
+              "success": {
+                "result": "你查到{{rival}}的药材来自一批陈年霉货，证据交到{{official}}手里。假药摊被查封，教门没有直接结仇。"
+              },
+              "failure": {
+                "result": "{{follower}}被{{rival}}的人发现，证据没拿到。你打草惊蛇，{{rival}}先一步把摊子转走。"
+              }
+            },
+            {
+              "id": "risky",
+              "label": "当众验药",
+              "action": "在{{market}}当众开炉验药，让所有人看见真假。",
+              "success": {
+                "result": "你当众验出假药的成分，信众哗然。{{official}}不得不出手，{{rival}}被拿问，教门的名声大涨。"
+              },
+              "failure": {
+                "result": "{{rival}}在药里做了手脚，反咬你验错了。信众半信半疑，教门和假药各挨了一半骂。"
+              }
+            }
+          ]
+        },
+        {
+          "id": "elixir-aftermath",
+          "kind": "life",
+          "entry": "假药的事已经了结或压下，信众和教门都要重新安顿。",
+          "situation": "受害人康复或留下后患，{{market}}上关于教门和假药的议论没有停。{{mentor}}让你把验药和救治的经过写进{{scripture}}，{{follower}}问以后还要不要管这种闲事。{{official}}那边也在看教门的动静。",
+          "outcome": {
+            "result": "假药的后果落在信众、教门名声和官面关系上；你知道了“救人”和“揭假”有时不是同一件事。",
+            "endsFlow": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "heresy-trial",
+      "actIds": [
+        "ancient.mystic-order.inheritance"
+      ],
+      "narrativeRole": "受法失败后续",
+      "label": "妖言与审问",
+      "entry": "上一组使你被指妖言、被官府审问或教门受禁，但仍有病人、弟子或师门可以重整。",
+      "routing": "planned",
+      "assetRoles": [
+        "home",
+        "temple",
+        "court",
+        "mentor",
+        "official",
+        "courtier",
+        "follower",
+        "scripture",
+        "doctrine"
+      ],
+      "events": [
+        {
+          "id": "heresy-grief",
+          "kind": "life",
+          "entry": "审问或禁令已经落下，师门和病人还没有安顿。",
+          "situation": "{{official}}封了{{temple}}的门，{{follower}}被带走问话。{{mentor}}让你先回{{home}}避一避，{{mother}}把{{scripture}}藏进灶房。{{patient}}还在门外等药。",
+          "outcome": {
+            "result": "禁令的损失落到师门、弟子和病人身上；你还剩下的医书、病人和关系被重新盘清。"
+          }
+        },
+        {
+          "id": "heresy-rebuild",
+          "kind": "life",
+          "entry": "师门已经安顿，你仍有人可以重新联络。",
+          "situation": "你带着{{scripture}}去拜访旧病人和{{courtier}}的门生，一家家说明教门不是妖言。{{mentor}}替你写信，{{follower}}从狱中捎出话来。",
+          "outcome": {
+            "result": "你重新有了一批愿意作证的病人和一条能说话的官面关系；禁令没有被抹去，路却重新接上。"
+          }
+        },
+        {
+          "id": "heresy-return",
+          "kind": "scene",
+          "entry": "重整已经完成，地方上出现一场官府也压不住的疫病或灾异。",
+          "situation": "{{market}}又爆发疫病，{{official}}的医官束手无策，{{courtier}}的门生想起你。你带着被禁过的{{scripture}}重新走进疫区。",
+          "outcome": {
+            "result": "你用实际救治重新证明了自己，妖言的旧案仍在，教门却重新有了站住的地方。",
+            "endsFlow": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "lineage-recognized",
+      "actIds": [
+        "ancient.mystic-order.inheritance"
+      ],
+      "narrativeRole": "本幕结果",
+      "label": "受传与法印",
+      "entry": "已经有医术、病人和一次公开的证明，师门要决定是否把传承交给你。",
+      "routing": "planned",
+      "assetRoles": [
+        "temple",
+        "home",
+        "mentor",
+        "follower",
+        "patient",
+        "scripture",
+        "seal",
+        "healing",
+        "doctrine"
+      ],
+      "events": [
+        {
+          "id": "lineage-arrives",
+          "kind": "scene",
+          "entry": "传承的归属还没有定，师门和病人都在看。",
+          "situation": "{{mentor}}把{{scripture}}和{{seal}}摆在{{temple}}正殿，{{follower}}和几个老病人分坐两侧。{{rival}}的人在外面说教门要“私相授受”。{{mentor}}问你：接了法印，准备怎么用它。",
+          "outcome": {
+            "result": "传承的资格、师门的规矩和外面的议论都摆开；你要决定接多少、担多少。"
+          }
+        },
+        {
+          "id": "lineage-verdict",
+          "kind": "settlement",
+          "entry": "师门要给出正式的传承结论。",
+          "situation": "{{temple}}正殿里，{{mentor}}把{{seal}}和{{scripture}}放在案上。{{follower}}和病人都在等，{{rival}}的人也在门外听。你的回答将决定你接的是法印、医书，还是整个教门的担子。",
+          "rules": [
+            {
+              "id": "inherit-seal",
+              "condition": "医术、病人和师门信任都立住，{{mentor}}愿意把法印交给你。",
+              "disposition": "你接下{{seal}}和{{scripture}}，成为师门的正式传人。{{follower}}改口叫你师兄/师姐，病人也开始直接来找你。",
+              "grantItems": [
+                "faith-seal"
+              ]
+            },
+            {
+              "id": "inherit-partial",
+              "condition": "医术有了，但师门仍要留一手，只交医书不交法印。",
+              "disposition": "你接下{{scripture}}，法印仍由{{mentor}}保管。你有了行医的资格，却还没有主持教门的身份。",
+              "grantItems": [
+                "faith-seal"
+              ]
+            },
+            {
+              "id": "remain-student",
+              "condition": "师门认为你还没有担起传承的准备。",
+              "disposition": "{{mentor}}把{{scripture}}留在自己手里，让你再跟着学一程。你保住了病人的信任，却没有接到法印。"
+            }
+          ]
+        },
+        {
+          "id": "lineage-aftermath",
+          "kind": "life",
+          "entry": "传承已经定下，师门与病人要重新排。",
+          "situation": "{{temple}}的香火或药棚换了人主持，{{follower}}开始跟着你抄方、认药。{{patient}}从远处赶来求医，{{mentor}}退到后堂。{{rival}}的人还在外面看着。",
+          "outcome": {
+            "result": "你有了传承身份和第一批自己的弟子，也知道了法印背后是病人、师门和官面三重的目光。",
+            "endsFlow": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "court-debate",
+      "actIds": [
+        "ancient.mystic-order.influence"
+      ],
+      "narrativeRole": "入世行为 A",
+      "label": "朝堂辩经",
+      "entry": "教门已经有名声，朝廷要辩正统与灾异，你被召入朝堂。",
+      "routing": "planned",
+      "assetRoles": [
+        "court",
+        "temple",
+        "courtier",
+        "official",
+        "rival",
+        "follower",
+        "scripture",
+        "doctrine",
+        "network"
+      ],
+      "events": [
+        {
+          "id": "debate-start",
+          "kind": "life",
+          "entry": "辩经的诏令还没有下到教门。",
+          "situation": "{{court}}要辩“灾异与正统”，{{courtier}}点名让教门派人。{{mentor}}说你若去，代表的不只是自己；{{follower}}怕你被扣在京城。{{rival}}已经在朝中递了话，说教门是妖言。",
+          "outcome": {
+            "result": "你摸清了朝堂上的对手、靠山和辩题，也知道这一场不是只比经典。"
+          }
+        },
+        {
+          "id": "debate-arrives",
+          "kind": "scene",
+          "entry": "辩经已经开场，{{rival}}和{{courtier}}都在等你的说法。",
+          "situation": "{{courtier}}问你：灾异是天谴还是病疫，教门的符水算不算正统。{{rival}}在旁边冷笑，{{official}}把疫村的旧案也翻了出来。",
+          "outcome": {
+            "result": "你必须决定只用经典辩、拿疫村实效说话，还是把{{rival}}的假药一并揭出来。"
+          }
+        },
+        {
+          "id": "debate-choice",
+          "kind": "choice",
+          "entry": "朝堂上两边都在等你落子。",
+          "situation": "{{courtier}}要你引经据典，{{follower}}让你讲疫村的实际救治，{{rival}}已经准备好反咬。{{scripture}}里的验方和{{doctrine}}都在你手里。",
+          "question": "引经据典、拿实效说话，还是反揭{{rival}}？",
+          "stakes": "教门在朝廷眼里的正统位置、{{mentor}}的传承，以及你会不会被留在京城。",
+          "check": {
+            "stat": "charisma",
+            "difficulty": 18
+          },
+          "options": [
+            {
+              "id": "safe",
+              "label": "引经据典",
+              "action": "只按经典和礼制回答，不碰疫村旧案。",
+              "success": {
+                "result": "你在经典上站住了，{{courtier}}没有挑出错。教门得了“通经”的名，却没有拿到实际的支持。"
+              },
+              "failure": {
+                "result": "{{rival}}在经典上设了套，你答得慢了一步。教门被说成“只会空谈”，你在朝堂上丢了分。"
+              }
+            },
+            {
+              "id": "balanced",
+              "label": "拿实效说话",
+              "action": "把疫村的救治、隔离和药方一一摆出来，用实际结果回答。",
+              "success": {
+                "result": "疫村的实效压住了空谈，{{courtier}}不得不承认教门有用。你得了朝廷的认可，也被{{rival}}记恨。"
+              },
+              "failure": {
+                "result": "实效被{{rival}}说成“收买人心”，{{courtier}}顺势把教门归到“民间私术”。你保住了命，没保住正统。"
+              }
+            },
+            {
+              "id": "risky",
+              "label": "反揭假药",
+              "action": "当廷揭出{{rival}}的假药和背后的人，把辩经变成查案。",
+              "success": {
+                "result": "假药的证据摆到御前，{{rival}}被拿问，教门得了“护民”的名。你也成了朝中某些人的眼中钉。"
+              },
+              "failure": {
+                "result": "证据被压下，{{rival}}反咬你诬告。{{courtier}}各打五十大板，教门被禁了一处香火。"
+              }
+            }
+          ]
+        },
+        {
+          "id": "debate-aftermath",
+          "kind": "life",
+          "entry": "辩经已经结束，教门与朝堂都要重新排。",
+          "situation": "{{court}}的评断传回{{temple}}，{{follower}}在门口等消息。{{courtier}}或{{official}}递来新的文书，{{mentor}}问你在朝堂上有没有把教门的底交出去。{{rival}}没有再来，但两边的账已经记下。",
+          "outcome": {
+            "result": "教门在朝廷眼里的位置变了，你也知道了经典、实效和官面关系各自能走多远。",
+            "endsFlow": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "popular-movement",
+      "actIds": [
+        "ancient.mystic-order.influence"
+      ],
+      "narrativeRole": "入世行为 B",
+      "label": "教团与起事",
+      "entry": "教门已经有信众，灾荒或官府压迫让信众走向聚集甚至起事。",
+      "routing": "planned",
+      "assetRoles": [
+        "shrine",
+        "market",
+        "temple",
+        "official",
+        "follower",
+        "patient",
+        "rival",
+        "doctrine",
+        "network"
+      ],
+      "events": [
+        {
+          "id": "movement-arrives",
+          "kind": "scene",
+          "entry": "信众已经在{{shrine}}聚集，官府的告示也贴了出来。",
+          "situation": "灾荒和加税让信众挤到{{shrine}}，{{follower}}说有人要推你出来“主持大局”。{{official}}贴出告示，禁止聚众。{{rival}}在暗中煽动，想把教门推成反叛。",
+          "outcome": {
+            "result": "信众、官府和{{rival}}的煽动都压到教门头上；你必须决定劝散、谈判，还是接住这股力量。"
+          }
+        },
+        {
+          "id": "movement-choice",
+          "kind": "choice",
+          "entry": "信众要一个说法，官府要一个交代。",
+          "situation": "{{follower}}要你带信众去县衙请愿，{{mentor}}让你先劝散、保教门，{{rival}}的人已经在人群中喊“反了”。{{official}}的兵在街口等。",
+          "question": "劝散信众、带人请愿，还是接住教团？",
+          "stakes": "信众的性命、教门的存亡，以及你会不会被定成“妖言聚众”。",
+          "check": {
+            "stat": "charisma",
+            "difficulty": 19
+          },
+          "options": [
+            {
+              "id": "safe",
+              "label": "劝散信众",
+              "action": "按{{mentor}}的意思劝散信众，保住教门。",
+              "success": {
+                "result": "信众散去，官府没有动手。教门保住了，{{follower}}却问你，那些人的灾荒怎么办。"
+              },
+              "failure": {
+                "result": "信众不肯散，官府先动手抓人。你保住了教门的名，却没能保住信众。"
+              }
+            },
+            {
+              "id": "balanced",
+              "label": "带人请愿",
+              "action": "带信众去县衙请愿，只求赈济，不碰官府底线。",
+              "success": {
+                "result": "请愿没有变成起事，{{official}}开了仓。信众得了粮，教门得了民心，{{rival}}的煽动落空。"
+              },
+              "failure": {
+                "result": "请愿被当成聚众，{{official}}抓了几个带头的。你保住了大部分人，教门却被记了一笔。"
+              }
+            },
+            {
+              "id": "risky",
+              "label": "接住教团",
+              "action": "把信众组织成教团，和官府谈条件。",
+              "success": {
+                "result": "教团成了气候，{{official}}不得不和你谈。你得了可以动员的信众，也成了官府眼里必须盯住的人。"
+              },
+              "failure": {
+                "result": "教团被定为“妖言聚众”，{{official}}出兵围了{{shrine}}。你带少数人脱身，教门元气大伤。"
+              }
+            }
+          ]
+        },
+        {
+          "id": "movement-aftermath",
+          "kind": "life",
+          "entry": "信众已经散去或成团，教门要安顿他们。",
+          "situation": "{{shrine}}里的信众散了或留下了名册，{{follower}}按你的意思安置伤员和领头的人。{{official}}的告示还贴在街上，{{mentor}}让你把这次的事记进教门簿册。",
+          "outcome": {
+            "result": "信众的去留、教门的存亡和官面的态度都落定；你知道了教团能救人，也能把教门推到刀口上。",
+            "endsFlow": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "seal-taboo",
+      "actIds": [
+        "ancient.mystic-order.influence"
+      ],
+      "narrativeRole": "入世行为 C",
+      "label": "封禁与禁忌传承",
+      "entry": "教门的某部经典或法印被指为禁忌，官府要封禁，教内也有人想借它夺权。",
+      "routing": "planned",
+      "assetRoles": [
+        "temple",
+        "court",
+        "shrine",
+        "official",
+        "courtier",
+        "follower",
+        "rival",
+        "scripture",
+        "seal",
+        "doctrine"
+      ],
+      "events": [
+        {
+          "id": "taboo-arrives",
+          "kind": "scene",
+          "entry": "封禁的文书还没有落下，教内已经有人打禁忌的主意。",
+          "situation": "{{courtier}}说{{scripture}}里有一部分“禁术”要封，{{official}}带人来查。{{rival}}却想借这本经夺教门的位置，{{follower}}问你要不要先把书藏起来。",
+          "outcome": {
+            "result": "封禁、{{rival}}的野心和教内的人心都压到经典上；你必须决定交书、藏经，还是公开一部分。"
+          }
+        },
+        {
+          "id": "taboo-choice",
+          "kind": "choice",
+          "entry": "查禁的人已经在{{temple}}门外。",
+          "situation": "{{official}}要你交出{{scripture}}，{{rival}}要你当众烧掉“禁术”以证清白，{{mentor}}让你想清楚：交出去，教门就少了一条根。",
+          "question": "交书、烧经，还是只交一部分？",
+          "stakes": "教门的传承、你在信众里的位置，以及{{rival}}会不会借机上位。",
+          "check": {
+            "stat": "intelligence",
+            "difficulty": 20
+          },
+          "options": [
+            {
+              "id": "safe",
+              "label": "交书",
+              "action": "把{{scripture}}交给{{official}}，换教门平安。",
+              "success": {
+                "result": "教门没有被封，经书被收走一部分。{{official}}放过{{temple}}，{{rival}}却说你“卖了祖宗”。"
+              },
+              "failure": {
+                "result": "书交了，{{official}}仍封了{{temple}}的香火。你保住了人，传承却断了一截。"
+              }
+            },
+            {
+              "id": "balanced",
+              "label": "只交一部分",
+              "action": "把无关紧要的部分交出去，核心验方留下。",
+              "success": {
+                "result": "{{official}}拿走一部分，核心医书留下。教门保住了根，{{rival}}没能借机上位。"
+              },
+              "failure": {
+                "result": "{{official}}查出你藏了书，封了{{temple}}。核心还在，教门却背上了“欺官”的名。"
+              }
+            },
+            {
+              "id": "risky",
+              "label": "当众烧经",
+              "action": "按{{rival}}的逼迫当众烧掉禁术，把人心夺回来。",
+              "success": {
+                "result": "你当众烧掉禁术，信众反而更信你“守正”。{{rival}}的算计落空，{{official}}也找不到把柄。"
+              },
+              "failure": {
+                "result": "烧经之后，教内一部分人离心，{{rival}}趁机拉走信众。教门没有被封，却先裂了。"
+              }
+            }
+          ]
+        },
+        {
+          "id": "taboo-verdict",
+          "kind": "settlement",
+          "entry": "封禁已经到最后一步，官府要给出处置。",
+          "situation": "{{temple}}的门前，{{official}}把处置文书摊开。{{courtier}}的人也在看，{{follower}}和信众在门外等。经书、法印和教门的香火，都等这一道处置。",
+          "rules": [
+            {
+              "id": "protected",
+              "condition": "教门保住了核心传承，官面没有抓到把柄。",
+              "disposition": "{{official}}撤了封条，教门继续开门。你保住了经典和信众，也被官面记成“不好拿捏”的一门。",
+              "endsFlow": true
+            },
+            {
+              "id": "restricted",
+              "condition": "教门保住一部分，但被限制香火或传教。",
+              "disposition": "{{official}}准教门留一处香火，其他活动受限。你保住了核心，却不能再像从前那样公开传教。",
+              "endsFlow": true
+            },
+            {
+              "id": "banned",
+              "condition": "封禁落实，教门被禁或被迫转入地下。",
+              "disposition": "{{temple}}被查封，信众散去，{{follower}}转入民间。教门还在，却只能藏在暗处。",
+              "endsFlow": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "suppression",
+      "actIds": [
+        "ancient.mystic-order.influence"
+      ],
+      "narrativeRole": "入世失败后续",
+      "label": "镇压之后",
+      "entry": "上一组使教门被禁、信众被驱散或你被官府追索，但仍有病人、弟子或民间关系可以重整。",
+      "routing": "planned",
+      "assetRoles": [
+        "home",
+        "temple",
+        "market",
+        "official",
+        "follower",
+        "patient",
+        "mentor",
+        "scripture",
+        "healing"
+      ],
+      "events": [
+        {
+          "id": "suppression-grief",
+          "kind": "life",
+          "entry": "镇压已经发生，弟子和病人还没有安顿。",
+          "situation": "{{temple}}被查封，{{follower}}有几个被带走。你回到{{home}}，母亲把{{scripture}}藏在灶房，父亲把来求医的人挡在门外。{{official}}的人还在打听你的下落。",
+          "outcome": {
+            "result": "镇压的损失落到教门、弟子和病人身上；你还剩下的医书、病人和关系被重新盘清。"
+          }
+        },
+        {
+          "id": "suppression-rebuild",
+          "kind": "life",
+          "entry": "弟子已经安顿，你仍有人可以重新联络。",
+          "situation": "你带着{{scripture}}去拜访旧病人和民间的{{follower}}，一家家重新接上。{{mentor}}替你写信，{{patient}}愿意作证教门只救人、不聚众。",
+          "outcome": {
+            "result": "你重新有了一批愿意作证的病人和一条民间的关系；镇压没有被抹去，路却重新接上。"
+          }
+        },
+        {
+          "id": "suppression-return",
+          "kind": "scene",
+          "entry": "重整已经完成，地方上出现一场官府也压不住的疫病或灾异。",
+          "situation": "{{market}}又爆发疫病，{{official}}的医官束手无策。{{patient}}把你的名字递到县衙，你带着被禁过的{{scripture}}重新走进疫区。",
+          "outcome": {
+            "result": "你用实际救治重新证明了自己，镇压的旧案仍在，教门却重新有了站住的地方。",
+            "endsFlow": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "influence-established",
+      "actIds": [
+        "ancient.mystic-order.influence"
+      ],
+      "narrativeRole": "本幕结果",
+      "label": "门徒与公共信任",
+      "entry": "已经有医术、信众和一次公开的证明，教门要决定是否让你主持一方。",
+      "routing": "planned",
+      "assetRoles": [
+        "temple",
+        "shrine",
+        "court",
+        "courtier",
+        "mentor",
+        "follower",
+        "patient",
+        "seal",
+        "doctrine",
+        "network"
+      ],
+      "events": [
+        {
+          "id": "influence-arrives",
+          "kind": "scene",
+          "entry": "教门的位置还没有定，师门、信众和官面都在看。",
+          "situation": "{{mentor}}把{{seal}}和{{scripture}}摆在{{temple}}正殿，{{follower}}和信众代表分坐两侧。{{courtier}}的人也在场，问教门准备怎么和官府相处。{{rival}}的余党还在外面看。",
+          "outcome": {
+            "result": "教门是继续藏在民间、公开主持一方，还是与官府合作，都要在这一局里定。"
+          }
+        },
+        {
+          "id": "influence-choice",
+          "kind": "choice",
+          "entry": "教门的去向在眼前，{{mentor}}和{{courtier}}各有一条路。",
+          "situation": "{{mentor}}要你守住师门的规矩，{{courtier}}要你接受官面的登记，{{follower}}想让你公开传教、扩大信众。{{seal}}在你手里，接哪一种都由你定。",
+          "question": "守师门、受官面登记，还是公开传教？",
+          "stakes": "教门的独立、信众的规模，以及官面会不会再次封禁。",
+          "check": {
+            "stat": "charisma",
+            "difficulty": 20
+          },
+          "options": [
+            {
+              "id": "safe",
+              "label": "守师门",
+              "action": "只守师门的医馆和香火，不扩信众、不碰官面。",
+              "success": {
+                "result": "教门守住了师门的规矩，医馆和香火都稳。信众不多，官面也没有再动手。"
+              },
+              "failure": {
+                "result": "师门守住了，信众却被{{rival}}的余党拉走。教门还在，影响力却停在一隅。"
+              }
+            },
+            {
+              "id": "balanced",
+              "label": "受官面登记",
+              "action": "接受官面的登记，换一个合法的教门身份。",
+              "success": {
+                "result": "教门登记在册，医馆和传教都有了官面许可。你保住了教门，也把一部分自主交给了官府。"
+              },
+              "failure": {
+                "result": "登记之后官面不断加派差事，教门成了官府的医署。你保住了香火，失去了独立。"
+              }
+            },
+            {
+              "id": "risky",
+              "label": "公开传教",
+              "action": "借信众和医术公开传教，把教门做大。",
+              "success": {
+                "result": "教门公开传教，信众和门徒大增。你成了民间与朝堂都不能忽视的人物，也被官面盯得更紧。"
+              },
+              "failure": {
+                "result": "公开传教被指“聚众”，官面再次封禁。教门被压下去，你保住了核心，却失去了刚刚打开的局面。"
+              }
+            }
+          ]
+        },
+        {
+          "id": "influence-verdict",
+          "kind": "settlement",
+          "entry": "教门的去向已经定下，官面要给出正式处置。",
+          "situation": "{{court}}和{{temple}}的文书都到了，{{mentor}}把{{seal}}放在案上。{{follower}}和信众代表在门外等。教门的身份、香火和传教范围，等这一道处置。",
+          "rules": [
+            {
+              "id": "established",
+              "condition": "教门有了稳定的信众、医馆或官面许可。",
+              "disposition": "教门正式立住，你成为一方主持。信众、门徒和官面都承认你的位置，{{follower}}开始独立带人。",
+              "grantItems": [
+                "faith-seal"
+              ]
+            },
+            {
+              "id": "limited",
+              "condition": "教门保住了核心，但规模或独立受限。",
+              "disposition": "教门留在一处，信众和医馆都还在。你没有做大，却保住了师门的规矩和病人。",
+              "grantItems": [
+                "faith-seal"
+              ]
+            },
+            {
+              "id": "scattered",
+              "condition": "教门没有立住，信众散去或再次被禁。",
+              "disposition": "{{temple}}的香火弱了下去，{{follower}}各奔东西。你保住了{{scripture}}，教门却退回民间暗处。"
+            }
+          ]
+        },
+        {
+          "id": "influence-aftermath",
+          "kind": "life",
+          "entry": "教门的位置已经定下，师门与信众都要重新排。",
+          "situation": "{{temple}}的匾换了或摘了，{{follower}}按新的身份带人。{{patient}}从远处赶来求医，{{mentor}}退到后堂。{{courtier}}或{{official}}的文书还在案上。",
+          "outcome": {
+            "result": "教门有了自己的位置、门徒和官面关系，也知道了医术、信众和正统三者各自的分量。",
+            "endsFlow": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "drought-miracle",
+      "actIds": [
+        "ancient.mystic-order.legacy"
+      ],
+      "narrativeRole": "定教行为 A",
+      "label": "旱灾与神迹",
+      "entry": "教门已经有了信众，旱灾或大疫让民众期待一场神迹。",
+      "routing": "planned",
+      "assetRoles": [
+        "shrine",
+        "market",
+        "temple",
+        "courtier",
+        "official",
+        "follower",
+        "patient",
+        "ritual",
+        "doctrine",
+        "network"
+      ],
+      "events": [
+        {
+          "id": "drought-arrives",
+          "kind": "scene",
+          "entry": "旱灾已经压到城下，信众在等教门开坛。",
+          "situation": "{{market}}外久旱无雨，{{shrine}}里挤满求雨的信众。{{courtier}}说朝廷也在设坛，{{official}}要你别抢官面的风头。{{follower}}问你要不要开一场大醮。",
+          "outcome": {
+            "result": "旱灾、信众和官面的目光都压到教门身上；你必须决定开坛、施药，还是把信众引向实际的水利。"
+          }
+        },
+        {
+          "id": "drought-choice",
+          "kind": "choice",
+          "entry": "求雨的法事和实际救灾撞在一起。",
+          "situation": "{{courtier}}要你按礼制开坛，{{official}}怕你聚众，{{follower}}已经把香案摆好。{{patient}}说村里更需要水和药，不是符纸。",
+          "question": "开坛求雨、施药救旱，还是借机把信众组织起来？",
+          "stakes": "信众的信任、官面对教门的容忍，以及旱灾里实际能救多少人。",
+          "check": {
+            "stat": "charisma",
+            "difficulty": 21
+          },
+          "options": [
+            {
+              "id": "safe",
+              "label": "开坛求雨",
+              "action": "按礼制开坛，把仪式做足，安抚民心。",
+              "success": {
+                "result": "法事做足，民心稳住，雨却不一定来。{{courtier}}认你守礼，{{patient}}那边仍缺水和药。"
+              },
+              "failure": {
+                "result": "法事做了，雨没来，信众开始怀疑。{{official}}借机说你“惑众”，教门的名声受损。"
+              }
+            },
+            {
+              "id": "balanced",
+              "label": "施药救旱",
+              "action": "把香案改成药棚，带信众挖渠、施药、分水。",
+              "success": {
+                "result": "教门带人挖渠、施药，旱情缓解了一部分。信众更信你，{{courtier}}却说教门“不务正业”。"
+              },
+              "failure": {
+                "result": "挖渠没有水源，药也不够。教门出了力却没有结果，信众开始散去。"
+              }
+            },
+            {
+              "id": "risky",
+              "label": "组织信众",
+              "action": "借旱灾把信众组织成救灾教团，和官府争民心。",
+              "success": {
+                "result": "教团在旱灾里救了人，信众和声望大增。{{official}}不得不和你谈，{{courtier}}却把教门记成“收买人心”。"
+              },
+              "failure": {
+                "result": "教团被指“借灾聚众”，{{official}}派兵驱散。你保住了核心信众，教门却被官面盯死。"
+              }
+            }
+          ]
+        },
+        {
+          "id": "drought-verdict",
+          "kind": "settlement",
+          "entry": "旱灾已经过去或还在，官面要给出对教门的处置。",
+          "situation": "{{temple}}和{{shrine}}的香火还在，{{courtier}}和{{official}}的文书摆在案上。{{follower}}把这次救灾的名册和药单交给你。教门的声望、信众和官面关系，都等这一道处置。",
+          "rules": [
+            {
+              "id": "miracle-recognized",
+              "condition": "教门在旱灾中实际救了人，官面也不得不承认。",
+              "disposition": "朝廷给教门一个正式名分，信众大增。你成了民间与朝堂都认的一方宗师，也背上了更大的期待。",
+              "endsFlow": true
+            },
+            {
+              "id": "miracle-limited",
+              "condition": "教门救了人，但官面只肯给有限的空间。",
+              "disposition": "教门保住了香火和信众，官面仍限制传教。你没有得到正统名分，却保住了实际的人。",
+              "endsFlow": true
+            },
+            {
+              "id": "miracle-failed",
+              "condition": "旱灾没有缓解，或教门被指惑众。",
+              "disposition": "信众散去，官面封了香火。教门退回民间，你保住了{{scripture}}和少数弟子。",
+              "endsFlow": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "succession-faith",
+      "actIds": [
+        "ancient.mystic-order.legacy"
+      ],
+      "narrativeRole": "定教行为 B",
+      "label": "教门继承",
+      "entry": "教门已经有法印和弟子，教内围绕继承与路线出现分歧。",
+      "routing": "planned",
+      "assetRoles": [
+        "temple",
+        "shrine",
+        "mentor",
+        "follower",
+        "patient",
+        "rival",
+        "seal",
+        "scripture",
+        "doctrine"
+      ],
+      "events": [
+        {
+          "id": "succession-choice",
+          "kind": "choice",
+          "entry": "法印要交给谁，教内还没有定。",
+          "situation": "{{mentor}}想把法印传给守规矩的{{follower}}，另一派要推一个更能聚众的弟子，{{rival}}的余党也在暗中拉人。{{patient}}只问以后还有没有人看病。",
+          "question": "按师门规矩传、传给最能聚众的人，还是把法印交给自己？",
+          "stakes": "教门的路线、信众的规模，以及师门规矩能不能延续。",
+          "check": {
+            "stat": "intelligence",
+            "difficulty": 21
+          },
+          "options": [
+            {
+              "id": "safe",
+              "label": "按规矩传",
+              "action": "把法印传给守师门规矩的{{follower}}，自己退居后堂。",
+              "success": {
+                "result": "法印按规矩传下去，教门稳住了医馆和香火。你退到后堂，师门的规矩保住了。"
+              },
+              "failure": {
+                "result": "守规矩的弟子压不住另一派，教内分裂。你保住了法印，却保不住人心。"
+              }
+            },
+            {
+              "id": "balanced",
+              "label": "传给聚众者",
+              "action": "把法印传给最能聚众的弟子，换教门做大。",
+              "success": {
+                "result": "教门在聚众者手里做大，信众和香火都涨。你却知道师门的规矩已经变了。"
+              },
+              "failure": {
+                "result": "聚众者把教门带向起事，被官府镇压。你保住了性命，教门却散了。"
+              }
+            },
+            {
+              "id": "risky",
+              "label": "自己接印",
+              "action": "把法印留在自己手里，亲自定教门的路。",
+              "success": {
+                "result": "你接下法印，教门按你的路线走。信众和弟子都听你，师门的规矩也由你重定。"
+              },
+              "failure": {
+                "result": "教内不服，另一派带人出走。你保住了法印，教门却分成两半。"
+              }
+            }
+          ]
+        },
+        {
+          "id": "succession-aftermath",
+          "kind": "life",
+          "entry": "继承已经定下，教门要按新的路线安顿。",
+          "situation": "{{temple}}的香火换了主持，{{follower}}按新的名分带人。{{patient}}来求医，{{mentor}}的旧物被收进箱子。{{rival}}的余党还在外面看。",
+          "outcome": {
+            "result": "教门的继承和路线有了实际结果；你知道法印背后是信众、师门和官面三重的目光。",
+            "endsFlow": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "scattered-faith",
+      "actIds": [
+        "ancient.mystic-order.legacy"
+      ],
+      "narrativeRole": "定教败势",
+      "label": "教禁与流散",
+      "entry": "教门被禁、信众流散或你被官府追索，但仍有医书、弟子或一命可以收束。",
+      "routing": "planned",
+      "assetRoles": [
+        "home",
+        "temple",
+        "market",
+        "official",
+        "follower",
+        "patient",
+        "mentor",
+        "scripture",
+        "seal",
+        "healing"
+      ],
+      "events": [
+        {
+          "id": "scattered-choice",
+          "kind": "choice",
+          "entry": "教禁已经落到教门头上，你还有最后一次选择。",
+          "situation": "{{official}}的人封了{{temple}}，{{follower}}被抓或散去。{{mentor}}托人带话让你藏起{{scripture}}，{{patient}}还在门外等药。父亲让你先保命，母亲让你先保人。",
+          "question": "藏经保人、带弟子出走，还是把法印交出去换从轻？",
+          "stakes": "教门的传承、弟子和病人的性命，以及你会不会被下狱。",
+          "check": {
+            "stat": "charisma",
+            "difficulty": 21
+          },
+          "options": [
+            {
+              "id": "safe",
+              "label": "藏经保人",
+              "action": "把{{scripture}}藏起来，让弟子和病人先散开。",
+              "success": {
+                "result": "经书藏住了，弟子和病人大多脱身。教门被禁，传承还在。"
+              },
+              "failure": {
+                "result": "藏经被搜出，弟子被抓。你保住了自己，经书和人都丢了大半。"
+              }
+            },
+            {
+              "id": "balanced",
+              "label": "带弟子出走",
+              "action": "带愿意走的弟子和病人退到外地，另立香火。",
+              "success": {
+                "result": "你带人退到外地，另立了一处小香火。教门没有原来大，传承和病人却保住了。"
+              },
+              "failure": {
+                "result": "出走路被截，弟子失散。你只身脱身，教门只剩一个名字。"
+              }
+            },
+            {
+              "id": "risky",
+              "label": "交印换人",
+              "action": "把{{seal}}交给{{official}}，换弟子和病人从轻。",
+              "success": {
+                "result": "法印交出去，弟子和病人被放回。教门失去正统身份，人却保住了。"
+              },
+              "failure": {
+                "result": "法印交了，{{official}}仍不肯放人。你保住了自己，教门和弟子都被清掉。"
+              }
+            }
+          ]
+        },
+        {
+          "id": "scattered-verdict",
+          "kind": "settlement",
+          "entry": "最后一次选择已经做出，官面要给出最终处置。",
+          "situation": "{{temple}}的封条还在，{{official}}把处置文书念完。{{follower}}和病人在门外等，{{mentor}}的旧物被收进箱子。你的教门、弟子和自己的性命，都等这一道处置。",
+          "rules": [
+            {
+              "id": "preserved-lineage",
+              "condition": "你的选择保住了传承和部分弟子。",
+              "disposition": "教门被禁，经书和少数弟子还在。你退到民间，传承没有断，香火却只能藏在暗处。"
+            },
+            {
+              "id": "preserved-person",
+              "condition": "你保住了自己或少数人，教门付出大半。",
+              "disposition": "你只身或带少数人脱身，教门被清掉。你活着，却要从头再来。"
+            },
+            {
+              "id": "lost-all",
+              "condition": "你的选择失败，清算扩大到弟子和病人。",
+              "disposition": "教门被彻底禁绝，弟子下狱或流散，经书被焚。你失去了可以延续的一切。"
+            }
+          ]
+        },
+        {
+          "id": "scattered-aftermath",
+          "kind": "life",
+          "entry": "教禁已经落定，你或弟子要在新的地方活下去。",
+          "situation": "外地的旧宅或亲友家里，母亲把最后一点药和盘缠分成几份，父亲把{{scripture}}的抄本交给还愿意跟的人。{{follower}}偶尔捎来消息，教门的名号已经不能公开提。",
+          "outcome": {
+            "result": "你在教禁后的地方重新安顿，传承、弟子和自己的去留都有了实际结果；教门的门关上了，医术和日子还要继续。",
+            "endsFlow": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "final-doctrine",
+      "actIds": [
+        "ancient.mystic-order.legacy"
+      ],
+      "narrativeRole": "本幕结果",
+      "label": "定教与散教",
+      "entry": "教门、传承和信众已经走到最后一步，定教、散教或交出传承要有一个回答。",
+      "routing": "planned",
+      "assetRoles": [
+        "temple",
+        "court",
+        "home",
+        "mentor",
+        "follower",
+        "patient",
+        "seal",
+        "scripture",
+        "doctrine"
+      ],
+      "events": [
+        {
+          "id": "doctrine-verdict",
+          "kind": "settlement",
+          "entry": "教门的最终去向还没有定，师门、信众和官面都在等。",
+          "situation": "{{temple}}的正殿里，{{mentor}}把{{seal}}、{{scripture}}和弟子名册摆在案上。{{follower}}和信众代表分坐两侧，{{court}}的文书也在桌上。你可以定教、交出传承，或让教门散掉。",
+          "rules": [
+            {
+              "id": "establish-doctrine",
+              "condition": "教门有稳定的传承、信众和官面容忍。",
+              "disposition": "你定下教门的经典、医馆与传教规矩，师门和信众都按你的路线走。教门立住，你成为后世记得的一代宗师。"
+            },
+            {
+              "id": "transmit",
+              "condition": "教门无法继续做大，但传承可以交到可信的人手里。",
+              "disposition": "你把{{seal}}和{{scripture}}交给{{follower}}，自己退到后堂或乡里。教门没有断，名字却换了人。"
+            },
+            {
+              "id": "dissolve",
+              "condition": "教门已无法维持，或你选择让传承退出公共视野。",
+              "disposition": "你遣散信众，封了{{temple}}的香火，把{{scripture}}交给少数弟子或付之一炬。教门散了，医术和旧事留在人心里。"
+            }
+          ]
+        },
+        {
+          "id": "doctrine-homecoming",
+          "kind": "life",
+          "entry": "教门的去向已经定下，你要回到师门、信众和自己的日子里。",
+          "situation": "{{temple}}的香火换了主持或灭了，{{follower}}和病人各自来送。{{mentor}}的旧物被收进箱子，{{father}}或{{mother}}在{{home}}门口等你。你把{{seal}}和{{scripture}}交给该交的人。",
+          "outcome": {
+            "result": "教门、传承和信众有了最终去向；无论定教、传法还是散教，这一生的医道与香火账都已经落下。",
+            "endsFlow": true
+          }
+        }
+      ]
+    }
+  ]
+}

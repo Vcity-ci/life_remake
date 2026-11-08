@@ -50,6 +50,7 @@ const nextFlowId = observation.decision === 'ongoing' ? await planNextEventFlow(
 }, ctx) : undefined;
 const summary = { source, preparationCalls, observationCalls, continuationCalls: calls - preparationCalls - observationCalls, nextFlowId,
   preservedBindings: card.flowBindings.every(binding => !run.narrative.eventFlow.bindings[binding.roleId] ||
-    run.narrative.eventFlow.bindings[binding.roleId] === binding.name), opening: card.eventFlows.openingFlowId, observation };
+    run.narrative.eventFlow.bindings[binding.roleId] === binding.name),
+  opening: run.narrative.eventFlow?.flowId ?? card.eventFlows?.openingFlowId, observation };
 await fs.writeFile(path.join(output, 'verification-result.json'), JSON.stringify(summary, null, 2));
 console.log(JSON.stringify({ output, ...summary }));

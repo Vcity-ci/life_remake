@@ -1,0 +1,1260 @@
+{
+  "id": "ancient.jianghu-master",
+  "revision": "1.0.0",
+  "originRoles": [
+    "home",
+    "father",
+    "mother",
+    "mentor",
+    "token"
+  ],
+  "roles": [
+    {
+      "id": "home",
+      "kind": "location",
+      "identity": "主角自幼生活的山脚村镇或街巷"
+    },
+    {
+      "id": "father",
+      "kind": "character",
+      "identity": "主角家中承担生计与教养的父亲"
+    },
+    {
+      "id": "mother",
+      "kind": "character",
+      "identity": "主角家中操持家务与生计的母亲"
+    },
+    {
+      "id": "sect",
+      "kind": "location",
+      "identity": "师门所在的山门、武馆或镖局"
+    },
+    {
+      "id": "road",
+      "kind": "location",
+      "identity": "连接村镇、州城与山门的官道、渡口和山道"
+    },
+    {
+      "id": "rivalSect",
+      "kind": "location",
+      "identity": "与师门有旧怨的敌对门派、山寨或行会"
+    },
+    {
+      "id": "mentor",
+      "kind": "character",
+      "identity": "传授主角技艺的师父或师门长辈"
+    },
+    {
+      "id": "senior",
+      "kind": "character",
+      "identity": "带主角出门办事的师兄或师姐"
+    },
+    {
+      "id": "companion",
+      "kind": "character",
+      "identity": "与主角一同长大或同行的江湖同伴"
+    },
+    {
+      "id": "rival",
+      "kind": "character",
+      "identity": "同辈中与主角争名、争路或争师承的对手"
+    },
+    {
+      "id": "escort",
+      "kind": "character",
+      "identity": "雇佣师门护送货物或人情的商旅、镖主或委托人"
+    },
+    {
+      "id": "official",
+      "kind": "character",
+      "identity": "管着地方治安、路引和旧案的官吏或捕头"
+    },
+    {
+      "id": "master",
+      "kind": "character",
+      "identity": "主持武林会、评定名望的大派掌门或前辈"
+    },
+    {
+      "id": "traitor",
+      "kind": "character",
+      "identity": "出卖师门或旧友、把山门推向围困的人"
+    },
+    {
+      "id": "blade",
+      "kind": "item",
+      "identity": "主角入门时得到的家传短剑或师门兵器"
+    },
+    {
+      "id": "manual",
+      "kind": "item",
+      "identity": "师门残谱、手抄本或关键武学记录"
+    },
+    {
+      "id": "letter",
+      "kind": "item",
+      "identity": "荐书、委托信或官府文书"
+    },
+    {
+      "id": "token",
+      "kind": "item",
+      "identity": "证明师承身份与出门资格的信物"
+    },
+    {
+      "id": "sword",
+      "kind": "ability",
+      "identity": "长兵、短剑或刀法一类正面搏杀技艺"
+    },
+    {
+      "id": "movement",
+      "kind": "ability",
+      "identity": "轻功、身法、追踪与脱身本领"
+    },
+    {
+      "id": "internal",
+      "kind": "ability",
+      "identity": "内功、气力与持久作战的根底"
+    },
+    {
+      "id": "medicine",
+      "kind": "ability",
+      "identity": "疗伤、辨药与野外救护的本事"
+    }
+  ],
+  "items": [
+    {
+      "id": "sect-token",
+      "roleId": "token",
+      "description": "师门发给能独立出门弟子的信物，可在江湖同道面前证明师承。"
+    },
+    {
+      "id": "sect-manual",
+      "roleId": "manual",
+      "description": "师门残谱，记录本门核心武学与几条不能外传的禁忌。"
+    },
+    {
+      "id": "escort-letter",
+      "roleId": "letter",
+      "description": "商旅或官府出具的委托文书，能证明护送任务与通行资格。"
+    }
+  ],
+  "groups": [
+    {
+      "id": "jianghu-first-errand",
+      "actIds": [
+        "ancient.jianghu-master.apprenticeship"
+      ],
+      "narrativeRole": "入门与第一次出门",
+      "label": "山门下的第一次差事",
+      "entry": "初入师门，只在{{home}}和{{sect}}之间行走，尚未独立承担江湖委托。",
+      "routing": "planned",
+      "assetRoles": [
+        "home",
+        "father",
+        "mother",
+        "sect",
+        "road",
+        "mentor",
+        "senior",
+        "companion",
+        "escort",
+        "blade",
+        "sword",
+        "movement"
+      ],
+      "events": [
+        {
+          "id": "errand-basics",
+          "kind": "life",
+          "entry": "还没有跟师门长辈出过远门。",
+          "lifeBefore": {
+            "minYears": 2,
+            "maxYears": 4,
+            "context": "你在{{home}}帮工、打杂，跟{{mentor}}学基本架势；{{companion}}常来找你，你们在街巷和山脚比划些不成章法的招式。"
+          },
+          "situation": "你在{{home}}长大，{{mentor}}在{{sect}}教你握剑、站桩和认路。{{companion}}与你年纪相仿，两人常拿树枝对练。师门并不急着让你出门，只让你先把脚下和手上的功夫练稳。",
+          "outcome": {
+            "result": "你熟悉了{{home}}到{{sect}}的路，能替师门跑腿、看门和照应来客，也知道了哪些话不能对外说。"
+          }
+        },
+        {
+          "id": "errand-escort",
+          "kind": "scene",
+          "entry": "已经能跟着师门长辈出门，但还没遇到真正的江湖冲突。",
+          "situation": "{{senior}}接了一趟到{{road}}的短程护送，{{mentor}}让你跟去认路。{{escort}}带着两车货和一名脚夫，路上说起近来{{road}}不太平，有人专挑落单的镖车下手。你们在岔口看见被砍断的车辕和撒了一地的草料。",
+          "outcome": {
+            "result": "你们把货送到了下一站，但{{road}}上确实有人盯上了这条线；{{senior}}让你记住岔口和退路。",
+            "grantItems": [
+              "escort-letter"
+            ]
+          }
+        },
+        {
+          "id": "errand-choice",
+          "kind": "choice",
+          "entry": "第一次遇到劫道者，委托物和同行者都身处危险。",
+          "situation": "回程时，三骑从{{road}}旁的枯树林里冲出来。{{escort}}被拽下马，货车的缰绳也断了。{{senior}}挡在你前面，让你护住车尾；可被拽走的{{escort}}已经喊不出声。",
+          "question": "先护住货物，还是先救被拽走的人？",
+          "stakes": "委托物、{{escort}}的性命，以及师门第一次交给你的差事。",
+          "check": {
+            "stat": "physique",
+            "difficulty": 12
+          },
+          "options": [
+            {
+              "id": "safe",
+              "label": "护住委托",
+              "action": "守住货车和{{senior}}的退路，先把能带走的货带回去。",
+              "success": {
+                "result": "你死死护住车尾，{{senior}}逼退两骑，剩下那人拖着{{escort}}退进树林。货保住了，{{escort}}被掳走、生死未定；师门和商队都欠你一个交代。",
+                "endsFlow": true
+              },
+              "failure": {
+                "result": "你被第一骑撞开，货车翻在沟边，{{escort}}被拖走、生死未定，{{senior}}为护你挨了一刀。你们带回半车货和一身伤。",
+                "endsFlow": true
+              }
+            },
+            {
+              "id": "balanced",
+              "label": "救人追货",
+              "action": "让{{senior}}护车，你带{{companion}}追被掳的人。",
+              "success": {
+                "result": "你们追到枯树林外，趁对方分神救回{{escort}}；货少了一半，但人都在。{{senior}}说这趟差事算你没白学。",
+                "endsFlow": true
+              },
+              "failure": {
+                "result": "你追出去后，{{road}}另一头又来了两骑，{{senior}}护车脱身，你与{{companion}}被逼进沟里；{{escort}}被对方拖走、生死未定，最后靠{{mentor}}赶来才把你们接回。",
+                "endsFlow": true
+              }
+            },
+            {
+              "id": "risky",
+              "label": "独闯贼窝",
+              "action": "沿劫道者留下的蹄印摸到{{rivalSect}}外围，把人抢回来。",
+              "success": {
+                "result": "你摸到{{rivalSect}}的外围，趁夜把人带出，还看清了对方寨门的布置。{{escort}}活着回来，师门第一次正眼看你。",
+                "endsFlow": true
+              },
+              "failure": {
+                "result": "你被巡夜的人围住，{{companion}}替你挡了一刀。{{mentor}}带人把你换回去，{{escort}}仍扣在对方手里、生死未定；师门赔了药钱和一笔人情。",
+                "endsFlow": true
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "escort-intercepted",
+      "actIds": [
+        "ancient.jianghu-master.apprenticeship"
+      ],
+      "narrativeRole": "失败后的善后",
+      "label": "被截的镖车与扣下的人",
+      "entry": "上一组结束时{{escort}}被掳走或下落不明，师门要你补上善后。",
+      "routing": "planned",
+      "assetRoles": [
+        "road",
+        "rivalSect",
+        "escort",
+        "senior",
+        "mentor",
+        "official",
+        "companion",
+        "letter"
+      ],
+      "events": [
+        {
+          "id": "escort-ambush",
+          "kind": "scene",
+          "entry": "第一批委托物或人还没有全部找回。",
+          "situation": "{{road}}的岔口留着断箭和车辙。{{official}}封了半条路，说近日有山寨在收过路钱；{{escort}}的家人找到{{sect}}，求师门把人和货要回来。{{senior}}主张按江湖规矩递话，{{companion}}却打听到{{rivalSect}}正准备把货转手。",
+          "outcome": {
+            "result": "你们确认货和人都在{{rivalSect}}手里，对方开出一个不算高、却要师门低头的价。"
+          }
+        },
+        {
+          "id": "escort-rescue",
+          "kind": "choice",
+          "entry": "被掳的人还扣在{{rivalSect}}手里，对方开出条件。",
+          "situation": "{{rivalSect}}的人把{{escort}}押在寨门旁，要师门拿{{letter}}和一笔银子换人。{{official}}暗示可以借官府的名头压一压，但那样师门就算欠了官面人情。{{mentor}}让你自己去谈。",
+          "question": "按对方的条件换人，还是另找一条不低头的路？",
+          "stakes": "{{escort}}的性命、师门的面子，以及官府会不会借机插手。",
+          "check": {
+            "stat": "intelligence",
+            "difficulty": 13
+          },
+          "options": [
+            {
+              "id": "safe",
+              "label": "按规矩换人",
+              "action": "交出{{letter}}和银子，先把人换回来。",
+              "success": {
+                "result": "人换回来了，{{escort}}的家人把师门当成救命恩人；可{{letter}}落到对方手里，师门此后在这条路上说话矮了一截。"
+              },
+              "failure": {
+                "result": "对方收了银子又加价，{{escort}}被转走，师门和商队都落空。{{mentor}}没有骂你，只让你记住这次是谁在定规矩。"
+              }
+            },
+            {
+              "id": "balanced",
+              "label": "夜探换人",
+              "action": "借{{official}}封路的机会摸进{{rivalSect}}，把人带出来。",
+              "success": {
+                "result": "你趁封路摸进寨子，把{{escort}}带出，还烧了对方的货棚。人回来了，{{letter}}没交出去，但{{rivalSect}}记下了这笔账。"
+              },
+              "failure": {
+                "result": "你被寨门的人发现，{{companion}}替你挡了一刀。{{mentor}}出面把你们领回去，货没要回，师门还赔了一笔药钱。"
+              }
+            },
+            {
+              "id": "risky",
+              "label": "借官压寨",
+              "action": "把{{rivalSect}}劫道和私货的证据交给{{official}}，借官府的手救人。",
+              "success": {
+                "result": "官府出兵封了{{rivalSect}}的寨门，{{escort}}被放回，货也追回大半。师门保住了面子，却从此欠了{{official}}一个随时会来讨的人情。"
+              },
+              "failure": {
+                "result": "{{official}}收了证据却按兵不动，{{rivalSect}}先一步转移了人。{{escort}}被赎出时已经伤重，师门和官府之间也起了嫌隙。"
+              }
+            }
+          ]
+        },
+        {
+          "id": "escort-aftermath",
+          "kind": "life",
+          "entry": "被掳者已经有着落，但师门和官府都在等一个交代。",
+          "situation": "{{escort}}的去向已经有了结果：救回的在{{sect}}后屋养伤，未救回的要由师门和商队面对交不出人的后果。{{mentor}}让你跟着{{senior}}把这次的人情、亏空和仇怨一笔笔记清。{{companion}}在院外练剑，比从前沉默。{{home}}那边也传来话，问你到底入了什么行当。",
+          "outcome": {
+            "result": "你第一次知道江湖的账不只算银子，还算人情、面子和谁欠谁一条命；师门把下一段路摆在了你面前。",
+            "endsFlow": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "apprentice-test",
+      "actIds": [
+        "ancient.jianghu-master.apprenticeship"
+      ],
+      "narrativeRole": "本幕结果",
+      "label": "师门的出师结论",
+      "entry": "已有基础技艺和一次真实江湖经历，师门将判断能否独立行走。",
+      "routing": "planned",
+      "assetRoles": [
+        "sect",
+        "mentor",
+        "senior",
+        "companion",
+        "blade",
+        "token",
+        "manual"
+      ],
+      "events": [
+        {
+          "id": "sect-test",
+          "kind": "scene",
+          "entry": "尚未通过师门对独立行走的考核。",
+          "lifeBefore": {
+            "minYears": 2,
+            "maxYears": 4,
+            "context": "你在{{sect}}学艺、随{{senior}}走山道、替{{home}}做事；{{mentor}}还没有放你独立行走。"
+          },
+          "situation": "{{mentor}}在{{sect}}后院设下三道考：一路追踪、一场对练、一次当着同门说明自己为何出手。{{senior}}做对手，{{companion}}被安排在暗处丢石子扰乱你的判断。{{mentor}}没有给提示，只说“把你会的都用出来”。",
+          "outcome": {
+            "result": "你走完了三道考，身上添了几处青紫，也把自己在{{road}}上做的选择说清楚了。同门各有评断，结论要由{{mentor}}来下。"
+          }
+        },
+        {
+          "id": "sect-verdict",
+          "kind": "settlement",
+          "entry": "考核已经结束，师门要给出正式结论。",
+          "situation": "{{sect}}的正厅里，{{mentor}}把{{blade}}放在案上，{{senior}}和几位同门分坐两侧。{{mentor}}问你：出门以后，若再遇到{{road}}上那样的岔口，你按什么规矩走？你的回答和这一路的实际表现，将决定师门给你什么身份。",
+          "rules": [
+            {
+              "id": "pass",
+              "condition": "三道考都通过，且没有把同门或委托人的安危当成可以随手丢下的代价。",
+              "disposition": "{{mentor}}把{{token}}交给你，准你独立行走，也准你在外报师门的名号；{{senior}}把{{manual}}抄本的一页交给你，让你路上别把根基丢了。",
+              "grantItems": [
+                "sect-token"
+              ],
+              "endsFlow": true
+            },
+            {
+              "id": "conditional",
+              "condition": "考核通过，但在关键处暴露了独断、轻信或只顾自己的毛病。",
+              "disposition": "师门准你出门，但不给{{token}}；{{mentor}}要你每走一程就捎信回来，遇事先问{{senior}}。你有了行走的资格，还没有独立立名的资格。",
+              "endsFlow": true
+            },
+            {
+              "id": "retain",
+              "condition": "考核未过，或在{{road}}上的选择让师门认为你还没有独立承担后果的准备。",
+              "disposition": "{{mentor}}把{{blade}}留给你，准你出门，但要你定期回山复命、遇事先问{{senior}}；师门承认你能走，只是还不许你独立立名。",
+              "endsFlow": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "rival-sect-feud",
+      "actIds": [
+        "ancient.jianghu-master.reputation"
+      ],
+      "narrativeRole": "扬名起点",
+      "label": "旧怨找上门",
+      "entry": "已经独立行走，{{rival}}和{{rivalSect}}的旧怨找上门。",
+      "routing": "planned",
+      "assetRoles": [
+        "road",
+        "rivalSect",
+        "sect",
+        "rival",
+        "senior",
+        "companion",
+        "mentor"
+      ],
+      "entryRequirements": {
+        "physique": 16,
+        "intelligence": 14
+      },
+      "events": [
+        {
+          "id": "rival-provocation",
+          "kind": "scene",
+          "entry": "对方还没有公开撕破脸。",
+          "situation": "{{road}}边的茶棚里，{{rival}}带着{{rivalSect}}的几个人拦住师门的货。他不拔剑，只把{{sect}}的旧事一件件说出来，让旁观的人以为师门理亏。{{companion}}要上前，被你按住。",
+          "outcome": {
+            "result": "{{rival}}留下话：三日之内在{{road}}旧渡口见，当着同道把旧账说清。消息传得比你们回{{sect}}还快。"
+          }
+        },
+        {
+          "id": "duel-choice",
+          "kind": "choice",
+          "entry": "对方公开挑战，师门和旁观者都在看。",
+          "situation": "旧渡口挤满了看热闹的人。{{rival}}把剑插在土里，说只比三招，输的人当众认错。{{mentor}}没有到场，只让{{senior}}带话：师门不替你决定怎么打。",
+          "question": "当众应战、避其锋芒，还是把旧账翻到官府面前？",
+          "stakes": "师门名声、你在同道眼里的分量，以及{{rivalSect}}会不会就此收手。",
+          "check": {
+            "stat": "physique",
+            "difficulty": 18
+          },
+          "options": [
+            {
+              "id": "safe",
+              "label": "避战留名",
+              "action": "不接这场比试，把旧账带回{{sect}}由师门出面。",
+              "success": {
+                "result": "你没有接招，{{rival}}赢得了一场空名；师门随后把旧账摆到同道面前，反而显得他咄咄逼人。你的名望没有涨，师门却记住了你的稳。"
+              },
+              "failure": {
+                "result": "你避战的消息被传成怯场，{{rivalSect}}趁势抢走两处生意。师门没有怪你，但{{road}}上的人开始重新掂量你的分量。"
+              }
+            },
+            {
+              "id": "balanced",
+              "label": "当众接招",
+              "action": "接三招，点到为止，把话说清。",
+              "success": {
+                "result": "你接下三招，最后一剑停在他喉前。{{rival}}当众认错，{{rivalSect}}暂时退去；你没有取他性命，也把师门的旧账摆平了一半。"
+              },
+              "failure": {
+                "result": "你接招时被他抓住旧伤，三招后落了下风。{{senior}}把你扶下渡口，师门没有输掉根本，但{{rivalSect}}的气焰起来了。"
+              }
+            },
+            {
+              "id": "risky",
+              "label": "借官翻案",
+              "action": "把{{rivalSect}}旧案的人证物证交给{{official}}，在渡口当众翻案。",
+              "success": {
+                "result": "官府的人当众带走{{rivalSect}}两名头目，旧案翻了过来。你赢得的不只是名声，还有官面上的一份忌惮；{{rival}}从此把你当成真正的对手。"
+              },
+              "failure": {
+                "result": "{{official}}收了状纸却不肯当场拿人，{{rival}}反咬你勾结官府。师门替你压下了风波，但你在同道中的名声沾了灰。"
+              }
+            }
+          ]
+        },
+        {
+          "id": "feud-aftermath",
+          "kind": "life",
+          "entry": "这场冲突已经分出结果，{{rival}}和{{rivalSect}}要应对后果。",
+          "situation": "回到{{sect}}后，{{mentor}}让你把渡口这一场的得失写进师门记事。{{senior}}在院里磨剑，{{companion}}问你后不后悔。{{home}}那边也听到风声，托人问你有没有受伤。",
+          "outcome": {
+            "result": "你在江湖上有了第一个被人记住的名号，也有了第一个明确记恨你的人；师门开始把更重的委托交到你手里。",
+            "endsFlow": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "escort-ambush",
+      "actIds": [
+        "ancient.jianghu-master.reputation"
+      ],
+      "narrativeRole": "跨地委托",
+      "label": "商队与山道",
+      "entry": "你的名字开始有人知道，商队愿意出高价请你护送。",
+      "routing": "planned",
+      "assetRoles": [
+        "road",
+        "rivalSect",
+        "escort",
+        "senior",
+        "companion",
+        "official",
+        "letter",
+        "medicine"
+      ],
+      "entryRequirements": {
+        "physique": 16,
+        "intelligence": 14
+      },
+      "events": [
+        {
+          "id": "road-ambush",
+          "kind": "scene",
+          "entry": "商队还没有走出{{road}}最窄的那段山道。",
+          "situation": "{{escort}}的商队带着药材和盐，要赶在封路前穿过{{road}}。{{companion}}在前头探路，{{senior}}压后。你们在半山腰看见前面塌了一截，塌方旁却有人新踩出的脚印。",
+          "outcome": {
+            "result": "你们确认塌方是人为的，{{rivalSect}}的人正等商队停下來搬石头；{{escort}}的脚夫已经慌了。"
+          }
+        },
+        {
+          "id": "convoy-choice",
+          "kind": "choice",
+          "entry": "山道被堵，商队里有人受伤，对方还没有现身。",
+          "situation": "石头堵住山道，{{escort}}的一名脚夫被落石砸伤。{{companion}}说可以抬人翻过塌方，{{senior}}说该退回{{road}}岔口等官府；可天色将晚，退回去也可能撞上{{rivalSect}}的人。",
+          "question": "抬人翻山、退回岔口，还是清开山道硬闯？",
+          "stakes": "商队的货、伤者的命，以及{{rivalSect}}会不会把这条山道彻底封死。",
+          "check": {
+            "stat": "intelligence",
+            "difficulty": 18
+          },
+          "options": [
+            {
+              "id": "safe",
+              "label": "退回岔口",
+              "action": "抬上伤者退回{{road}}岔口，等官府清路。",
+              "success": {
+                "result": "你们退回岔口，{{official}}带人清开山道。货晚到三日，{{escort}}赔了一笔违约金，但人一个没少；{{rivalSect}}的埋伏落了空。"
+              },
+              "failure": {
+                "result": "退路上也被人设了绊马索，{{senior}}为护商队受了伤。你们丢下部分货物才退回岔口，{{escort}}从此不再走这条线。"
+              }
+            },
+            {
+              "id": "balanced",
+              "label": "翻山送人",
+              "action": "带伤者和轻货翻过塌方，让{{senior}}带空车退回。",
+              "success": {
+                "result": "你们翻过塌方，把伤者送到山那边的药铺。{{escort}}保住大半货物，{{rivalSect}}只截到几辆空车；{{companion}}在山脊上记下了对方的哨位。"
+              },
+              "failure": {
+                "result": "翻山时伤者撑不住，{{companion}}也滑下坡。你们虽然把人救回，货却丢在山道上，{{escort}}的商队元气大伤。"
+              }
+            },
+            {
+              "id": "risky",
+              "label": "清道硬闯",
+              "action": "清开塌方，趁对方没合围前冲过去。",
+              "success": {
+                "result": "你们清开一条窄道，赶在{{rivalSect}}合围前冲过去。货保住了，{{companion}}还抓住一个落单的探子，问出了对方下一个伏击点。"
+              },
+              "failure": {
+                "result": "清到一半，{{rivalSect}}的人从坡上压下来。你们护着{{escort}}且战且退，货丢了大半，{{senior}}背上添了一道深口子。"
+              }
+            }
+          ]
+        },
+        {
+          "id": "convoy-return",
+          "kind": "life",
+          "entry": "商队已经脱离山道，{{rivalSect}}的伏击有了结果。",
+          "situation": "{{escort}}在{{home}}外的驿站清点损失，{{senior}}养伤，{{companion}}把山道上记下的哨位画成图。{{official}}来问话，{{mentor}}也托人带信，让你把这次的事说清楚。",
+          "outcome": {
+            "result": "你在这条商路上有了自己的名号，也知道了{{rivalSect}}不只劫道，还在替更上面的人试路。",
+            "endsFlow": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "official-arrest",
+      "actIds": [
+        "ancient.jianghu-master.reputation"
+      ],
+      "narrativeRole": "官府介入",
+      "label": "旧案与官差",
+      "entry": "官府开始注意你和{{companion}}，一桩旧案被翻出来。",
+      "routing": "planned",
+      "assetRoles": [
+        "road",
+        "sect",
+        "official",
+        "companion",
+        "senior",
+        "mentor",
+        "letter"
+      ],
+      "entryRequirements": {
+        "physique": 16,
+        "intelligence": 14
+      },
+      "events": [
+        {
+          "id": "yamen-visit",
+          "kind": "scene",
+          "entry": "{{official}}第一次带着旧案卷宗上门，师门还没有决定怎么应对。",
+          "situation": "{{official}}在{{sect}}门口摆开旧案卷宗，说{{road}}上那桩劫案有了新的人证，{{companion}}当时在场。{{mentor}}不在，{{senior}}把门半掩着，院里的弟子都停了手。{{official}}没有拿人，只留下一句话：三日内给县衙一个交代。",
+          "outcome": {
+            "result": "官差走了，旧案却留在了师门门口。{{companion}}承认自己当时在场，{{senior}}要你先想清楚是交人、护人，还是拿师门的面子去换一个查清的机会。"
+          }
+        },
+        {
+          "id": "arrest-choice",
+          "kind": "choice",
+          "entry": "{{official}}带着旧案上门，{{companion}}被指认为当事人。",
+          "situation": "{{official}}在{{sect}}门口摆出旧案卷宗，说{{companion}}与{{road}}上那桩劫案有关。{{companion}}承认当时在场，却说自己只是被卷进去的脚夫。{{mentor}}不在，{{senior}}让你拿主意。",
+          "question": "交人、护人，还是拿师门的面子去换一个查清的机会？",
+          "stakes": "{{companion}}的去留、师门与官府的关系，以及旧案背后真正的人。",
+          "check": {
+            "stat": "charisma",
+            "difficulty": 17
+          },
+          "options": [
+            {
+              "id": "safe",
+              "label": "交人候审",
+              "action": "让{{official}}带走{{companion}}，师门递状子候审。",
+              "success": {
+                "result": "{{companion}}被关了三日，师门递上的状子把旧案拖成复核。人放出来时瘦了一圈，但案子没有坐实；{{official}}也承了师门一个情。"
+              },
+              "failure": {
+                "result": "{{companion}}在牢里被逼供，师门花了大笔银子才把人保出来。旧案没有查清，{{official}}却认定师门好拿捏。"
+              }
+            },
+            {
+              "id": "balanced",
+              "label": "护人查案",
+              "action": "不让{{official}}带走人，师门自己查旧案。",
+              "success": {
+                "result": "你把{{companion}}留在{{sect}}，与{{senior}}顺着旧案查到真正的劫匪。人证物证摆到{{official}}面前，旧案翻了，{{companion}}洗清，师门和官府各退一步。"
+              },
+              "failure": {
+                "result": "你们查到一半，{{official}}以窝藏罪封了{{sect}}的门。{{mentor}}回来收拾局面，{{companion}}还是被带走，师门赔了面子。"
+              }
+            },
+            {
+              "id": "risky",
+              "label": "借案反查",
+              "action": "把{{official}}与{{rivalSect}}的往来捅到州府，逼他自保。",
+              "success": {
+                "result": "州府派人复核，{{official}}为求自保不再咬住{{companion}}，{{rivalSect}}也被查出私运。你赢了一局，却从此在官面上挂了一个“不好惹”的名。"
+              },
+              "failure": {
+                "result": "州府把状子压回县里，{{official}}变本加厉，{{sect}}被勒令交出{{letter}}。{{companion}}虽未被定罪，却不能再在{{home}}露面。"
+              }
+            }
+          ]
+        },
+        {
+          "id": "yamen-verdict",
+          "kind": "settlement",
+          "entry": "旧案已经查到最后一步，官府要给出处置。",
+          "situation": "县衙后堂，{{official}}把卷宗合上，说上面要一个结果。{{mentor}}坐在你旁边，{{companion}}在门外等。你可以让师门保人、让案子继续拖，也可以拿{{letter}}换一个干净的了结。",
+          "rules": [
+            {
+              "id": "release",
+              "condition": "旧案查清，{{companion}}没有坐实罪名，师门也愿意担保。",
+              "disposition": "{{official}}当堂销案，{{companion}}随你回{{sect}}。师门与官府之间多了一层互不信任的默契，但人保住了。"
+            },
+            {
+              "id": "ban",
+              "condition": "案子没有完全查清，但双方都需要一个能收场的处置。",
+              "disposition": "{{companion}}被勒令离开{{home}}三年，师门交出{{letter}}作保。人没有被定罪，却也不能再堂堂正正走在这条路上。",
+              "consumeItems": [
+                "escort-letter"
+              ]
+            },
+            {
+              "id": "exile",
+              "condition": "官府坚持重判，或师门无法再保。",
+              "disposition": "{{companion}}被判流放，师门被罚银封门一月。你保住了自己，却第一次知道江湖的名声在官印面前有多轻。"
+            }
+          ]
+        },
+        {
+          "id": "arrest-aftermath",
+          "kind": "life",
+          "entry": "旧案已经有了处置，师门与{{companion}}要承受实际后果。",
+          "situation": "县衙的处置传回{{sect}}后，弟子们各自收拾门里的活计。{{companion}}的去留已经定下，{{mentor}}让你把这次的人情、亏空和官面上的话一笔笔记清。{{official}}没有再上门，但{{road}}上的风声没有停。",
+          "outcome": {
+            "result": "旧案的后果已经落到师门和{{companion}}身上；你知道了官印与江湖名声各自的分量，也知道下一段路要靠什么把人重新聚起来。",
+            "endsFlow": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "sect-rebuild",
+      "actIds": [
+        "ancient.jianghu-master.reputation"
+      ],
+      "narrativeRole": "受挫后的重整",
+      "label": "师门受挫后的重整",
+      "entry": "上一组使师门或同伴因官府打压、伤亡或离散失去原有协作，主角仍有重整条件。",
+      "routing": "planned",
+      "assetRoles": [
+        "sect",
+        "home",
+        "road",
+        "mentor",
+        "senior",
+        "companion",
+        "official",
+        "blade",
+        "sword",
+        "movement"
+      ],
+      "entryRequirements": {
+        "physique": 16,
+        "intelligence": 14
+      },
+      "events": [
+        {
+          "id": "rebuild-grief",
+          "kind": "life",
+          "entry": "此前行动已经造成真实损失，师门与同伴尚未完成安顿。",
+          "situation": "你与幸存者安葬死者、探望伤者，逐个问留下的人还愿不愿意跟。有人因伤退出，有人把愤怒带到你面前；{{senior}}把师门还能动用的兵器、银钱和人情一笔笔摆开，{{companion}}在旁边不说话。",
+          "outcome": {
+            "result": "死者与伤者已经安顿，去留和师门还能继续动用的力量确定；损失没有被抹去。"
+          }
+        },
+        {
+          "id": "rebuild-training",
+          "kind": "life",
+          "entry": "伤亡后的安顿已经结束，师门仍有人愿意跟你重整。",
+          "situation": "你把留下的人按本事重新分组，按上一场失利暴露的短处改练。{{senior}}带旧人熟悉退路，{{companion}}盯着新补进来的人；{{mentor}}不再逐招指点，只在你把权责分下去时点头。",
+          "outcome": {
+            "result": "现有同伴重新形成协作，训练和分工因真实失利而改变；此前离开的人没有被补写回来。"
+          }
+        },
+        {
+          "id": "rebuild-stand",
+          "kind": "scene",
+          "entry": "重整与操练已经完成，师门能再次共同应对一桩实际麻烦。",
+          "situation": "{{official}}或{{rivalSect}}再次找上门，这次你按重整后的分工带人应对：谁守门、谁护百姓、谁去断对方的路，都在出发前说清。{{senior}}和{{companion}}各自领人，{{mentor}}留在{{sect}}等消息。",
+          "outcome": {
+            "result": "你在一次实际冲突中保住师门与百姓，重整后的队伍重新具备行动能力；故事离开了失败现场。",
+            "endsFlow": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "tournament",
+      "actIds": [
+        "ancient.jianghu-master.reputation"
+      ],
+      "narrativeRole": "本幕结果",
+      "label": "武林会与名望",
+      "entry": "你的声望已经足以被邀请参加{{master}}主持的武林会。",
+      "routing": "planned",
+      "assetRoles": [
+        "road",
+        "master",
+        "rival",
+        "senior",
+        "companion",
+        "mentor",
+        "sect",
+        "manual",
+        "sword",
+        "internal"
+      ],
+      "entryRequirements": {
+        "physique": 16,
+        "intelligence": 14
+      },
+      "events": [
+        {
+          "id": "martial-meet",
+          "kind": "scene",
+          "entry": "武林会已经开场，你还没有站到最后的场上。",
+          "situation": "{{master}}在{{road}}外的旧校场设会，各门各派都派人来。{{rival}}代表{{rivalSect}}，{{senior}}替你压阵，{{companion}}在台下。前几场你赢得不轻松，{{master}}却在看台上一直没说话。",
+          "outcome": {
+            "result": "你进了最后一轮。{{master}}派人传话：最后一战不只比胜负，还看你怎么对待对手和台下的人。"
+          }
+        },
+        {
+          "id": "final-bout",
+          "kind": "choice",
+          "entry": "最后一战在即，{{rival}}和{{master}}都在等你的选择。",
+          "situation": "最后一战的对手是{{rival}}。他旧伤未愈，却仍站在场上；台下有人起哄让你下重手，{{master}}的目光落在你身上。{{companion}}在人群里摇头，{{senior}}没有表情。",
+          "question": "争胜、留手，还是把这场比试变成别的东西？",
+          "stakes": "武林会的名次、{{rival}}的伤势，以及{{master}}会如何评定你的名望。",
+          "check": {
+            "stat": "physique",
+            "difficulty": 20
+          },
+          "options": [
+            {
+              "id": "safe",
+              "label": "稳守取胜",
+              "action": "不冒进，靠耐力和步法拖到对手旧伤发作。",
+              "success": {
+                "result": "你稳住阵脚，{{rival}}旧伤先撑不住。你赢得不算漂亮，却没有添新伤；{{master}}点头，台下也挑不出错。"
+              },
+              "failure": {
+                "result": "你守得太保守，被{{rival}}抓住空档逼出场外。名次停在第三，{{master}}只说了句“还差一口气”。"
+              }
+            },
+            {
+              "id": "balanced",
+              "label": "点到为止",
+              "action": "在能取胜时收手，当众给{{rival}}留一条退路。",
+              "success": {
+                "result": "你在最后一剑前收手，{{rival}}愣了片刻，抱拳认输。{{master}}当众说你懂得“胜负之外还有江湖”；{{rivalSect}}没有借口再闹。"
+              },
+              "failure": {
+                "result": "你收手时被{{rival}}反扑，虽未重伤，却输了这一场。{{master}}没有评价，台下有人说你妇人之仁。"
+              }
+            },
+            {
+              "id": "risky",
+              "label": "以伤换胜",
+              "action": "拼着受一剑，也要在台上打出自己的名号。",
+              "success": {
+                "result": "你硬接一剑，反手把{{rival}}制住。满场都记住了你的狠劲，{{master}}把首名给了你，也提醒你“名望来得快，去得也快”。"
+              },
+              "failure": {
+                "result": "你拼得太狠，被{{rival}}抓住破绽击倒，伤及筋骨。名次没有拿到，{{mentor}}连夜把你接回{{sect}}。"
+              }
+            }
+          ]
+        },
+        {
+          "id": "tournament-result",
+          "kind": "settlement",
+          "entry": "最后一战已经结束，{{master}}要给出评断。",
+          "situation": "旧校场上，各派尚未散去。{{master}}把名次和评语写在木牌上，{{rival}}在台下等着，{{senior}}和{{companion}}站在你身后。你如何应对这份评断，将决定你以什么身份进入下一段江湖。",
+          "rules": [
+            {
+              "id": "champion",
+              "condition": "最后一战取胜，且没有在台上失掉江湖分寸。",
+              "disposition": "{{master}}把你列为魁首，准你在他门下听一次讲武。各派开始把你当成一方人物，{{rivalSect}}也暂时收手。",
+              "grantItems": [
+                "sect-manual"
+              ]
+            },
+            {
+              "id": "respected",
+              "condition": "没有拿到首名，但在台上保住了分寸和同伴。",
+              "disposition": "{{master}}给你一个“可交”的评语，各派记住了你的名字。你没有一步登天，却有了能继续行走江湖的名声。"
+            },
+            {
+              "id": "discredited",
+              "condition": "名次或手段让同道不服，或{{rivalSect}}借机发难。",
+              "disposition": "{{master}}没有给你评语，台下有人当面质疑。你保住了性命，却在江湖上多了一道需要自己洗清的口舌。"
+            }
+          ]
+        },
+        {
+          "id": "tournament-aftermath",
+          "kind": "life",
+          "entry": "武林会已经结束，名望与师门关系需要落回日常。",
+          "situation": "旧校场散了，{{master}}的评语传遍各派。{{senior}}带你回{{sect}}，{{companion}}在院里等你；{{mentor}}没有问名次，只问你在台上有没有把同门和对手当成可以随手丢下的人。",
+          "outcome": {
+            "result": "名望已经落回师门和日常：有人因你的名字来投，也有人因你的名字记恨。你把下一段要带的人和要守的规矩定了下来。",
+            "endsFlow": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "sect-siege",
+      "actIds": [
+        "ancient.jianghu-master.legacy"
+      ],
+      "narrativeRole": "山门危机",
+      "label": "围山",
+      "entry": "{{rivalSect}}与官府合流，{{sect}}被围。",
+      "routing": "planned",
+      "assetRoles": [
+        "sect",
+        "rivalSect",
+        "road",
+        "mentor",
+        "senior",
+        "companion",
+        "traitor",
+        "official",
+        "sword",
+        "movement"
+      ],
+      "entryRequirements": {
+        "physique": 24,
+        "intelligence": 21
+      },
+      "events": [
+        {
+          "id": "siege-pressure",
+          "kind": "scene",
+          "entry": "{{rivalSect}}与官府合流的风声已经传到{{sect}}，围山尚未合拢。",
+          "situation": "{{road}}上的粮车接连被截，{{official}}又封了另一头山口。{{sect}}的存粮只够半月，{{traitor}}在围山前失踪，后山小路上多了几处新踩的脚印。{{mentor}}旧伤复发，把弟子名册交到你手里。",
+          "outcome": {
+            "result": "围山还没有合拢，但断粮、封路和内鬼已经同时压到{{sect}}；你必须在守、走、清内鬼之间先做一个判断。"
+          }
+        },
+        {
+          "id": "siege-arrives",
+          "kind": "scene",
+          "entry": "{{sect}}还没有被完全围死，山门里仍有弟子和百姓。",
+          "situation": "{{rivalSect}}的人封了{{road}}，{{official}}以查案为名堵住另一头。{{sect}}里的粮食只够半月，{{traitor}}却在围山前失踪。{{mentor}}让你决定是守、是走，还是先清内鬼。",
+          "outcome": {
+            "result": "你确认围山的人不只{{rivalSect}}，官府也在等{{sect}}自己乱起来；{{traitor}}留下的线索指向后山一条小路。"
+          }
+        },
+        {
+          "id": "defense-choice",
+          "kind": "choice",
+          "entry": "围山已经开始，{{sect}}的弟子和百姓都在等你拿主意。",
+          "situation": "{{rivalSect}}在山下立了栅，{{official}}按兵不动。{{senior}}要带人夜袭，{{companion}}主张护着百姓从后山走。{{mentor}}旧伤复发，把{{sect}}的印信交到你手里。",
+          "question": "守山、突围，还是先拿下{{traitor}}？",
+          "stakes": "{{sect}}的存亡、弟子与百姓的性命，以及师门传承会不会断在你手里。",
+          "check": {
+            "stat": "intelligence",
+            "difficulty": 22
+          },
+          "options": [
+            {
+              "id": "safe",
+              "label": "守山待援",
+              "action": "收拢弟子和百姓，守住山门等外面的同道来援。",
+              "success": {
+                "result": "你守住山门半月，{{mentor}}的旧友带人从{{road}}外压来，{{rivalSect}}退去。{{sect}}保住了，但粮仓空了，弟子也伤了几个。"
+              },
+              "failure": {
+                "result": "援军没有来，山门被撞开。你带人退到后山，{{sect}}前院失守，{{mentor}}为护弟子受了重伤。"
+              }
+            },
+            {
+              "id": "balanced",
+              "label": "护人突围",
+              "action": "让{{senior}}带弟子守门，你护百姓从后山走。",
+              "success": {
+                "result": "你护着百姓从后山出去，{{senior}}守到最后一刻才撤。{{sect}}丢了前院，人却大多活着；{{rivalSect}}只得到一座空山。"
+              },
+              "failure": {
+                "result": "后山小路被{{traitor}}出卖，你们在半山腰被截。百姓死伤，{{companion}}为护你落下重伤。"
+              }
+            },
+            {
+              "id": "risky",
+              "label": "先清内鬼",
+              "action": "不理山下，先把{{traitor}}揪出来，再拿他的人头去谈。",
+              "success": {
+                "result": "你在后山堵住{{traitor}}，拿到他与{{official}}往来的证据。你把人头和证据摆到阵前，{{rivalSect}}的围攻先乱了，{{official}}也退了兵。"
+              },
+              "failure": {
+                "result": "你追{{traitor}}时被调开，{{rivalSect}}趁机攻山。{{sect}}前院失守，你回来时只看见{{senior}}带伤收拢残部。"
+              }
+            }
+          ]
+        },
+        {
+          "id": "siege-result",
+          "kind": "settlement",
+          "entry": "围山已经结束，{{sect}}和师门传承要有一个实际结果。",
+          "situation": "山门内外都是断木和血迹。{{mentor}}靠在正厅柱上，{{senior}}在清点弟子，{{companion}}扶着受伤的百姓。{{official}}的人还在山下等着一个说法。",
+          "rules": [
+            {
+              "id": "hold",
+              "condition": "山门守住，师门核心没有落入{{rivalSect}}之手。",
+              "disposition": "{{sect}}保住了山门和印信，弟子与百姓大多存活。{{mentor}}把掌门信物交给你，师门从此由你实际主持。"
+            },
+            {
+              "id": "break",
+              "condition": "山门失守，但你和师门核心活着退走。",
+              "disposition": "{{sect}}前院被焚，你们退到{{home}}外的旧宅。传承还在人身上，山门却要重新找地方；{{rivalSect}}占了旧地，官府也插了手。"
+            },
+            {
+              "id": "negotiate",
+              "condition": "你用{{traitor}}的证据或别的筹码逼退了围山的人。",
+              "disposition": "{{official}}撤了封条，{{rivalSect}}退到{{road}}外。{{sect}}没有全胜，却换来了喘息；你师门与官府之间多了一条随时会断的线。"
+            }
+          ]
+        },
+        {
+          "id": "siege-aftermath",
+          "kind": "life",
+          "entry": "围山已经结束，师门与弟子要安顿伤者、残部与百姓。",
+          "situation": "山门内外都是断木和血迹。{{mentor}}靠在柱上，{{senior}}在清点弟子，{{companion}}扶着受伤的百姓。{{official}}的人还在山下等一个说法，{{rivalSect}}的探子也没有走远。",
+          "outcome": {
+            "result": "伤者、残部与百姓有了实际去处；师门是保住山门、退到旧宅，还是拿筹码换来停战，都已经落定。",
+            "endsFlow": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "last-sect-line",
+      "actIds": [
+        "ancient.jianghu-master.legacy"
+      ],
+      "narrativeRole": "败势中的最终取舍",
+      "label": "山门失守后的最后一线",
+      "entry": "围山失利，山门已失，主角与残存弟子、百姓仍有退路；师门传承尚未落定。",
+      "routing": "planned",
+      "assetRoles": [
+        "sect",
+        "home",
+        "road",
+        "mentor",
+        "senior",
+        "companion",
+        "traitor",
+        "official",
+        "blade",
+        "sword",
+        "movement",
+        "token",
+        "manual"
+      ],
+      "entryRequirements": {
+        "physique": 24,
+        "intelligence": 21
+      },
+      "events": [
+        {
+          "id": "last-stand-choice",
+          "kind": "choice",
+          "entry": "围山已经失利，山门失守，残部与百姓仍有退路。",
+          "situation": "{{sect}}前院被焚，{{rivalSect}}的人占着山门，{{official}}的兵还在山口。{{senior}}收拢了残部，{{companion}}带着百姓退到{{home}}外的旧宅；{{mentor}}伤重，把{{token}}和{{manual}}交到你手里。",
+          "question": "最后怎样处置残部与百姓？",
+          "stakes": "残存弟子与百姓的性命、师门传承，以及你与{{rivalSect}}/{{official}}之间的最后一点余地。",
+          "check": {
+            "stat": "charisma",
+            "difficulty": 22
+          },
+          "options": [
+            {
+              "id": "safe",
+              "label": "护人撤守",
+              "action": "带百姓与残部退到能守的地方，放弃夺回山门。",
+              "success": {
+                "result": "你护着百姓与残部退到{{road}}外的旧镇，{{rivalSect}}占了空山。师门没有夺回山门，却保住了人和{{manual}}；{{official}}见你不再争，暂时停了追索。"
+              },
+              "failure": {
+                "result": "撤退路上被{{official}}截住，百姓失散，{{senior}}为护你落下重伤。你带少数人脱身，师门传承虽在，山门与旧部都已失去。"
+              }
+            },
+            {
+              "id": "balanced",
+              "label": "合残部坚守",
+              "action": "收拢残部与百姓，在旧宅或山口再守一次。",
+              "success": {
+                "result": "你把残部与百姓收进旧宅，借地形守到{{official}}退兵。{{rivalSect}}没有拿到{{manual}}，师门在山门外留下了一线；伤亡与失地仍在。"
+              },
+              "failure": {
+                "result": "旧宅守不住，{{companion}}为护百姓被擒，{{senior}}带残部突围。你保住了{{manual}}和少数人，师门的实体已经散了。"
+              }
+            },
+            {
+              "id": "risky",
+              "label": "决死反击",
+              "action": "带残部夜袭{{rivalSect}}占住的山门，夺回师门或死在那里。",
+              "success": {
+                "result": "你带残部夜袭山门，{{rivalSect}}措手不及，山门被你夺回一半。{{official}}见势收兵，师门保住了根；{{senior}}和{{companion}}都带了伤，死者没有回来。"
+              },
+              "failure": {
+                "result": "夜袭中伏，{{senior}}战死，{{companion}}拖着你退出山门。{{manual}}还在，师门的实体却已经覆灭；{{official}}开始清剿余下的人。"
+              }
+            }
+          ]
+        },
+        {
+          "id": "last-stand-reckoning",
+          "kind": "settlement",
+          "entry": "最后行动已经结束，主角存活，师门去向尚未落定。",
+          "situation": "{{home}}外的旧宅里，{{mentor}}听你把最后一场说完。{{senior}}或{{companion}}带伤坐在旁边，残存弟子和百姓等一个去处。{{official}}的文书、{{rivalSect}}的退兵、师门还剩下的东西，都摆在案上。",
+          "rules": [
+            {
+              "id": "line-preserved",
+              "condition": "最后行动保住了百姓与部分残部，山门或旧宅仍有一处可落脚。",
+              "disposition": "{{mentor}}把师门印信与{{manual}}交给你，准你在实际保住的地方重开一脉；失去的山门与死者不被补写回来。",
+              "grantItems": [
+                "sect-manual"
+              ]
+            },
+            {
+              "id": "line-broken",
+              "condition": "师门实体已散，但你与少数弟子、百姓活着退出。",
+              "disposition": "师门不再有山门，{{mentor}}让你带{{manual}}和愿意走的人另寻去处；{{official}}的通缉与{{rivalSect}}的旧怨都还在。"
+            },
+            {
+              "id": "line-extinguished",
+              "condition": "最后行动失败，师门核心覆灭，只剩你一人或极少数人脱身。",
+              "disposition": "{{mentor}}没有撑到旧宅，{{senior}}或{{companion}}死在最后一场。你带着{{manual}}或空手离开，师门只剩一个名字。"
+            }
+          ]
+        },
+        {
+          "id": "last-stand-aftermath",
+          "kind": "life",
+          "entry": "最后行动与师门去向已经落定，幸存者要重新落脚。",
+          "situation": "幸存者在实际守住或退走的地方安顿。你照料伤者，面对没有归来的同门和失去旧居的百姓；{{companion}}与{{senior}}各自承担战后处境，{{mentor}}的旧物被收进一只木箱。",
+          "outcome": {
+            "result": "幸存者、残部与师门传承按实际保全、失地或覆灭得到最终结果；你接回还能继续的生活，也记住了没有回来的人。",
+            "endsFlow": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "amnesty-offer",
+      "actIds": [
+        "ancient.jianghu-master.legacy"
+      ],
+      "narrativeRole": "招安与去向",
+      "label": "官府的招安",
+      "entry": "围山结束，山门守住或谈判停战，官府带来招安条件。",
+      "routing": "planned",
+      "assetRoles": [
+        "sect",
+        "home",
+        "official",
+        "mentor",
+        "senior",
+        "companion",
+        "letter",
+        "token"
+      ],
+      "entryRequirements": {
+        "physique": 24,
+        "intelligence": 21
+      },
+      "events": [
+        {
+          "id": "amnesty-choice",
+          "kind": "choice",
+          "entry": "官府给出招安条件，师门内部意见不一。",
+          "situation": "{{official}}在残存正厅或{{home}}外的旧宅摆出文书：师门交出{{token}}、登记弟子名册，可换一个官面上的名分和一条活路；否则{{rivalSect}}的事还会再来。{{mentor}}不表态，{{senior}}要接，{{companion}}要走。",
+          "question": "接招安、拒绝，还是带人离开这里？",
+          "stakes": "师门的独立、弟子的生计，以及你愿意让这门技艺以什么方式传下去。",
+          "check": {
+            "stat": "charisma",
+            "difficulty": 21
+          },
+          "options": [
+            {
+              "id": "safe",
+              "label": "接招安",
+              "action": "交出{{token}}和名册，换师门一个官面名分。",
+              "success": {
+                "result": "师门挂上官办武馆的名，弟子有了户籍和粮。{{mentor}}把掌门印信交给你，也把“从此受制于人”这句话说在前头。"
+              },
+              "failure": {
+                "result": "{{official}}收了名册却只给了一个空名分，师门弟子被拆散编入官差。你保住了师门的名，却失去了大半自主。"
+              }
+            },
+            {
+              "id": "balanced",
+              "label": "拒招安",
+              "action": "不交{{token}}，但答应约束弟子不与官府为敌。",
+              "success": {
+                "result": "你当众拒了招安，也压住了弟子报仇的念头。{{official}}暂时退去，师门保住独立，却要自己设法撑过下一个冬天。"
+              },
+              "failure": {
+                "result": "拒招安后{{official}}断了师门的粮道，{{rivalSect}}也趁机抢走两处产业。师门没有散，但日子比围山时还紧。"
+              }
+            },
+            {
+              "id": "risky",
+              "label": "带人远走",
+              "action": "带愿意走的弟子离开{{home}}，去{{road}}外另立门户。",
+              "success": {
+                "result": "你带愿意走的弟子离开{{home}}，在{{road}}外找到一处能落脚的旧院。师门没有官面名分，却保住了人和技艺。"
+              },
+              "failure": {
+                "result": "远走途中被{{rivalSect}}截住，弟子失散，{{token}}也丢在乱里。你带着少数人到了新地方，师门却已元气大伤。"
+              }
+            }
+          ]
+        },
+        {
+          "id": "amnesty-aftermath",
+          "kind": "life",
+          "entry": "招安一事的去向已经定下，师门要重新安排生计与传艺。",
+          "situation": "{{sect}}的院子里，弟子按去留分成几拨。{{mentor}}把旧谱和账册摊在桌上，{{senior}}在清点兵器，{{companion}}问你以后还教不教人。{{official}}的人已经走了，{{rivalSect}}的探子还在{{road}}上。",
+          "outcome": {
+            "result": "师门有了新的活法，也付出了对应的代价；你把下一段路要带的人和要守的规矩定了下来。",
+            "endsFlow": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "legacy-final",
+      "actIds": [
+        "ancient.jianghu-master.legacy"
+      ],
+      "narrativeRole": "本幕结果",
+      "label": "传承的最终去向",
+      "entry": "{{sect}}和你的传承已经走到最后一步。",
+      "routing": "planned",
+      "assetRoles": [
+        "sect",
+        "home",
+        "road",
+        "mentor",
+        "senior",
+        "companion",
+        "rival",
+        "master",
+        "manual",
+        "token",
+        "blade"
+      ],
+      "entryRequirements": {
+        "physique": 24,
+        "intelligence": 21
+      },
+      "events": [
+        {
+          "id": "legacy-verdict",
+          "kind": "settlement",
+          "entry": "师门和你的传承需要一个最终交代。",
+          "situation": "残存正厅或旧宅里，{{mentor}}把{{manual}}、{{blade}}和掌门印信摆在案上。{{senior}}和{{companion}}站在两侧，{{master}}派来的人也在门外。你面前有三条路：开宗立派、把传承交出去，或让它散掉。",
+          "rules": [
+            {
+              "id": "found-school",
+              "condition": "你保住了师门核心、弟子和可信的传承，且愿意承担立宗的责任。",
+              "disposition": "你在{{sect}}正式立宗，定下门规与传艺次序；{{mentor}}退居后堂，{{senior}}与{{companion}}各领一房。你的名字从此与这门技艺绑在一起。"
+            },
+            {
+              "id": "inherit",
+              "condition": "你没有立宗，但把{{manual}}和核心弟子交到了可信的人手里。",
+              "disposition": "你把{{manual}}与掌门印信交给{{senior}}，自己退到{{home}}或{{road}}外。传承没有断，师门却不再以你的名字为号。"
+            },
+            {
+              "id": "dissolve",
+              "condition": "师门已无力维持，或你选择让这门技艺退出江湖。",
+              "disposition": "你遣散弟子，封了{{sect}}的正厅，把{{manual}}交给{{mentor}}或付之一炬。江湖上少了一门传承，多了一段说不清的旧事。"
+            }
+          ]
+        },
+        {
+          "id": "legacy-homecoming",
+          "kind": "life",
+          "entry": "传承已经有了最终去向，你要回到自己的生活里。",
+          "situation": "{{home}}的旧街还在，{{companion}}在门口等你，{{senior}}带着弟子来送。{{mentor}}没有出门，只让人捎来一句话：往后你怎么教人，就是你自己的事了。",
+          "outcome": {
+            "result": "你走完了从学艺到立身的这一程，师门、同道和旧敌都有了各自的去处；江湖上留下了你的名号，也留下了你定下的规矩。",
+            "endsFlow": true
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -768,6 +768,12 @@ export function ensureNarrativeRunState(
     : state.opening?.status === "pending"
       ? { status: "pending" as const }
       : undefined;
+  // Legacy act cards may still carry a flow selection. Move it into run state
+  // once; the normalized card no longer stores a selection.
+  const legacyOpeningFlowId = (state.actRuntime?.outline as
+    { eventFlows?: { openingFlowId?: string } } | undefined)?.eventFlows?.openingFlowId?.trim();
+  const eventFlow = state.eventFlow ? structuredClone(state.eventFlow) : undefined;
+  if (eventFlow && !eventFlow.flowId && legacyOpeningFlowId) eventFlow.flowId = legacyOpeningFlowId;
   const actOutline = normalizeNarrativeActOutline(state.actRuntime?.outline, state.actRuntime?.actId);
   const actRuntime = state.actRuntime && typeof state.actRuntime.actId === "string"
     ? {
@@ -817,6 +823,7 @@ export function ensureNarrativeRunState(
   return {
     ...defaults,
     ...state,
+    eventFlow,
     version: state.version,
     enabled: enabled && state.enabled !== false,
     opening,

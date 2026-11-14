@@ -23,21 +23,42 @@ if (process.argv.includes('--server')) {
   if (process.env.NARRATIVE_CHECK_RESUME) {
     const { resolveAnonymousSession, saveRun } = await import(pathToFileURL(path.join(root, 'apps/backend/src/store.ts')).href);
     const { session, token } = await resolveAnonymousSession();
-    const run = JSON.parse(await fs.readFile(process.env.NARRATIVE_CHECK_RESUME, 'utf8'));
+    const run = JSON.parse(await fs.readFile(path.resolve(root, process.env.NARRATIVE_CHECK_RESUME), 'utf8'));
     // Opt-in development replay: committed text stays intact, while the isolated
     // fixture uses current authored units. This never changes the player's save.
     if (process.env.NARRATIVE_CHECK_CURRENT_MATERIAL === '1') {
       const current = JSON.parse(await fs.readFile(path.join(root, 'data/narratives/event-flows', `${run.storyPackSnapshot.id}.json`), 'utf8'));
-      if (run.narrative.version !== 20 || current.id !== run.storyPackSnapshot.eventFlow.id || run.choiceExecution)
+      if (![20, 21, 22].includes(run.narrative.version) || current.id !== run.storyPackSnapshot.eventFlow.id || run.choiceExecution)
         throw new Error('verification_material_replay_invalid');
       run.storyPackSnapshot.eventFlow = current;
+      const { eventFlowRuntimeVersion } = await import(pathToFileURL(path.join(root, 'apps/backend/src/narrative/event-flow.ts')).href);
+      run.narrative.version = eventFlowRuntimeVersion(current);
+      if (!run.narrative.actRuntime?.outline) {
+        const { loadNarrativeWorldDefinition } = await import(pathToFileURL(path.join(root, 'apps/backend/src/content.ts')).href);
+        const { loadNarrativeStoryPack } = await import(pathToFileURL(path.join(root, 'apps/backend/src/story-packs.ts')).href);
+        run.storyPackSnapshot = await loadNarrativeStoryPack(await loadNarrativeWorldDefinition(run.worldId), current.id);
+      }
       const { eventFlowRoles } = await import(pathToFileURL(path.join(root, 'apps/backend/src/narrative/event-flow.ts')).href);
       const card = run.narrative.actRuntime.outline;
-      card.flowBindings = eventFlowRoles(current, card.actId).map(role => {
+      if (card) card.flowBindings = eventFlowRoles(current, card.actId).map(role => {
         const name = run.narrative.eventFlow.bindings[role.id];
         if (!name) throw new Error('verification_material_binding_missing:' + role.id);
         return { roleId: role.id, name };
       });
+      // Explicit isolated replay of a corrected IF boundary. Preserve the
+      // committed action, roll and prose; only repeat its pending observation.
+      if (process.env.NARRATIVE_CHECK_REOBSERVE === '1') {
+        if (!run.pendingActFinalization || run.choiceExecution) throw new Error('verification_observation_replay_invalid');
+        const { loadNarrativeWorldDefinition } = await import(pathToFileURL(path.join(root, 'apps/backend/src/content.ts')).href);
+        const { loadNarrativeStoryPack } = await import(pathToFileURL(path.join(root, 'apps/backend/src/story-packs.ts')).href);
+        const material = await loadNarrativeStoryPack(await loadNarrativeWorldDefinition(run.worldId), current.id);
+        run.storyPackSnapshot = material;
+        const act = material.acts.find(act => act.id === run.pendingActFinalization.actId);
+        if (!card || !act) throw new Error('verification_observation_act_missing');
+        card.objective = act.objective;
+        card.closureMeaning = act.payoffMeaning;
+        delete run.pendingActFinalization.observation;
+      }
     }
     await saveRun(run, session.id);
     process.send?.({ cookie: `reroll_session=${token}` });
@@ -88,9 +109,24 @@ if (process.argv.includes('--server')) {
       stats[available[i % available.length]]++;
     }
     const cardIds = bootstrap.cardPool.slice(0, bootstrap.startAllocation.selectedCardMin).map(card => card.id);
+    const pack = process.env.NARRATIVE_CHECK_PACK ?? 'ancient.frontier-commander';
+    const pathChoices = JSON.parse(process.env.NARRATIVE_CHECK_CHOICES ?? '{}');
+    const sovereign = pack === 'ancient.sovereign-rise';
+    // Explicit authored node/action pairs, not a positional or global risk fallback.
+    // NARRATIVE_CHECK_CHOICES overrides individual actions for branch replays.
+    const sovereignOptions = { 'join-choice': 'disciplined', 'scattered-choice': 'regroup', 'ally-choice': 'mutual',
+      'offer-choice': 'accept', 'regional-choice': 'self-rule', 'future-choice': 'west', 'reduced-choice': 'last-campaign',
+      'rise-choice': 'safe', 'scattered-gather': 'balanced', 'county-choice': 'balanced', 'offer-negotiation': 'safe',
+      'road-choice': 'safe', 'warlord-choice': 'balanced', 'lost-defense': 'safe',
+      'capital-founding-action': 'safe', 'realm-campaign': 'safe', 'realm-counterstroke': 'safe', 'last-choice': 'safe',
+      'west-defense': 'safe', 'reduced-breakout': 'safe' };
+    const frontierOptions = { 'ridge-warning': 'balanced', 'captive-way-out': 'safe',
+      'wolves-breakout': 'balanced', 'flood-crossing': 'balanced', 'campaign-first-defense': 'balanced',
+      'campaign-raid': 'balanced', 'service-direction': 'remain', 'war-decision': 'balanced',
+      'last-defense': 'safe', 'postwar-choice': 'retire' };
     let payload = process.env.NARRATIVE_CHECK_RESUME ? await call('/api/game/current') : await call('/api/game/start', { clientId: 'narrative-verification', worldId: 'ancient',
-      storyPackId: process.env.NARRATIVE_CHECK_PACK ?? 'ancient.frontier-commander', difficultyId: bootstrap.difficulties[0].id,
-      personaPrompt: '你是边地军户的孩子，性情直率，珍惜家人与同伴。', talentPointTotal: total, stats, selectedCardIds: cardIds });
+      storyPackId: pack, difficultyId: bootstrap.difficulties[0].id,
+      personaPrompt: sovereign ? '你出身西洲乡里小户，性情直率，珍惜家人与同伴，有改变乱世的志向。' : '你是边地军户的孩子，性情直率，珍惜家人与同伴。', talentPointTotal: total, stats, selectedCardIds: cardIds });
     verifiedRunId = payload.run.runId;
     const stepBudget = Number(process.env.NARRATIVE_CHECK_STEPS ?? 100);
     if (!Number.isInteger(stepBudget) || stepBudget < 1) throw new Error('verification_step_budget_invalid');
@@ -115,9 +151,14 @@ if (process.argv.includes('--server')) {
       else if (run.growthFocus?.options?.length && !run.growthFocus.selectedId) Object.assign(body, { action: 'select_growth_focus', growthFocusId: run.growthFocus.options[0].id });
       else if (run.nextMilestoneChoice) {
         const choice = run.nextMilestoneChoice;
-        const desired = process.env.NARRATIVE_CHECK_DECISION ?? 'balanced';
+        const flowState = internal.narrative.eventFlow;
+        const group = internal.storyPackSnapshot?.eventFlow?.groups.find(group => group.id === flowState?.flowId);
+        const node = group?.events[flowState?.eventIndex];
+        const desired = pathChoices[node?.id] ?? (sovereign ? sovereignOptions[node?.id] : frontierOptions[node?.id]);
         const optionIndex = internal.nextMilestoneChoice.options.findIndex(option => option.id === desired);
-        const option = choice.options[optionIndex < 0 ? 0 : optionIndex];
+        if (optionIndex < 0) throw new Error(`verification_choice_not_configured:${node?.id}:${desired}`);
+        const option = choice.options[optionIndex];
+        await fs.appendFile(path.join(output, 'choices.jsonl'), JSON.stringify({ nodeId: node?.id, mode: choice.mode ?? 'check', optionId: desired, action: internal.nextMilestoneChoice.options[optionIndex].description }) + '\n');
         Object.assign(body, { action: 'decide', decision: option.optionId ?? option.id, decisionAge: choice.age, sceneId: choice.sceneId, sceneRevision: choice.revision });
       } else if (run.actPlanning?.status === 'failed') Object.assign(body, { action: 'prepare_act' });
       else Object.assign(body, { action: 'consume' });
@@ -134,11 +175,14 @@ if (process.argv.includes('--server')) {
       const store = JSON.parse(await fs.readFile(path.join(sandbox, 'storage/anonymous-game-store.json'), 'utf8'));
       const final = store.runs.find(entry => entry.run.runId === verifiedRunId)?.run;
       if (final) {
+        const story = final.turnRecords.map(turn => `[${turn.age}岁] ${turn.narrative ?? turn.text ?? JSON.stringify(turn)}`).join('\n\n');
+        await fs.writeFile(path.join(output, 'story.txt'), story + (final.endingSummary ? `\n\n[结局·${final.narrative.endingPolarity}]\n${final.endingSummary}` : ''));
         await fs.writeFile(path.join(output, 'latest-run.json'), JSON.stringify(final, null, 2));
         await fs.writeFile(path.join(output, 'verification-result.json'), JSON.stringify({ runId: verifiedRunId,
           completed: final.ended === true, age: final.age, records: final.turnRecords.length,
           actId: final.narrative.actRuntime?.actId,
           ...(process.env.NARRATIVE_CHECK_CURRENT_MATERIAL === '1' ? { currentMaterialReplay: true } : {}),
+          ...(process.env.NARRATIVE_CHECK_REOBSERVE === '1' ? { reobservedMaterialBoundary: true } : {}),
           ...(process.env.NARRATIVE_CHECK_STOP_FLOW ? { pilotFlow: process.env.NARRATIVE_CHECK_STOP_FLOW,
             pilotCompleted: final.narrative.eventFlow?.completedFlows.some(entry => entry.flowId === process.env.NARRATIVE_CHECK_STOP_FLOW) ?? false } : {}) }, null, 2));
       }

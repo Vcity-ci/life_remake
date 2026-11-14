@@ -9,18 +9,23 @@ const lifeBeforeSchema = z.object({ minYears: z.number().int().nonnegative(),
   maxYears: z.number().int().nonnegative(), context: text }).strict()
   .refine((range) => range.maxYears >= range.minYears, "life_interval_range_invalid");
 const resultSchema = z.object({ result: text, grantItems: z.array(text).optional(),
-  consumeItems: z.array(text).optional(), endsFlow: z.boolean().optional() }).strict();
+  consumeItems: z.array(text).optional(), endsFlow: z.boolean().optional(),
+  nextEventIds: z.array(text).optional(), nextFlowIds: z.array(text).optional() }).strict();
 const eventSchema = z.union([
   z.object({ id: text, kind: z.enum(["life", "scene"]), entry: text.optional(), lifeBefore: lifeBeforeSchema.optional(), situation: text, outcome: resultSchema }).strict(),
   z.object({ id: text, kind: z.literal("choice"), entry: text.optional(), lifeBefore: lifeBeforeSchema.optional(), situation: text, question: text, stakes: text,
     check: z.object({ stat: z.enum(["intelligence", "charisma", "family", "fortune", "physique"]), difficulty: z.number().positive() }).strict(),
     options: z.array(z.object({ id: z.enum(["safe", "balanced", "risky"]), label: text, action: text,
       success: resultSchema, failure: resultSchema }).strict()).length(3) }).strict(),
+  z.object({ id: text, kind: z.literal("decision"), entry: text.optional(), lifeBefore: lifeBeforeSchema.optional(), situation: text, question: text, stakes: text,
+    options: z.array(z.object({ id: text, label: text, action: text, outcome: resultSchema }).strict()).min(2) }).strict(),
   z.object({ id: text, kind: z.literal("settlement"), entry: text.optional(), lifeBefore: lifeBeforeSchema.optional(), situation: text,
     rules: z.array(z.object({ id: text, condition: text, disposition: text, grantItems: z.array(text).optional(),
-      consumeItems: z.array(text).optional(), endsFlow: z.boolean().optional() }).strict()).min(1) }).strict()
+      consumeItems: z.array(text).optional(), endsFlow: z.boolean().optional(), nextEventIds: z.array(text).optional(), nextFlowIds: z.array(text).optional() }).strict()).min(1) }).strict()
 ]);
 const flowSchema = z.object({ id: text, revision: text,
+  protocolVersion: z.literal(2).optional(),
+  actEntries: z.record(z.array(text).min(1)).optional(),
   roles: z.array(z.object({ id: text, kind: z.enum(["character", "location", "item", "ability"]), identity: text, name: text.optional() }).strict()),
   originRoles: z.array(text).optional(),
   items: z.array(z.object({ id: text, roleId: text, description: text }).strict()),
@@ -33,6 +38,7 @@ const flowSchema = z.object({ id: text, revision: text,
 
 export function validateNarrativeEventFlow(raw: unknown, pack: Pick<NarrativeStoryPackDefinition, "id" | "acts" | "eventFlowId">): NarrativeEventFlowDefinition {
   const flow = flowSchema.parse(raw);
+  if (flow.protocolVersion === 2 && !flow.actEntries) throw new Error("event_flow_act_entry_missing");
   if (flow.id !== pack.eventFlowId || flow.id !== pack.id) throw new Error("event_flow_identity_invalid");
   const unique = (ids: string[]) => new Set(ids).size === ids.length;
   const actIds = new Set(pack.acts.map((act) => act.id));
@@ -47,21 +53,40 @@ export function validateNarrativeEventFlow(raw: unknown, pack: Pick<NarrativeSto
       group.assetRoles?.some((id) => !roleIds.has(id))) throw new Error("event_flow_group_reference_invalid");
     let hasExit = false;
     for (const event of group.events) {
-      const results = event.kind === "choice" ? event.options.flatMap((option) => [option.success, option.failure])
+      const results = event.kind === "decision" ? event.options.map((option) => option.outcome)
+        : event.kind === "choice" ? event.options.flatMap((option) => [option.success, option.failure])
         : event.kind === "settlement" ? event.rules : [event.outcome];
-      if (event.kind === "choice" && !unique(event.options.map((option) => option.id))) throw new Error("event_flow_options_invalid");
+      if ((event.kind === "choice" || event.kind === "decision") && !unique(event.options.map((option) => option.id))) throw new Error("event_flow_options_invalid");
       if (event.kind === "settlement" && !unique(event.rules.map((rule) => rule.id))) throw new Error("event_flow_rules_invalid");
       if (group.routing === "planned" && !event.entry) throw new Error("event_flow_unit_entry_missing");
       hasExit ||= results.some((result) => result.endsFlow === true);
       if (results.some((result) => [...(result.grantItems ?? []), ...(result.consumeItems ?? [])].some((id) => !itemIds.has(id)))) throw new Error("event_flow_result_item_invalid");
+      for (const result of results) {
+        if (result.nextEventIds?.some((id) => !group.events.some((node) => node.id === id)) ||
+            result.nextFlowIds?.some((id) => !flow.groups.some((candidate) => candidate.id === id && candidate.actIds.some((act) => group.actIds.includes(act))))) throw new Error("event_flow_continuation_invalid");
+        if (flow.actEntries && (result.endsFlow ? result.nextEventIds !== undefined || result.nextFlowIds === undefined
+          : result.nextEventIds === undefined || result.nextEventIds.length === 0 || result.nextFlowIds !== undefined)) throw new Error("event_flow_continuation_missing");
+      }
     }
     if (group.routing === "planned" && !hasExit) throw new Error("event_flow_exit_missing");
   }
   if (pack.acts.some((act) => !flow.groups.some((group) => group.actIds.includes(act.id)))) throw new Error("event_flow_act_empty");
+  if (flow.actEntries && (Object.keys(flow.actEntries).some((id) => !actIds.has(id)) || pack.acts.some((act) =>
+    !flow.actEntries![act.id]?.length || flow.actEntries![act.id].some((id) => !flow.groups.some((group) => group.id === id && group.actIds.includes(act.id)))))) throw new Error("event_flow_act_entry_invalid");
   // `eventFlowRoles` grants originRoles to the act that owns the first group.
   // Keep the authored order contract explicit: the first group is the opening act.
   if (!flow.groups[0].actIds.includes(pack.acts[0].id)) throw new Error("event_flow_first_group_act_invalid");
   return flow;
+}
+
+/** Runtime capability is authored by the protocol, never selected by a route ID. */
+export function eventFlowRuntimeVersion(definition?: NarrativeEventFlowDefinition): 18 | 20 | 22 {
+  return definition?.protocolVersion === 2 ? 22 : definition ? 20 : 18;
+}
+
+/** A newly published protocol makes its old saves read-only, without migrating them. */
+export function canAdvanceEventFlowVersion(version: number, published?: NarrativeEventFlowDefinition): boolean {
+  return version === eventFlowRuntimeVersion(published);
 }
 
 export function eventFlowRoles(definition: NarrativeEventFlowDefinition, actId: string) {
@@ -137,7 +162,7 @@ export function currentEventFlowStep(run: InternalRunState): EventFlowStep | und
 
 /** Ordinary years are counted by committed age, never by generation attempts. */
 export function prepareEventFlowLifeInterval(run: InternalRunState) {
-  if (run.narrative.version !== 20) return undefined;
+  if (run.narrative.version < 20) return undefined;
   const step = currentEventFlowStep(run);
   if (!step?.event.lifeBefore) return undefined;
   const state = run.narrative.eventFlow!;
@@ -156,7 +181,7 @@ export function prepareEventFlowLifeInterval(run: InternalRunState) {
 
 /** Admission is latched at group entry, independently of the once-per-act admission. */
 export function prepareEventFlowEntry(run: InternalRunState) {
-  if (run.narrative.version !== 20) return undefined;
+  if (run.narrative.version < 20) return undefined;
   const step = currentEventFlowStep(run);
   if (!step) return undefined;
   const state = run.narrative.eventFlow!;
@@ -180,7 +205,7 @@ export interface EventFlowRenderInput {
   result?: string;
   question?: string;
   stakes?: string;
-  options?: Array<{ id: "safe" | "balanced" | "risky"; label: string; action: string }>;
+  options?: Array<{ id: string; label: string; action: string }>;
   rules?: Array<{ id: string; condition: string; disposition: string }>;
 }
 
@@ -189,7 +214,7 @@ export function eventFlowRenderInput(run: InternalRunState, step: EventFlowStep)
   const event = step.event;
   return { flowId: step.flow.id, label: step.flow.label, narrativeRole: step.flow.narrativeRole,
     eventIndex: step.eventIndex, kind: event.kind, situation: bind(event.situation),
-    ...(event.kind === "choice" ? { question: bind(event.question), stakes: bind(event.stakes),
+    ...(event.kind === "choice" || event.kind === "decision" ? { question: bind(event.question), stakes: bind(event.stakes),
       options: event.options.map((option) => ({ id: option.id, label: bind(option.label), action: bind(option.action) })) }
       : event.kind === "settlement" ? { rules: event.rules.map((rule) => ({ id: rule.id,
         condition: bind(rule.condition), disposition: bind(rule.disposition) })) }
@@ -199,17 +224,26 @@ export function eventFlowRenderInput(run: InternalRunState, step: EventFlowStep)
 export function eventFlowResult(run: InternalRunState, outcome: string): NarrativeEventResult {
   const step = currentEventFlowStep(run);
   if (!step) throw new Error("event_flow_step_missing");
-  if (step.event.kind === "settlement") {
-    const rule = step.event.rules.find((entry) => outcome === "settlement:" + entry.id);
+  return nodeResult(step.event, outcome);
+}
+
+function nodeResult(event: NarrativeEventNode, outcome: string): NarrativeEventResult {
+  if (event.kind === "settlement") {
+    const rule = event.rules.find((entry) => outcome === "settlement:" + entry.id);
     if (!rule) throw new Error("event_flow_resolution_invalid");
-    return { result: rule.disposition, grantItems: rule.grantItems, consumeItems: rule.consumeItems, endsFlow: rule.endsFlow };
+    return { ...rule, result: rule.disposition };
   }
-  if (step.event.kind !== "choice") {
+  if (event.kind === "decision") {
+    const option = event.options.find((option) => outcome === "decision:" + option.id);
+    if (!option) throw new Error("event_flow_decision_invalid");
+    return option.outcome;
+  }
+  if (event.kind !== "choice") {
     if (outcome !== "experience") throw new Error("event_flow_result_invalid");
-    return step.event.outcome;
+    return event.outcome;
   }
   const [optionId, result] = outcome.split(":");
-  const option = step.event.options.find((option) => option.id === optionId);
+  const option = event.options.find((option) => option.id === optionId);
   if (!option || (result !== "success" && result !== "failure")) throw new Error("event_flow_result_invalid");
   return option[result];
 }
@@ -217,7 +251,9 @@ export function eventFlowResult(run: InternalRunState, outcome: string): Narrati
 /** The planner sees applicability and selects an identity; it cannot rewrite outcomes. */
 export function availableNextEventUnits(run: InternalRunState, step: EventFlowStep) {
   const completed = new Set(run.narrative.eventFlow!.completed.filter((entry) => entry.flowId === step.flow.id).map((entry) => entry.nodeId));
-  return step.flow.events.filter((event) => !completed.has(event.id)).map((event) => ({
+  const source = run.narrative.eventFlow!.completed.filter((entry) => entry.flowId === step.flow.id).at(-1);
+  const allowed = source ? nodeResult(step.flow.events.find(event => event.id === source.nodeId)!, source.outcome).nextEventIds : undefined;
+  return step.flow.events.filter((event) => !completed.has(event.id) && (!allowed || allowed.includes(event.id))).map((event) => ({
     id: event.id, kind: event.kind, entry: bindEventFlowText(event.entry!, run.narrative.eventFlow!.bindings),
     situation: bindEventFlowText(event.situation, run.narrative.eventFlow!.bindings)
   }));
@@ -227,8 +263,12 @@ export function availableNextEventFlows(run: InternalRunState) {
   const definition = run.storyPackSnapshot!.eventFlow!;
   const state = run.narrative.eventFlow!;
   const completed = new Set(state.completedFlows.map((entry) => entry.flowId));
+  const source = state.completed.filter(entry => entry.flowId === state.flowId).at(-1);
+  const previous = source && definition.groups.find(group => group.id === source.flowId)?.events.find(event => event.id === source.nodeId);
+  const allowed = !state.flowId ? definition.actEntries?.[run.narrative.actRuntime!.actId]
+    : previous && source ? nodeResult(previous, source.outcome).nextFlowIds : undefined;
   return eventFlowCatalog(definition, run.narrative.actRuntime!.actId).filter((group) =>
-    group.id !== state.flowId && !completed.has(group.id) && group.requiresItems.every((id) => hasEventFlowItem(run, id)));
+    group.id !== state.flowId && !completed.has(group.id) && (!allowed || allowed.includes(group.id)) && group.requiresItems.every((id) => hasEventFlowItem(run, id)));
 }
 
 /** Numeric inventory is never supplied by, or writable through, continuity maintenance. */

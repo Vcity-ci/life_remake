@@ -34,6 +34,9 @@ coverage/
 /.codex/config.toml
 /.trae/skills/skill-config.json
 
+# Local authoring skill; development aid, not project content
+/.trae/skills/author-if-event-flow/
+
 # OS metadata and the legacy local file literally named .txt (not all *.txt)
 .DS_Store
 Thumbs.db

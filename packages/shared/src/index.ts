@@ -425,8 +425,11 @@ export interface NarrativeEventResult {
   result: string;
   grantItems?: string[];
   consumeItems?: string[];
-  /** This result concludes the current event group; the observer selects what follows. */
+  /** Concludes the group; observation decides closure, routing selects allowed continuations. */
   endsFlow?: boolean;
+  /** Authored candidates, interpreted by the router using actual history. */
+  nextEventIds?: string[];
+  nextFlowIds?: string[];
 }
 
 export type NarrativeEventNode = {
@@ -439,10 +442,13 @@ export type NarrativeEventNode = {
       check: { stat: StatKey; difficulty: number };
       options: Array<{ id: DecisionType; label: string; action: string;
         success: NarrativeEventResult; failure: NarrativeEventResult }> }
+  | { id: string; kind: "decision"; situation: string; question: string; stakes: string;
+      options: Array<{ id: string; label: string; action: string; outcome: NarrativeEventResult }> }
   | { id: string; kind: "settlement"; situation: string;
       /** World procedures applied to actual history by the narrator, not the routing planner. */
       rules: Array<{ id: string; condition: string; disposition: string;
-        grantItems?: string[]; consumeItems?: string[]; endsFlow?: boolean }> });
+        grantItems?: string[]; consumeItems?: string[]; endsFlow?: boolean;
+        nextEventIds?: string[]; nextFlowIds?: string[] }> });
 
 export interface NarrativeEventFlowGroup {
   id: string;
@@ -456,7 +462,7 @@ export interface NarrativeEventFlowGroup {
   entryRequirements?: Partial<Stats>;
   preparation?: string;
   assetRoles?: string[];
-  /** Route complete units by their applicability; there is no authored result-to-node tree. */
+  /** Route among the authored continuations using actual history. */
   routing?: "planned";
   events: NarrativeEventNode[];
 }
@@ -464,6 +470,10 @@ export interface NarrativeEventFlowGroup {
 export interface NarrativeEventFlowDefinition {
   id: string;
   revision: string;
+  /** Absent means legacy protocol; v2 requires explicit entries and result continuations. */
+  protocolVersion?: 2;
+  /** Authored act entry groups, never model-authored. */
+  actEntries?: Record<string, string[]>;
   roles: Array<{ id: string; kind: "character" | "location" | "item" | "ability"; identity: string; name?: string }>;
   originRoles?: string[];
   items: Array<{ id: string; roleId: string; description: string }>;
@@ -1193,7 +1203,7 @@ export interface CompletedNarrativeScene {
 }
 
 export interface NarrativeRunState {
-  version: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 16 | 17 | 18 | 19 | 20;
+  version: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 16 | 17 | 18 | 19 | 20 | 21 | 22;
   enabled: boolean;
   opening?: NarrativeOpeningState;
   arcPhase: NarrativeArcPhase;
@@ -1649,13 +1659,14 @@ export interface ChoiceRoll {
 }
 
 export interface MilestoneChoice {
+  mode?: "check" | "direct";
   check?: ChoiceCheck;
   revision?: number;
   publicIdentity?: string;
   age: number;
   background?: string;
   options: Array<{
-    id: DecisionType;
+    id: string;
     label: string;
     risk: number;
     reward: number;
@@ -1744,11 +1755,12 @@ export interface TurnRecord {
     status?: "selected" | "rendered" | "settled";
     roll?: ChoiceRoll;
   };
-  decisionResult?: { sceneId: string; revision: number; roll: ChoiceRoll; status: "rendered" | "settled" };
+  decisionResult?: { sceneId: string; revision: number; mode?: "check" | "direct"; roll?: ChoiceRoll; status: "rendered" | "settled" };
   createdAt: number;
 }
 
 export interface PublicMilestoneChoice {
+  mode?: "check" | "direct";
   sceneId: string;
   revision: number;
   age: number;

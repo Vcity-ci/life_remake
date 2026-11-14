@@ -490,7 +490,7 @@ export function ensureNarrativeRunState(
   const defaults = createNarrativeRunState(enabled);
   if (!state) return defaults;
   // Historical snapshots remain read-only, including versions created by reverted work.
-  if (state.version !== 18 && state.version !== 19 && state.version !== 20) return structuredClone(state);
+  if (state.version !== 18 && state.version !== 19 && state.version !== 20 && state.version !== 21 && state.version !== 22) return structuredClone(state);
   const normalizeAge = (value: unknown): number => {
     const age = Number(value);
     if (!Number.isFinite(age)) return 0;
@@ -1977,7 +1977,7 @@ function buildTaskNarrativePlan(
       `力量结构：${world.worldCore.powerStructure}`,
       `日常生活：${world.worldCore.everydayLife}`,
 
-    ].filter(Boolean).join("\n") : activeOutline && source.narrative.version === 20 ? undefined : world.storyBible : undefined,
+    ].filter(Boolean).join("\n") : activeOutline && source.narrative.version >= 20 ? undefined : world.storyBible : undefined,
     activeLore: loreSources.map((entry) => entry.text), activeLoreSources: loreSources, activeWorldCardSources: worldCardSources, worldCardDiagnostics: excludedWorldCards, activeThreads: [],
     activeSocialForces: [],
     plotEssentials: recall.facts.map((fact) => `${fact.id}：${fact.label}`),

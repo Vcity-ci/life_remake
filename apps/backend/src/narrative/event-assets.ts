@@ -15,7 +15,7 @@ export type EventAssetChanges = z.infer<typeof eventAssetChangesSchema>;
 type Batch = NonNullable<InternalRunState["narrative"]["assetBuffer"]>;
 
 export function usesPresetEventAssets(run: InternalRunState): boolean {
-  return run.narrative.version === 20 && Boolean(run.storyPackSnapshot?.eventFlow);
+  return run.narrative.version >= 20 && Boolean(run.storyPackSnapshot?.eventFlow);
 }
 
 export function eventAssetCandidates(run: InternalRunState, batch: Batch) {

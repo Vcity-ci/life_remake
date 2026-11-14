@@ -51,7 +51,9 @@ export interface NarrativeTurnEnvelope {
   recentChanges?: string[];
   choiceCheck?: ChoiceCheck;
   growthFocus?: { id: string; label: string; description: string };
-  preparation?: { mode: "transition" | "prepare" | "flow_prepare" | "life_interval"; context?: string; deficits: Array<{ stat: StatKey; label: string; value: number; target: number }> };
+  preparation?: { mode: "transition" | "prepare" | "flow_prepare" | "life_interval"; context?: string;
+    lifeRange?: { fromAge: number; throughAge: number };
+    deficits: Array<{ stat: StatKey; label: string; value: number; target: number }> };
   clock: { mode: "advance" | "hold"; sameAgeTurnCount: number; maxSameAgeTurns: number };
 }
 

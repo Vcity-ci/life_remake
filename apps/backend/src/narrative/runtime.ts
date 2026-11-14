@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { continuityDetailIds, retireNarrativeAssets } from "./asset-scope.js";
 import { prepareChoiceCheck, canOpenChoiceSurvival } from "../choice-check.js";
-import type { DecisionType, NarrativeAgentAttemptRecord, NarrativeAttributePolicy, NarrativeActObservation, NarrativeDecisionBrief, NarrativeStoryPackSnapshot, NarrativeWorldDefinition, PublicMilestoneChoice, WorldConfig } from "@reroll/shared";
+import type { NarrativeAgentAttemptRecord, NarrativeAttributePolicy, NarrativeActObservation, NarrativeDecisionBrief, NarrativeStoryPackSnapshot, NarrativeWorldDefinition, PublicMilestoneChoice, WorldConfig } from "@reroll/shared";
 import {
   generateDynamicNarrativeScene,
   settleDynamicNarrativeScene,
@@ -364,7 +364,7 @@ export async function runNarrativeAgentDecision(input: {
   context: NarrativeContext;
   callId: string;
   choice?: PublicMilestoneChoice;
-  decision: { decision: DecisionType; label: string; description: string; abilityRefs?: string[]; locationDirective?: import("@reroll/shared").MilestoneChoice["options"][number]["locationDirective"]; decisionBrief?: NarrativeDecisionBrief; attributePolicy: NarrativeAttributePolicy };
+  decision: { decision: string; label: string; description: string; abilityRefs?: string[]; locationDirective?: import("@reroll/shared").MilestoneChoice["options"][number]["locationDirective"]; decisionBrief?: NarrativeDecisionBrief; attributePolicy: NarrativeAttributePolicy };
   onProgress?: (stage: "settling" | "rendering" | "syncing") => Promise<void> | void;
   onRendered?: (outcome: Omit<DirectedDecisionNarrativeOutcome, "effects">) => Promise<void> | void;
   onSettled?: () => Promise<void> | void;
@@ -399,12 +399,12 @@ export async function runNarrativeAgentDecision(input: {
   await input.onProgress?.("rendering");
   const check = input.run.nextMilestoneChoice?.check;
   const flowStep = currentEventFlowStep(input.run);
-  const selectedResult = flowStep && execution ? eventFlowResult(input.run,
-    execution.roll.decision + ":" + (execution.roll.success ? "success" : "failure")) : undefined;
+  const selectedResult = flowStep && execution ? eventFlowResult(input.run, execution.mode === "direct"
+    ? "decision:" + execution.optionId : execution.roll!.decision + ":" + (execution.roll!.success ? "success" : "failure")) : undefined;
   const rendered = execution?.rendered ?? await renderDirectedDecisionNarrative(input.run, input.world, {
     ...input.decision, check, roll: execution?.roll,
     eventResult: selectedResult ? bindEventFlowText(selectedResult.result, input.run.narrative.eventFlow!.bindings) : undefined,
-    allowSurvival: Boolean(check && execution && canOpenChoiceSurvival(check, execution.roll)),
+    allowSurvival: Boolean(check && execution?.roll && canOpenChoiceSurvival(check, execution.roll)),
     socialForces: input.narrativeWorld.socialForces
   }, input.context);
   if (execution) execution.rendered = rendered;

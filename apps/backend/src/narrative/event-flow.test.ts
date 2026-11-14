@@ -2,19 +2,20 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import OpenAI from "openai";
 import { createDefaultGameplayTuning, type WorldConfig, type DifficultyConfig } from "@reroll/shared";
-import { createRun, advanceWithDynamicNarrativeScene, applyDirectedClosureRequest, dynamicBackgroundAttributePolicy, approveNarrativeAttributeOutcome, settleNarrativeBackgroundOutcomes } from "../engine.js";
+import { createRun, advanceWithDynamicNarrativeScene, applyDirectedClosureRequest, dynamicBackgroundAttributePolicy, approveNarrativeAttributeOutcome, settleNarrativeBackgroundOutcomes, toPublicMilestoneChoice, applyDirectNarrativeDecision, completeMilestoneDecision } from "../engine.js";
 import { loadNarrativeWorldDefinition } from "../content.js";
 import { loadNarrativeStoryPack } from "../story-packs.js";
 import { resolveNarrativeExperience } from "../narrative-experience.js";
 import { ensureNarrativeActRuntime, ensureNarrativeRunState, buildNarrativePromptPlan } from "../narrative.js";
-import { generateDynamicNarrativeScene, generateNarrativeActWorldCard, observeNarrativeAct, planNextEventFlow, planNextEventUnit, dynamicNarrativeRenderPrompt, type NarrativeContext } from "../ai.js";
-import { prepareChoiceCheck, rollChoice } from "../choice-check.js";
+import { generateDynamicNarrativeScene, generateNarrativeActWorldCard, observeNarrativeAct, planNextEventFlow, planNextEventUnit, settleDynamicNarrativeScene, type NarrativeContext } from "../ai.js";
+import { prepareChoiceCheck, rollChoice, selectDirectChoice } from "../choice-check.js";
 import { currentEventFlowStep, eventFlowRoles, eventFlowRenderInput, eventFlowResult, applyEventFlowResultItems,
   availableNextEventFlows, availableNextEventUnits, validateEventFlowBindings, validateNarrativeEventFlow } from "./event-flow.js";
+import { eventFlowRuntimeVersion, canAdvanceEventFlowVersion } from "./event-flow.js";
 import { prepareEventFlowEntry, prepareEventFlowLifeInterval } from "./event-flow.js";
 import { eventAssetCandidates, applyEventAssetChanges } from "./event-assets.js";
 import { stageNarrativeAssetRound } from "./asset-buffer.js";
-import { runNarrativeAgentTurn, synchronizeNarrativeAssetBatch } from "./runtime.js";
+import { runNarrativeAgentTurn, runNarrativeAgentDecision, synchronizeNarrativeAssetBatch } from "./runtime.js";
 import { commitNarrativeActOutline, parseNarrativeActWorldCard } from "./act-outline.js";
 import { ensureCurrentEventFlow, finishPendingNarrativeActEvent } from "./finalization.js";
 import { hostingFixture } from "./hosting-fixture.js";
@@ -252,13 +253,24 @@ test("新版正文不被追加登记工具，展示同步仅供应预设身份�
   });
 });
 
-async function fixture(actIndex = 0, flowId?: string) {
-  const base = (await loadNarrativeWorldDefinition("ancient"))!, pack = (await loadNarrativeStoryPack(base, "ancient.frontier-commander"))!;
+async function fixture(actIndex = 0, flowId?: string, packId = "ancient.frontier-commander", currentProtocol = false) {
+  const base = (await loadNarrativeWorldDefinition("ancient"))!, pack = (await loadNarrativeStoryPack(base, packId))!;
+  // Existing v19/v20 tests exercise the legacy router. New-protocol tests below
+  // keep the published entries and continuations and run as v22.
+  if (!currentProtocol && packId === "ancient.frontier-commander") {
+    delete pack.eventFlow!.protocolVersion;
+    delete pack.eventFlow!.actEntries;
+    for (const group of pack.eventFlow!.groups) for (const node of group.events) {
+      const results = node.kind === "choice" ? node.options.flatMap(option => [option.success, option.failure])
+        : node.kind === "decision" ? node.options.map(option => option.outcome) : node.kind === "settlement" ? node.rules : [node.outcome];
+      for (const result of results) { delete result.nextEventIds; delete result.nextFlowIds; }
+    }
+  }
   const definition = resolveNarrativeExperience(base, pack), tuning = createDefaultGameplayTuning(); tuning.bootstrap.selectedCardMin = 0;
   const run = createRun({ world, difficulty, tuning, cards: [], narrativeEnabled: true, storyPack: pack }, {
     clientId: "flow-test", worldId: world.id, storyPackId: pack.id, difficultyId: difficulty.id, personaPrompt: "军户孩子",
     talentPointTotal: 25, stats: { intelligence: 5, charisma: 5, family: 5, fortune: 5, physique: 5 }, selectedCardIds: [] });
-  run.age = 20; run.narrative.version = 19;
+  run.age = 20; run.narrative.version = currentProtocol ? 22 : 19;
   run.narrative = ensureNarrativeActRuntime(run.narrative, definition, 20);
   const act = definition.mainlineActs![actIndex];
   run.narrative.actRuntime!.actId = act.id; run.narrative.actRuntime!.admittedAtAge = 20;
@@ -270,6 +282,412 @@ async function fixture(actIndex = 0, flowId?: string) {
     flowId: flowId ?? groups[0].id, completed: [], completedFlows: [] };
   return { run, definition, act, pack };
 }
+
+test("协议能力决定运行版本，两条样本旧局只读，其他路线保留旧协议", async () => {
+  const base = (await loadNarrativeWorldDefinition("ancient"))!;
+  for (const id of ["ancient.frontier-commander", "ancient.sovereign-rise"]) {
+    const pack = (await loadNarrativeStoryPack(base, id))!;
+    assert.equal(pack.eventFlow!.protocolVersion, 2);
+    assert.equal(eventFlowRuntimeVersion(pack.eventFlow), 22);
+    for (const old of [18, 19, 20, 21]) assert.equal(canAdvanceEventFlowVersion(old, pack.eventFlow), false);
+    assert.equal(canAdvanceEventFlowVersion(22, pack.eventFlow), true);
+    const renamed = structuredClone(pack.eventFlow!); renamed.id = "another-world.another-story";
+    assert.ok(validateNarrativeEventFlow(renamed, { ...pack, id: renamed.id, eventFlowId: renamed.id }));
+    assert.equal(eventFlowRuntimeVersion(renamed), 22);
+    delete renamed.actEntries;
+    assert.throws(() => validateNarrativeEventFlow(renamed, { ...pack, id: renamed.id, eventFlowId: renamed.id }), /act_entry_missing/);
+  }
+  const legacy = (await loadNarrativeStoryPack(base, "ancient.jianghu-master"))!;
+  assert.equal(eventFlowRuntimeVersion(legacy.eventFlow), 20);
+  assert.equal(canAdvanceEventFlowVersion(20, legacy.eventFlow), true);
+  assert.equal(canAdvanceEventFlowVersion(18), true);
+});
+
+test("边境非授将结果接直接去留，不抽取晋升补考或其他全幕单元", async () => {
+  const { run, pack } = await fixture(1, "border-campaign", "ancient.frontier-commander", true);
+  const state = run.narrative.eventFlow!;
+  const group = pack.eventFlow!.groups.find(group => group.id === state.flowId)!;
+  state.eventIndex = group.events.findIndex(node => node.id === "general-commission");
+  const step = currentEventFlowStep(run)!;
+  for (const outcome of ["settlement:retain-command", "settlement:reduce-command"]) {
+    state.completed = [{ sourceEventId: outcome, actId: state.actId, flowId: group.id, nodeId: step.event.id, outcome, age: run.age }];
+    assert.equal(eventFlowResult(run, outcome).endsFlow, undefined);
+    assert.deepEqual(availableNextEventUnits(run, step).map(node => node.id), ["service-direction"]);
+  }
+  state.eventIndex = group.events.findIndex(node => node.id === "service-direction");
+  state.completed.push({ sourceEventId: "leave", actId: state.actId, flowId: group.id, nodeId: "service-direction", outcome: "decision:leave", age: run.age });
+  assert.deepEqual(availableNextEventFlows(run).map(group => group.id), ["retired-life"]);
+  const input = eventFlowRenderInput(run, currentEventFlowStep(run)!);
+  assert.equal(input.kind, "decision");
+  assert.ok(!JSON.stringify(input).includes("nextFlowIds"));
+  assert.ok(!JSON.stringify(input).includes("归乡后的生活尚待展开"), "未选结果不提前发送正文");
+});
+
+test("边境直接去留保存恢复后无掷点，接受现职换幕，离军接生活", async t => {
+  for (const selected of ["remain", "leave"] as const) await t.test(selected, async t => {
+    const { run, definition, pack } = await fixture(1, "border-campaign", "ancient.frontier-commander", true);
+    const flow = pack.eventFlow!.groups.find(group => group.id === "border-campaign")!;
+    run.narrative.eventFlow!.eventIndex = flow.events.findIndex(node => node.id === "service-direction");
+    const step = currentEventFlowStep(run)!;
+    advanceWithDynamicNarrativeScene(run, world, definition, { patternIds: [], forceIds: [], participants: [],
+      narrative: "你已留任校尉，面对继续服役与交接离军的去留。", createsDecision: true,
+      eventFlow: { flowId: flow.id, eventIndex: step.eventIndex, nodeId: step.event.id, outcome: "pending" } });
+    const choice = toPublicMilestoneChoice(run)!;
+    assert.equal(choice.mode, "direct"); assert.equal(choice.check, undefined);
+    assert.ok(choice.options.every(option => option.probability === undefined));
+    selectDirectChoice(run, selected);
+    const restored = JSON.parse(JSON.stringify(run)) as typeof run;
+    restored.narrative = ensureNarrativeRunState(restored.narrative, true);
+    selectDirectChoice(restored, selected); assert.equal(restored.choiceExecution!.roll, undefined);
+    restored.choiceExecution!.outcome = { narrative: selected === "remain" ? "你接受校尉现职继续服役。" : "你已交清军职离军，归乡生活尚未展开。",
+      effects: [], nextClock: "hold", assetActivity: { locationIds: [], abilityIds: [] } };
+    const options = { narrative: restored.choiceExecution!.outcome.narrative, narrativeOutcome: { effects: [] }, narrativeWorld: definition, deferCompletion: true };
+    const committed = applyDirectNarrativeDecision(restored, world, selected, options);
+    completeMilestoneDecision(restored, committed.decisionEvent, committed.sourceEventId, [], { narrativeWorld: definition });
+    t.mock.method(OpenAI.Chat.Completions.prototype, "create", async (payload: any) => {
+      assert.equal(payload.tools[0].function.name, "observe_act_closure", "单候选不额外请求路由");
+      return reply("observe_act_closure", selected === "remain" ? { decision: "act_closed", evidence: "带队实践及军议已完成，你接受现职继续服役。" } : { decision: "ongoing", evidence: "" });
+    });
+    await finishPendingNarrativeActEvent(restored, world, definition, context, async () => {});
+    assert.equal(restored.narrative.sceneClock.mode, "hold");
+    assert.equal(restored.pendingActFinalization, undefined);
+    if (selected === "remain") assert.equal(restored.narrative.actRuntime!.actId, pack.acts[2].id);
+    else assert.equal(currentEventFlowStep(restored)!.flow.id, "retired-life");
+    assert.equal(restored.narrative.eventFlow!.ending, undefined);
+  });
+});
+
+test("战后去向、失败后续和交图使用显式接续，退役生活共享且不重置前情", async () => {
+  const { run, pack } = await fixture(2, "postwar-direction", "ancient.frontier-commander", true);
+  const state = run.narrative.eventFlow!;
+  for (const [outcome, next] of [["decision:serve", "peace-service"], ["decision:retire", "retired-life"]]) {
+    state.completed = [{ sourceEventId: outcome, actId: state.actId, flowId: state.flowId!, nodeId: "postwar-choice", outcome, age: run.age }];
+    assert.deepEqual(availableNextEventFlows(run).map(group => group.id), [next]);
+  }
+  state.flowId = "decisive-frontier-war"; state.eventIndex = 1;
+  state.completed = [{ sourceEventId: "war-failure", actId: state.actId, flowId: state.flowId, nodeId: "war-decision", outcome: "balanced:failure", age: run.age }];
+  assert.deepEqual(availableNextEventFlows(run).map(group => group.id), ["last-frontier-line"]);
+  assert.deepEqual(eventFlowResult(run, "risky:failure").nextFlowIds, []);
+  const retired = pack.eventFlow!.groups.find(group => group.id === "retired-life")!;
+  assert.deepEqual(retired.actIds, [pack.acts[1].id, pack.acts[2].id]);
+  state.flowId = "retired-life"; state.eventIndex = 1;
+  const before = structuredClone(state.completed);
+  assert.ok(prepareEventFlowLifeInterval(run)!.remainingYears >= 6);
+  assert.deepEqual(state.completed, before);
+  assert.ok(!pack.eventFlow!.groups.find(group => group.id === "invasion-arrival")!.requiresItems?.includes("command-banner"));
+  assert.ok(!pack.eventFlow!.groups.find(group => group.id === "invasion-arrival")!.entry.includes("已经实际成为将军"));
+});
+
+test("生活请求同时标出保存的整个间隔与本次覆盖，动态区间不改变职责", async t => {
+  const { run, definition, act } = await fixture(1, "company-training", "ancient.frontier-commander", true);
+  const captures: any[] = [];
+  t.mock.method(OpenAI.Chat.Completions.prototype, "create", async (payload: any) => {
+    captures.push(payload);
+    return reply("render_background_prose", { narrative: "你照常服役，与亲友相处。" });
+  });
+  for (const range of [{ fromAge: 21, toAge: 23 }, { fromAge: 24, toAge: 25 }]) {
+    const input: any = { act, presentation: "summary", sceneAge: range.toAge, backgroundAgeRange: range,
+      socialForces: [], storyPatterns: [],
+      preparation: { mode: "life_interval", context: "以实际军职服役，与同伍和亲友生活。", lifeRange: { fromAge: 20, throughAge: 25 }, deficits: [] },
+      statTiers: {}, backgroundAttributePolicy: {}, allowedTurnKinds: ["background"] };
+    await generateDynamicNarrativeScene(run, world, input, { ...context,
+      narrativePlan: buildNarrativePromptPlan(run, definition, null, "background") });
+  }
+  for (const [index, capture] of captures.entries()) {
+    const tasks = capture.messages.filter((message: any) => message.content?.startsWith("【当前任务】"));
+    assert.equal(tasks.length, 1);
+    const text = tasks[0].content;
+    assert.ok(text.includes(index === 0 ? "整段普通生活：20—25岁；本次覆盖：21—23岁" : "整段普通生活：20—25岁；本次覆盖：24—25岁"));
+    assert.ok(!text.includes("本段年龄区间"));
+    assert.ok(!text.includes("本段结果"));
+  }
+  assert.equal(captures.length, 2);
+  assert.deepEqual(captures[0].messages.filter((message: any) => message.role === "system"), captures[1].messages.filter((message: any) => message.role === "system"));
+  assert.deepEqual(captures[0].tools, captures[1].tools);
+});
+
+test("显式后续不被观察器换幕或提前总结跳过，真实败局仍能结束", async t => {
+  for (const decision of ["act_closed", "run_ended", "defeat"] as const) await t.test(decision, async t => {
+    const { run } = await fixture(0, "border-childhood", "ancient.frontier-commander", true);
+    const captures: any[] = [];
+    t.mock.method(OpenAI.Chat.Completions.prototype, "create", async (payload: any) => {
+      captures.push(payload);
+      return reply("observe_act_closure", captures.length > 1 ? { decision: "ongoing", evidence: "" }
+        : decision === "act_closed" ? { decision, evidence: "童年阶段结束。" }
+        : { decision: "run_ended", evidence: decision === "defeat" ? "主角实际战死。" : "可以总结人生。",
+          endingPolarity: decision === "defeat" ? "bad" : "normal", lifeStatus: decision === "defeat" ? "dead" : "alive",
+          ...(decision === "defeat" ? { deathCause: "战死" } : {}) });
+    });
+    const observation = await observeNarrativeAct(run, world, { callId: decision, actId: run.narrative.actRuntime!.actId,
+      sourceEventId: "closure-test", recentStory: "主角实际已经发生的经历。", outline: run.narrative.actRuntime!.outline!,
+      eventFlow: { id: "group", label: "本组", narrativeRole: "成长", result: "本组实际结果" }, actContinuationPending: true }, context);
+    assert.equal(observation.decision, decision === "defeat" ? "run_ended" : "ongoing");
+    assert.equal(captures.length, decision === "defeat" ? 1 : 2);
+    if (captures.length === 2) {
+      assert.deepEqual(captures[0].tools, captures[1].tools);
+      assert.deepEqual(captures[0].messages.filter((message: any) => message.role === "system"), captures[1].messages.filter((message: any) => message.role === "system"));
+    }
+  });
+});
+
+test("布衣直接选择不检定，保存恢复后只提交一次并承接同年下一单元", async (t) => {
+  const { run, definition } = await fixture(0, "join-rebels", "ancient.sovereign-rise");
+  run.narrative.version = 21;
+  run.narrative.eventFlow!.eventIndex = 1;
+  const step = currentEventFlowStep(run)!;
+  advanceWithDynamicNarrativeScene(run, world, definition, { patternIds: [], forceIds: [], participants: [],
+    narrative: "三支人马向你说明各自收留条件。", createsDecision: true,
+    eventFlow: { flowId: step.flow.id, eventIndex: step.eventIndex, nodeId: step.event.id, outcome: "pending" } });
+  const choice = toPublicMilestoneChoice(run)!;
+  assert.equal(choice.mode, "direct");
+  assert.equal(choice.check, undefined);
+  assert.ok(choice.options.every(option => option.probability === undefined));
+  selectDirectChoice(run, "provisioned");
+  const restored = JSON.parse(JSON.stringify(run)) as typeof run;
+  restored.narrative = ensureNarrativeRunState(restored.narrative, true);
+  selectDirectChoice(restored, "provisioned");
+  assert.equal(restored.choiceExecution!.roll, undefined);
+  assert.throws(() => selectDirectChoice(restored, "disciplined"), /decision_already_selected/);
+  assert.throws(() => rollChoice(restored, "safe"));
+  restored.choiceExecution!.outcome = { narrative: "你接受粮械充足的队伍收留，旧人按约接受调遣。", effects: [], nextClock: "hold", assetActivity: { locationIds: [], abilityIds: [] } };
+  const options = { narrative: restored.choiceExecution!.outcome!.narrative, narrativeOutcome: { effects: [] }, narrativeWorld: definition, deferCompletion: true };
+  const committed = applyDirectNarrativeDecision(restored, world, "provisioned", options);
+  const count = restored.history.length;
+  assert.deepEqual(applyDirectNarrativeDecision(restored, world, "provisioned", options).sourceEventId, committed.sourceEventId);
+  assert.equal(restored.history.length, count);
+  completeMilestoneDecision(restored, committed.decisionEvent, committed.sourceEventId, [], { narrativeWorld: definition });
+  assert.equal(restored.pendingActFinalization!.eventFlow!.outcome, "decision:provisioned");
+  t.mock.method(OpenAI.Chat.Completions.prototype, "create", async () => { throw new Error("singleton_must_not_request"); });
+  await finishPendingNarrativeActEvent(restored, world, definition, context, async () => {});
+  assert.equal(currentEventFlowStep(restored)!.event.id, "join-life");
+  assert.equal(restored.narrative.sceneClock.mode, "hold");
+  assert.equal(restored.pendingActFinalization, undefined);
+});
+
+test("布衣结果限制接续范围：失败进入重整，留守不能回到入京候选", async () => {
+  const { run, pack } = await fixture(0, "self-rise", "ancient.sovereign-rise");
+  run.narrative.version = 21;
+  const state = run.narrative.eventFlow!;
+  state.eventIndex = 1;
+  state.completed.push({ flowId: "self-rise", nodeId: "rise-choice", outcome: "balanced:failure", sourceEventId: "failed", actId: state.actId, age: run.age });
+  assert.deepEqual(availableNextEventFlows(run).map(group => group.id), ["scattered-band"]);
+  state.actId = pack.acts[2].id; run.narrative.actRuntime!.actId = state.actId;
+  state.flowId = "future-road"; state.eventIndex = 0;
+  state.completed.push({ flowId: "future-road", nodeId: "future-choice", outcome: "decision:west", sourceEventId: "west", actId: state.actId, age: run.age });
+  assert.deepEqual(availableNextEventFlows(run).map(group => group.id), ["western-settlement"]);
+  Object.assign(state.bindings, Object.fromEntries(eventFlowRoles(pack.eventFlow!, state.actId).map(role => [role.id, "实名" + role.id])));
+  const future = eventFlowRenderInput(run, currentEventFlowStep(run)!);
+  assert.equal(future.options!.length, 2);
+  assert.ok(!JSON.stringify(future).includes("nextFlowIds"));
+  const bad = structuredClone(pack.eventFlow!);
+  bad.actEntries![state.actId] = ["nonexistent"];
+  assert.throws(() => validateNarrativeEventFlow(bad, pack));
+});
+
+test("区域战果只接权力安排，受挫后守住剩余力量才接去向", async () => {
+  const { run, pack } = await fixture(1, "fight-warlord", "ancient.sovereign-rise", true);
+  const state = run.narrative.eventFlow!;
+  state.eventIndex = 2;
+  state.completed.push({ flowId: state.flowId!, nodeId: "warlord-return", outcome: "experience", sourceEventId: "remaining-base", actId: state.actId, age: run.age });
+  assert.deepEqual(availableNextEventFlows(run).map(group => group.id), ["regional-lord"]);
+  state.flowId = "regional-lord";
+  state.eventIndex = pack.eventFlow!.groups.find(group => group.id === state.flowId)!.events.findIndex(node => node.id === "regional-aftermath");
+  state.completed.push({ flowId: state.flowId!, nodeId: "regional-aftermath", outcome: "experience", sourceEventId: "regional-result", actId: state.actId, age: run.age });
+  assert.deepEqual(availableNextEventFlows(run), [], "一方成果成立后不降格为残部或回抽扩张");
+  state.completed = [];
+  state.flowId = "lost-territory";
+  state.eventIndex = pack.eventFlow!.groups.find(group => group.id === state.flowId)!.events.findIndex(node => node.id === "lost-return");
+  state.completed.push({ flowId: state.flowId!, nodeId: "lost-return", outcome: "experience", sourceEventId: "preserved-base", actId: state.actId, age: run.age });
+  assert.deepEqual(availableNextEventFlows(run).map(group => group.id), ["reduced-future"]);
+  state.flowId = "reduced-future"; state.eventIndex = 0;
+  const local = eventFlowResult(run, "decision:local");
+  assert.deepEqual(local.nextEventIds, ["reduced-local-life"]);
+  assert.equal(local.grantItems, undefined);
+  assert.deepEqual(eventFlowResult(run, "decision:last-campaign").nextEventIds, ["reduced-breakout"]);
+  assert.deepEqual(eventFlowResult(run, "decision:submit").nextFlowIds, []);
+  state.completed.push({ flowId: state.flowId, nodeId: "reduced-choice", outcome: "decision:local", sourceEventId: "local-choice", actId: state.actId, age: run.age });
+  assert.deepEqual(availableNextEventUnits(run, currentEventFlowStep(run)!).map(node => node.id), ["reduced-local-life"]);
+  state.eventIndex = 1;
+  for (const option of ["safe", "balanced", "risky"]) {
+    const failed = eventFlowResult(run, option + ":failure");
+    assert.equal(failed.endsFlow, true);
+    assert.deepEqual(failed.nextFlowIds, []);
+    assert.equal(failed.grantItems, undefined);
+  }
+});
+
+test("最后突破取得区域后只接尚未处理的一方政治安排，不重问已完成选择", async () => {
+  const { run } = await fixture(1, "reduced-future", "ancient.sovereign-rise");
+  run.narrative.version = 21;
+  const state = run.narrative.eventFlow!;
+  state.completed.push({ flowId: state.flowId!, nodeId: "reduced-aftermath", outcome: "experience",
+    sourceEventId: "new-region", actId: state.actId, age: run.age });
+  assert.deepEqual(availableNextEventFlows(run).map(group => group.id), ["regional-lord"]);
+  state.completedFlows.push({ flowId: "regional-lord", sourceEventId: "prior-arrangement", actId: state.actId });
+  assert.deepEqual(availableNextEventFlows(run), []);
+});
+
+test("京畿失利后保住地方与基业覆亡分流，只有保全分支继续交接生活", async () => {
+  const { run } = await fixture(2, "last-stand", "ancient.sovereign-rise");
+  run.narrative.version = 21;
+  const state = run.narrative.eventFlow!;
+  state.eventIndex = 1;
+  assert.deepEqual(eventFlowResult(run, "settlement:line-preserved").nextEventIds, ["last-aftermath"]);
+  for (const rule of ["line-broken", "line-extinguished"]) {
+    const result = eventFlowResult(run, "settlement:" + rule);
+    assert.equal(result.endsFlow, true);
+    assert.deepEqual(result.nextFlowIds, []);
+    assert.equal(result.nextEventIds, undefined);
+  }
+  state.eventIndex = 2;
+  state.completed.push({ flowId: state.flowId!, nodeId: "last-aftermath", outcome: "experience", sourceEventId: "preserved", actId: state.actId, age: run.age });
+  assert.deepEqual(availableNextEventFlows(run).map(group => group.id), ["western-succession"]);
+});
+
+test("夺宫不发帝印或跳到新朝，天下行动及失利后不同战事分别接实际处置", async () => {
+  const { run, pack } = await fixture(2, "decisive-capital", "ancient.sovereign-rise", true);
+  const state = run.narrative.eventFlow!;
+  const group = pack.eventFlow!.groups.find(group => group.id === state.flowId)!;
+  const at = (id: string) => { state.eventIndex = group.events.findIndex(node => node.id === id); assert.ok(state.eventIndex >= 0); };
+  at("capital-reckoning");
+  const capital = eventFlowResult(run, "settlement:capital-held");
+  assert.deepEqual(capital.nextEventIds, ["realm-front"]);
+  assert.equal(capital.grantItems, undefined);
+  at("realm-campaign");
+  for (const option of ["safe", "balanced", "risky"]) {
+    assert.deepEqual(eventFlowResult(run, option + ":success").nextEventIds, ["realm-reckoning"]);
+    assert.deepEqual(eventFlowResult(run, option + ":failure").nextEventIds, ["realm-reverse"]);
+  }
+  at("realm-reverse");
+  assert.deepEqual(eventFlowResult(run, "experience").nextEventIds, ["realm-counterstroke"]);
+  at("realm-counterstroke");
+  assert.deepEqual(eventFlowResult(run, "safe:failure").nextFlowIds, ["last-stand"]);
+  at("realm-reckoning");
+  for (const rule of ["campaign-won", "core-defended"]) {
+    assert.deepEqual(eventFlowResult(run, "settlement:" + rule).nextEventIds, ["realm-foundation"]);
+  }
+  at("realm-foundation");
+  const result = eventFlowResult(run, "settlement:throne-established");
+  assert.equal(result.endsFlow, undefined);
+  assert.deepEqual(result.nextEventIds, ["new-court"]);
+  applyEventFlowResultItems(run, result);
+  state.completed.push({ flowId: state.flowId!, nodeId: "realm-foundation", outcome: "settlement:throne-established", sourceEventId: "new-court", actId: state.actId, age: run.age });
+  assert.deepEqual(availableNextEventUnits(run, currentEventFlowStep(run)!).map(node => node.id), ["new-court"]);
+});
+
+test("逐鹿各幕从显式入口可达全部单元，辅助经历不产生回环或要求跑完全部组", async () => {
+  const { pack } = await fixture(0, "family-ruin", "ancient.sovereign-rise", true);
+  const flow = pack.eventFlow!;
+  for (const act of pack.acts) {
+    const groups = flow.groups.filter(group => group.actIds.includes(act.id));
+    const edges = new Map<string, string[]>();
+    for (const group of groups) for (const node of group.events) {
+      const results = node.kind === "choice" ? node.options.flatMap(option => [option.success, option.failure])
+        : node.kind === "decision" ? node.options.map(option => option.outcome)
+        : node.kind === "settlement" ? node.rules : [node.outcome];
+      edges.set(node.id, results.flatMap(result => result.endsFlow
+        ? (result.nextFlowIds ?? []).map(id => groups.find(candidate => candidate.id === id)!.events[0].id)
+        : result.nextEventIds ?? []));
+    }
+    const visited = new Set<string>(), stack = new Set<string>();
+    const walk = (id: string) => {
+      assert.ok(!stack.has(id), "已结束经历不能形成回环：" + id);
+      if (visited.has(id)) return;
+      stack.add(id);
+      for (const next of edges.get(id) ?? []) walk(next);
+      stack.delete(id); visited.add(id);
+    };
+    for (const id of flow.actEntries![act.id]) walk(groups.find(group => group.id === id)!.events[0].id);
+    assert.deepEqual([...visited].sort(), [...edges.keys()].sort(), act.id + "不能存在孤立素材");
+  }
+});
+
+test("布衣结算校验进入现有单次纠错，不放宽属性、不重写正文、不污染后续请求", async (t) => {
+  for (const apiPath of ["/chat/completions", "/responses"] as const) await t.test(apiPath, async (t) => {
+    const { run, act } = await fixture(2, "western-succession", "ancient.sovereign-rise");
+    run.narrative.version = 21;
+    const captures: any[] = [];
+    const respond = async (payload: any) => {
+      captures.push(payload);
+      const args = { effects: [{ stat: captures.length === 1 ? "physique" : "family", direction: captures.length === 1 ? "down" : "up", band: "light" }] };
+      return apiPath === "/responses" ? { output: [{ type: "function_call", name: "resolve_background_outcome", arguments: JSON.stringify(args), call_id: "settlement" }] }
+        : reply("resolve_background_outcome", args);
+    };
+    if (apiPath === "/responses") t.mock.method(OpenAI.Responses.prototype, "create", respond);
+    else t.mock.method(OpenAI.Chat.Completions.prototype, "create", respond);
+    const input = { act, presentation: "summary", allowedTurnKinds: ["background"], backgroundAgeRange: { fromAge: 51, toAge: 52 },
+      socialForces: [], storyPatterns: [], knownCharacters: [], knownFactIds: [], backgroundAttributePolicy: dynamicBackgroundAttributePolicy(run) } as any;
+    const scene = { turnKind: "background", createsDecision: false, narrative: "你与家人生活，偶有小病，休息后继续相处。" } as any;
+    const before = structuredClone({ age: run.age, stats: run.stats, history: run.history });
+    const ctx = { ...context, providerConfig: { ...context.providerConfig, apiPath } };
+    const result = await settleDynamicNarrativeScene(run, world, input, scene, ctx);
+    assert.equal(result.narrative, scene.narrative);
+    assert.deepEqual(result.backgroundAttributeEffects, [{ stat: "family", direction: "up", band: "light" }]);
+    assert.equal(captures.length, 2);
+    const text = (request: any) => JSON.stringify(apiPath === "/responses" ? request.input : request.messages);
+    assert.ok(text(captures[1]).includes("direction_not_allowed"));
+    await settleDynamicNarrativeScene(run, world, input, scene, ctx);
+    assert.equal(captures.length, 3);
+    assert.ok(!text(captures[2]).includes("originalToolArguments"));
+    assert.deepEqual(captures[0].tools, captures[2].tools);
+    assert.deepEqual({ age: run.age, stats: run.stats, history: run.history }, before);
+  });
+});
+
+test("两种传输的直接结果只接收已选道路，不补成功率、掷点或未来分支", async (t) => {
+  for (const apiPath of ["/chat/completions", "/responses"] as const) await t.test(apiPath, async (t) => {
+    const captures: any[] = [];
+    const respond = async (payload: any) => {
+      const tool = payload.tools[0].function ?? payload.tools[0];
+      if (tool.name === "render_decision_outcome") captures.push(payload);
+      const args = tool.name === "render_decision_outcome" ? { narrative: "你向旧部说明自己选定的道路。", nextClock: "hold" } : { effects: [] };
+      return apiPath === "/responses" ? { output: [{ type: "function_call", name: tool.name, arguments: JSON.stringify(args), call_id: "direct" }] } : reply(tool.name, args);
+    };
+    if (apiPath === "/responses") t.mock.method(OpenAI.Responses.prototype, "create", respond);
+    else t.mock.method(OpenAI.Chat.Completions.prototype, "create", respond);
+    for (const selected of ["west", "capital"]) {
+      const { run, definition } = await fixture(2, "future-road", "ancient.sovereign-rise");
+      run.narrative.version = 21;
+      const step = currentEventFlowStep(run)!;
+      advanceWithDynamicNarrativeScene(run, world, definition, { patternIds: [], forceIds: [], participants: [],
+        narrative: "京畿邀约与故土责任都在眼前。", createsDecision: true,
+        eventFlow: { flowId: step.flow.id, eventIndex: step.eventIndex, nodeId: step.event.id, outcome: "pending" } });
+      const choice = toPublicMilestoneChoice(run)!;
+      selectDirectChoice(run, selected);
+      const option = run.nextMilestoneChoice!.options.find(option => option.id === selected)!;
+      await runNarrativeAgentDecision({ run, world, narrativeWorld: definition, context: { ...context, providerConfig: { ...context.providerConfig, apiPath } },
+        callId: "direct:" + selected, choice, decision: { decision: selected, label: option.label, description: option.description,
+          attributePolicy: { allowedStats: ["charisma"], allowedBands: ["light"], allowedDirections: ["up", "down"], minEffects: 0, maxEffects: 2 } } });
+      assert.equal(run.choiceExecution!.roll, undefined);
+    }
+    assert.equal(captures.length, 2);
+    const system = (payload: any) => apiPath === "/responses" ? payload.instructions : payload.messages.filter((m: any) => m.role === "system");
+    assert.deepEqual(system(captures[0]), system(captures[1]));
+    assert.deepEqual(captures[0].tools, captures[1].tools);
+    for (const request of captures) {
+      const content = JSON.stringify(apiPath === "/responses" ? request.input : request.messages);
+      assert.ok(content.includes("本次确定的事件结果"));
+      assert.ok(!content.includes("检定结果：失败"));
+      assert.ok(!content.includes("检定结果：成功"));
+      assert.ok(!content.includes("nextFlowIds"));
+    }
+  });
+});
+
+test("布衣空接续不退回全幕抽取，保留已提交来源", async (t) => {
+  const { run, definition } = await fixture(2, "western-succession", "ancient.sovereign-rise");
+  run.narrative.version = 21; run.narrative.eventFlow!.eventIndex = 2;
+  const step = currentEventFlowStep(run)!;
+  advanceWithDynamicNarrativeScene(run, world, definition, { patternIds: [], forceIds: [], participants: [],
+    narrative: "你已交出职责，地方依旧有序，晚年旧人各有归处。", nextClock: "hold", attributeOutcome: { effects: [] },
+    eventFlow: { flowId: step.flow.id, eventIndex: step.eventIndex, nodeId: step.event.id, outcome: "experience" } });
+  const source = run.pendingActFinalization!.sourceEventId;
+  t.mock.method(OpenAI.Chat.Completions.prototype, "create", async () => reply("observe_act_closure", { decision: "ongoing", evidence: null }));
+  await assert.rejects(finishPendingNarrativeActEvent(run, world, definition, context, async () => {}), /event_flow_candidates_empty/);
+  assert.equal(run.pendingActFinalization!.sourceEventId, source);
+  assert.deepEqual(availableNextEventFlows(run), []);
+  assert.equal(run.narrative.eventFlow!.flowId, "western-succession");
+});
 
 test("事件素材按可复用组加载，幕初绑定持久化，正文只取得当前经历且不取得未来结果", async () => {
   const { run, definition, pack } = await fixture(0, "ridge-scouts");
@@ -949,52 +1367,4 @@ test("方术教门按生命周期覆盖三幕、疫病教团行为与道具链�
   const lineageExit = lineage.events[lineage.events.length - 1] as any;
   assert.equal(lineageExit.id, "lineage-aftermath");
   assert.ok(lineageExit.outcome.endsFlow);
-});
-
-test("布衣逐鹿按生命周期覆盖三幕、军阀联盟行为与道具链路", async () => {
-  const base = (await loadNarrativeWorldDefinition("ancient"))!;
-  const pack = (await loadNarrativeStoryPack(base, "ancient.sovereign-rise"))!;
-  const flow = pack.eventFlow!;
-  assert.equal(flow.groups.length, 14);
-  assert.equal(flow.groups.reduce((total, group) => total + group.events.length, 0), 43);
-  const actIds = pack.acts.map((act) => act.id);
-  assert.deepEqual(actIds.map((actId) => flow.groups.filter((group) => group.actIds.includes(actId)).length), [5, 5, 4]);
-  for (const group of flow.groups) {
-    const events = group.events as any[];
-    const exits = (event: any) => event.kind === "choice"
-      ? event.options.some((option: any) => option.success.endsFlow || option.failure.endsFlow)
-      : event.kind === "settlement"
-        ? event.rules.some((rule: any) => rule.endsFlow)
-        : Boolean(event.outcome.endsFlow);
-    assert.ok(exits(events[events.length - 1]), group.id + " exit");
-    for (const event of events.slice(0, -1)) assert.ok(!exits(event), group.id + ":" + event.id);
-  }
-  const foundationIds = new Set(flow.groups.filter((group) => group.actIds.includes(actIds[0])).map((group) => group.id));
-  for (const id of ["stronghold", "first-followers", "scattered-band", "base-established"]) assert.ok(foundationIds.has(id), id);
-  const contentionIds = new Set(flow.groups.filter((group) => group.actIds.includes(actIds[1])).map((group) => group.id));
-  for (const id of ["warlord-alliance", "siege", "betrayal", "lost-territory", "contender"]) assert.ok(contentionIds.has(id), id);
-  const grants = new Set<string>();
-  const consumes = new Set<string>();
-  for (const group of flow.groups) {
-    for (const event of group.events as any[]) {
-      const results = event.kind === "choice" ? event.options.flatMap((option: any) => [option.success, option.failure])
-        : event.kind === "settlement" ? event.rules : [event.outcome];
-      for (const result of results) {
-        for (const id of result.grantItems ?? []) grants.add(id);
-        for (const id of result.consumeItems ?? []) consumes.add(id);
-      }
-    }
-  }
-  assert.ok(grants.has("alliance-pact") && consumes.has("alliance-pact"));
-  assert.ok(grants.has("grain-ledger") && consumes.has("grain-ledger"));
-  assert.ok(grants.has("command-tally"));
-  assert.ok(flow.originRoles?.includes("father") && flow.originRoles?.includes("mother") && flow.originRoles?.includes("elder"));
-  const entry = flow.groups.find((group) => group.id === "refugee-crossing")!;
-  assert.ok(entry.assetRoles?.includes("father") && entry.assetRoles?.includes("elder"));
-  const basics = entry.events.find((event) => event.id === "crossing-basics") as any;
-  assert.ok(basics.lifeBefore);
-  const baseGroup = flow.groups.find((group) => group.id === "base-established")!;
-  const baseExit = baseGroup.events[baseGroup.events.length - 1] as any;
-  assert.equal(baseExit.id, "base-aftermath");
-  assert.ok(baseExit.outcome.endsFlow);
 });

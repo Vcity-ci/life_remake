@@ -1,6 +1,7 @@
 {
   "id": "ancient.sovereign-rise",
-  "revision": "1.0.0",
+  "revision": "4.0.2",
+  "protocolVersion": 2,
   "originRoles": [
     "home",
     "father",
@@ -12,62 +13,67 @@
     {
       "id": "home",
       "kind": "location",
-      "identity": "主角家族所在的乡里、渡口与旧居"
+      "identity": "西洲边地的县城、渡口、矿村与乡里"
+    },
+    {
+      "id": "county",
+      "kind": "location",
+      "identity": "西洲边地的县城、官署与仓场"
+    },
+    {
+      "id": "prefecture",
+      "kind": "location",
+      "identity": "西洲州城、关隘与连接各县的驿路"
+    },
+    {
+      "id": "pass",
+      "kind": "location",
+      "identity": "连接西洲与京畿的关隘、渡口与粮道"
+    },
+    {
+      "id": "capital",
+      "kind": "location",
+      "identity": "天阙城、宫禁与京畿"
     },
     {
       "id": "camp",
       "kind": "location",
-      "identity": "主角建立的据点、营寨与屯粮之处"
+      "identity": "义军营寨、据点与屯粮处"
     },
     {
       "id": "road",
       "kind": "location",
-      "identity": "粮道、关隘与连接各城的通道"
-    },
-    {
-      "id": "city",
-      "kind": "location",
-      "identity": "争夺中的城池、郡城与京畿"
+      "identity": "西洲的驿路、粮道与渡口"
     },
     {
       "id": "court",
       "kind": "location",
-      "identity": "旧政权的官署、朝堂与降臣议事之处"
+      "identity": "朝廷、宫禁与官署"
     },
     {
       "id": "father",
       "kind": "character",
-      "identity": "主角家中承担生计与乡里关系的父亲"
+      "identity": "主角的父亲，承接身世中的生计与身份"
     },
     {
       "id": "mother",
       "kind": "character",
-      "identity": "主角家中操持家务与亲族往来的母亲"
+      "identity": "主角的母亲，承接身世中的生计、家人关系和实际经历"
     },
     {
       "id": "elder",
       "kind": "character",
-      "identity": "乡老、旧友或最早愿意替主角担保的人"
+      "identity": "最早照应主角和乡邻的长辈或旧友"
+    },
+    {
+      "id": "mentor",
+      "kind": "character",
+      "identity": "退伍老兵、义军教头或懂行伍的长辈"
     },
     {
       "id": "follower",
       "kind": "character",
-      "identity": "追随主角的乡勇、部曲或最早的一批人"
-    },
-    {
-      "id": "rivalWarlord",
-      "kind": "character",
-      "identity": "与主角争地、争粮或争名分的军阀与豪强"
-    },
-    {
-      "id": "ally",
-      "kind": "character",
-      "identity": "与主角结盟的旧友、邻郡首领或地方势力"
-    },
-    {
-      "id": "official",
-      "kind": "character",
-      "identity": "旧政权的县令、郡守或降臣"
+      "identity": "最早跟随主角的乡勇、部曲与亲兵"
     },
     {
       "id": "artisan",
@@ -75,34 +81,54 @@
       "identity": "修寨、造船、制械的工匠与船户"
     },
     {
-      "id": "covenant",
-      "kind": "item",
-      "identity": "写清盟约、人质与分地的盟书"
+      "id": "clerk",
+      "kind": "character",
+      "identity": "熟悉地方人情、官署事务与辖地日常的旧吏"
     },
     {
-      "id": "grainLedger",
-      "kind": "item",
-      "identity": "记录粮仓、户口与调拨的粮册"
+      "id": "magistrate",
+      "kind": "character",
+      "identity": "县令、地方豪强或掌着县仓与差役的人"
     },
     {
-      "id": "tally",
-      "kind": "item",
-      "identity": "调兵与传令用的兵符"
+      "id": "rebelAlly",
+      "kind": "character",
+      "identity": "守纪而需要合作的义军首领；与主角的关系依实际投军和结盟经历"
     },
     {
-      "id": "token",
-      "kind": "item",
-      "identity": "乡里或旧友传下的信物，用于证明来处"
+      "id": "rebelRival",
+      "kind": "character",
+      "identity": "西洲争夺中的强势义军首领或军阀，依实际经历保留其依附、合作与敌对关系"
+    },
+    {
+      "id": "courtier",
+      "kind": "character",
+      "identity": "朝廷首辅、文官或奉命招安的使者"
+    },
+    {
+      "id": "emperor",
+      "kind": "character",
+      "identity": "大衍皇帝萧稷"
+    },
+    {
+      "id": "eunuch",
+      "kind": "character",
+      "identity": "掌印宦官曹淳"
+    },
+    {
+      "id": "general",
+      "kind": "character",
+      "identity": "兵部尚书陆秉或握兵的军镇将领"
     },
     {
       "id": "mobilization",
       "kind": "ability",
-      "identity": "组织乡勇、动员百姓与分配任务的本领"
+      "identity": "聚众、编伍与动员百姓的本领"
     },
     {
       "id": "logistics",
       "kind": "ability",
-      "identity": "筹粮、运输、修寨与维持据点的本领"
+      "identity": "组织运输、修筑和共同生活所需供给的本领"
     },
     {
       "id": "command",
@@ -112,360 +138,332 @@
     {
       "id": "legitimacy",
       "kind": "ability",
-      "identity": "名分、约法、用人及与旧官吏周旋的本领"
+      "identity": "任用人才、处理军政权责与不同力量合作的本领"
+    },
+    {
+      "id": "covenant",
+      "kind": "item",
+      "identity": "与义军或盟友写下的盟书"
+    },
+    {
+      "id": "edict",
+      "kind": "item",
+      "identity": "已经交付具体任职与差遣的任命凭据"
+    },
+    {
+      "id": "tally",
+      "kind": "item",
+      "identity": "调兵与传令用的兵符"
+    },
+    {
+      "id": "throneSeal",
+      "kind": "item",
+      "identity": "新政权使用的帝印"
+    },
+    {
+      "id": "token",
+      "kind": "item",
+      "identity": "家中留下的旧木牌或亲人信物"
+    },
+    {
+      "id": "contender",
+      "kind": "character",
+      "identity": "京外争逐天下的主要起兵者，统合与主角竞争的活跃力量；承接已有盟敌及其真实继任关系"
     }
   ],
   "items": [
     {
       "id": "alliance-pact",
       "roleId": "covenant",
-      "description": "与邻郡或旧友写下的盟书，写明援军、分地与不背盟的条件。"
+      "description": "与义军或盟友写下的盟书，写明援军、分地与背盟条件。"
     },
     {
-      "id": "grain-ledger",
-      "roleId": "grainLedger",
-      "description": "记录据点粮仓、户口与调拨的粮册，是维持部众的底账。"
+      "id": "imperial-edict",
+      "roleId": "edict",
+      "description": "记录已实际交付的任职与差遣，不交付未取得的地盘。"
     },
     {
       "id": "command-tally",
       "roleId": "tally",
       "description": "调兵与传令的兵符，代表部众承认的指挥权。"
+    },
+    {
+      "id": "throne-seal",
+      "roleId": "throneSeal",
+      "description": "新朝建立后使用的帝印，不代表各地已经归属。"
+    },
+    {
+      "id": "token",
+      "roleId": "token",
+      "description": "家中留下的信物，保留亲人联系，不承担证明资格的任务。"
     }
   ],
   "groups": [
     {
-      "id": "refugee-crossing",
+      "id": "family-ruin",
       "actIds": [
         "ancient.sovereign-rise.foundation"
       ],
-      "narrativeRole": "立足起点",
-      "label": "渡口与逃民",
-      "entry": "尚未有自己的部众，家乡被乱兵或洪水波及，第一次面对一群需要安顿的人。",
+      "narrativeRole": "家境开局",
+      "label": "家变与流亡",
+      "entry": "开局身世已经确定西洲家庭的生计与条件，尚未投军。承接同一家庭，从童年写到家变与流亡。",
       "routing": "planned",
       "assetRoles": [
         "home",
-        "road",
         "father",
         "mother",
         "elder",
-        "follower",
-        "artisan",
-        "covenant",
-        "grainLedger",
-        "mobilization"
+        "mentor",
+        "magistrate"
       ],
       "events": [
         {
-          "id": "crossing-basics",
+          "id": "ruin-home",
           "kind": "life",
-          "entry": "还没有组织过一群人，只在乡里帮家里做事。",
-          "lifeBefore": {
-            "minYears": 2,
-            "maxYears": 4,
-            "context": "你在{{home}}帮父亲种田、跑腿，跟{{elder}}认路和认人。{{mother}}替邻里分粮时，你在旁边记账。"
-          },
-          "situation": "你在{{home}}长大，父亲教你乡里的人情，母亲教你分粮和记账。{{elder}}说县里的兵和豪强都在抢粮，渡口那边已经有人逃过来。",
+          "entry": "你家的来处已经写在身世里。",
+          "situation": "你在{{home}}长大，{{father}}与{{mother}}维持身世里已经成立的生计，{{elder}}照应乡邻。你逐渐能帮家里做事，也有自己的伙伴和好恶。",
           "outcome": {
-            "result": "你熟悉了乡里的路、粮和人情，也知道了乱世里最先缺的不是刀，是能让一群人活下去的秩序。"
+            "result": "你已经熟悉家乡的人与生活，能承担一些家事；家人的关系与生活根基在这些年间形成。",
+            "nextEventIds": [
+              "ruin-tax"
+            ]
+          },
+          "lifeBefore": {
+            "minYears": 6,
+            "maxYears": 8,
+            "context": "在{{home}}度过童年。承接身世中父母的真实生计，写家人相处、乡邻与同龄伙伴、学会做事的经历；家变尚未发生。"
           }
         },
         {
-          "id": "crossing-ferry",
+          "id": "ruin-tax",
           "kind": "scene",
-          "entry": "逃民已经挤到渡口，船和粮都不够。",
-          "situation": "{{road}}的渡口挤满逃民，{{artisan}}的船只能再渡一趟。{{elder}}说豪强要拿粮换人，{{follower}}问你能不能先把老人和孩子送过去。{{official}}的县兵在河对岸看着。",
+          "entry": "清丈、征逼或旧党牵连已经压到原家庭，地方武装来接管家业。",
+          "situation": "{{magistrate}}派人夺取家中实际赖以谋生的田地、铺面或依靠。亲人按已经成立的身份抵抗、求助或护送家人，冲突使这户人家失去原来的生活。",
           "outcome": {
-            "result": "你把第一批人送过河，{{elder}}替你写下盟约和粮册的底，{{follower}}开始叫你“主事”。",
-            "grantItems": [
-              "alliance-pact",
-              "grain-ledger"
+            "result": "家业被夺，亲人遭拘捕、伤亡或失去庇护，具体损失依这次冲突落定；尚在的人离开原来的住处。",
+            "nextEventIds": [
+              "ruin-flight"
             ]
           }
         },
         {
-          "id": "crossing-choice",
-          "kind": "choice",
-          "entry": "船和粮只够救一部分人，豪强和县兵都在等。",
-          "situation": "{{elder}}要你先送老人孩子，{{follower}}要你带人抢豪强的粮，{{official}}说交出一批人就能换船。{{artisan}}的船再渡一趟就要散。",
-          "question": "先救老弱、抢粮立威，还是交人换船？",
-          "stakes": "第一批人的性命、你在乡里的名望，以及豪强和县兵会不会先动手。",
-          "check": {
-            "stat": "charisma",
-            "difficulty": 12
-          },
-          "options": [
-            {
-              "id": "safe",
-              "label": "先救老弱",
-              "action": "按{{elder}}的意思先送老人孩子，青壮留下断后。",
-              "success": {
-                "result": "老弱过了河，青壮也大多脱身。{{follower}}认你仁义，豪强却记下了你没交人。"
-              },
-              "failure": {
-                "result": "船到河心散了，只救回一部分人。你得了仁义的名，却没能保住所有人。"
-              }
-            },
-            {
-              "id": "balanced",
-              "label": "抢粮立威",
-              "action": "带{{follower}}抢豪强的粮仓，用粮换船。",
-              "success": {
-                "result": "你抢下粮仓，渡了人，也立了威。豪强成了死敌，{{follower}}却开始真信你能带他们活下去。"
-              },
-              "failure": {
-                "result": "抢粮失手，{{follower}}伤了几个人。粮没抢到，船也没了，第一批人散了一半。"
-              }
-            },
-            {
-              "id": "risky",
-              "label": "交人换船",
-              "action": "按{{official}}的条件交出一批人，换船和过河的路。",
-              "success": {
-                "result": "船和路都拿到了，大多数人过了河。被交出去的人没有回来，{{elder}}不再正眼看你。"
-              },
-              "failure": {
-                "result": "人交了出去，船却被县兵扣下。你失了人，也没换来路，第一批人开始散。"
-              }
-            }
-          ]
-        },
-        {
-          "id": "crossing-aftermath",
+          "id": "ruin-flight",
           "kind": "life",
-          "entry": "第一批人已经过河或失散，你要给他们一个落脚处。",
-          "situation": "河对岸的破庙或旧村挤着剩下的人，{{elder}}按户点名，{{mother}}分剩下的粮。{{follower}}问你下一步去哪，{{artisan}}说上游还有一条小道。",
+          "entry": "家已经破了，{{home}}不能再留。",
+          "situation": "你与尚在的亲人和乡邻沿西洲道路流亡，遇见逃难者与招收人手的武装。{{elder}}联系旧人寻找落脚处；每个人带着家变中实际留下的伤痛与责任。",
           "outcome": {
-            "result": "第一批人有了临时的落脚处，也有了第一个愿意听你调度的小团体；你知道这还不是“基业”，只是活下来的开始。",
-            "endsFlow": true
+            "result": "你与尚在的家人、乡邻离开故居，在西洲边地暂时落脚；附近几支人马正在收留流民，你还没有选择依附对象。",
+            "endsFlow": true,
+            "nextFlowIds": [
+              "join-rebels"
+            ]
           }
         }
       ]
     },
     {
-      "id": "stronghold",
+      "id": "join-rebels",
       "actIds": [
         "ancient.sovereign-rise.foundation"
       ],
-      "narrativeRole": "立足行为 A",
-      "label": "据点与寨墙",
-      "entry": "已经有一小群追随者，需要选一处能守能屯的地方立足。",
+      "narrativeRole": "投义军",
+      "label": "先投义军",
+      "entry": "家已破/失势流亡，西洲边地附近有义军、溃兵、流民；主角决定先投哪一支义军。",
+      "routing": "planned",
+      "assetRoles": [
+        "home",
+        "road",
+        "rebelAlly",
+        "rebelRival",
+        "follower",
+        "mentor"
+      ],
+      "events": [
+        {
+          "id": "join-arrives",
+          "kind": "scene",
+          "entry": "你带着剩下的人走到{{road}}，前面有几支义军在招人。",
+          "situation": "{{rebelAlly}}的义军守着一座小寨，纪律较严但粮少；{{rebelRival}}的人多、粮多，却明说要“先抢够再讲规矩”；还有一支溃兵只想裹人。{{mentor}}说投谁都要先看粮和刀。",
+          "outcome": {
+            "result": "你摸清了三支人马的路数：{{rebelAlly}}能立规矩，{{rebelRival}}能打但会抢，溃兵不可靠；你必须选一个先活下去。",
+            "nextEventIds": [
+              "join-choice"
+            ]
+          }
+        },
+        {
+          "id": "join-choice",
+          "kind": "decision",
+          "entry": "三支人马已经明确提出收留条件。",
+          "situation": "{{rebelAlly}}愿收留乡邻但缺粮；{{rebelRival}}以粮械换服从；溃兵愿让你随行，却靠劫掠过活。",
+          "question": "选择依附哪支人马？",
+          "stakes": "你选择的是眼下的庇护与所承担的关系，不是替这支人马保证未来胜利。",
+          "options": [
+            {
+              "id": "disciplined",
+              "label": "投守规矩的义军",
+              "action": "接受{{rebelAlly}}的收留，与原来带来的人共同服役。",
+              "outcome": {
+                "result": "你加入{{rebelAlly}}，乡邻得以一起安顿；要共担守寨与缺粮，仍保留原有的同伴关系。",
+                "nextEventIds": [
+                  "join-life"
+                ]
+              }
+            },
+            {
+              "id": "provisioned",
+              "label": "投粮械充足的义军",
+              "action": "接受{{rebelRival}}的供给与调遣。",
+              "outcome": {
+                "result": "你加入{{rebelRival}}，家人和旧人暂得供给；带来的人接受其指挥，你从属这位首领。",
+                "nextEventIds": [
+                  "join-life"
+                ]
+              }
+            },
+            {
+              "id": "stragglers",
+              "label": "随溃兵求生",
+              "action": "带旧人随溃兵行走，以劳役与护送换口粮。",
+              "outcome": {
+                "result": "你随溃兵求生，没有固定驻地与可靠军纪；旧人彼此照应，也被卷入这支队伍与乡民的冲突。",
+                "nextEventIds": [
+                  "join-life"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": "join-life",
+          "kind": "life",
+          "entry": "你已经进了义军。",
+          "situation": "在实际选择的队伍里经历服役与战事。庇护者按先前接受的条件使用你，旧人也有自己的得失；{{mentor}}教你行伍，{{follower}}开始承担同伴职责。",
+          "outcome": {
+            "result": "你已经有了实际行伍经验，旧人之间形成了协作；依附关系带来的供给、束缚与冲突都已落到生活里。",
+            "endsFlow": true,
+            "nextFlowIds": [
+              "self-rise"
+            ]
+          },
+          "lifeBefore": {
+            "minYears": 1,
+            "maxYears": 3,
+            "context": "在已选择的队伍里生活与服役，写共同劳作、训练与同伴关系的变化；不把未选择的首领写成你的主将。"
+          }
+        }
+      ]
+    },
+    {
+      "id": "self-rise",
+      "actIds": [
+        "ancient.sovereign-rise.foundation"
+      ],
+      "narrativeRole": "自立",
+      "label": "带人自立",
+      "entry": "在所选队伍服役后，你与原有伙伴已能协同行动。守纪队伍需要分担地方战事的独立伙伴，受控队伍收紧对旧人的支配，溃兵则在追击中瓦解；承接实际依附，处理组织独立队伍这件事。",
       "routing": "planned",
       "assetRoles": [
         "camp",
         "road",
-        "home",
-        "elder",
+        "rebelAlly",
+        "rebelRival",
         "follower",
-        "artisan",
-        "rivalWarlord",
-        "grainLedger",
-        "logistics"
+        "mentor",
+        "tally"
       ],
       "events": [
         {
-          "id": "stronghold-arrives",
+          "id": "rise-dispute",
           "kind": "scene",
-          "entry": "落脚处还没有定，几处地形各有利弊。",
-          "situation": "{{elder}}看中{{camp}}的旧寨，{{artisan}}说寨墙要修、水源要挖。{{follower}}想住近{{road}}方便抢粮，{{rivalWarlord}}的人已经在附近踩点。",
+          "entry": "实际依附关系已在服役中发展，旧人面对新的出路。",
+          "situation": "若依附{{rebelAlly}}，他要分兵保护失序乡里，由你组织熟悉的人独立承担；若依附{{rebelRival}}，他要拆散旧人调往自己的亲军，你们商议脱离；若随溃兵，原队伍在追击中失去主事者，你和幸存者组织自保。{{mentor}}与{{follower}}各自承担已经获得的职责。",
           "outcome": {
-            "result": "旧寨、路口和粮源都摆在眼前；你必须决定守哪一处、先修什么。"
+            "result": "实际依附关系使你与旧人走到组织独立行动的关口。合作分兵保留友谊，脱离控制留下冲突，溃散后重组承接失散与损失。",
+            "nextEventIds": [
+              "rise-choice"
+            ]
           }
         },
         {
-          "id": "stronghold-choice",
+          "id": "rise-choice",
           "kind": "choice",
-          "entry": "据点选址和修寨的次序要定。",
-          "situation": "{{elder}}要你先修寨墙，{{artisan}}说先挖水源和粮窖，{{follower}}要你先带人打掉{{rivalWarlord}}的探子。{{grainLedger}}上的粮只够撑一冬。",
-          "question": "先修寨墙、先屯粮水，还是先打探子？",
-          "stakes": "据点能不能守住、部众能不能过冬，以及{{rivalWarlord}}会不会提前来攻。",
-          "check": {
-            "stat": "physique",
-            "difficulty": 13
-          },
-          "options": [
-            {
-              "id": "safe",
-              "label": "先修寨墙",
-              "action": "按{{elder}}的意思先修寨墙，把旧寨围起来。",
-              "success": {
-                "result": "寨墙修好，{{rivalWarlord}}的探子没敢靠近。粮水还紧，但据点有了能守的壳。"
-              },
-              "failure": {
-                "result": "墙没修完，{{rivalWarlord}}的人先来抢了一趟粮。据点立住了，过冬的粮却少了一截。"
-              }
-            },
-            {
-              "id": "balanced",
-              "label": "先屯粮水",
-              "action": "按{{artisan}}的意思先挖水源、修粮窖，把过冬的底子打牢。",
-              "success": {
-                "result": "粮水屯住，部众过了冬。寨墙还矮，但据点有了能撑下去的底。"
-              },
-              "failure": {
-                "result": "粮窖挖到一半塌了，过冬的粮损了一部分。据点还在，人心却开始慌。"
-              }
-            },
-            {
-              "id": "risky",
-              "label": "先打探子",
-              "action": "带{{follower}}先打掉{{rivalWarlord}}的探子，立威再修寨。",
-              "success": {
-                "result": "探子被赶走，{{rivalWarlord}}暂时没来。你立了威，寨墙和水源却都还没修。"
-              },
-              "failure": {
-                "result": "打探子中了埋伏，{{follower}}伤了几个人。据点没立稳，先折了人。"
-              }
-            }
-          ]
-        },
-        {
-          "id": "stronghold-aftermath",
-          "kind": "life",
-          "entry": "据点已经立住或勉强撑住，部众要过冬。",
-          "situation": "{{camp}}的旧寨有了墙、水或粮窖，{{elder}}按户分地，{{artisan}}带着人继续修。{{follower}}开始按队伍轮值，{{grainLedger}}上的粮一笔笔记清。",
-          "outcome": {
-            "result": "你有了一处能守能屯的据点，也有了第一批按你调度过冬的人；基业还小，却不再是逃难。",
-            "endsFlow": true
-          }
-        }
-      ]
-    },
-    {
-      "id": "first-followers",
-      "actIds": [
-        "ancient.sovereign-rise.foundation"
-      ],
-      "narrativeRole": "立足行为 B",
-      "label": "追随者与乡勇",
-      "entry": "据点已经立住，周围还有散兵、逃民和乡勇可以收拢。",
-      "routing": "planned",
-      "assetRoles": [
-        "camp",
-        "home",
-        "elder",
-        "follower",
-        "artisan",
-        "rivalWarlord",
-        "official",
-        "mobilization",
-        "command"
-      ],
-      "events": [
-        {
-          "id": "followers-arrives",
-          "kind": "scene",
-          "entry": "散兵和逃民在据点外，收不收、怎么收还没有定。",
-          "situation": "{{camp}}外来了几十个散兵，领头的说要投靠。{{elder}}怕他们抢粮，{{follower}}说正好补人，{{official}}的县兵也在附近。{{artisan}}问粮够不够。",
-          "outcome": {
-            "result": "散兵、逃民和县兵都在据点外；你必须决定收人、挑人，还是先挡回去。"
-          }
-        },
-        {
-          "id": "followers-choice",
-          "kind": "choice",
-          "entry": "几十个散兵要入伙，粮和信任都不够。",
-          "situation": "{{follower}}要你把散兵打散编入各队，{{elder}}说先给粮再谈入伙，{{official}}派人来招安，说收编就给你一个名分。",
-          "question": "打散收编、给粮立信，还是接招安？",
-          "stakes": "据点的人手、粮和名分，以及旧政权会不会先把你当成威胁。",
+          "entry": "旧人需要组织独立行动，尚未完成转驻与集结。",
+          "situation": "你要把实际愿意同行的人带到乡里，组织由自己指挥的队伍。依附守纪义军时，独立分兵已获首领同意，他交付原有伙伴并协助转驻，行动阻力来自乡外乱兵与道路；受控路线面对原首领拦阻，溃散路线面对沿途追击。",
+          "question": "怎样组织这支独立队伍？",
+          "stakes": "实际同行的人、可用装备与原依附关系。",
           "check": {
             "stat": "charisma",
-            "difficulty": 14
+            "difficulty": 15
           },
           "options": [
             {
               "id": "safe",
-              "label": "打散收编",
-              "action": "把散兵打散编入各队，由{{follower}}和老乡勇带着。",
+              "label": "带核心伙伴转驻",
+              "action": "由愿意同行的核心伙伴组成先遣队，按已有分兵安排沿熟路转驻乡里，护送同行家属。",
               "success": {
-                "result": "散兵被打散编入，据点多了人手，也没有哪一队能独大。{{official}}的招安晚了一步。"
+                "result": "你把核心伙伴安全带出，在乡里暂时安顿，形成一支规模小但能独立行动的队伍；与原势力的关系承接此前实际依附。",
+                "nextEventIds": [
+                  "rise-band"
+                ]
               },
               "failure": {
-                "result": "散兵不服编队，夜里跑了一半。你保住了据点，却没补上人手。"
+                "result": "转驻遭阻，部分旧人失散，现有装备与行李损失；你带少数幸存者脱险，还未组织起完整队伍。",
+                "endsFlow": true,
+                "nextFlowIds": [
+                  "scattered-band"
+                ]
               }
             },
             {
               "id": "balanced",
-              "label": "给粮立信",
-              "action": "先按{{elder}}的意思给粮安家，再谈入伙。",
+              "label": "组织现有部伍同行",
+              "action": "以已经协作的队官分路掩护，把所属人手与共同置办的装备带往新驻地。",
               "success": {
-                "result": "散兵安了家，愿意跟你过冬。粮少了一截，人心却稳了。"
+                "result": "所属部伍按安排抵达新驻地，实际带出的装备支撑独立行动；协助与阻拦者分别留下合作或敌对关系。",
+                "nextEventIds": [
+                  "rise-band"
+                ]
               },
               "failure": {
-                "result": "粮给了，散兵吃饱就走。你赔了粮，没收到人。"
+                "result": "部伍会合被打断，有人被追兵截住、有人留在原队伍，只有幸存者跟你脱险。",
+                "endsFlow": true,
+                "nextFlowIds": [
+                  "scattered-band"
+                ]
               }
             },
             {
               "id": "risky",
-              "label": "接招安",
-              "action": "按{{official}}的条件接招安，换一个正式名分。",
+              "label": "争取整支所部自领",
+              "action": "公开带领本部承担独立守卫，集中转驻并护送原队伍中的家属。",
               "success": {
-                "result": "你接了招安，得了一个名义上的官职。旧政权不再把你当贼，却也开始管你的粮和兵。"
+                "result": "本部愿意跟随的人实际完成转驻，开始由你自主带领；只取得已经同行的队伍，尚无县城或新地盘。",
+                "nextEventIds": [
+                  "rise-band"
+                ]
               },
               "failure": {
-                "result": "招安是套，县兵借机要你交人交粮。你拒了，据点被围了几日，粮损了一截。"
+                "result": "集中转驻暴露了行踪，护送与集结失败，旧人死散或被收编；你带少数人离开，独立力量尚未站住。",
+                "endsFlow": true,
+                "nextFlowIds": [
+                  "scattered-band"
+                ]
               }
             }
           ]
         },
         {
-          "id": "followers-aftermath",
+          "id": "rise-band",
           "kind": "life",
-          "entry": "人手已经收下或散去，据点要重新编队。",
-          "situation": "{{camp}}里多了新面孔，{{follower}}按队编人，{{elder}}按户分粮。{{artisan}}开始教新来的人修寨，{{official}}的文书还压在案上。",
+          "entry": "你有了第一支自己的队伍。",
+          "situation": "你把实际带出的旧人安顿下来，为自己的队伍安排职责与落脚之处。离开时得到或失去的粮械、朋友及敌对关系继续有效。",
           "outcome": {
-            "result": "你有了第一批能按队伍行动的部众，也有了养他们的粮账；人多了，责任也重了。",
-            "endsFlow": true
-          }
-        }
-      ]
-    },
-    {
-      "id": "scattered-band",
-      "actIds": [
-        "ancient.sovereign-rise.foundation"
-      ],
-      "narrativeRole": "立足失败后续",
-      "label": "部众离散",
-      "entry": "上一组使你部众离散、据点失守或粮道被断，但仍有乡里、旧友或少数人可以重整。",
-      "routing": "planned",
-      "assetRoles": [
-        "home",
-        "camp",
-        "road",
-        "father",
-        "mother",
-        "elder",
-        "follower",
-        "artisan",
-        "grainLedger"
-      ],
-      "events": [
-        {
-          "id": "scattered-grief",
-          "kind": "life",
-          "entry": "部众已经离散，剩下的人还没有安顿。",
-          "situation": "{{camp}}的寨墙塌了一角，{{follower}}带回来的人不到一半。{{elder}}按户点名，{{mother}}把剩下的粮分成小份。{{father}}问你还要不要继续。",
-          "outcome": {
-            "result": "离散的损失已经落到部众和乡里身上；你还剩下的人、粮和关系被重新盘清。"
-          }
-        },
-        {
-          "id": "scattered-rebuild",
-          "kind": "life",
-          "entry": "剩下的人已经安顿，你仍有人可以重新联络。",
-          "situation": "你带着{{grainLedger}}去拜访{{elder}}和旧友，一家家重新接上。{{artisan}}修好能用的寨墙，{{follower}}把还愿意跟的人编成小队。",
-          "outcome": {
-            "result": "你重新有了一支小队和能撑一阵的粮；离散没有被抹去，路却重新接上。"
-          }
-        },
-        {
-          "id": "scattered-return",
-          "kind": "scene",
-          "entry": "重整已经完成，附近出现一桩需要人出头的事。",
-          "situation": "{{road}}上的逃民又被豪强截住，{{elder}}把你的名字递过去。你带着小队和剩下的粮，重新站到乡民面前。",
-          "outcome": {
-            "result": "你用一桩实际救援重新聚起了人，离散的旧账仍在，据点却重新有了入口。",
-            "endsFlow": true
+            "result": "实际跟随的部众形成了独立队伍；人数与家底沿用脱身结果，尚未取得的地盘没有增加。",
+            "endsFlow": true,
+            "nextFlowIds": [
+              "base-established"
+            ]
           }
         }
       ]
@@ -477,117 +475,530 @@
       ],
       "narrativeRole": "本幕结果",
       "label": "第一块基业",
-      "entry": "已经有据点、部众和粮，乡里与旧政权要给你一个正式位置。",
+      "entry": "已有独立行动的队伍，尚未取得稳定据点；须用现有力量取得落脚处并守住。",
       "routing": "planned",
       "assetRoles": [
+        "county",
         "camp",
-        "home",
         "elder",
         "follower",
-        "artisan",
-        "official",
-        "tally",
-        "grainLedger",
-        "mobilization"
+        "clerk",
+        "magistrate",
+        "tally"
       ],
       "events": [
         {
-          "id": "base-arrives",
-          "kind": "scene",
-          "entry": "据点的归属和名分还没有定。",
-          "situation": "{{camp}}的寨墙已经围住，{{elder}}和{{follower}}要你立规矩。{{official}}派人来，说可以给你一个名义，但要你交粮、听调。{{artisan}}把新修的粮窖和兵器库指给你看。",
+          "id": "base-organize",
+          "kind": "life",
+          "entry": "你有了队伍，还没有能守的地方。",
+          "situation": "{{elder}}指引附近废弃寨子和渡口，{{artisan}}查看能修复的住处，{{mentor}}教新人互相掩护。你安排旧人照顾伤者与家属，为取得落脚处作准备。",
           "outcome": {
-            "result": "名分、粮和兵都在你手里；你要决定接不接旧政权的位置，以及据点听谁的。"
+            "result": "现有队伍能够协同行动，家属与伤者得到临时照应；仍需要一处实际能守住的落脚地。",
+            "nextEventIds": [
+              "base-first-stand"
+            ]
+          },
+          "lifeBefore": {
+            "minYears": 1,
+            "maxYears": 3,
+            "context": "独立队伍在西洲边地寻找落脚处，旧人学习共同守卫，家属与乡邻互相安顿，部众保持实际依附关系。"
           }
         },
         {
-          "id": "base-verdict",
-          "kind": "settlement",
-          "entry": "据点与部众已经到最后一层，乡里和旧政权要给出结果。",
-          "situation": "{{camp}}的正屋里，{{elder}}把{{grainLedger}}和名册摆在案上，{{follower}}带着队长们站在两侧。{{official}}的文书也在桌上。你接的是自立、受编，还是暂时依附。",
-          "rules": [
-            {
-              "id": "self-rule",
-              "condition": "据点能自守，部众和粮都够撑。",
-              "disposition": "你在{{camp}}自立，拿到{{tally}}，乡里按你的规矩纳粮、出丁。你成了一股能持续行动的力量。",
-              "grantItems": [
-                "command-tally"
-              ]
-            },
-            {
-              "id": "nominal-rule",
-              "condition": "据点立住，但旧政权仍有名义上的控制。",
-              "disposition": "你接了{{official}}的名义，拿到{{tally}}，实际仍管据点。你保住了人，也把一部分粮和兵交了出去。",
-              "grantItems": [
-                "command-tally"
-              ]
-            },
-            {
-              "id": "tributary",
-              "condition": "据点不足以自立，只能暂时依附。",
-              "disposition": "你受了旧政权的编制，没有拿到{{tally}}。部众保住了，你却要听人调遣。"
-            }
-          ]
+          "id": "base-first-stand",
+          "kind": "scene",
+          "entry": "你带人拿下第一个能站住的地方。",
+          "situation": "你依靠现有部众与乡邻的协作，驱逐盘踞在一处废弃渡口或山寨的散兵，修复能住人的地方；{{artisan}}和{{follower}}各自承担实际工作。",
+          "outcome": {
+            "result": "你实际控制了第一处可守的据点，乡邻开始在这里避难和生活；这是现有队伍的立足之地。",
+            "nextEventIds": [
+              "base-recognition"
+            ]
+          }
         },
         {
-          "id": "base-aftermath",
-          "kind": "life",
-          "entry": "基业的名分已经定下，乡里与部众要重新排。",
-          "situation": "{{camp}}的旗换了或立了起来，{{elder}}按新规矩分地，{{follower}}按队领粮。{{artisan}}把寨墙和粮窖都修了一遍，{{official}}的文书收进箱底。",
+          "id": "base-recognition",
+          "kind": "scene",
+          "entry": "据点已经取得，官署的征逼抵达，避难者仍住在里面。",
+          "situation": "官署要求交还避难者并恢复原有征逼。你拒绝交人，以现有部众守住寨门，邻近乡里继续在这里生活；官署撤去来人，转而封锁与监视这处独立据点。",
           "outcome": {
-            "result": "你有了第一块能自守、能出丁的基业，也知道了名分、粮和兵三者缺一不可。",
-            "endsFlow": true
+            "result": "避难者与部众守住据点，你独立承担此地守卫和生活；与官署的冲突已经发生，第一块基业实际成立。",
+            "endsFlow": true,
+            "nextFlowIds": [],
+            "grantItems": [
+              "command-tally"
+            ]
           }
         }
       ]
     },
     {
-      "id": "warlord-alliance",
+      "id": "scattered-band",
       "actIds": [
-        "ancient.sovereign-rise.contention"
+        "ancient.sovereign-rise.foundation"
       ],
-      "narrativeRole": "逐鹿行为 A",
-      "label": "军阀与盟约",
-      "entry": "已经有据点和部众，邻郡军阀或旧友提出结盟，条件与风险都摆在桌上。",
+      "narrativeRole": "失败后的转向",
+      "label": "队伍被打散",
+      "entry": "上一组自立/立足失败，队伍被打散或被义军/官军吞并，主角仍活着。",
       "routing": "planned",
       "assetRoles": [
+        "home",
         "camp",
-        "city",
-        "road",
-        "rivalWarlord",
-        "ally",
         "elder",
-        "follower",
-        "official",
-        "covenant",
-        "legitimacy"
+        "follower"
       ],
       "events": [
         {
-          "id": "alliance-start",
-          "kind": "life",
-          "entry": "盟约还没有谈，各方的底细还没有摸清。",
-          "situation": "{{ally}}派人来，说{{rivalWarlord}}要吞并附近几县，愿意和你结盟。{{elder}}怕引狼入室，{{follower}}说正好借兵。{{official}}也在看你会倒向哪边。",
-          "outcome": {
-            "result": "你摸清了{{ally}}的兵、{{rivalWarlord}}的势力和旧政权的态度，也知道盟约里最值钱的是援军和分地。"
-          }
+          "id": "scattered-choice",
+          "kind": "decision",
+          "entry": "独立行动受挫，仍有少数旧人活着。",
+          "situation": "{{follower}}与幸存者已经脱险，继续独立就需要重新争取人手和庇护；原势力提出接收这些人的条件。",
+          "question": "继续独立，还是接受编入？",
+          "stakes": "旧人是否还能作为你自己的队伍存在。",
+          "options": [
+            {
+              "id": "regroup",
+              "label": "争取重新聚拢",
+              "action": "带幸存者联系乡邻和旧友，重新组织独立力量。",
+              "outcome": {
+                "result": "你决定继续独立，并开始向仍能联系的旧友争取帮助；尚未召回的人与粮械没有凭空回来。",
+                "nextEventIds": [
+                  "scattered-gather"
+                ]
+              }
+            },
+            {
+              "id": "submit",
+              "label": "接受编入",
+              "action": "交出独立指挥权，让幸存者随你进入别人的编制。",
+              "outcome": {
+                "result": "你交出独立指挥权，幸存旧人被分入接收方部伍；你也成为受调遣的部将，自己的独立基业至此结束。",
+                "endsFlow": true,
+                "nextFlowIds": []
+              }
+            }
+          ]
         },
         {
-          "id": "alliance-arrives",
-          "kind": "scene",
-          "entry": "结盟的条件已经摆到桌上，{{ally}}要一个准话。",
-          "situation": "{{ally}}要你出粮出人，换他出兵牵制{{rivalWarlord}}。{{elder}}说先要看人质，{{follower}}说盟书一签就不能反悔。{{covenant}}还空着最后几条。",
-          "outcome": {
-            "result": "援军、分地、人质和背盟的代价都摆开；你必须决定签、拖，还是拒绝。"
-          }
-        },
-        {
-          "id": "alliance-choice",
+          "id": "scattered-gather",
           "kind": "choice",
-          "entry": "盟约在眼前，{{ally}}和{{rivalWarlord}}都在等。",
-          "situation": "{{ally}}要你按盟书出粮出人，{{elder}}要你先要人质，{{rivalWarlord}}也派人来，说可以给你更好的条件。{{follower}}问你信谁。",
-          "question": "签盟出兵、要人质再签，还是倒向{{rivalWarlord}}？",
-          "stakes": "援军与分地、据点的粮和人，以及背盟后的名声。",
+          "entry": "主角已决定继续独立，还没有重新取得队伍。",
+          "situation": "{{elder}}能联系乡邻，{{follower}}认识失散旧人。你需要在现有信用、危险与家底下把人真正聚回来。",
+          "question": "怎样重新组织旧人？",
+          "stakes": "这次行动关系到现有部众、实际控制的地方与同伴安危。",
+          "check": {
+            "stat": "charisma",
+            "difficulty": 12
+          },
+          "options": [
+            {
+              "id": "safe",
+              "label": "依靠乡邻",
+              "action": "以守护乡里换取一处安顿旧人的地方。",
+              "success": {
+                "result": "乡邻收留你们，愿意回来的旧人组成了小队；你承担守护这一片乡里的责任。",
+                "nextEventIds": [
+                  "scattered-recovery"
+                ]
+              },
+              "failure": {
+                "result": "乡邻不敢收留，失散旧人另投他处；你没有再聚起独立部众，只能依附别人谋生。",
+                "endsFlow": true,
+                "nextFlowIds": []
+              }
+            },
+            {
+              "id": "balanced",
+              "label": "逐一招回",
+              "action": "带幸存者寻找失散旧人，许诺共同承担此后的生活。",
+              "success": {
+                "result": "旧人实际归来，你们用剩余家底重新组成队伍；失去的兵械与战死者没有回来。",
+                "nextEventIds": [
+                  "scattered-recovery"
+                ]
+              },
+              "failure": {
+                "result": "旧人不肯再跟，追索又耗尽家底；剩下的人接受别人的收编，独立队伍解散。",
+                "endsFlow": true,
+                "nextFlowIds": []
+              }
+            },
+            {
+              "id": "risky",
+              "label": "夺取立足资源",
+              "action": "带最核心的人袭取原势力的小型转运队，换取安顿条件。",
+              "success": {
+                "result": "转运队被击退，所得足以安顿核心旧人；原势力成为明确的敌人。",
+                "nextEventIds": [
+                  "scattered-recovery"
+                ]
+              },
+              "failure": {
+                "result": "行动失败，核心旧人死散；你脱身却已无独立力量，起兵之路结束。",
+                "endsFlow": true,
+                "nextFlowIds": []
+              }
+            }
+          ]
+        },
+        {
+          "id": "scattered-recovery",
+          "kind": "life",
+          "entry": "聚拢行动已经取得实际力量。",
+          "situation": "按聚拢结果安置旧人、伤者与家属，重新分工；关系、物资和必须承担的责任来自这次实际行动。",
+          "outcome": {
+            "result": "你以实际聚回的力量重新出发，准备取得自己的立足之地。",
+            "endsFlow": true,
+            "nextFlowIds": [
+              "base-established"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "army-building",
+      "actIds": [
+        "ancient.sovereign-rise.contention"
+      ],
+      "narrativeRole": "掌军起点",
+      "label": "从队伍到成军",
+      "entry": "已有据点/队伍，但还没有成军的编制、纪律和常备粮。",
+      "routing": "planned",
+      "assetRoles": [
+        "camp",
+        "mentor",
+        "follower",
+        "artisan",
+        "clerk",
+        "tally"
+      ],
+      "events": [
+        {
+          "id": "army-service",
+          "kind": "life",
+          "entry": "队伍还只是一群愿意跟你走的人。",
+          "situation": "{{mentor}}把旧人分成能互相接应的部伍，{{follower}}带骨干，{{artisan}}修械、教新人；你亲自处理训练、守卫与家属安置中的实际分歧。",
+          "outcome": {
+            "result": "骨干与新人形成持续协作，能轮换守卫和随队外出，家属在据点逐渐安顿。",
+            "nextEventIds": [
+              "army-first-command"
+            ]
+          },
+          "lifeBefore": {
+            "minYears": 2,
+            "maxYears": 4,
+            "context": "在据点度过整军与共同生活的岁月：骨干带新人、工匠修械、家属落脚，部伍通过共同经历逐渐协作；本阶段不预写扩张战果。"
+          }
+        },
+        {
+          "id": "army-first-command",
+          "kind": "scene",
+          "entry": "你第一次以主将身份带这支队伍出去。",
+          "situation": "邻近乡里遭散兵侵扰，你带现有部伍护送居民、守住通路。{{mentor}}留守据点，{{follower}}负责前队，新人第一次按协作安排承担实际任务。",
+          "outcome": {
+            "result": "这次护卫任务完成，原来各自行动的部伍学会接应；主角与骨干取得了实际带队经验，未因此取得县城或正式官职。",
+            "nextEventIds": [
+              "army-coordination"
+            ]
+          }
+        },
+        {
+          "id": "army-coordination",
+          "kind": "life",
+          "entry": "队伍回来了，开始像一支军。",
+          "situation": "你根据护卫经历调整队官与协作，安排部众轮换回家，修复实际损坏的器械，并与周边乡里形成稳定的守护关系。",
+          "outcome": {
+            "result": "现有部伍能够守护据点并承担对外行动，附近县城的守军正在征讨这支独立力量。",
+            "endsFlow": true,
+            "nextFlowIds": [
+              "attack-county",
+              "ally-rebels"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "attack-county",
+      "actIds": [
+        "ancient.sovereign-rise.contention"
+      ],
+      "narrativeRole": "扩张：攻县城",
+      "label": "攻县城",
+      "entry": "已成军，县城、豪强或官军是下一个目标；县城里有粮、有官署，也有守军。",
+      "routing": "planned",
+      "assetRoles": [
+        "county",
+        "magistrate",
+        "follower",
+        "tally"
+      ],
+      "events": [
+        {
+          "id": "county-arrives",
+          "kind": "scene",
+          "entry": "已成军，县城守军正在组织征讨原据点。",
+          "situation": "{{magistrate}}控制县城与邻近乡里，向独立据点派出征讨人手。你带现有部众抵达城外，{{mentor}}观察城防，熟悉当地的{{clerk}}接触城中旧人，既有盟方按约牵制外援。",
+          "outcome": {
+            "result": "县城守军、城内接应与可用通路已明确，夺城行动尚未实施。",
+            "nextEventIds": [
+              "county-choice"
+            ]
+          }
+        },
+        {
+          "id": "county-choice",
+          "kind": "choice",
+          "entry": "已探明县城防守，尚未实施夺城。",
+          "situation": "守军依城防与外援支撑，城里居民也承受征逼。你有现有部众、沿路供给与已成立的协作，可以选择围困、内外协同或集中强攻。",
+          "question": "县城怎么打？",
+          "stakes": "这座县城的归属、参战者伤亡及此后的地方责任。",
+          "check": {
+            "stat": "physique",
+            "difficulty": 16
+          },
+          "options": [
+            {
+              "id": "safe",
+              "label": "围城断粮",
+              "action": "先断县城粮道，等守军自乱。",
+              "success": {
+                "result": "县城粮尽开城，你拿下官署与仓场；部众伤亡不大，但官军已经注意到你。",
+                "nextEventIds": [
+                  "county-return"
+                ]
+              },
+              "failure": {
+                "result": "围城拖得太久，自己粮先见底；你只能退，县城仍在官军手里。",
+                "endsFlow": true,
+                "nextFlowIds": [
+                  "lost-territory"
+                ]
+              }
+            },
+            {
+              "id": "balanced",
+              "label": "接城中内应",
+              "action": "让旧吏开仓接应，里应外合。",
+              "success": {
+                "result": "旧吏开了仓门，你拿下县城；{{magistrate}}被擒或逃走，你得了粮和官署。",
+                "nextEventIds": [
+                  "county-return"
+                ]
+              },
+              "failure": {
+                "result": "内应被查出，城门没开；{{magistrate}}借机向官军求援，你只能退。",
+                "endsFlow": true,
+                "nextFlowIds": [
+                  "lost-territory"
+                ]
+              }
+            },
+            {
+              "id": "risky",
+              "label": "趁夜强攻",
+              "action": "带{{follower}}趁夜爬城，一战拿下。",
+              "success": {
+                "result": "你带部众突破城防，实际占领县城，守军溃退；城中居民、战损与投降者需要安顿。",
+                "nextEventIds": [
+                  "county-return"
+                ]
+              },
+              "failure": {
+                "result": "夜攻受挫，{{follower}}折了人；官军援兵到了，你只能退，粮也耗了大半。",
+                "endsFlow": true,
+                "nextFlowIds": [
+                  "lost-territory"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": "county-return",
+          "kind": "life",
+          "entry": "县城已在夺城行动中取得。",
+          "situation": "原据点与县城之间开始有稳定往来，旧人承担城防，{{clerk}}协助居民处理生计和旧官署留下的争端，实际投降守军进入新的生活。你面对领兵之外的地方责任。",
+          "outcome": {
+            "result": "县城和原据点已经由实际部众驻守，居民生活开始恢复；控制西洲通路的军阀把你视为争夺区域的对手。",
+            "endsFlow": true,
+            "nextFlowIds": [
+              "fight-warlord",
+              "court-offer",
+              "cut-grain-road"
+            ]
+          },
+          "lifeBefore": {
+            "minYears": 2,
+            "maxYears": 4,
+            "context": "已经取得县城，旧据点与城中居民往来，骨干接手守卫与地方事务，亲人与新来的家庭各自安顿；尚未取得西洲其他辖地。"
+          }
+        }
+      ]
+    },
+    {
+      "id": "ally-rebels",
+      "actIds": [
+        "ancient.sovereign-rise.contention"
+      ],
+      "narrativeRole": "夺县的合作条件",
+      "label": "联义军",
+      "entry": "准备夺取县城，现有义军伙伴因共同敌人提出协同，合作条件尚未确定。",
+      "routing": "planned",
+      "assetRoles": [
+        "road",
+        "rebelAlly",
+        "rebelRival",
+        "covenant"
+      ],
+      "events": [
+        {
+          "id": "ally-choice",
+          "kind": "decision",
+          "entry": "夺县行动前，附近义军提出共同作战的条件。",
+          "situation": "{{rebelAlly}}愿各自统军、共同牵制县城援兵；{{rebelRival}}要求统一调度、由各队官带原部。你也能拒绝合作，以现有力量独自行事。",
+          "question": "这场夺县行动采取哪种合作关系？",
+          "stakes": "指挥权、实际援助与此后共同承担的责任。",
+          "options": [
+            {
+              "id": "mutual",
+              "label": "互助结盟",
+              "action": "与{{rebelAlly}}各自统军，相互牵制援兵。",
+              "outcome": {
+                "result": "互助盟约成立，各自指挥已有部众，共同承担约定的作战责任。",
+                "nextEventIds": [
+                  "ally-return"
+                ],
+                "grantItems": [
+                  "alliance-pact"
+                ]
+              }
+            },
+            {
+              "id": "combined",
+              "label": "接受联合调度",
+              "action": "接受{{rebelRival}}的共同调度，旧部仍由原队官带领。",
+              "outcome": {
+                "result": "你接受共同调度，盟方按约提供实际援助；旧部和现有辖地没有凭盟约扩大。",
+                "nextEventIds": [
+                  "ally-return"
+                ],
+                "grantItems": [
+                  "alliance-pact"
+                ]
+              }
+            },
+            {
+              "id": "independent",
+              "label": "独立作战",
+              "action": "拒绝联合要求，以自己现有的队伍承担夺县行动。",
+              "outcome": {
+                "result": "你保留独立指挥，其他人马不承担援助责任；夺县只能使用现有人手与条件。",
+                "endsFlow": true,
+                "nextFlowIds": [
+                  "attack-county"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": "ally-return",
+          "kind": "scene",
+          "entry": "合作方式已选定，落实本次实际协同。",
+          "situation": "你与实际盟方分担牵制和接应，各部进入自己的位置；原投军关系在合作中继续变化。",
+          "outcome": {
+            "result": "约定的协同已经实施，下一步面对县城守军；不再重问结盟，也未取得城池。",
+            "endsFlow": true,
+            "nextFlowIds": [
+              "attack-county"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "court-offer",
+      "actIds": [
+        "ancient.sovereign-rise.contention"
+      ],
+      "narrativeRole": "西洲争夺的任职与合作",
+      "label": "受招安",
+      "entry": "县城已经取得，控制西洲要地的军阀同时威胁朝廷军镇；朝廷因此提出任职与共同作战条件。",
+      "routing": "planned",
+      "assetRoles": [
+        "county",
+        "courtier",
+        "eunuch",
+        "general",
+        "edict"
+      ],
+      "events": [
+        {
+          "id": "offer-arrives",
+          "kind": "scene",
+          "entry": "朝廷因共同对手派来使者。",
+          "situation": "{{courtier}}提出以现有县城的守卫职司换取你协同对付西洲军阀，{{general}}的实际军镇要求共同承担战线。任职牵涉旧部是否接受上级调度，尚未成立。",
+          "outcome": {
+            "result": "任职与差遣的具体条件已经摆明，你还没有接受或拒绝。",
+            "nextEventIds": [
+              "offer-choice"
+            ]
+          }
+        },
+        {
+          "id": "offer-choice",
+          "kind": "decision",
+          "entry": "朝廷已提出招安条件。",
+          "situation": "{{courtier}}提出授官与供给，并要求接受调令；你可以接受条件、为自主权进一步交涉，或明确拒绝。",
+          "question": "如何回应招安？",
+          "stakes": "是否接受朝廷体系，以及现有部众的处置。",
+          "options": [
+            {
+              "id": "accept",
+              "label": "接受条件",
+              "action": "接受已摆明的官职、调度与供给条件。",
+              "outcome": {
+                "result": "你接受招安条件并进入朝廷编制；所授职务与实际指挥范围依现有兵力和任官规则交付，不能凭官身另得地盘。",
+                "nextEventIds": [
+                  "offer-return"
+                ]
+              }
+            },
+            {
+              "id": "negotiate",
+              "label": "交涉自主范围",
+              "action": "明确愿意受任，但要求谈定旧部指挥与辖地范围。",
+              "outcome": {
+                "result": "你表明愿受任的立场，开始就旧部与辖地进行具体交涉。",
+                "nextEventIds": [
+                  "offer-negotiation"
+                ]
+              }
+            },
+            {
+              "id": "refuse",
+              "label": "拒绝招安",
+              "action": "拒绝官身与收编要求，继续独立承担与朝廷的关系。",
+              "outcome": {
+                "result": "你拒绝任职，以现有独立力量面对西洲对手，朝廷不承担所提议的供给和协同。",
+                "endsFlow": true,
+                "nextFlowIds": [
+                  "fight-warlord",
+                  "cut-grain-road"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": "offer-negotiation",
+          "kind": "choice",
+          "entry": "主角已表明受任立场，双方还需裁定具体条件。",
+          "situation": "{{courtier}}要求交出部分旧部，你要争取实际指挥范围；现有兵力和盟友构成交涉筹码。",
+          "question": "怎样争取旧部与辖地？",
+          "stakes": "这次行动关系到现有部众、实际控制的地方与同伴安危。",
           "check": {
             "stat": "charisma",
             "difficulty": 18
@@ -595,255 +1006,410 @@
           "options": [
             {
               "id": "safe",
-              "label": "签盟出兵",
-              "action": "用{{covenant}}与{{ally}}立盟，按约出粮出人。",
+              "label": "以守土换辖区",
+              "action": "承担现有地方的守卫与供给责任，争取保留原部。",
               "success": {
-                "result": "盟约立住，{{ally}}出兵牵制{{rivalWarlord}}，你得了援军和分地。{{covenant}}用掉了，你也把一部分粮和人交了出去。",
-                "consumeItems": [
-                  "alliance-pact"
+                "result": "交涉达成，你受任守现有辖区并保留原部；相应调令与供给义务成立。",
+                "nextEventIds": [
+                  "offer-return"
                 ]
               },
               "failure": {
-                "result": "{{ally}}收了粮却出兵迟缓，{{rivalWarlord}}趁机压过来。盟约还在，信任已经裂了。",
-                "consumeItems": [
-                  "alliance-pact"
+                "result": "朝廷坚持拆编，你未能保住完整旧部，只保有原据点的一部分力量。",
+                "endsFlow": true,
+                "nextFlowIds": [
+                  "lost-territory"
                 ]
               }
             },
             {
               "id": "balanced",
-              "label": "要人质再签",
-              "action": "按{{elder}}的意思先要人质和分地，再签盟书。",
+              "label": "联络军镇斡旋",
+              "action": "请已有关系的军镇担保，明确你的调度边界。",
               "success": {
-                "result": "{{ally}}送了人质，盟约按你的条件立住。你得了援军，也没有把粮全交出去。"
+                "result": "军镇担保生效，你取得具体职司与调度范围，也承担与担保方合作的义务。",
+                "nextEventIds": [
+                  "offer-return"
+                ]
               },
               "failure": {
-                "result": "{{ally}}不肯送人质，结盟拖了下去。{{rivalWarlord}}趁机抢了两个村，你失了先机。"
+                "result": "军镇借斡旋夺走部分辖地与旧部，你保住据点却失去原有的行动范围。",
+                "endsFlow": true,
+                "nextFlowIds": [
+                  "lost-territory"
+                ]
               }
             },
             {
               "id": "risky",
-              "label": "倒向{{rivalWarlord}}",
-              "action": "拒绝{{ally}}，接受{{rivalWarlord}}的条件，换更大的地盘。",
+              "label": "坚持独立统军",
+              "action": "以现有地盘与军事力量要求不拆旧部。",
               "success": {
-                "result": "{{rivalWarlord}}给了你两个县，{{ally}}成了敌人。你扩了地盘，也背上了背盟的名。"
+                "result": "对方接受不拆旧部的条件，你取得官职并保持实际指挥，但须承担明确的战时差遣。",
+                "nextEventIds": [
+                  "offer-return"
+                ]
               },
               "failure": {
-                "result": "{{rivalWarlord}}用完你就把你晾在一边，{{ally}}也不再信你。你在两方之间都没有了位置。"
+                "result": "交涉破裂，军镇发兵施压；你保住核心旧人撤回原据点，招安没有成立。",
+                "endsFlow": true,
+                "nextFlowIds": [
+                  "lost-territory"
+                ]
               }
             }
           ]
         },
         {
-          "id": "alliance-aftermath",
+          "id": "offer-return",
           "kind": "life",
-          "entry": "盟约已经定下，援军、分地和粮都要落实。",
-          "situation": "{{camp}}里多了{{ally}}的援军或{{rivalWarlord}}的使者，{{elder}}按盟约分粮分地。{{follower}}开始按新的编制带人，{{official}}的文书也到了。",
+          "entry": "招安的风波过去，朝廷和义军都在重新看你。",
+          "situation": "招安或交涉的实际条件已成立。落实原有部众在新编制中的职责、已经授予的差遣与真实供给；旧人的生活和相处随实际关系改变。",
           "outcome": {
-            "result": "你有了援军、地盘或更大的对手，也知道了盟约背后是粮、人和背盟的代价。",
-            "endsFlow": true
+            "result": "任职与差遣按已定条件交付，你使用实际部众和权限参与西洲战事；朝廷没有赠送新地盘。",
+            "endsFlow": true,
+            "nextFlowIds": [
+              "fight-warlord",
+              "cut-grain-road"
+            ],
+            "grantItems": [
+              "imperial-edict"
+            ]
           }
         }
       ]
     },
     {
-      "id": "siege",
+      "id": "cut-grain-road",
       "actIds": [
         "ancient.sovereign-rise.contention"
       ],
-      "narrativeRole": "逐鹿行为 B",
-      "label": "攻城与粮道",
-      "entry": "已经有兵力和盟约，需要攻取一座城或守住粮道。",
+      "narrativeRole": "西洲争夺的补给条件",
+      "label": "截粮道",
+      "entry": "已取得县城，西洲军阀沿关道向争夺地区运输兵械；这支军运直接支撑其对现有辖地的进攻。",
       "routing": "planned",
       "assetRoles": [
-        "city",
         "road",
-        "camp",
-        "rivalWarlord",
-        "follower",
-        "artisan",
-        "official",
-        "grainLedger",
-        "command",
-        "logistics"
+        "pass",
+        "follower"
       ],
       "events": [
         {
-          "id": "siege-arrives",
-          "kind": "scene",
-          "entry": "目标城或粮道还没有拿下，守军和援军都在动。",
-          "situation": "{{city}}的守军闭门不出，{{rivalWarlord}}的援军还在路上。{{follower}}要强攻，{{artisan}}说可以先断粮道，{{grainLedger}}上的粮只够半月。",
+          "id": "road-choice",
+          "kind": "choice",
+          "entry": "已探明对手军运路线，准备实施一次截断行动。",
+          "situation": "对手的军用车队沿{{pass}}进入西洲战线，护军与转运营互相接应；{{mentor}}熟悉道路，{{follower}}能带现有部众行动。",
+          "question": "怎样截断对手这次军运？",
+          "stakes": "对手后续进攻的补给与你实际投入的兵力。",
+          "check": {
+            "stat": "intelligence",
+            "difficulty": 17
+          },
+          "options": [
+            {
+              "id": "safe",
+              "label": "袭截末队",
+              "action": "截击离主营最远的军运末队，完成后沿熟路撤离。",
+              "success": {
+                "result": "末队兵械被截，这次军运只剩部分物资抵达；你的现有部众得到实际缴获，对手调整后续进军。",
+                "nextEventIds": [
+                  "road-return"
+                ]
+              },
+              "failure": {
+                "result": "护军赶回，你未截下军运，损失人手后撤；对手补给抵达，接下来的进逼更强。",
+                "endsFlow": true,
+                "nextFlowIds": [
+                  "fight-warlord"
+                ]
+              }
+            },
+            {
+              "id": "balanced",
+              "label": "设伏转运口",
+              "action": "让旧部正面牵制护军，另一队伏击必须经过的转运口。",
+              "success": {
+                "result": "转运口被攻破，军用车队停止向前线输送；实际缴获与伤亡改变随后战事的条件。",
+                "nextEventIds": [
+                  "road-return"
+                ]
+              },
+              "failure": {
+                "result": "护军识破配合，伏击失败，你带幸存者退回县城；军运沿替代通路抵达，对手获得补充。",
+                "endsFlow": true,
+                "nextFlowIds": [
+                  "fight-warlord"
+                ]
+              }
+            },
+            {
+              "id": "risky",
+              "label": "深入军运主营",
+              "action": "集中骨干深入对手控制区，袭取屯运主营以截断整条军用补给。",
+              "success": {
+                "result": "屯运主营被攻破，前线补给中断，你取得实际可带走的兵械；对手被迫在缺少补充的处境下作战。",
+                "nextEventIds": [
+                  "road-return"
+                ]
+              },
+              "failure": {
+                "result": "主营设防，骨干遭重创，行动未截断军运；县城仍由留守者控制，今后的区域战事只能使用受损力量。",
+                "endsFlow": true,
+                "nextFlowIds": [
+                  "fight-warlord"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": "road-return",
+          "kind": "life",
+          "entry": "本次军运截击已经成功。",
+          "situation": "把实际缴获送回现有驻地，安顿伤者并准备面对西洲主力；军阀按已经受损的补给调整部署。",
           "outcome": {
-            "result": "城、粮道和援军都摆在眼前；你必须决定强攻、围城，还是先断粮道。"
+            "result": "这次截击已经结束，区域战事承接实际补给与伤亡；尚未夺取新的城镇。",
+            "endsFlow": true,
+            "nextFlowIds": [
+              "fight-warlord"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "fight-warlord",
+      "actIds": [
+        "ancient.sovereign-rise.contention"
+      ],
+      "narrativeRole": "区域争夺",
+      "label": "争夺西洲要地",
+      "entry": "已夺县并经营原有据点，控制西洲相连城镇和关道的军阀前来压制，双方争夺使县城能持续立足的区域。",
+      "routing": "planned",
+      "assetRoles": [
+        "county",
+        "prefecture",
+        "rebelRival",
+        "general",
+        "tally"
+      ],
+      "events": [
+        {
+          "id": "warlord-arrives",
+          "kind": "scene",
+          "entry": "对手主力从西洲通路向实际辖地进逼。",
+          "situation": "西洲军阀从{{prefecture}}和{{pass}}调兵，要夺回你掌握的县城。你以县城与原据点互相接应，实际盟友、朝廷差遣和此前军运行动决定双方力量，周边乡里也在选择依靠谁。",
+          "outcome": {
+            "result": "区域双方的兵力与通路已经展开，决战将决定县城和相连要地的归属。",
+            "nextEventIds": [
+              "warlord-choice"
+            ]
           }
         },
         {
-          "id": "siege-choice",
+          "id": "warlord-choice",
           "kind": "choice",
-          "entry": "攻城在即，粮和援军都在倒计时。",
-          "situation": "{{follower}}要你趁援军未到强攻，{{artisan}}说可以先掘壕断粮，{{official}}在城里递话，说愿意开城但要有条件。{{grainLedger}}只够半月。",
-          "question": "强攻、围城断粮，还是接城中内应？",
-          "stakes": "城能不能拿下、部众的伤亡，以及粮够不够撑到援军来。",
+          "entry": "对手区域主力进逼，县城与相连要地的归属尚未裁定。",
+          "situation": "你已取得并经营县城。对手沿关道分兵压来，{{follower}}带现有部伍，{{mentor}}熟悉城外道路；能调用的援助严格承接已成立的合作与任职。",
+          "question": "怎样击败这次区域进攻并掌握相连要地？",
+          "stakes": "县城、相连通路与可持续辖地，以及双方参战力量。",
           "check": {
             "stat": "physique",
-            "difficulty": 19
+            "difficulty": 18
           },
           "options": [
             {
               "id": "safe",
-              "label": "围城断粮",
-              "action": "按{{artisan}}的意思掘壕断粮，等城中粮尽。",
+              "label": "依城出击",
+              "action": "依靠已有城防消耗进逼部队，再沿熟悉道路夺取其连接要地。",
               "success": {
-                "result": "城中粮尽开城，你拿下{{city}}，部众伤亡不大。{{grainLedger}}用掉大半，援军还没到。",
-                "consumeItems": [
-                  "grain-ledger"
+                "result": "守军与出击部伍迫使对手主力退出，实际夺取连接县城与乡里的要地，县城及这些地方形成可以持续驻守的区域。",
+                "nextEventIds": [
+                  "warlord-return"
                 ]
               },
               "failure": {
-                "result": "围城拖得太久，自己的粮先见底。{{rivalWarlord}}的援军到了，你只能退。",
-                "consumeItems": [
-                  "grain-ledger"
+                "result": "要道失守，你带旧部退回剩余据点，实际外围与物资被对手夺走。",
+                "endsFlow": true,
+                "nextFlowIds": [
+                  "lost-territory"
                 ]
               }
             },
             {
               "id": "balanced",
-              "label": "接城中内应",
-              "action": "按{{official}}的条件接内应，里应外合开城。",
+              "label": "协同截击",
+              "action": "用实有部伍和已约定的援助分担正面与侧翼，切断对手各部联络。",
               "success": {
-                "result": "内应开了城门，你拿下{{city}}，伤亡不大。{{official}}保住了位置，也成了你城里的一根钉子。"
+                "result": "协同截断对手各部，敌方退出相连城镇；你与实际参战方接管所得辖地，盟约和从属关系决定各自权限。",
+                "nextEventIds": [
+                  "warlord-return"
+                ]
               },
               "failure": {
-                "result": "内应被守军查出，城门没开。{{rivalWarlord}}的援军到了，你只能退。"
+                "result": "配合被打断，敌军抢占外围，你带幸存旧部退守原有落脚地。",
+                "endsFlow": true,
+                "nextFlowIds": [
+                  "lost-territory"
+                ]
               }
             },
             {
               "id": "risky",
-              "label": "趁援军未到强攻",
-              "action": "带{{follower}}趁援军未到强攻，一战拿下。",
+              "label": "突击主军",
+              "action": "集中骨干突破对手主军，趁其指挥瓦解接管争夺中的关道与驻地。",
               "success": {
-                "result": "你在援军到达前破城，{{city}}归你。部众伤亡不小，{{rivalWarlord}}的援军扑了个空。"
+                "result": "主军被击溃，仍守在关道的对手放弃阵地；你实际驻守县城与所得要地，伤亡由参战旧部承担。",
+                "nextEventIds": [
+                  "warlord-return"
+                ]
               },
               "failure": {
-                "result": "强攻受挫，{{follower}}折了人。{{rivalWarlord}}的援军一到，你只能退，粮也耗了大半。"
+                "result": "主营有备，突击惨败，你损失骨干与物资，敌军开始逼近剩余据点。",
+                "endsFlow": true,
+                "nextFlowIds": [
+                  "lost-territory"
+                ]
               }
             }
           ]
         },
         {
-          "id": "siege-aftermath",
+          "id": "warlord-return",
           "kind": "life",
-          "entry": "攻城已经结束，城、粮和部众都要安顿。",
-          "situation": "{{city}}的城门开了或还关着，{{follower}}带人清点伤亡。{{artisan}}修城防，{{official}}的降书或守军的名册摆在案上。{{grainLedger}}上的粮需要重新算。",
+          "entry": "本次区域争夺已取得实际辖地。",
+          "situation": "伤者和家属在现有城镇安顿，原队官承担新的驻守；盟友、官署与地方人按本次实际战果接管各自负责的部分。",
           "outcome": {
-            "result": "城的归属、部众的伤亡和粮的消耗都落定；你知道了攻城不只是打仗，还是粮道和降人的账。",
-            "endsFlow": true
+            "result": "县城与实际夺得的相连要地进入持续驻守，双方战果与既有政治关系明确；接下来落实这片区域的权力安排。",
+            "endsFlow": true,
+            "nextFlowIds": [
+              "regional-lord"
+            ]
           }
         }
       ]
     },
     {
-      "id": "betrayal",
+      "id": "regional-lord",
       "actIds": [
         "ancient.sovereign-rise.contention"
       ],
-      "narrativeRole": "逐鹿行为 C",
-      "label": "背叛与夺权",
-      "entry": "部众或盟友中有人私通敌军、争权或准备背盟。",
+      "narrativeRole": "本幕结果",
+      "label": "一方之势",
+      "entry": "主角已经从区域战事或援救邻地中实际取得县城及相连辖地，有足以持续守护的部众；现在处理这片区域的军政安排。",
       "routing": "planned",
       "assetRoles": [
+        "prefecture",
+        "pass",
         "camp",
-        "city",
-        "ally",
-        "rivalWarlord",
-        "follower",
+        "rebelAlly",
+        "courtier",
         "elder",
-        "official",
-        "covenant",
-        "legitimacy"
+        "tally"
       ],
       "events": [
         {
-          "id": "betrayal-arrives",
+          "id": "regional-arrives",
           "kind": "scene",
-          "entry": "背叛的线索已经出现，还没有摊开。",
-          "situation": "{{follower}}发现有人私通{{rivalWarlord}}，{{ally}}的人也牵在里面。{{elder}}要你先稳住，{{official}}说可以借机清理。{{covenant}}上的分地条款成了争执的由头。",
+          "entry": "西洲各方都来试探你的位置。",
+          "situation": "{{elder}}带乡里代表来讨论已经掌握地区的权责，实际盟友与官署依现有关系提出安排；{{follower}}代表旧部参与。只处理当前已取得的地方，不把未取得的县城、州城或关隘当成你的领地。",
           "outcome": {
-            "result": "背叛的线索、盟友的嫌疑和部众的人心都摆开；你必须决定查、压，还是先动手。"
+            "result": "已控制地方的兵民权责进入议定，参与各方提出自己的真实条件，主角尚未答复。",
+            "nextEventIds": [
+              "regional-choice"
+            ]
           }
         },
         {
-          "id": "betrayal-choice",
-          "kind": "choice",
-          "entry": "背叛还没有坐实，{{ally}}和{{follower}}都在等你的处置。",
-          "situation": "{{follower}}要你先抓人，{{elder}}说没有实证会寒了人心，{{ally}}要你交出查案的人。{{official}}在旁看着。",
-          "question": "先抓人、暗查实证，还是当众对质？",
-          "stakes": "部众的人心、与{{ally}}的盟约，以及你会不会先被孤立。",
-          "check": {
-            "stat": "charisma",
-            "difficulty": 20
-          },
+          "id": "regional-choice",
+          "kind": "decision",
+          "entry": "主角已有实际力量，各方正在议定地方秩序。",
+          "situation": "{{elder}}代表乡里，既有盟友和官署按实际关系提出安排；你需要确定自己愿承担的政治位置。",
+          "question": "以什么方式经营这一方？",
+          "stakes": "主角的自主权、旧部归属和地方秩序。",
           "options": [
             {
-              "id": "safe",
-              "label": "先抓人",
-              "action": "按{{follower}}的意思先抓嫌疑的人，稳住部众。",
-              "success": {
-                "result": "嫌疑的人被抓，部众暂时稳住，{{ally}}却开始防你。你保住了营寨，盟约裂了一道缝。"
-              },
-              "failure": {
-                "result": "抓错了人，部众离心，{{ally}}借机退盟。你保住了权，却失了人。"
+              "id": "self-rule",
+              "label": "独立立制",
+              "action": "以现有地盘和部众自行建立地方秩序，不接受新的朝廷收编。",
+              "outcome": {
+                "result": "你决定以现有力量独立立制，公开承担这片地方的军政责任；原来已接受的义务必须在随后处置中交代。",
+                "nextEventIds": [
+                  "regional-verdict"
+                ]
               }
             },
             {
-              "id": "balanced",
-              "label": "暗查实证",
-              "action": "按{{elder}}的意思暗查，拿到实证再处置。",
-              "success": {
-                "result": "你拿到{{rivalWarlord}}的密信，当众处置了内应。部众服气，{{ally}}也无话可说。"
-              },
-              "failure": {
-                "result": "暗查被内应察觉，人跑了，证据也毁了。你保住了营寨，却没抓出内鬼。"
+              "id": "nominal-rule",
+              "label": "接受官身",
+              "action": "接受朝廷体系中的地方职司，按真实任命安排旧部。",
+              "outcome": {
+                "result": "你决定接受朝廷体系内的职司，现有兵权、辖地与调令按任官和收编规则处置。",
+                "nextEventIds": [
+                  "regional-verdict"
+                ]
               }
             },
             {
-              "id": "risky",
-              "label": "当众对质",
-              "action": "把{{ally}}和嫌疑人一起叫到帐前，当众对质。",
-              "success": {
-                "result": "对质逼出了内应，{{ally}}也表了态。你保住了盟约，也立了威。"
-              },
-              "failure": {
-                "result": "对质变成争吵，{{ally}}当场退盟，内应趁乱跑了。你失了盟友，也没抓到人。"
+              "id": "shared-rule",
+              "label": "与地方共治",
+              "action": "与实际存在的盟友、乡里和旧吏共同承担地方事务。",
+              "outcome": {
+                "result": "你提出并参加地方共治，实际参与者及各自权限由已有力量与关系决定。",
+                "nextEventIds": [
+                  "regional-verdict"
+                ]
               }
             }
           ]
         },
         {
-          "id": "betrayal-verdict",
+          "id": "regional-verdict",
           "kind": "settlement",
-          "entry": "背叛已经处置或压下，营寨与盟约要给出结果。",
-          "situation": "{{camp}}的帐前，{{follower}}把处置结果报上来，{{elder}}和{{ally}}的人都在等。内应、盟约和部众的去留，都等这一道处置。",
+          "entry": "一方之势已经到最后一步，西洲各方要一个结果。",
+          "situation": "依据已选政治立场、真实兵权与辖地落实地方安排。旧部、乡里、实际盟友或上级按已有权力参与，不凭一次表态补发领土、兵力或承认。",
           "rules": [
             {
-              "id": "purged",
-              "condition": "内应被查实处置，部众与盟约都还稳。",
-              "disposition": "内应被清理，部众重新整编，{{ally}}继续履约。你保住了营寨和盟约，也被部众记住了手段。",
-              "endsFlow": true
+              "id": "self-rule",
+              "condition": "主角已经选择自主承担所获区域，仍有实际部众与辖地。",
+              "disposition": "以现有部众和辖地承担独立军政职责；原有从属关系按这次明确选择解除，原上级和盟友作出相应回应，不要求重新取得已经占有的地方。",
+              "nextEventIds": [
+                "regional-aftermath"
+              ]
             },
             {
-              "id": "divided",
-              "condition": "内应处置了，但盟友或部众出现分裂。",
-              "disposition": "内应被处置，{{ally}}却退了一部分盟约，部众也分成两派。你保住了营寨，力量却弱了。",
-              "endsFlow": true
+              "id": "nominal-rule",
+              "condition": "主角已经选择朝廷体系内的地方职司，实际辖地与部众仍在。",
+              "disposition": "依任官规则落实所选职司及上级差遣；旧部承担已交付职责，官职对应真实辖地，不扩大未占有地区。",
+              "nextEventIds": [
+                "regional-aftermath"
+              ]
             },
             {
-              "id": "broken",
-              "condition": "背叛没有被压住，营寨或盟约崩了。",
-              "disposition": "内应打开寨门或{{ally}}倒向{{rivalWarlord}}，营寨失守。你带少数人退走，基业伤了大半。",
-              "endsFlow": true
+              "id": "shared-rule",
+              "condition": "主角已经选择与实际盟友及地方力量共治，仍有自己的部众与明确辖地。",
+              "disposition": "按参与各方的实际力量落实共同军政责任；旧部有具体职守，原有盟约和损失继续生效。",
+              "nextEventIds": [
+                "regional-aftermath"
+              ]
             }
           ]
+        },
+        {
+          "id": "regional-aftermath",
+          "kind": "life",
+          "entry": "区域军政安排已经实际成立。",
+          "situation": "原来的伙伴有人守城，有人照顾家庭或回乡，{{clerk}}与地方人处理各自负责的生活。你以已确定的职权在这片区域主事，部众和居民承接此前的损失与收获。",
+          "outcome": {
+            "result": "实际辖地、部众和对外关系已经形成持续运转的一方力量，区域安排已落实，第二幕的问题已经得到回答。",
+            "endsFlow": true,
+            "nextFlowIds": []
+          },
+          "lifeBefore": {
+            "minYears": 2,
+            "maxYears": 4,
+            "context": "区域权责已经成立，旧人承担不同职责，家人与居民在所得地方继续生活，盟友或上级按已定关系来往；尚未作出去向选择。"
+          }
         }
       ]
     },
@@ -852,369 +1418,582 @@
       "actIds": [
         "ancient.sovereign-rise.contention"
       ],
-      "narrativeRole": "逐鹿失败后续",
-      "label": "失地与重整",
-      "entry": "上一组使你失地、失盟或部众减半，但仍有据点、旧友或少数人可以重整。",
+      "narrativeRole": "受挫后的发展",
+      "label": "受挫与重整",
+      "entry": "上一行动未达成目标，尚有自己的落脚地与部众。承接这次已经发生的撤退、物资损失、伤亡或失地，处理返回后的生活与对手后续行动。",
       "routing": "planned",
       "assetRoles": [
         "camp",
-        "road",
-        "home",
-        "elder",
         "follower",
-        "artisan",
-        "ally",
-        "grainLedger",
-        "mobilization"
+        "rebelAlly",
+        "artisan"
       ],
       "events": [
         {
           "id": "lost-grief",
           "kind": "life",
-          "entry": "失地已经发生，剩下的人还没有安顿。",
-          "situation": "{{camp}}的寨墙又塌了一角，{{follower}}带回来的人不到一半。{{elder}}按户点名，{{artisan}}把还能用的兵器收拢。{{ally}}的人没有来。",
+          "entry": "上次行动已经受挫，返回的人需要恢复生活。",
+          "situation": "撤回的部众与家人重新相处，修补这次真正损坏的器械与住处。若此前有伤亡或失地，处理其实际影响；若人手与原据点完整，则承接撤退劳顿、耗损和未达成的目标。{{follower}}与旧人依已有职责参与。",
           "outcome": {
-            "result": "失地的损失落到部众、粮和盟约上；你还剩下的人与据点被重新盘清。"
+            "result": "上次受挫已经落实到返回后的生活，原有人员、辖地与损耗依已发生的结果保留。",
+            "nextEventIds": [
+              "lost-rebuild"
+            ]
           }
         },
         {
           "id": "lost-rebuild",
           "kind": "life",
-          "entry": "剩下的人已经安顿，你仍有人可以重新联络。",
-          "situation": "你带着{{grainLedger}}去联络旧友和乡里，一家家重新接上。{{elder}}替你担保，{{artisan}}修好寨墙，{{follower}}把愿意跟的人重新编队。",
+          "entry": "返回后的生活已经恢复，对手利用前一战的结果继续行动。",
+          "situation": "对手把兵力推向你仍保有的地方，旧友依已成立的关系来援或离开。你与现有骨干修复协作、部署守卫；接下来面对的是对手的新进逼。",
           "outcome": {
-            "result": "你重新有了一支小队和能撑一阵的粮；失地没有被抹去，路却重新接上。"
+            "result": "现有部众在实际可用的地方安顿，守卫部署已经完成；人手、辖地和耗损沿用上次结果。",
+            "nextEventIds": [
+              "lost-defense"
+            ]
           }
         },
         {
-          "id": "lost-return",
-          "kind": "scene",
-          "entry": "重整已经完成，附近出现一桩可以重新立威的事。",
-          "situation": "{{road}}上的粮队被{{rivalWarlord}}的人截住，{{elder}}把你的名字递过去。你带着小队和剩下的粮，重新站到敌军面前。",
-          "outcome": {
-            "result": "你用一桩实际战斗重新立住，失地的旧账仍在，基业却重新有了入口。",
-            "endsFlow": true
-          }
-        }
-      ]
-    },
-    {
-      "id": "contender",
-      "actIds": [
-        "ancient.sovereign-rise.contention"
-      ],
-      "narrativeRole": "本幕结果",
-      "label": "一方之势",
-      "entry": "已经有城、有兵、有盟，周围势力要承认你是一方之主。",
-      "routing": "planned",
-      "assetRoles": [
-        "camp",
-        "city",
-        "road",
-        "ally",
-        "rivalWarlord",
-        "official",
-        "follower",
-        "tally",
-        "command",
-        "legitimacy"
-      ],
-      "events": [
-        {
-          "id": "contender-arrives",
-          "kind": "scene",
-          "entry": "各方势力还没有承认你的位置。",
-          "situation": "{{city}}和{{camp}}连成一片，{{follower}}按军功请赏，{{official}}的旧官吏来投。{{ally}}要你兑现分地，{{rivalWarlord}}在边境集结。{{tally}}在你手里，名分却还没有定。",
-          "outcome": {
-            "result": "军功、分地、旧官吏和{{rivalWarlord}}的威胁都摆开；你要决定先安内还是先对外。"
-          }
-        },
-        {
-          "id": "contender-choice",
+          "id": "lost-defense",
           "kind": "choice",
-          "entry": "一方之势已经成形，{{ally}}和{{follower}}都在等你的安排。",
-          "situation": "{{follower}}要你先赏军功、立军规，{{official}}要你先安民、约法，{{ally}}要你先兑现分地。{{rivalWarlord}}的兵已经在边境。",
-          "question": "先赏军功、先安民约法，还是先兑现分地？",
-          "stakes": "部众的忠诚、旧地的民心，以及盟友会不会倒向{{rivalWarlord}}。",
+          "entry": "实际重整已经完成，对手进逼尚存据点。",
+          "situation": "敌方试图夺取你剩下的立足之地，{{follower}}带幸存者守卫，旧友按真实盟约决定援助。",
+          "question": "怎样保住剩下的力量？",
+          "stakes": "这次行动关系到现有部众、实际控制的地方与同伴安危。",
           "check": {
-            "stat": "charisma",
-            "difficulty": 21
+            "stat": "physique",
+            "difficulty": 18
           },
           "options": [
             {
               "id": "safe",
-              "label": "先赏军功",
-              "action": "按{{follower}}的意思先赏军功、立军规，稳住部众。",
+              "label": "守住退路",
+              "action": "集中现有人手护住据点与居民撤离通路。",
               "success": {
-                "result": "军功赏下，部众归心，军规也立住了。{{ally}}和旧官吏暂时没有闹，{{rivalWarlord}}的兵也退了一步。"
+                "result": "你守住剩下的立足之地，居民和幸存部众得以留下；此前失去的辖地没有回来。",
+                "nextEventIds": [
+                  "lost-return"
+                ]
               },
               "failure": {
-                "result": "赏功分不均，部众起了争执。{{ally}}趁机要地，{{rivalWarlord}}在边境加压。"
+                "result": "剩余据点也失守，部众被打散或编走，主角失去独立基业。",
+                "endsFlow": true,
+                "nextFlowIds": []
               }
             },
             {
               "id": "balanced",
-              "label": "先安民约法",
-              "action": "按{{official}}的意思先安民、约法，把新占的地方稳住。",
+              "label": "依地协防",
+              "action": "依靠熟悉的地形与已有盟友分担守卫。",
               "success": {
-                "result": "约法立住，旧地民心安定，降臣也肯办事。军功赏得薄，{{follower}}有些不满。"
+                "result": "协防挡住进逼，你以实际援助稳住剩余地方，相关盟约的责任更深。",
+                "nextEventIds": [
+                  "lost-return"
+                ]
               },
               "failure": {
-                "result": "约法推不动，旧官吏阳奉阴违。民心没稳住，{{follower}}也开始问赏。"
+                "result": "协防失败，盟友与残部各自退走，你失去统合部众与保有地盘的能力。",
+                "endsFlow": true,
+                "nextFlowIds": []
               }
             },
             {
               "id": "risky",
-              "label": "先兑现分地",
-              "action": "按{{ally}}的要求先分地，换他出兵共抗{{rivalWarlord}}。",
+              "label": "出击解围",
+              "action": "以现有骨干袭击对手进逼的侧翼。",
               "success": {
-                "result": "分地兑现，{{ally}}出兵，{{rivalWarlord}}被挡在边境。你保住了盟约，也把一部分地盘交了出去。"
+                "result": "侧击解除了眼前围困，你保住剩余据点但损失骨干，已失领土没有自动收复。",
+                "nextEventIds": [
+                  "lost-return"
+                ]
               },
               "failure": {
-                "result": "{{ally}}拿了地却按兵不动，{{rivalWarlord}}趁虚压过来。你失了地，也失了先机。"
+                "result": "出击惨败，骨干死散，敌方接收剩余据点，自己的基业覆灭。",
+                "endsFlow": true,
+                "nextFlowIds": []
               }
             }
           ]
         },
         {
-          "id": "contender-verdict",
-          "kind": "settlement",
-          "entry": "一方之势已经定下，周围势力要给出承认或敌对的结论。",
-          "situation": "{{city}}的正堂里，{{follower}}带着将领，{{official}}带着降臣，{{ally}}的使者在门外。{{tally}}和{{grainLedger}}摆在案上。你的地盘、兵和名分，等这一道处置。",
-          "rules": [
-            {
-              "id": "recognized",
-              "condition": "军、民、盟三者都稳，周围势力承认你的位置。",
-              "disposition": "你成为一方之主，{{tally}}号令各部，旧官吏按你的约法办事。{{rivalWarlord}}暂时退去，天下开始把你当成一个名字。",
-              "grantItems": [
-                "command-tally"
-              ]
-            },
-            {
-              "id": "contested",
-              "condition": "你立住了一方，但周围仍有强敌或盟友离心。",
-              "disposition": "你保住地盘和兵，{{ally}}或{{rivalWarlord}}仍在外头。你没有独大，却已经能左右一方局势。",
-              "grantItems": [
-                "command-tally"
-              ]
-            },
-            {
-              "id": "reduced",
-              "condition": "你没有立住一方之势，地盘或部众被削。",
-              "disposition": "你退回据点，{{rivalWarlord}}拿走了一部分城。你保住了核心部众，逐鹿暂时退了一步。"
-            }
-          ]
-        },
-        {
-          "id": "contender-aftermath",
-          "kind": "life",
-          "entry": "一方之势已经定下，军、民和盟都要重新排。",
-          "situation": "{{city}}和{{camp}}的旗换了或立住，{{follower}}按军功领职，{{official}}按约法办事。{{ally}}的使者在等回话，{{rivalWarlord}}的探子还在边境。",
+          "id": "lost-return",
+          "kind": "scene",
+          "entry": "本次守卫已经完成，留下的地方与部众需要安顿。",
+          "situation": "剩余地方在本次守卫后保住。你让幸存者恢复生活，并按真实损失重新承担守土责任；下一次行动只能使用眼下的力量。",
           "outcome": {
-            "result": "你有了能号令一方的兵、地和名分，也知道了军功、民心和盟约三者不能只顾一头。",
-            "endsFlow": true
+            "result": "独立力量与实际地方保住，原有损失按已发生结果保留，此后以这些力量决定去向。",
+            "endsFlow": true,
+            "nextFlowIds": [
+              "reduced-future"
+            ]
           }
         }
       ]
     },
     {
-      "id": "capital",
+      "id": "capital-arrival",
       "actIds": [
         "ancient.sovereign-rise.order"
       ],
-      "narrativeRole": "定鼎行为 A",
-      "label": "京畿与粮道",
-      "entry": "已经有足够的地盘和兵，最后竞争者占据京畿，粮道与决战都压到眼前。",
+      "narrativeRole": "大战展开",
+      "label": "入京与京畿",
+      "entry": "你已经明确选择入京，带着实际拥有的力量与关系抵达京畿外围。",
       "routing": "planned",
       "assetRoles": [
-        "city",
+        "capital",
         "road",
-        "camp",
-        "rivalWarlord",
-        "ally",
-        "official",
-        "follower",
-        "grainLedger",
-        "command",
-        "legitimacy"
+        "pass",
+        "courtier",
+        "general",
+        "emperor"
       ],
       "events": [
         {
-          "id": "capital-arrives",
+          "id": "capital-falls",
           "kind": "scene",
-          "entry": "京畿还没有拿下，粮道和守军都在动。",
-          "situation": "{{city}}的京畿被{{rivalWarlord}}占着，{{road}}的粮道被截。{{follower}}要强攻，{{official}}说京畿百姓怕战，{{ally}}的援军还在路上。{{grainLedger}}上的粮只够一月。",
+          "entry": "你率实际带来的部众抵达京畿外围。",
+          "situation": "外围城池已陷，残军与逃民往关门涌。{{general}}守不住全部城门，{{courtier}}急求接防；你依既定入京目的护送沿途军民并占据一段可守的位置。",
           "outcome": {
-            "result": "京畿、粮道和援军都摆在眼前；你必须决定强攻、断粮，还是先安民再进。"
+            "result": "你带来的人马与逃民在京畿外围落脚，接下一段实际能承担的防区；没有因此控制宫城。",
+            "nextEventIds": [
+              "capital-joint"
+            ]
           }
         },
         {
-          "id": "capital-choice",
+          "id": "capital-joint",
+          "kind": "scene",
+          "entry": "你已在京畿有落脚处，要与当地力量共同应对战事。",
+          "situation": "{{general}}有城防兵，{{courtier}}联络朝廷，{{rebelAlly}}有城外援军。沿用已成立的盟约与政治身份，处理交防、援军配合和保护百姓的实际事务。",
+          "outcome": {
+            "result": "实际合作方按约接防和协作，你在京畿有了可持续驻地；城内控制权与京外军镇仍各自掌握。",
+            "nextEventIds": [
+              "capital-rotation"
+            ]
+          }
+        },
+        {
+          "id": "capital-rotation",
+          "kind": "life",
+          "entry": "京畿各方暂时对峙。",
+          "situation": "旧部在防区轮换，伤者恢复，逃民重新谋生。{{courtier}}与{{general}}继续为各自立场争取支持，宫城的权力危机仍在发展。",
+          "outcome": {
+            "result": "你在京畿持续承担防区事务，部众与当地人有了真实联系，各方力量和立场已明。",
+            "endsFlow": true,
+            "nextFlowIds": [
+              "decisive-capital"
+            ]
+          },
+          "lifeBefore": {
+            "minYears": 1,
+            "maxYears": 3,
+            "context": "在已占防区经历战时生活、协作与损失，京畿争夺尚未裁定。"
+          }
+        }
+      ]
+    },
+    {
+      "id": "decisive-capital",
+      "actIds": [
+        "ancient.sovereign-rise.order"
+      ],
+      "narrativeRole": "天下争夺与人生后续",
+      "label": "京城与天下",
+      "entry": "已选择入京逐鹿并在外围立足，先处理京畿控制，随后面对仍据有外州的主要对手；不能从夺宫跳到天下太平。",
+      "routing": "planned",
+      "assetRoles": [
+        "capital",
+        "court",
+        "emperor",
+        "courtier",
+        "eunuch",
+        "general",
+        "rebelRival",
+        "throneSeal",
+        "contender",
+        "prefecture",
+        "follower",
+        "mentor",
+        "elder",
+        "home"
+      ],
+      "events": [
+        {
+          "id": "capital-founding-action",
           "kind": "choice",
-          "entry": "京畿在望，粮和援军都在倒计时。",
-          "situation": "{{follower}}要你趁援军未到强攻，{{official}}说可以先开仓安民、争取京畿人心，{{ally}}要你等他到再动手。{{grainLedger}}只够一月。",
-          "question": "强攻京畿、先安民，还是等援军？",
-          "stakes": "京畿的归属、百姓的生死，以及你能不能赶在{{rivalWarlord}}整合之前定局。",
+          "entry": "已在京畿立足，尚未控制京城。",
+          "situation": "实际控制京城的守军掌着城门与宫防，旧朝官署各求出路。你以原有部众和已成立的协作夺取中枢；京外军镇和其他起兵者仍控制各自地方。",
+          "question": "怎样夺取京城的实际控制？",
+          "stakes": "京畿驻地、旧朝中枢与这次参战力量。",
           "check": {
-            "stat": "physique",
+            "stat": "charisma",
             "difficulty": 22
           },
           "options": [
             {
               "id": "safe",
-              "label": "等援军",
-              "action": "按{{ally}}的意思等援军到齐，再合攻京畿。",
+              "label": "分割守军",
+              "action": "争取已有盟友切断援军，再逐段攻取城防。",
               "success": {
-                "result": "援军到齐，合攻拿下京畿。你赢了这一局，也欠了{{ally}}一笔要还的盟约。"
+                "result": "援军被阻，城防逐段失守，你控制京畿与宫城，旧朝失去实际权力。",
+                "nextEventIds": [
+                  "capital-reckoning"
+                ]
               },
               "failure": {
-                "result": "援军迟到，{{rivalWarlord}}先整合了京畿。你失了先机，只能退到城外。"
+                "result": "援军突破封锁，你攻势受挫，失去外围阵地。",
+                "endsFlow": true,
+                "nextFlowIds": [
+                  "last-stand"
+                ]
               }
             },
             {
               "id": "balanced",
-              "label": "先安民",
-              "action": "按{{official}}的意思先开仓安民，争取京畿人心，再图攻城。",
+              "label": "内外合击",
+              "action": "与已成立的内应及盟军约定同时行动。",
               "success": {
-                "result": "京畿百姓开城迎你，{{rivalWarlord}}的守军不战自乱。你拿下京畿，也得了民心。"
+                "result": "内外配合夺下城门与宫防，你实际控制京畿，反对者败退。",
+                "nextEventIds": [
+                  "capital-reckoning"
+                ]
               },
               "failure": {
-                "result": "安民拖了时日，{{rivalWarlord}}趁机加固城防。你得了民心，却没拿下城。"
+                "result": "内应或盟军失约，合击失败，你带残部退离京畿核心。",
+                "endsFlow": true,
+                "nextFlowIds": [
+                  "last-stand"
+                ]
               }
             },
             {
               "id": "risky",
-              "label": "趁援军未到强攻",
-              "action": "带{{follower}}趁{{rivalWarlord}}未整合强攻京畿。",
+              "label": "决战破城",
+              "action": "集中主力与京畿守军决战，突破后直接夺宫防。",
               "success": {
-                "result": "你赶在{{rivalWarlord}}整合前破城，京畿归你。部众伤亡不小，天下震动。"
+                "result": "守军主力败退，你实际取得城门、宫防与中枢驻地；京外辖地和军镇尚不在你掌握之中。",
+                "nextEventIds": [
+                  "capital-reckoning"
+                ]
               },
               "failure": {
-                "result": "强攻受挫，{{follower}}折了人，{{rivalWarlord}}的援军到了。你只能退，粮也耗了大半。"
+                "result": "主力决战失利，京畿仍在敌手，你只能带残部撤走。",
+                "endsFlow": true,
+                "nextFlowIds": [
+                  "last-stand"
+                ]
               }
             }
           ]
         },
         {
-          "id": "capital-verdict",
+          "id": "capital-reckoning",
           "kind": "settlement",
-          "entry": "京畿已经拿下或还在敌手，天下要给出一个结果。",
-          "situation": "{{city}}的城门开了或还关着，{{official}}带着降臣，{{follower}}带着将领。{{ally}}的使者在等分地，{{rivalWarlord}}的残部还在城外。天下的归属，等这一道处置。",
+          "entry": "京城已在本次行动中取得，京外尚未统一。",
+          "situation": "以实际控制的京城安顿守军与居民，处理退出中枢的旧朝势力；京外仍活跃的军镇与起兵者按自身利益部署。",
           "rules": [
             {
-              "id": "capital-taken",
-              "condition": "京畿拿下，{{rivalWarlord}}的主力已破。",
-              "disposition": "你入主京畿，{{rivalWarlord}}退走或投降。天下大半归你，{{ally}}和旧官吏都等你的封赏。",
-              "endsFlow": true
-            },
-            {
-              "id": "capital-shared",
-              "condition": "京畿拿下，但{{rivalWarlord}}仍占一部分或{{ally}}要分地。",
-              "disposition": "你入京畿，{{rivalWarlord}}退到一隅，{{ally}}要走了几郡。天下未定，你已经站在最高的位置上。",
-              "endsFlow": true
-            },
-            {
-              "id": "capital-lost",
-              "condition": "京畿没有拿下，或以极大代价才进城。",
-              "disposition": "京畿仍在敌手或只拿下残城。你退到城外，逐鹿还没有结束。",
-              "endsFlow": true
+              "id": "capital-held",
+              "condition": "本次京畿行动已实际取得京城与中枢驻地。",
+              "disposition": "接管京城军政，安顿本次参战者与居民，承担现有控制范围；尚未解决的主要对手依然控制各自地方。",
+              "nextEventIds": [
+                "realm-front"
+              ]
             }
           ]
-        }
-      ]
-    },
-    {
-      "id": "enthronement",
-      "actIds": [
-        "ancient.sovereign-rise.order"
-      ],
-      "narrativeRole": "定鼎行为 B",
-      "label": "登基与分封",
-      "entry": "京畿已经拿下或天下大半归你，称帝、分封或另立秩序要有一个选择。",
-      "routing": "planned",
-      "assetRoles": [
-        "city",
-        "court",
-        "ally",
-        "official",
-        "follower",
-        "elder",
-        "tally",
-        "legitimacy"
-      ],
-      "events": [
+        },
         {
-          "id": "enthronement-choice",
+          "id": "realm-front",
+          "kind": "life",
+          "entry": "京城控制已经落实，主要外部对手仍在争夺。",
+          "situation": "你从实际控制范围组织战线，旧部与驻地居民承受战时生活，{{contender}}联合京外反对力量；家人和留守者的生活承接长年征战。",
+          "outcome": {
+            "result": "本方与京外主要对手的战线实际展开，天下归属尚未裁定。",
+            "nextEventIds": [
+              "realm-campaign"
+            ]
+          },
+          "lifeBefore": {
+            "minYears": 1,
+            "maxYears": 3,
+            "context": "京城已控制，战事尚未结束。实际驻地轮换守卫、安顿家庭，外部对手继续行动；不预写全国归附或新朝太平。"
+          }
+        },
+        {
+          "id": "realm-campaign",
           "kind": "choice",
-          "entry": "最高位置在眼前，{{ally}}、{{follower}}和旧官吏各有主张。",
-          "situation": "{{follower}}要你称帝，{{official}}说先要定礼制、安降臣，{{ally}}要你兑现分地再谈名分。{{elder}}问你还记不记得乡里。",
-          "question": "称帝、先定制度，还是先兑现分封？",
-          "stakes": "新朝的合法性、盟友与功臣的去留，以及天下能不能真正定下来。",
+          "entry": "京畿已经控制，京外主要对手正联合进逼。",
+          "situation": "{{contender}}统合仍活跃的反对力量，依实际拥有的城镇和军队争夺通往京畿的战线。旧朝军镇与原有盟友依已发生的关系参战、守土或中立；你从京畿与西洲实有力量出发处理这场战役。",
+          "question": "怎样击破争夺天下的主力？",
+          "stakes": "主要战线、京畿与各地军政归属。",
           "check": {
             "stat": "charisma",
-            "difficulty": 23
+            "difficulty": 22
           },
           "options": [
             {
               "id": "safe",
-              "label": "先定制度",
-              "action": "按{{official}}的意思先定礼制、约法和降臣安排，再谈称帝。",
+              "label": "稳住后方推进",
+              "action": "以现有驻地互相支援，集中兵力逐段切断对手主军的交通。",
               "success": {
-                "result": "制度先立，降臣和百姓都安了心。你还没有称帝，新朝却已经有了架子。"
+                "result": "现有部伍与实际归附者协同推进，对手主军失去交通后战败，各主要战线的守军撤退或停止抵抗；具体归属尚待处置。",
+                "nextEventIds": [
+                  "realm-reckoning"
+                ]
               },
               "failure": {
-                "result": "制度拖得太久，{{follower}}和{{ally}}都等不及。名分没定，人心先散。"
+                "result": "推进被对手截断，外线驻地失守，你撤回仍由自己控制的京畿与西洲核心，转为守势；对手进入已经丢失的地方。",
+                "nextEventIds": [
+                  "realm-reverse"
+                ]
               }
             },
             {
               "id": "balanced",
-              "label": "先兑现分封",
-              "action": "按{{ally}}的要求先分封功臣与盟友，再定名分。",
+              "label": "分化与会战并行",
+              "action": "以既有盟约争取实际愿意协作的力量，分担牵制，再集中旧部迎击对手主军。",
               "success": {
-                "result": "功臣和盟友都得了地，你随后称帝。新朝立住，分封却给后世埋了争端的根。"
+                "result": "实际合作方完成牵制，主军会战获胜；敌对军镇失去联合支撑，各自提出归附或退出战线的安排。",
+                "nextEventIds": [
+                  "realm-reckoning"
+                ]
               },
               "failure": {
-                "result": "分封不均，{{ally}}或{{follower}}当场不满。你称了帝，新朝却先裂了。"
+                "result": "协作失效，会战失利，实际参战旧部受损；你保有中枢和原有后方，敌方开始包围外线。",
+                "nextEventIds": [
+                  "realm-reverse"
+                ]
               }
             },
             {
               "id": "risky",
-              "label": "直接称帝",
-              "action": "趁京畿在手直接称帝，用既成事实压住各方。",
+              "label": "集中主力决战",
+              "action": "投入核心部伍突破对手联军的主阵，把主战线胜负押在这次集中交战。",
               "success": {
-                "result": "你直接称帝，天下震动，旧官吏和降臣不得不认。新朝立住，{{ally}}和{{follower}}却各自记下了未兑现的账。"
+                "result": "对手联军主力被击溃，争天下的军事联合瓦解；你保有实有中枢与后方，接下来处置各地真实归属。",
+                "nextEventIds": [
+                  "realm-reckoning"
+                ]
               },
               "failure": {
-                "result": "称帝被指“僭越”，{{ally}}退盟，旧官吏观望。你坐了位子，天下却没有真正归心。"
+                "result": "决战失利，骨干损耗，外线被迫撤回；敌方沿胜势逼向中枢，你仍有实际留守力量可以组织防守。",
+                "nextEventIds": [
+                  "realm-reverse"
+                ]
               }
             }
           ]
         },
         {
-          "id": "enthronement-verdict",
+          "id": "realm-reverse",
+          "kind": "scene",
+          "entry": "外线战役已经失利，核心与后方仍在。",
+          "situation": "你安顿这次受损的部众，把前线转为守卫中枢与后方；实际盟友在压力下决定援助或离开，敌军沿夺得的道路进逼，幸存者重新承担防守。",
+          "outcome": {
+            "result": "先前战败的失地与伤亡已经落实，新的处境是核心遭围攻，双方力量与职责随之改变。",
+            "nextEventIds": [
+              "realm-counterstroke"
+            ]
+          }
+        },
+        {
+          "id": "realm-counterstroke",
+          "kind": "choice",
+          "entry": "前一战已败，敌军转而进逼保有的核心，守势部署已经完成。",
+          "situation": "{{contender}}率各主要对手的联军主力围攻中枢，各方指挥与精锐都投入了这场决定性战役。你据实际城防与后方迎战，{{follower}}带幸存者，仍在的伙伴各担职责。前一战失地与伤亡保留，这次战事决定双方还能否继续争天下。",
+          "question": "怎样守住中枢并击败主要对手的联军？",
+          "stakes": "仍保有的中枢、后方与独立力量。",
+          "check": {
+            "stat": "charisma",
+            "difficulty": 22
+          },
+          "options": [
+            {
+              "id": "safe",
+              "label": "据守反击",
+              "action": "依靠真实城防消耗围攻，轮换骨干，待敌军分散后逐段反击。",
+              "success": {
+                "result": "守卫顶住围攻并在敌军分散后反击，{{contender}}的联军主力被击溃，联军指挥被俘，其余主要军镇交出兵权与辖地归附，争天下的军事联合终结；旧伤亡不会补回。",
+                "nextEventIds": [
+                  "realm-reckoning"
+                ]
+              },
+              "failure": {
+                "result": "核心城防失守，幸存者向实际仍可撤守的方向退去，天下争夺转入最后保全。",
+                "endsFlow": true,
+                "nextFlowIds": [
+                  "last-stand"
+                ]
+              }
+            },
+            {
+              "id": "balanced",
+              "label": "内外协同解围",
+              "action": "由城内旧部守住主要防线，与实际仍在外的援手夹击围攻部队。",
+              "success": {
+                "result": "内外配合歼破围攻主力，{{contender}}败亡，参战军镇失去独立争夺力量并交出辖地与兵权；你保住中枢，取得主要对手的实际降附，前次伤亡仍在。",
+                "nextEventIds": [
+                  "realm-reckoning"
+                ]
+              },
+              "failure": {
+                "result": "内外协作被切断，核心无法守住，你带能带出的旧人退出，准备最后撤守。",
+                "endsFlow": true,
+                "nextFlowIds": [
+                  "last-stand"
+                ]
+              }
+            },
+            {
+              "id": "risky",
+              "label": "突击围攻主阵",
+              "action": "带现有骨干突入敌军围攻主阵，以留守部队掩护核心与居民。",
+              "success": {
+                "result": "围攻主阵被突破，{{contender}}及各方主将被擒，联军主力投降，剩余守军交出辖地；主要对手失去独立争夺天下的力量，骨干承担本次真实伤亡。",
+                "nextEventIds": [
+                  "realm-reckoning"
+                ]
+              },
+              "failure": {
+                "result": "突击失败，核心旧部损耗，敌军攻入中枢；残部尚存，进入最后撤守与败局处置。",
+                "endsFlow": true,
+                "nextFlowIds": [
+                  "last-stand"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": "realm-reckoning",
           "kind": "settlement",
-          "entry": "名分与分封已经定下，新朝要给出正式结果。",
-          "situation": "{{city}}的正殿里，{{follower}}带着功臣，{{official}}带着降臣，{{ally}}的使者在门外。{{tally}}和{{grainLedger}}摆在案上。新朝的合法性、封地和兵权，等这一道处置。",
+          "entry": "主要对手的战役力量已经在实际行动中被解决。",
+          "situation": "主要对手已在上一战败亡、被俘或降附。处理其原有军镇、辖地与官署的实际交接，结束独立军令；合作方按已成立的盟约交付约定权力，原有军队与地方随之进入同一统辖。战死或失散的旧人不参与封赏。",
+          "rules": [
+            {
+              "id": "campaign-won",
+              "condition": "外线战役获胜，主要对手主军战败，各战线已撤退、投降或停止抵抗。",
+              "disposition": "按实际战果接管归附辖地，安置军队与地方；既有合作和任职通过此次权力更替处置，新秩序取得可持续运行的实际范围。",
+              "nextEventIds": [
+                "realm-foundation"
+              ]
+            },
+            {
+              "id": "core-defended",
+              "condition": "外线战败后转入守势，核心反击实际解决了主要对手的进逼与联合力量。",
+              "disposition": "接收已败主要对手交出的军队、辖地与官署，原军镇不再各发独立军令，战线随归附结束；此前人员与器械损失仍在，军政交接按本次胜利所得落实。",
+              "nextEventIds": [
+                "realm-foundation"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "realm-foundation",
+          "kind": "settlement",
+          "entry": "主要对手已解决，战后辖地与军队实际交付。",
+          "situation": "主要对手已退出争夺，辖地军政已经交付。你在京城建朝即位，确定国号与中枢，任命仍在的开国同伴及归附人才承担中央和地方职务，旧盟约转为新朝已经议定的权责。",
           "rules": [
             {
               "id": "throne-established",
-              "condition": "名分、制度和分封都立住，各方承认新朝。",
-              "disposition": "你正式称帝，新朝的制度、封地和兵权都定下来。天下大半归心，{{ally}}和{{follower}}各得其所。",
-              "endsFlow": true
-            },
-            {
-              "id": "throne-shared",
-              "condition": "你立住新朝，但盟友或功臣仍各据一方。",
-              "disposition": "你称帝，{{ally}}和功臣各据几郡。天下名义上归你，实际上还要靠盟约维持。",
-              "endsFlow": true
-            },
-            {
-              "id": "throne-failed",
-              "condition": "名分没有立住，或分封引发内乱。",
-              "disposition": "你称帝或退让，新朝却没有真正统一。{{ally}}或{{follower}}起兵，天下重新分裂。",
-              "endsFlow": true
+              "condition": "主要对手得到实际解决，军政交付已经成立，可以在这些辖地建立新朝。",
+              "disposition": "在已经取得的统辖范围建立新朝并正式即位，交付各地任命与军令，主角以皇帝身份承担最高权力；授印记录此次建朝的既成结果。",
+              "nextEventIds": [
+                "new-court"
+              ],
+              "grantItems": [
+                "throne-seal"
+              ]
             }
           ]
+        },
+        {
+          "id": "new-court",
+          "kind": "life",
+          "entry": "新朝已立，主角开始统治。",
+          "situation": "你以新朝统治者身份在宫城召集朝议，任用参与开国的人处理军队、州县与百姓安顿。家人从逃难者成为皇室，旧部有人领兵在外，有人留朝；他们对你的称呼与相处已不同从前。",
+          "outcome": {
+            "result": "新朝朝廷与地方开始实际运作，主角承担统治天下的责任，旧朝权力已经退出。",
+            "nextEventIds": [
+              "new-reign-years"
+            ]
+          },
+          "lifeBefore": {
+            "minYears": 4,
+            "maxYears": 7,
+            "context": "新朝初年的朝政、战后恢复与家人生活：旧部进入新职，州县恢复交通耕作，主角在宫中与家人适应新的身份。"
+          }
+        },
+        {
+          "id": "new-reign-years",
+          "kind": "life",
+          "entry": "新朝持续运转，开国之后进入长期治理。",
+          "situation": "在已经建立的新朝里，你处理州县争端、守边将领与朝臣的分歧，看到战后的村镇重新有了市集。开国同伴有人成家、有人成为朝臣，有人老病归乡；你的子女在宫中长大，逐渐理解这份权力所承担的责任。",
+          "outcome": {
+            "result": "新朝经历实际治理，百姓与旧部的生活已有持续变化，主角仍是承担最高军政权力的统治者。",
+            "nextEventIds": [
+              "new-crown-transfer"
+            ]
+          },
+          "lifeBefore": {
+            "minYears": 5,
+            "maxYears": 8,
+            "context": "新朝的长期治理、家人相处和旧臣变化。表现不同地方恢复的生活，以及统治者与亲友的距离和牵挂。"
+          }
+        },
+        {
+          "id": "new-crown-transfer",
+          "kind": "settlement",
+          "entry": "执政多年，新朝需要完成最高权力的正式交接。",
+          "situation": "你按本朝已经成立的继位制度确定接手者，交付朝政与军队的统辖权，朝臣和地方依制度承认继任者。",
+          "rules": [
+            {
+              "id": "crown-transferred",
+              "condition": "主角建立的新朝仍在运转，继任者按已经成立的制度接掌最高权力。",
+              "disposition": "新君实际即位并接掌朝政与军队，主角退位，日常政务由新君与朝臣承担。",
+              "nextEventIds": [
+                "retired-sovereign"
+              ]
+            }
+          ],
+          "lifeBefore": {
+            "minYears": 4,
+            "maxYears": 7,
+            "context": "执政后期的家人、旧臣和后来人：继任者逐渐承担政务，老臣交替，主角经历老病与相处方式的改变。"
+          }
+        },
+        {
+          "id": "retired-sovereign",
+          "kind": "life",
+          "entry": "最高权力已经正式交接，主角退位生活。",
+          "situation": "你住在退居之所，与尚在的家人、故交相处。旧臣来探望时会说起新朝的人事和家乡变化；新君处理朝政，你不再亲自主持。故友的去世与晚辈的成长成为生活的一部分。",
+          "outcome": {
+            "result": "主角已退位并经历实际退居，新君持续治理，新朝与百姓生活没有因主角退出而停止。",
+            "nextEventIds": [
+              "dynasty-legacy"
+            ]
+          },
+          "lifeBefore": {
+            "minYears": 5,
+            "maxYears": 8,
+            "context": "退位后的日常、旧友探访、家人聚散与身体老去；新君实际主政，主角以退居者身份看见新朝的后续。"
+          }
+        },
+        {
+          "id": "dynasty-legacy",
+          "kind": "life",
+          "entry": "退位多年，开国的一代渐渐老去。",
+          "situation": "在退居生活里，你看见自己建立的朝廷仍在运转，故土的后来人已有不同于逃难年代的生活。尚在的旧友、家人和晚辈各有归处，你面对一生的所得与牺牲。",
+          "outcome": {
+            "result": "这一生从布衣、聚众与征战走到建立新朝、执政和正式传承，主角已经退位；实际留下的秩序与损失均已可见。",
+            "endsFlow": true,
+            "nextFlowIds": []
+          },
+          "lifeBefore": {
+            "minYears": 3,
+            "maxYears": 6,
+            "context": "退位后的晚年：故土与宫中的后人、开国故交的离去，以及新朝持续运转带来的生活变化。"
+          }
         }
       ]
     },
@@ -1223,159 +2002,616 @@
       "actIds": [
         "ancient.sovereign-rise.order"
       ],
-      "narrativeRole": "定鼎败势",
-      "label": "败势与退守",
-      "entry": "决战失利或京畿得而复失，你还有残部、百姓或一命可以收束。",
+      "narrativeRole": "败势中的最终取舍",
+      "label": "最后一线",
+      "entry": "京畿或天下战事失败，幸存部众尚在，处理撤守与最后保全；是否仍有地方以实际历史为准。",
       "routing": "planned",
       "assetRoles": [
-        "camp",
-        "city",
-        "road",
-        "rivalWarlord",
-        "ally",
+        "capital",
+        "general",
+        "rebelRival",
         "follower",
-        "elder",
-        "tally",
-        "command"
+        "elder"
       ],
       "events": [
         {
-          "id": "last-stand-choice",
+          "id": "last-choice",
           "kind": "choice",
           "entry": "败局已经压到眼前，残部和百姓还有最后一次选择。",
-          "situation": "{{city}}的城门失守，{{follower}}收拢残部，{{elder}}带着百姓退到{{camp}}。{{rivalWarlord}}的兵在后追，{{ally}}的援军没有来。你可以退、守，或反扑。",
-          "question": "带人退守、合残部再守，还是决死反扑？",
-          "stakes": "残部与百姓的性命、你还能不能保住一块地盘，以及新朝的结局。",
+          "situation": "实际仍在追击的敌军控制主要通路，幸存旧部护送居民离开失守地区。{{follower}}等人只按真实生死参与；你们必须用现有力量争取一条撤守通路。",
+          "question": "护人撤守、合残部再守，还是决死反击？",
+          "stakes": "残部与百姓的性命、最后一点基业，都在这一选择里。",
           "check": {
             "stat": "charisma",
-            "difficulty": 22
+            "difficulty": 21
           },
           "options": [
             {
               "id": "safe",
-              "label": "带人退守",
-              "action": "带百姓与残部退到{{camp}}，放弃京畿。",
+              "label": "护人撤守",
+              "action": "带百姓与残部退到能守的地方，放弃京畿。",
               "success": {
-                "result": "你带人退到据点，{{rivalWarlord}}占了京畿。天下没有定在你手里，残部和百姓却保住了。"
+                "result": "你护送居民与残部退出京畿，抵达仍实际可守的地方，未能完成此前的入京目标。",
+                "nextEventIds": [
+                  "last-reckoning"
+                ]
               },
               "failure": {
-                "result": "退路被截，百姓失散，{{follower}}为护你重伤。你带少数人脱身，基业去了大半。"
+                "result": "退路被截，百姓失散；你只带少数人脱身，基业去了大半。",
+                "nextEventIds": [
+                  "last-reckoning"
+                ]
               }
             },
             {
               "id": "balanced",
               "label": "合残部再守",
-              "action": "收拢残部与百姓，在据点或山口再守一次。",
+              "action": "收拢残部与百姓，在城门/旧宅再守一次。",
               "success": {
-                "result": "你借地形守到{{rivalWarlord}}退兵，保住了据点和残部。京畿仍在敌手，你却留下了一线。"
+                "result": "你借地形守到对方退兵，保住残部与百姓；京畿仍在敌手，你却留下了一线。",
+                "nextEventIds": [
+                  "last-reckoning"
+                ]
               },
               "failure": {
-                "result": "据点守不住，{{follower}}被擒，{{elder}}带百姓突围。你保住了少数人，基业散了。"
+                "result": "旧宅守不住，{{follower}}被擒；你保住了少数人，基业散了。",
+                "nextEventIds": [
+                  "last-reckoning"
+                ]
               }
             },
             {
               "id": "risky",
-              "label": "决死反扑",
-              "action": "带残部夜袭{{rivalWarlord}}，夺回京畿或死在那里。",
+              "label": "决死反击",
+              "action": "以残部突击追兵打开撤离通路，掩护幸存者抵达实际可守的地方。",
               "success": {
-                "result": "夜袭成功，{{rivalWarlord}}措手不及，你夺回京畿。残部伤亡惨重，天下却重新归你。"
+                "result": "夜袭打穿追兵的包围，你带残部和居民撤到仍可守的旧地；京畿仍在敌手，未因此夺回天下。",
+                "nextEventIds": [
+                  "last-reckoning"
+                ]
               },
               "failure": {
-                "result": "夜袭中伏，{{follower}}战死，你只身脱身。基业覆灭，天下归了{{rivalWarlord}}。"
+                "result": "夜袭中伏，{{follower}}战死；你只身脱身，基业覆灭。",
+                "nextEventIds": [
+                  "last-reckoning"
+                ]
               }
             }
           ]
         },
         {
-          "id": "last-stand-verdict",
+          "id": "last-reckoning",
           "kind": "settlement",
           "entry": "最后行动已经结束，你与残部的去向要落定。",
-          "situation": "{{camp}}的旧寨里，{{elder}}按户点名，{{follower}}带伤站在旁边。{{rivalWarlord}}的追兵还在附近，{{ally}}的使者没有来。你的去留、残部和百姓，都等这一道处置。",
+          "situation": "在最后行动留下的真实据点或避难处，幸存者处理伤亡与去向；已死或被擒的人不重新出现。",
           "rules": [
             {
               "id": "line-preserved",
-              "condition": "最后行动保住了残部与百姓，你还控制着一块地方。",
-              "disposition": "你退守一方，保住残部和百姓。天下没有定在你手里，你却还有一块可以重新开始的基业。"
+              "condition": "最后行动保住了残部与百姓，还有一块可守的地方。",
+              "disposition": "你退守实际保住的地方，安顿残部与居民，不再争夺京畿。",
+              "nextEventIds": [
+                "last-aftermath"
+              ]
             },
             {
               "id": "line-broken",
               "condition": "基业已散，但你与少数人活着退出。",
-              "disposition": "你带少数人退走，据点和京畿都归了{{rivalWarlord}}。你活着，却要从头再来。"
+              "disposition": "独立基业已经终结，你与少数幸存者退出争夺，不以从头再来延续已经结束的事业。",
+              "endsFlow": true,
+              "nextFlowIds": []
             },
             {
               "id": "line-extinguished",
-              "condition": "最后行动失败，残部覆灭，只剩你一人或极少数人。",
-              "disposition": "{{follower}}或{{elder}}死在最后一场，你只身脱身。基业只剩一个名字。"
+              "condition": "最后行动失败，残部覆灭，只剩极少数人。",
+              "disposition": "残部与基业覆灭，幸存者面对实际损失，逐鹿事业已经结束。",
+              "endsFlow": true,
+              "nextFlowIds": []
             }
           ]
         },
         {
-          "id": "last-stand-aftermath",
+          "id": "last-aftermath",
           "kind": "life",
-          "entry": "最后行动与去向已经落定，幸存者要重新落脚。",
-          "situation": "幸存者在{{camp}}或外地安顿，{{elder}}照料伤者，{{follower}}的旧部各自找出路。你面对没有归来的同伴和失去旧居的百姓，{{rivalWarlord}}的通缉还在。",
+          "entry": "最后行动保住了残部、百姓和可守的地方，撤守后的生活已经开始。",
+          "situation": "你仍承担现有地方与幸存者的安顿责任，伤者恢复，旧部各寻生计。已死亡、被俘和失散的人按真实状态留在此后生活中，不恢复失去的权力与队伍。",
           "outcome": {
-            "result": "残部、百姓和你自己的去留有了实际结果；天下没有定在你手里，日子却还要继续。",
-            "endsFlow": true
+            "result": "撤守后的地方生活与现有职责已经落实，你仍承担幸存者和地方的责任，随后处理这些职责的交接与退居。",
+            "endsFlow": true,
+            "nextFlowIds": [
+              "western-succession"
+            ]
+          },
+          "lifeBefore": {
+            "minYears": 3,
+            "maxYears": 6,
+            "context": "最后行动之后幸存者的实际生活；承接失去的权力与同伴，不恢复已经覆灭的基业。"
           }
         }
       ]
     },
     {
-      "id": "postwar-order",
+      "id": "future-road",
       "actIds": [
         "ancient.sovereign-rise.order"
       ],
-      "narrativeRole": "本幕结果",
-      "label": "新朝与治理",
-      "entry": "天下归属已经落定，新朝的治理、功臣与百姓要有一个最终回答。",
+      "narrativeRole": "人生道路",
+      "label": "入京或留守",
+      "entry": "你已在西洲形成一方势力，上一幕的实际权力安排已经落定。",
       "routing": "planned",
       "assetRoles": [
-        "city",
+        "home",
         "court",
-        "camp",
-        "ally",
-        "official",
+        "courtier",
         "follower",
-        "elder",
-        "tally",
-        "legitimacy"
+        "elder"
       ],
       "events": [
         {
-          "id": "order-verdict",
-          "kind": "settlement",
-          "entry": "新朝的最后一道安排还没有定。",
-          "situation": "{{city}}的朝堂上，{{official}}带着新朝的文臣，{{follower}}带着功臣，{{ally}}和{{elder}}都在等。{{tally}}和{{grainLedger}}摆在案上。你可以定都、分封、让位，或让新朝退回旧制。",
-          "rules": [
+          "id": "future-choice",
+          "kind": "decision",
+          "entry": "京畿局势动荡，各方争夺朝廷；西洲也需要有人继续主持。",
+          "situation": "{{courtier}}带来京畿的消息与邀约，{{follower}}愿随你行动，{{elder}}希望故土不再失守。是否离开西洲是你本人的道路取舍。",
+          "question": "入京争取天下，还是留守西洲？",
+          "stakes": "入京把你卷入天下争夺，留守把余生重心放在已建成的地方与旧人。",
+          "options": [
             {
-              "id": "new-order",
-              "condition": "新朝有稳定的制度、军权和民心。",
-              "disposition": "你定下新朝的制度与封赏，百姓复业，功臣各得其所。天下归你，也归这套新秩序。"
+              "id": "capital",
+              "label": "入京",
+              "action": "带愿随行的力量赴京，西洲按现有权责留下守土者。",
+              "outcome": {
+                "result": "你决定入京争取天下，已有力量与政治关系随你进入京畿，故土按真实安排留守。",
+                "endsFlow": true,
+                "nextFlowIds": [
+                  "capital-arrival"
+                ]
+              }
             },
             {
-              "id": "shared-order",
-              "condition": "新朝立住，但功臣或盟友仍各据一方。",
-              "disposition": "你与功臣、盟友共治，天下名义上统一，实际靠盟约维持。你保住了新朝，也留下了下一场争端的根。"
+              "id": "west",
+              "label": "留守西洲",
+              "action": "拒绝赴京邀约，继续经营西洲与现有部众、盟友的生活。",
+              "outcome": {
+                "result": "你决定留守西洲，不参加京畿争夺；实际拥有的地盘、兵权与外部约束都继续存在。",
+                "endsFlow": true,
+                "nextFlowIds": [
+                  "western-settlement"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "western-settlement",
+      "actIds": [
+        "ancient.sovereign-rise.order"
+      ],
+      "narrativeRole": "地方守成",
+      "label": "守土与地方生活",
+      "entry": "你已明确留守西洲，未参加京畿争夺；沿用实际地盘、部众与对外关系。",
+      "routing": "planned",
+      "assetRoles": [
+        "home",
+        "county",
+        "pass",
+        "road",
+        "follower",
+        "elder",
+        "artisan",
+        "rebelRival",
+        "general"
+      ],
+      "events": [
+        {
+          "id": "west-council",
+          "kind": "scene",
+          "entry": "留守决定已经成立，旧地进入持续经营。",
+          "situation": "{{follower}}主持部众轮换，{{artisan}}修复真实受损的道路与寨防，乡里继续耕作。朝廷与其他军镇不再把你放在天下争夺的中心，但依旧有守土、盟约和供给的责任。",
+          "outcome": {
+            "result": "你把重心放回地方，按已有权责安排日常军民事务；政治影响局限在实际掌握的范围。",
+            "nextEventIds": [
+              "west-defense"
+            ]
+          },
+          "lifeBefore": {
+            "minYears": 3,
+            "maxYears": 5,
+            "context": "地方生产、旧部家庭与军民协作持续发展，昔日战友逐渐各有生活。"
+          }
+        },
+        {
+          "id": "west-defense",
+          "kind": "choice",
+          "entry": "西洲既有边界与外部对手发生实际冲突。",
+          "situation": "既有敌对军镇或义军越过边界争夺要道，受威胁的是你真实拥有的土地与居民；未形成的地盘不被假定为你的领地。",
+          "question": "怎样守住地方？",
+          "stakes": "本次行动的实际目标、投入的人手与已有基业。",
+          "check": {
+            "stat": "physique",
+            "difficulty": 18
+          },
+          "options": [
+            {
+              "id": "safe",
+              "label": "护住要道",
+              "action": "以已有寨防保护居民与关键道路，放弃难以防守的外围。",
+              "success": {
+                "result": "你守住核心道路与居民，代价落在实际投入的人力物力，地方基业得以继续。",
+                "nextEventIds": [
+                  "west-repair"
+                ]
+              },
+              "failure": {
+                "result": "外围地段失守，部分居民迁入核心地区；你保住较小的基业，实力与收入下降。",
+                "nextEventIds": [
+                  "west-repair"
+                ]
+              }
             },
             {
-              "id": "old-order",
-              "condition": "新朝无法维持，或你选择退回旧制/让位。",
-              "disposition": "你让位、退守或恢复旧制。天下没有按你的意思重造，百姓和部众却得了一个暂时安定的去处。"
+              "id": "balanced",
+              "label": "协同御敌",
+              "action": "按已成立的盟约与军镇关系协同防守。",
+              "success": {
+                "result": "援手与旧部配合击退入侵，原有边界保住，盟约责任实际加深。",
+                "nextEventIds": [
+                  "west-repair"
+                ]
+              },
+              "failure": {
+                "result": "协作未成，边界被压缩，部众伤亡；你带地方人退守剩下的据点，仍有生计与权责。",
+                "nextEventIds": [
+                  "west-repair"
+                ]
+              }
+            },
+            {
+              "id": "risky",
+              "label": "出境反击",
+              "action": "以现有主力攻击入侵者后方，迫其退兵。",
+              "success": {
+                "result": "反击迫使对手退出，地方得以恢复生活，你承担真实损耗而没有自动扩大地盘。",
+                "nextEventIds": [
+                  "west-repair"
+                ]
+              },
+              "failure": {
+                "result": "主力中伏，最后的独立守土力量崩溃；对手夺取现有据点，旧部与居民失散，你的地方基业覆亡。",
+                "endsFlow": true,
+                "nextFlowIds": []
+              }
             }
           ]
         },
         {
-          "id": "order-homecoming",
+          "id": "west-repair",
           "kind": "life",
-          "entry": "新朝的去向已经定下，你要回到乡里与自己的日子里。",
-          "situation": "{{city}}的宫室或{{camp}}的旧寨里，{{elder}}和{{follower}}来送，{{ally}}的使者在门外。{{mother}}或{{father}}的旧物被收进箱子，{{token}}还在你身上。你把{{tally}}和{{grainLedger}}交给该交的人。",
+          "entry": "边界冲突已经裁定，幸存者承接实际得失。",
+          "situation": "伤者恢复、失去家园者重新安顿，{{follower}}与{{elder}}依真实存亡和关系参与生活；失去的土地不在日常叙述中自动归还。",
           "outcome": {
-            "result": "天下、新朝与你自己的去留有了最终回答；无论定鼎、共治还是退守，这一生的逐鹿账都已经落下。",
-            "endsFlow": true
+            "result": "地方人在战后恢复生计，你的兵力、地盘和关系承接实际守土结果。",
+            "nextEventIds": [
+              "west-years"
+            ]
+          },
+          "lifeBefore": {
+            "minYears": 2,
+            "maxYears": 4,
+            "context": "写守土之后的恢复与旧人生活，不重打上一场战争。"
+          }
+        },
+        {
+          "id": "west-years",
+          "kind": "life",
+          "entry": "地方重新形成可持续的生活。",
+          "situation": "旧部有人经营家业，有人继续服役，孩子们开始自己的婚事与营生；你仍总领地方，处理已有权责中的争端与外部关系，京畿的变局不再把你强拉回去。",
+          "outcome": {
+            "result": "地方生活已持续，旧部及其家人的处境有了变化；你仍承担地方总领职责，接下来另行处理权力交接。",
+            "endsFlow": true,
+            "nextFlowIds": [
+              "western-succession"
+            ]
+          },
+          "lifeBefore": {
+            "minYears": 5,
+            "maxYears": 8,
+            "context": "你仍在任上，旧部、家人及地方居民经历数年的生产、婚嫁与相处，守成的得失落实在他们的生活中。"
+          }
+        }
+      ]
+    },
+    {
+      "id": "western-succession",
+      "actIds": [
+        "ancient.sovereign-rise.order"
+      ],
+      "narrativeRole": "交接与退居",
+      "label": "旧部与后来人",
+      "entry": "主动留守或逐鹿失败后仍保有的地方已经历生活与压力，到了处理实际权责交接的阶段。",
+      "routing": "planned",
+      "assetRoles": [
+        "home",
+        "county",
+        "follower",
+        "elder",
+        "courtier"
+      ],
+      "events": [
+        {
+          "id": "west-handover",
+          "kind": "settlement",
+          "entry": "依据实际权力来源安排后来人接手。",
+          "situation": "年岁增长，旧部和地方已有能承担事务的人。{{follower}}、{{elder}}与实际权力关系中的人参与交接。",
+          "rules": [
+            {
+              "id": "independent-handover",
+              "condition": "主角实际自主掌握地方，没有上级任命关系。",
+              "disposition": "你依既有地方秩序交付军政职责，旧部与居民接受具体接手安排，保留已存在的权力边界。",
+              "nextEventIds": [
+                "west-retirement"
+              ]
+            },
+            {
+              "id": "appointed-handover",
+              "condition": "主角按朝廷或军镇授职承担地方职责。",
+              "disposition": "你依现有任命权限请求并落实继任，不把公职与军队私自当成家产；退居后保留实际所得待遇与关系。",
+              "nextEventIds": [
+                "west-retirement"
+              ]
+            },
+            {
+              "id": "shared-handover",
+              "condition": "地方由主角与其他势力共同治理。",
+              "disposition": "各方按已成立的共同权责确定继任与分工，你交回自己承担的部分，地方不因退居自动归一家。",
+              "nextEventIds": [
+                "west-retirement"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "west-retirement",
+          "kind": "life",
+          "entry": "交接已经完成，后来人开始实际承担职责。",
+          "situation": "你退出日常军政事务，与尚在的家人、旧部相处，看到过去的安排怎样影响后来人；有人离去，有人仍回来探望。",
+          "outcome": {
+            "result": "接手者已实际承担地方事务，你的生活从争夺与执掌转为退居，保住与失去的东西都已明确。",
+            "nextEventIds": [
+              "west-legacy"
+            ]
+          },
+          "lifeBefore": {
+            "minYears": 5,
+            "maxYears": 8,
+            "context": "退居后的日常、老朋友的变化和后来人的生活；不重新索取已交出的权力。"
+          }
+        },
+        {
+          "id": "west-legacy",
+          "kind": "life",
+          "entry": "退居生活已经持续，地方与旧人的后续可见。",
+          "situation": "故土依真实结果继续运作，幸存者各有去处。你面对自己的选择给家人、旧部和地方留下的生活。",
+          "outcome": {
+            "result": "留守道路已有完整人生结果：按实际守成与交接留下地方秩序及旧人归处；未争得天下，也不补写入京定鼎。",
+            "endsFlow": true,
+            "nextFlowIds": []
+          },
+          "lifeBefore": {
+            "minYears": 3,
+            "maxYears": 6,
+            "context": "在晚年生活中看见地方与旧人的真实后续，不以年龄数字自动判定成功。"
+          }
+        }
+      ]
+    },
+    {
+      "id": "reduced-future",
+      "actIds": [
+        "ancient.sovereign-rise.contention"
+      ],
+      "narrativeRole": "有限力量的最后去向",
+      "label": "小据点与未竟之路",
+      "entry": "夺县或西洲争夺受挫后，已处理损失并保住实际剩余力量；按现有地方决定守成、援救邻地另立区域，或交出独立指挥权。这里不接已经完成一方区域安排的人。",
+      "routing": "planned",
+      "assetRoles": [
+        "camp",
+        "road",
+        "follower",
+        "mentor",
+        "elder"
+      ],
+      "events": [
+        {
+          "id": "reduced-choice",
+          "kind": "decision",
+          "entry": "受挫后的剩余地方已经守住，尚未决定此后的去向。",
+          "situation": "幸存旧人已安顿。你能经营真实留下的地方；相邻城镇因军阀内争遭到劫掠，居民向这支仍有组织的力量求援。接收方也提出吞并旧部的条件。",
+          "question": "怎样使用实际保住的力量？",
+          "stakes": "幸存者的生活、独立指挥权和此后承担的事业。",
+          "options": [
+            {
+              "id": "local",
+              "label": "守住眼下的生活",
+              "action": "不再扩张，以剩余据点保护旧人，逐渐把地方事务交给后来人。",
+              "outcome": {
+                "result": "你决定经营实际剩余地方，不再扩张；仍有的城镇和部众全部保留，随后完成生活与交接。",
+                "nextEventIds": [
+                  "reduced-local-life"
+                ]
+              }
+            },
+            {
+              "id": "last-campaign",
+              "label": "承担最后的突破",
+              "action": "以现有独立力量援救受劫掠的邻近城镇，与居民共同守卫新地方。",
+              "outcome": {
+                "result": "你决定援救遭劫掠的邻地，承担接管和守卫的责任；此次行动不同于先前失败的攻城或军运，尚未取得邻地。",
+                "nextEventIds": [
+                  "reduced-breakout"
+                ]
+              }
+            },
+            {
+              "id": "submit",
+              "label": "交出指挥权",
+              "action": "接受编入别人的部伍，让幸存者按对方条件安顿。",
+              "outcome": {
+                "result": "你交出独立指挥，部众归入接收方，自己的逐鹿事业实际结束。",
+                "endsFlow": true,
+                "nextFlowIds": []
+              }
+            }
+          ]
+        },
+        {
+          "id": "reduced-breakout",
+          "kind": "choice",
+          "entry": "已决定援救邻地，居民受围困，地方尚未取得。",
+          "situation": "军阀内争使邻近城镇的守卫瓦解，劫掠军队困住居民。你只能使用损失后尚存的骨干，乡邻和实际盟友协助接应。",
+          "question": "怎样解救邻地并接手守卫？",
+          "stakes": "剩余部众与受围居民，以及这次援救能够建立的实际辖地。",
+          "check": {
+            "stat": "physique",
+            "difficulty": 18
+          },
+          "options": [
+            {
+              "id": "safe",
+              "label": "护送开路",
+              "action": "依熟悉道路先护送外围居民，联合本地守卫逐处清退劫掠军。",
+              "success": {
+                "result": "你护住居民并与本地守卫清退劫掠军，邻地实际交由共同守卫；所得城镇与原落脚处形成可驻守的区域。",
+                "nextEventIds": [
+                  "reduced-order"
+                ]
+              },
+              "failure": {
+                "result": "援救被劫掠军截断，核心部众覆灭，原有地方失去守卫后被接收，独立基业覆亡。",
+                "endsFlow": true,
+                "nextFlowIds": []
+              }
+            },
+            {
+              "id": "balanced",
+              "label": "内外接应",
+              "action": "组织愿意守乡的居民，与旧部内外夹击围困者。",
+              "success": {
+                "result": "内外接应击退围困军队，你依实际参战力量接手邻地守卫；新区域成立，旧伤亡与债务仍在。",
+                "nextEventIds": [
+                  "reduced-order"
+                ]
+              },
+              "failure": {
+                "result": "夹击失败，剩余部众死散或被编走，你失去独立控制地方的力量。",
+                "endsFlow": true,
+                "nextFlowIds": []
+              }
+            },
+            {
+              "id": "risky",
+              "label": "直破围困主营",
+              "action": "以核心部众突击围困者主力，为居民与本地守卫夺回城防。",
+              "success": {
+                "result": "围困主力溃退，居民与旧部共同掌握城防，你承担所得区域的守护；骨干的实际伤亡不会被补回。",
+                "nextEventIds": [
+                  "reduced-order"
+                ]
+              },
+              "failure": {
+                "result": "夜袭中伏，核心部众覆灭，最后据点被接收，逐鹿事业终结。",
+                "endsFlow": true,
+                "nextFlowIds": []
+              }
+            }
+          ]
+        },
+        {
+          "id": "reduced-order",
+          "kind": "settlement",
+          "entry": "援救邻地已经成功，居民与旧部取得实际城防，按已有关系落实权责。",
+          "situation": "本次新增地方与原有据点相连。已经选择自主、受编或共治的，沿用该立场；此前尚未议定的，按目前实际统属和协作关系接管，不在收尾中替主角决定新的政治道路。",
+          "rules": [
+            {
+              "id": "independent",
+              "condition": "此前明确自主，且没有后来接受上级统属。",
+              "disposition": "把本次实际控制的区域纳入自主守土秩序，以已有部众承担实际职责。",
+              "nextEventIds": [
+                "reduced-aftermath"
+              ]
+            },
+            {
+              "id": "appointed",
+              "condition": "此前已经接受上级任命，仍处于该指挥与职司范围。",
+              "disposition": "按既有权限交付本次守土成果，接下明确的地方职责，不自行取得越权封赏。",
+              "nextEventIds": [
+                "reduced-aftermath"
+              ]
+            },
+            {
+              "id": "shared",
+              "condition": "此前选择共治或已经形成联合权责。",
+              "disposition": "按已成立的各方权责共同接管本次区域，主角保留自己的实际部众与职司。",
+              "nextEventIds": [
+                "reduced-aftermath"
+              ]
+            },
+            {
+              "id": "existing-command",
+              "condition": "此前尚未作出自主、受编或共治的政治选择。",
+              "disposition": "按本次行动已有的指挥、协作和守土关系安顿区域，不增加新官身或新的臣属义务。",
+              "nextEventIds": [
+                "reduced-aftermath"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "reduced-aftermath",
+          "kind": "life",
+          "entry": "区域控制与职责已经成立。",
+          "situation": "幸存旧人安顿在实际取得的地方，居民恢复生活，主角承担与过往损失相称的守土与对外责任。",
+          "outcome": {
+            "result": "本次所得区域与原据点形成持续运转的一方之势，先前失去的人与物没有恢复，已有权责得到实际落实。",
+            "endsFlow": true,
+            "nextFlowIds": [
+              "regional-lord"
+            ]
+          },
+          "lifeBefore": {
+            "minYears": 2,
+            "maxYears": 4,
+            "context": "经历新区域的恢复、部众安顿与地方事务，留下真实损失。"
+          }
+        },
+        {
+          "id": "reduced-local-life",
+          "kind": "life",
+          "entry": "决定经营真实保住的地方，不再逐鹿。",
+          "situation": "按剩余辖地和政治关系承担地方生活，旧部成家或退出行伍，亲人走向各自晚年；后来人实际接过你原来总领的职责，你交出指挥并退居。",
+          "outcome": {
+            "result": "经营剩余地方的决定已经落实为持续生活与实际交接，你经历退居；此前有多少辖地就留下多少，不补发失去的地盘。",
+            "endsFlow": true,
+            "nextFlowIds": []
+          },
+          "lifeBefore": {
+            "minYears": 10,
+            "maxYears": 15,
+            "context": "真实保住的地方经历长期生活，旧人与家庭改变，后来人接手职责，主角交权并退居；县城或小据点的规模均按实际历史。"
           }
         }
       ]
     }
-  ]
+  ],
+  "actEntries": {
+    "ancient.sovereign-rise.foundation": [
+      "family-ruin"
+    ],
+    "ancient.sovereign-rise.contention": [
+      "army-building"
+    ],
+    "ancient.sovereign-rise.order": [
+      "future-road"
+    ]
+  }
 }

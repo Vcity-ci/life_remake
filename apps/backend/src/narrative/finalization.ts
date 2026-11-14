@@ -13,7 +13,7 @@ export async function ensureCurrentEventFlow(
   run: InternalRunState, world: WorldConfig, definition: NarrativeEventFlowDefinition | undefined,
   context: NarrativeContext, checkpoint: () => Promise<void>
 ): Promise<void> {
-  if (run.narrative.version !== 20 || !definition) return;
+  if (run.narrative.version < 20 || !definition) return;
   const runtime = run.narrative.actRuntime;
   if (!runtime?.outline || runtime.admittedAtAge === undefined) return;
   const state = run.narrative.eventFlow ??= { actId: runtime.actId, eventIndex: 0, bindings: {}, completed: [], completedFlows: [] };
@@ -26,7 +26,7 @@ export async function ensureCurrentEventFlow(
     id, label, narrativeRole, entry: bindEventFlowText(entry, state.bindings)
   }));
   if (!candidates.length) throw new Error("event_flow_candidates_empty");
-  state.flowId = await planNextEventFlow(run, world, {
+  state.flowId = definition.protocolVersion === 2 && candidates.length === 1 ? candidates[0].id : await planNextEventFlow(run, world, {
     callId: `flow-open:${run.runId}:${runtime.actId}`,
     actId: runtime.actId, outline: runtime.outline,
     recentStory: narrativeCommittedHistory(run), candidates
@@ -60,7 +60,7 @@ export async function finishPendingNarrativeActEvent(
       outline: runtime.outline,
       recentStory: narrativeObservationHistory(run, {
         actId: pending.actId, age: memory.age, sourceEventId: pending.sourceEventId, narrative,
-        decisionResult: record?.decisionResult ? (record.decisionResult.roll.success ? "success" : "failure") : undefined
+        decisionResult: record?.decisionResult?.roll ? (record.decisionResult.roll.success ? "success" : "failure") : undefined
       })
     }, context);
     await checkpoint();
@@ -107,11 +107,12 @@ async function finishPendingEventFlow(
     const record = run.turnRecords.find((entry) => entry.turnId === episode?.turnId);
     return narrativeObservationHistory(run, { actId: pending.actId, age: memory.age,
       sourceEventId: pending.sourceEventId, narrative,
-      decisionResult: record?.decisionResult ? record.decisionResult.roll.success ? "success" : "failure" : undefined });
+      decisionResult: record?.decisionResult?.roll ? record.decisionResult.roll.success ? "success" : "failure" : undefined });
   };
   if (complete && !pending.observation) {
     pending.observation = await observeNarrativeAct(run, world, {
       callId: "flow:" + pending.sourceEventId, actId: pending.actId, sourceEventId: pending.sourceEventId,
+      actContinuationPending: run.storyPackSnapshot?.eventFlow?.protocolVersion === 2 && availableNextEventFlows(run).length > 0,
       outline: run.narrative.actRuntime!.outline!,
       recentStory: history(), eventFlow: groupResult
     }, context);
@@ -123,7 +124,8 @@ async function finishPendingEventFlow(
   if (!complete && step.flow.routing === "planned" && observation?.decision !== "run_ended") {
     const candidates = availableNextEventUnits(run, step);
     if (!pending.nextEventId) {
-      pending.nextEventId = await planNextEventUnit(run, world, { callId: "unit:" + pending.sourceEventId,
+      if (!candidates.length) throw new Error("event_unit_candidates_empty");
+      pending.nextEventId = run.storyPackSnapshot?.eventFlow?.protocolVersion === 2 && candidates.length === 1 ? candidates[0].id : await planNextEventUnit(run, world, { callId: "unit:" + pending.sourceEventId,
         actId: pending.actId, outline: run.narrative.actRuntime!.outline!, recentStory: history(),
         group: { id: step.flow.id, label: step.flow.label, narrativeRole: step.flow.narrativeRole }, candidates }, context);
       await checkpoint();
@@ -133,7 +135,8 @@ async function finishPendingEventFlow(
   if (complete && observation?.decision === "ongoing") {
     const candidates = availableNextEventFlows(run);
     if (!pending.nextFlowId) {
-      pending.nextFlowId = await planNextEventFlow(run, world, {
+      if (!candidates.length) throw new Error("event_flow_candidates_empty");
+      pending.nextFlowId = run.storyPackSnapshot?.eventFlow?.protocolVersion === 2 && candidates.length === 1 ? candidates[0].id : await planNextEventFlow(run, world, {
         callId: "flow:" + pending.sourceEventId, actId: pending.actId,
         outline: run.narrative.actRuntime!.outline!, recentStory: history(), previous: groupResult,
         candidates: candidates.map(({ id, label, narrativeRole, entry }) => ({ id, label, narrativeRole,

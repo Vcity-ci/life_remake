@@ -8,6 +8,7 @@ import { registerNarrativeParticipants, formatNarrativeRelationship } from "./na
 import { factUpdateContract, parseFactUpdates, prepareNarrativeFactUpdates, normalizeNarrativeHandoffFact, narrativeActFacts } from "./narrative-continuity.js";
 import { createHash } from "node:crypto";
 import { choiceProbability, rollChoice } from "./choice-check.js";
+import { bindEventFlowText } from "./narrative/event-flow.js";
 import { protagonistIntroduction, statNames } from "./narrative/protagonist.js";
 import { ACT_TRANSITION_LIMIT } from "./narrative/act-preparation.js";
 import type { DirectedDecisionNarrativeOutcome } from "./ai.js";
@@ -113,9 +114,10 @@ export interface PendingDirectedDecisionPolicy extends NarrativeAttributePolicy 
 
 export function getPendingDirectedDecisionPolicy(
   run: InternalRunState,
-  decision: DecisionType
+  decision: string
 ): PendingDirectedDecisionPolicy | undefined {
-  return run.pendingDynamicScene ? dynamicDecisionPolicies()[decision] : run.pendingDirectedDecisionPolicy?.[decision];
+  if (run.nextMilestoneChoice?.mode === "direct") return { allowedStats: allStatKeys, allowedBands: ["light", "medium"], allowedDirections: ["up", "down"], minEffects: 0, maxEffects: 2 };
+  return run.pendingDynamicScene ? dynamicDecisionPolicies()[decision as DecisionType] : run.pendingDirectedDecisionPolicy?.[decision as DecisionType];
 }
 
 interface DirectedDecisionEffect {
@@ -221,7 +223,9 @@ export interface InternalRunState extends RunState {
   };
   choiceExecution?: {
     choiceId: string;
-    roll: ChoiceRoll;
+    mode?: "check" | "direct";
+    optionId?: string;
+    roll?: ChoiceRoll;
     rendered?: Omit<DirectedDecisionNarrativeOutcome, "effects">;
     outcome?: DirectedDecisionNarrativeOutcome;
     attemptId?: string;
@@ -1678,7 +1682,7 @@ function publicToken(run: InternalRunState, scope: string, value: string): strin
   return `${scope}_${digest}`;
 }
 
-function publicOptionId(run: InternalRunState, choice: MilestoneChoice, decision: DecisionType): string {
+function publicOptionId(run: InternalRunState, choice: MilestoneChoice, decision: string): string {
   choice.revision ??= run.history.length;
   choice.publicIdentity ??= publicToken(run, "scene", run.narrative.activeScene?.id ?? `${choice.age}:${choice.revision}`);
   return publicToken(run, "option", `${choice.age}:${choice.revision}:${decision}`);
@@ -1693,6 +1697,7 @@ export function toPublicMilestoneChoice(
   choice.revision ??= run.history.length;
   choice.publicIdentity ??= publicToken(run, "scene", sceneState?.id ?? `${choice.age}:${choice.revision}`);
   return {
+    mode: choice.mode,
     sceneId: choice.publicIdentity,
     revision: choice.revision,
     age: choice.age,
@@ -1702,7 +1707,7 @@ export function toPublicMilestoneChoice(
       id: publicOptionId(run, choice, option.id),
       label: option.label,
       description: option.description,
-      probability: choice.check?.probabilities[option.id]
+      probability: choice.mode === "direct" ? undefined : choice.check?.probabilities[option.id as DecisionType]
     }))
   };
 }
@@ -1710,7 +1715,7 @@ export function toPublicMilestoneChoice(
 export function resolvePublicDecisionOption(
   run: InternalRunState,
   optionId: string | undefined
-): DecisionType | undefined {
+): string | undefined {
   const choice = run.nextMilestoneChoice;
   if (!choice || !optionId?.trim()) return undefined;
   return choice.options.find((option) => publicOptionId(run, choice, option.id) === optionId)?.id;
@@ -2175,7 +2180,7 @@ export function applyDirectedMilestonePresentation(
   if (background) choice.background = background;
   const overrides = new Map(presentation.optionOverrides.map((option) => [option.id, option]));
   choice.options = choice.options.map((option) => {
-    const override = overrides.get(option.id);
+    const override = overrides.get(option.id as DecisionType);
     if (!override) return option;
     return {
       ...option,
@@ -3617,7 +3622,12 @@ export function advanceWithDynamicNarrativeScene(
   }
   if (!run.ended && createsDecision) {
     const tuning = run.tuningSnapshot ?? createDefaultGameplayTuning();
-    run.nextMilestoneChoice = generateMilestoneChoice(run.age, payload.narrative, tuning);
+    const authored = payload.eventFlow && run.storyPackSnapshot?.eventFlow?.groups.find((group) => group.id === payload.eventFlow!.flowId)?.events.find((node) => node.id === payload.eventFlow!.nodeId);
+    run.nextMilestoneChoice = authored?.kind === "decision" ? {
+      mode: "direct", age: run.age, background: payload.narrative,
+      options: authored.options.map((option) => ({ id: option.id, label: bindEventFlowText(option.label, run.narrative.eventFlow!.bindings),
+        description: bindEventFlowText(option.action, run.narrative.eventFlow!.bindings), risk: 0, reward: 0 }))
+    } : generateMilestoneChoice(run.age, payload.narrative, tuning);
     run.pendingDirectedDecisionPolicy = dynamicDecisionPolicies();
     run.pendingDynamicScene = {
       id: sceneId,
@@ -3657,7 +3667,7 @@ export function dynamicBackgroundAttributePolicy(run: InternalRunState): Narrati
     minEffects: 1,
     maxEffects: 2,
     requirePositive: true,
-    positiveMagnitudeByBand: { light: 1, medium: run.narrative.version === 20 ? 2 : 1 }
+    positiveMagnitudeByBand: { light: 1, medium: run.narrative.version >= 20 ? 2 : 1 }
   };
 }
 
@@ -3778,6 +3788,34 @@ export function autoAdvanceToCheckpoint(
   }
 
   return { updated: run, fromAge, toAge: run.age, chunk };
+}
+
+/** A selected political direction has an outcome, but no random success value. */
+export function applyDirectNarrativeDecision(
+  run: InternalRunState, world: WorldConfig, optionId: string,
+  options: { narrative?: string; narrativeOutcome?: ApprovedNarrativeAttributeOutcome; narrativeWorld?: NarrativeWorldDefinition | null;
+    relationshipUpdates?: NarrativeRelationshipUpdate[]; narrativeFactUpdates?: NarrativeFactUpdates; deferCompletion?: boolean }
+) {
+  const execution = run.choiceExecution;
+  if (run.nextMilestoneChoice?.mode !== "direct" || execution?.mode !== "direct" || execution.optionId !== optionId || execution.roll) throw new Error("direct_decision_state_invalid");
+  if (execution.applied) return { updated: run, fromAge: execution.applied.event.age, toAge: run.age, chunk: [execution.applied.event], decisionEvent: execution.applied.event, factIds: execution.applied.factIds, sourceEventId: execution.applied.sourceEventId };
+  if (!options.narrativeOutcome || !options.narrative?.trim() || !run.pendingDynamicScene) throw new Error("decision_outcome_required");
+  const changes = approveNarrativeAttributeOutcome(run, world, options.narrativeOutcome, "decision", getPendingDirectedDecisionPolicy(run, optionId));
+  if (!changes) throw new Error("decision_outcome_required");
+  run.stats = applyChanges(run.stats, changes);
+  resetRecoveredSurvivalStreak(run);
+  updateNegativeStreaks(run);
+  const event: YearEvent = { age: run.age, title: `${run.age}岁·人生抉择`, summary: options.narrative, statChanges: changes, tags: ["milestone", "decision_direct", optionId] };
+  run.history.push(event);
+  const pending = run.pendingDynamicScene;
+  const sourceEventId = `${pending.id}:decision:${run.history.length}`;
+  const factIds = applyNarrativeFactUpdates(run, options.narrativeFactUpdates, { sourceEventId, actId: pending.mainlineActId,
+    factionId: pending.forceIds[0], characterIds: pending.characterIds });
+  applyNarrativeRelationshipUpdates(run, options.relationshipUpdates, factIds);
+  execution.applied = { event, sourceEventId, factIds };
+  refreshRunFame(run);
+  if (!options.deferCompletion) completeMilestoneDecision(run, event, sourceEventId, factIds, options);
+  return { updated: run, fromAge: run.age, toAge: run.age, chunk: [event], decisionEvent: event, factIds, sourceEventId };
 }
 
 export function applyMilestoneDecisionAndAdvance(
@@ -3924,7 +3962,8 @@ export function completeMilestoneDecision(
     run.pendingActFinalization = { actId: act.id, sourceEventId,
       nextClock: requireNarrativeNextClock(run.choiceExecution?.outcome?.nextClock),
       ...(pending.eventFlow ? { eventFlow: { ...pending.eventFlow,
-        outcome: run.choiceExecution!.roll.decision + ":" + (run.choiceExecution!.roll.success ? "success" : "failure") } } : {}) };
+        outcome: run.choiceExecution!.mode === "direct" ? "decision:" + run.choiceExecution!.optionId
+          : run.choiceExecution!.roll!.decision + ":" + (run.choiceExecution!.roll!.success ? "success" : "failure") } } : {}) };
   }
   refreshRunFame(run);
   if (!pending) run.narrative = recordNarrativeSceneDecision(run.narrative);
@@ -4064,7 +4103,7 @@ export function toClientRun(run: InternalRunState): PublicRunState {
     nextMilestoneChoice: visibleSurvivalCrisis ? undefined : visibleChoice,
     pendingChoice: run.choiceExecution && run.nextMilestoneChoice ? {
       choice: toPublicMilestoneChoice(run)!,
-      optionId: publicOptionId(run, run.nextMilestoneChoice, run.choiceExecution.roll.decision),
+      optionId: publicOptionId(run, run.nextMilestoneChoice, run.choiceExecution.optionId ?? run.choiceExecution.roll!.decision),
       status: run.choiceExecution.applied ? "settled" : run.choiceExecution.rendered ? "rendered" : "selected"
     } : undefined,
     survivalCrisis: run.choiceExecution ? undefined : toPublicSurvivalCrisis(run),

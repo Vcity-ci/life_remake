@@ -7,7 +7,7 @@ import seedrandom from "seedrandom";
 import { once } from "node:events";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
-import { prepareEventFlowEntry, prepareEventFlowLifeInterval } from "./narrative/event-flow.js";
+import { prepareEventFlowEntry, prepareEventFlowLifeInterval, eventFlowRuntimeVersion, canAdvanceEventFlowVersion } from "./narrative/event-flow.js";
 import type {
   AgeThreshold,
   AdminConfigPayload,
@@ -56,7 +56,7 @@ import { commitNarrativeEpisode, runNarrativeTurnTransaction } from "./narrative
 import { narrativeTurnCapabilities, narrativeTurnKindsForReadiness, recentCommittedNarrativeChanges, type NarrativeTurnEnvelope } from "./narrative/turn.js";
 import { commitNarrativeAgentTurn, runNarrativeAgentDecision, finishNarrativeAgentDecision, runNarrativeAgentEnding, runNarrativeAgentTurn, synchronizeNarrativeAgentScene, synchronizeNarrativeAssetBatch } from "./narrative/runtime.js";
 import { ensureCurrentEventFlow, finishPendingNarrativeActEvent } from "./narrative/finalization.js";
-import { prepareChoiceCheck, rollChoice } from "./choice-check.js";
+import { prepareChoiceCheck, rollChoice, selectDirectChoice } from "./choice-check.js";
 import { approveStoryClosure, approveStoryIntent } from "./tool-gateway.js";
 import { providerLimits } from "./constants.js";
 import { getCloudApiKey, getDeployMode, readRuntimeConfig, writeRuntimeConfig, upgradeProviderOutputBudget } from "./config.js";
@@ -84,6 +84,7 @@ import {
   advanceWithDynamicNarrativeScene,
   autoAdvanceToCheckpoint,
   applyMilestoneDecisionAndAdvance,
+  applyDirectNarrativeDecision,
   completeMilestoneDecision,
   openChoiceSurvivalCrisis,
   appendPublicTurnRecord,
@@ -1255,7 +1256,7 @@ async function generateDirectedSegmentForRunUnsafe(options: DirectedSegmentOptio
   const backgroundPacing = narrativeWorld.progression?.backgroundPacing ?? { minYears: 1, maxYears: 1 };
   const backgroundMinYears = Math.max(1, Math.trunc(backgroundPacing.minYears));
   // Waiting for hosting material is not a multi-year training interval.
-  const configuredBackgroundMaxYears = run.narrative.version === 20 && !runtime.outline
+  const configuredBackgroundMaxYears = run.narrative.version >= 20 && !runtime.outline
     ? 1 : Math.max(backgroundMinYears, Math.trunc(backgroundPacing.maxYears));
   const earlyLifeMaxAge = narrativeWorld.opening?.earlyLife?.maxAge;
   const ageLimitedBackgroundMaxYears = earlyLife && Number.isInteger(earlyLifeMaxAge)
@@ -1320,7 +1321,9 @@ async function generateDirectedSegmentForRunUnsafe(options: DirectedSegmentOptio
       ? { mode: "prepare", deficits: narrativeActDeficits(narrativeSource, narrativeWorld).map((entry) => ({ ...entry, label: statNames[entry.stat] })) }
       : groupPreparation ? { mode: "flow_prepare", context: groupPreparation.context,
         deficits: groupPreparation.deficits.map((entry) => ({ ...entry, label: statNames[entry.stat] })) }
-      : lifeInterval ? { mode: "life_interval", context: lifeInterval.context, deficits: [] } : undefined,
+      : lifeInterval ? { mode: "life_interval", context: lifeInterval.context,
+        lifeRange: run.storyPackSnapshot?.eventFlow?.protocolVersion === 2
+          ? { fromAge: lifeInterval.fromAge, throughAge: lifeInterval.throughAge } : undefined, deficits: [] } : undefined,
     clock: { ...run.narrative.sceneClock }
   };
   const agentTurn = await runNarrativeAgentTurn({
@@ -1713,7 +1716,7 @@ async function runStartFlowUnlocked(
     },
     body
   );
-  if (storyPack.eventFlow) run.narrative.version = 20;
+  run.narrative.version = eventFlowRuntimeVersion(storyPack.eventFlow);
   const providerConfig = resolveProviderConfig(env, runtime.cloud);
   const apiKey = resolveApiKey(env);
   if (debugModel) {
@@ -1825,7 +1828,13 @@ async function runStepFlowUnlocked(
   if (!ownerSessionId || ownerSessionId !== sessionId) {
     throw new Error("run_not_found");
   }
-  if (run.narrative.enabled && run.narrative.version !== 18 && run.narrative.version !== 20) throw new Error("run_version_read_only");
+  if (run.narrative.enabled) {
+    const publishedWorld = await loadNarrativeWorldDefinition(run.worldId);
+    const publishedPack = publishedWorld && run.storyPackSnapshot
+      ? await loadNarrativeStoryPack(publishedWorld, run.storyPackSnapshot.id) : undefined;
+    if (!publishedPack || !canAdvanceEventFlowVersion(run.narrative.version, publishedPack.eventFlow) ||
+        eventFlowRuntimeVersion(run.storyPackSnapshot?.eventFlow) !== run.narrative.version) throw new Error("run_version_read_only");
+  }
   const env = await getGameEnv(sessionId);
   if (!env) {
     throw new Error("missing_game_environment_config");
@@ -2051,7 +2060,7 @@ async function runStepFlowUnlocked(
         action
       };
     }
-    const optionId = body.decision ?? (run.choiceExecution ? toPublicMilestoneChoice(run)?.options.find((option, index) => decisionChoice.options[index]?.id === run.choiceExecution!.roll.decision)?.id : undefined);
+    const optionId = body.decision ?? (run.choiceExecution ? toPublicMilestoneChoice(run)?.options.find((option, index) => decisionChoice.options[index]?.id === (run.choiceExecution!.optionId ?? run.choiceExecution!.roll?.decision))?.id : undefined);
     if (!optionId) {
       throw new Error("decision_required");
     }
@@ -2074,8 +2083,10 @@ async function runStepFlowUnlocked(
     const selectedOption = decisionChoice.options.find((option) => option.id === resolvedDecision);
     const selectedPublicOption = publicChoice?.options.find((option) => option.id === optionId);
     if (!run.choiceExecution) await createDecisionCheckpoint(sessionId, run);
-    decisionChoice.check ??= prepareChoiceCheck(run, narrativeWorld);
-    const roll = rollChoice(run, resolvedDecision);
+    const directChoice = decisionChoice.mode === "direct";
+    if (!directChoice) decisionChoice.check ??= prepareChoiceCheck(run, narrativeWorld);
+    if (directChoice) selectDirectChoice(run, resolvedDecision);
+    const roll = directChoice ? undefined : rollChoice(run, resolvedDecision as import("@reroll/shared").DecisionType);
     settledChoiceRecord = resolveTurnRecordChoice(run, publicChoice, selectedPublicOption);
     await saveRun(structuredClone(run), sessionId);
     const emitChoiceTurn = async (record: TurnRecord | undefined) => {
@@ -2144,7 +2155,7 @@ async function runStepFlowUnlocked(
               entryId: `${execution.choiceId}:result`, kind: "choice_outcome", age: run.age,
               ageStage: { label: run.ageStage.label }, narrative: rendered.narrative, statChanges: {}
             });
-            resultChoiceRecord.decisionResult = { sceneId: publicChoice!.sceneId, revision: publicChoice!.revision, roll, status: "rendered" };
+            resultChoiceRecord.decisionResult = { sceneId: publicChoice!.sceneId, revision: publicChoice!.revision, mode: directChoice ? "direct" : "check", roll, status: "rendered" };
             execution.resultTurnId = resultChoiceRecord.turnId;
           }
           if (settledChoiceRecord?.choiceOutcome) settledChoiceRecord.choiceOutcome.status = "rendered";
@@ -2164,11 +2175,15 @@ async function runStepFlowUnlocked(
       assetActivity = outcome.assetActivity;
     }
     await reportProgress("committing");
-    const stepped = applyMilestoneDecisionAndAdvance(
+    const commitOptions = {
+      milestoneEventPool, narrativeOutcome, narrativeFactUpdates, narrative: directedDecisionNarrative,
+      relationshipUpdates, narrativeWorld, deferCompletion: wasDirectedMilestone && usesStoryDirectionDecision
+    };
+    const stepped = directChoice ? applyDirectNarrativeDecision(run, world, resolvedDecision, commitOptions) : applyMilestoneDecisionAndAdvance(
       run,
       world,
       difficulty,
-      resolvedDecision,
+      resolvedDecision as import("@reroll/shared").DecisionType,
       {
         milestoneEventPool,
         narrativeOutcome,

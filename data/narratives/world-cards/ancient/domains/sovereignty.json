@@ -6,7 +6,7 @@
       "title": "聚众、起事与地方动员",
       "kind": "practice",
       "contextRole": "knowledge",
-      "content": "乱局中的力量从粮食、安全、乡里信用和共同怨望中聚集。人物可以组织自保、响应起事或接管失序地区，但每一次征发与承诺都决定追随者为何而来。",
+      "content": "起兵者从乡邻自保、流亡互助和共同服役中聚集部众。共同经历形成信任，庇护与供给形成依附；独立带队需要实际愿意同行的人和可用力量。分兵合作、脱离控制与原队伍瓦解都会产生独立武装，但分别留下盟友、追索者或失散同伴。",
       "priority": 75,
       "placement": "scenario",
       "activation": { "keys": ["聚众", "起义", "起事", "乡勇", "动员", "征发"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] }
@@ -16,7 +16,7 @@
       "title": "据点、攻城与地盘",
       "kind": "conflict",
       "contextRole": "knowledge",
-      "content": "县城、关隘、粮仓、渡口和交通线是作战与驻守的据点，也关系当地人口与土地。治理涉及税粮、治安和俘降处置。",
+      "content": "占据县城意味着实际接管城防、居民生活与周边通路，也要承担原守军和豪强留下的冲突。区域控制来自城镇、关隘与乡里之间持续有效的驻守和联系；援助承诺、任命或一场远处的胜利不交付尚未占有的地方。失去外围与核心据点分别改变可用力量，撤守者仍可经营真实保住的地方。",
       "priority": 76,
       "placement": "scenario",
       "activation": { "keys": ["据点", "县城", "关隘", "攻城", "地盘", "渡口"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] }
@@ -26,17 +26,17 @@
       "title": "收编、联盟与旧部",
       "kind": "faction",
       "contextRole": "knowledge",
-      "content": "扩张需要收编降军、地方豪强、流民首领与旧朝官吏。封赏、婚盟、质子、共同敌人和制度位置都能维持联盟，也会让新旧部曲争夺功劳与信任。",
+      "content": "互助盟约保留各方指挥权，援助以约定和实际能力为限；联合指挥使参战者受共同调度，但不自动交出全部辖地。接受任命取得具体职司，同时承担上级差遣；改变隶属会失去相应庇护并引起原上级回应。降军与地方力量按实际归附取得位置，既有旧部的功劳和伤亡不会因此消失。",
       "priority": 74,
       "placement": "scenario",
       "activation": { "keys": ["收编", "降军", "豪强", "旧部", "封赏", "联盟"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] }
     },
     {
       "id": "ancient.domain.sovereignty.legitimacy_enthronement",
-      "title": "名分、登基与分封",
+      "title": "中枢、辖地与建朝",
       "kind": "institution",
       "contextRole": "knowledge",
-      "content": "称王、登基、拥立与奉旧主涉及名分、礼仪、官署和地方响应。分封关系功臣、宗室、士族与盟友，也影响中央与地方的权力。",
+      "content": "控制京城使起兵者取得中枢驻地与官署，京外军镇、城池和其他起兵者仍各有武力与辖地。主要对手通过实际战事、归附或政治处置进入新秩序后，统治才能在相应地区运行。登基和帝印记录政权身份，不代替地方的实际归属。既往任官、盟约与共同作战影响建朝后的军政位置。",
       "priority": 78,
       "placement": "scenario",
       "activation": { "keys": ["登基", "称王", "拥立", "名分", "分封", "宗室"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] }
@@ -46,7 +46,7 @@
       "title": "战后治理与继承",
       "kind": "consequence",
       "contextRole": "knowledge",
-      "content": "战后治理包括军队裁撤或安置、生产恢复、旧敌与功臣的处置、税制和继承。",
+      "content": "战后安置承接真实控制范围、参战功过和原有权力关系，使军队、地方与居民恢复日常。执政期间，旧部转任或老去，家人与后来人获得各自职责；实际继任是接手原由主事者总领的权力，日常分工不等于交权。退居后地方和政权继续由接手者运行，原主事者经历属于自己的晚年。",
       "priority": 77,
       "placement": "scenario",
       "activation": { "keys": ["战后", "治理", "功臣", "税制", "继承", "裁军"], "scanDepth": 5, "tasks": ["planning", "horizon", "rendering", "dynamic", "decision"] }

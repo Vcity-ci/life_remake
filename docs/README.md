@@ -1,11 +1,13 @@
 # 项目文档索引
 
-更新于 2026-11-07。项目处于原型开发；当前边镇将帅使用运行版本 20，其他 IF 使用版本 18。基础世界内容版本 10 与运行版本是不同概念。
+更新于 2026-11-14。项目处于原型开发；边境、逐鹿声明事件协议 2，新局均为运行版本 22；其余古代路线保留 20，其他世界 IF 保留 18。基础世界内容版本与运行版本是不同概念。
 
 ## 当前规范
 
 | 文档 | 阅读目的 |
 | --- | --- |
+| [边境分支与协议复用](FRONTIER_BRANCH_PILOT.md) | 版本 22 的作者表、非授将后续、战后生活及验收；不作为模型输入 |
+| [布衣分支与直接选择](SOVEREIGN_BRANCH_PILOT.md) | 逐鹿故事与历史试点；当前执行协议以事件组实现文档为准 |
 | [架构与运行链路](ARCHITECTURE.md) | 从身世、幕初到事件提交、收束、接组和记忆的完整链路 |
 | [分时段记忆与独立接组](PERIOD_MEMORY_AND_EVENT_ROUTING.md) | 最新上游提示词溯源、摘要替换与职责拆分；包含完整出生请求原文 |
 | [事件组实现](EVENT_FLOW_IMPLEMENTATION.md) | 人工骨架、幕初具象化、节点检定与结果交接 |
@@ -26,6 +28,7 @@
 - [仓库文件与验证记录](REPOSITORY_HYGIENE.md)：忽略规则、取消跟踪清单、验证脚本与本地记录。
 - [提交前核对](GITHUB_RELEASE_CHECKLIST.md)：检查暂存内容、构建产物与本地文件。
 - [小说与世界包制作](NOVEL_DISTILLATION_GUIDE.md)、[基础模板](../examples/world-pack/WORLD_PACK_GUIDE.txt)、[IF 模板](../examples/world-pack/STORY_PACK_GUIDE.txt)。
+- [IF 故事创作 skill](../skills/if-story-authoring/SKILL.md)：开发时对齐故事分支、落实事件素材并验收，不进入游戏提示词。
 
 ## 历史实测与变更
 

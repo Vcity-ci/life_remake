@@ -469,6 +469,7 @@ export interface DynamicNarrativeSceneResult {
 export async function observeNarrativeAct(
   run: InternalRunState, world: WorldConfig,
   input: { callId: string; actId: string; sourceEventId: string; recentStory: string; outline: NarrativeActOutline;
+    actContinuationPending?: boolean;
     eventFlow?: { id: string; label: string; narrativeRole: string; result: string } },
   ctx: NarrativeContext
 ): Promise<NarrativeActObservation> {
@@ -480,6 +481,14 @@ export async function observeNarrativeAct(
       task: "observation", callId: input.callId + ":act-observer", source: "scene", actId: input.actId,
       parseResult: (raw) => {
         const parsed = parseNarrativeActObservation(raw, input.actId, input.sourceEventId);
+        if (input.actContinuationPending && parsed.decision === "act_closed") {
+          throw invalidNarrativeOutcome("narrative_act_observation_invalid", { rule: "authored_act_continuation_pending", path: "decision",
+            expected: ["ongoing", "run_ended"], received: parsed.decision });
+        }
+        if (input.actContinuationPending && parsed.decision === "run_ended" && parsed.lifeStatus === "alive" && parsed.endingPolarity !== "bad") {
+          throw invalidNarrativeOutcome("narrative_act_observation_invalid", { rule: "authored_life_continuation_pending", path: "decision",
+            expected: "ongoing, or an actual death/career-ending defeat", received: parsed.decision });
+        }
         if (input.eventFlow && parsed.decision === "run_ended" && (!parsed.lifeStatus ||
             (parsed.lifeStatus === "dead" && !parsed.deathCause))) throw invalidNarrativeOutcome("narrative_act_observation_invalid", { rule: "ending_life_status_required", path: "lifeStatus", received: raw.lifeStatus });
         if (parsed.decision === "act_closed" && run.storyPackSnapshot?.acts.at(-1)?.id === input.actId) {
@@ -521,12 +530,13 @@ export function parseNarrativeActObservation(raw: Record<string, unknown>, actId
     actId, sourceEventId, createdAt: Date.now() };
 }
 
-export function narrativeActObservationPrompt(input: { recentStory: string; actId?: string; storyPack?: InternalRunState["storyPackSnapshot"]; eventFlow?: { id: string; label: string; narrativeRole: string; result: string } }): string {
+export function narrativeActObservationPrompt(input: { recentStory: string; actId?: string; actContinuationPending?: boolean; storyPack?: InternalRunState["storyPackSnapshot"]; eventFlow?: { id: string; label: string; narrativeRole: string; result: string } }): string {
   const pack = input.storyPack;
   return [pack ? "IF 人生成长方向：" + JSON.stringify({ name: pack.name, protagonistTrajectory: pack.protagonistTrajectory }) : "",
     pack ? "IF 结局标准：" + JSON.stringify(pack.endingDirections) : "",
     pack ? "本幕序位：" + (pack.acts.findIndex((act) => act.id === input.actId) + 1) + "/" + pack.acts.length : "",
     input.eventFlow ? "已提交事件组及确定结果：" + JSON.stringify(input.eventFlow) : "",
+    input.actContinuationPending ? "事件接续：仍有已配置的同幕后续，正常存活时继续承接，不能 act_closed 或提前给好／普通结局；实际死亡或事业败亡仍可 run_ended。" : "",
     "实际历史（含本次完整事件）：\n" + input.recentStory].filter(Boolean).join("\n");
 }
 
@@ -2190,7 +2200,7 @@ export function dynamicNarrativeRenderTools(input: DynamicNarrativeSceneInput): 
   };
   const names: DynamicNarrativeRenderToolName[] = input.presentation === "summary"
     ? ["render_background_prose"] : input.flowEvent
-      ? [input.flowEvent.kind === "choice" ? "render_choice_prose" : input.flowEvent.kind === "settlement" ? "render_event_settlement" : "render_scene_prose"]
+      ? [input.flowEvent.kind === "choice" || input.flowEvent.kind === "decision" ? "render_choice_prose" : input.flowEvent.kind === "settlement" ? "render_event_settlement" : "render_scene_prose"]
       : ["render_scene_prose", "render_choice_prose"];
   return { names, tools: names.map((name) => {
     const choice = name === "render_choice_prose";
@@ -2200,7 +2210,7 @@ export function dynamicNarrativeRenderTools(input: DynamicNarrativeSceneInput): 
       type: "function",
       function: {
         name,
-        description: choice ? "写出一件完整事件关键取舍前的处境与三种行动，停在玩家作答前。" : "本段实际经历正文。",
+        description: choice ? authoredChoice ? "写出当前事件关键取舍前的处境，使用本次给定的行动，停在玩家作答前。" : "写出一件完整事件关键取舍前的处境与三种行动，停在玩家作答前。" : "本段实际经历正文。",
         parameters: {
           type: "object", additionalProperties: false,
           required: ["narrative", ...(choice ? authoredChoice ? [] : ["decisionBrief", "background", "optionOverrides"] : name === "render_scene_prose" || settlement ? ["nextClock"] : []), ...(settlement ? ["resolutionId"] : [])],
@@ -3192,7 +3202,7 @@ export async function generateNarrativeOrigin(
 export async function generateDirectedDecisionSettlement(
   run: InternalRunState,
   world: WorldConfig,
-  input: { decision: DecisionType; label: string; description: string; narrative: string; attributePolicy: NarrativeAttributePolicy },
+  input: { decision: string; label: string; description: string; narrative: string; attributePolicy: NarrativeAttributePolicy },
   ctx: NarrativeContext
 ): Promise<DirectedDecisionSettlement> {
   const prompt = [
@@ -3212,13 +3222,13 @@ export async function generateDirectedDecisionSettlement(
 export async function renderDirectedDecisionNarrative(
   run: InternalRunState,
   world: WorldConfig,
-  input: { decision: DecisionType; label: string; description: string; abilityRefs?: string[]; locationDirective?: import("@reroll/shared").MilestoneChoice["options"][number]["locationDirective"]; decisionBrief?: NarrativeDecisionBrief; socialForces?: NarrativeSocialForceReference[]; check?: ChoiceCheck; roll?: ChoiceRoll; allowSurvival?: boolean; eventResult?: string },
+  input: { decision: string; label: string; description: string; abilityRefs?: string[]; locationDirective?: import("@reroll/shared").MilestoneChoice["options"][number]["locationDirective"]; decisionBrief?: NarrativeDecisionBrief; socialForces?: NarrativeSocialForceReference[]; check?: ChoiceCheck; roll?: ChoiceRoll; allowSurvival?: boolean; eventResult?: string },
   ctx: NarrativeContext
 ): Promise<NarrativeContinuityChanges & { narrative: string; assetActivity: NarrativeAssetActivity; survivalThreat?: string; nextClock?: "hold" | "advance" }> {
   const prompt = [
     "已选行动：" + input.label + "：" + input.description,
     input.decisionBrief ? "事件背景：" + input.decisionBrief.question + "；" + input.decisionBrief.stakes : "",
-    "检定结果：" + (input.roll?.success ? "成功" : "失败"),
+    input.roll ? "检定结果：" + (input.roll.success ? "成功" : "失败") : "",
     input.eventResult ? "本次确定的事件结果：" + input.eventResult : "",
     "求生分支权限：" + (input.allowSurvival ? "允许" : "不允许")
   ].filter(Boolean).join("\n");
@@ -3417,7 +3427,9 @@ export function dynamicNarrativeScenePrompt(
 
 export function dynamicNarrativeRenderPrompt(input: DynamicNarrativeSceneInput, previousAge: number): string {
   return [
-    input.presentation === "summary"
+    input.preparation?.lifeRange
+      ? `整段普通生活：${input.preparation.lifeRange.fromAge}—${input.preparation.lifeRange.throughAge}岁；本次覆盖：${input.backgroundAgeRange.fromAge}—${input.backgroundAgeRange.toAge}岁。`
+      : input.presentation === "summary"
       ? "本段年龄区间：" + input.backgroundAgeRange.fromAge + "—" + input.backgroundAgeRange.toAge + "岁。"
       : "本段年龄：" + input.sceneAge + "岁；" + (input.sceneAge === previousAge
         ? "在当前岁内继续经历。" : "本段覆盖从" + previousAge + "岁到" + input.sceneAge + "岁的岁月。"),
@@ -3479,7 +3491,7 @@ export async function generateDynamicNarrativeScene(
     focusIds: input.plan ? narrativeTurnPlanFocusIds(input.plan) : undefined,
     handoff, contracts: { activity: true, assets: "declarations" },
     parseResult: (raw, toolName, { characterDirectory }) => ({
-      ...(input.flowEvent?.kind === "choice" ? parseAuthoredEventChoice(raw, input.flowEvent)
+      ...(input.flowEvent?.kind === "choice" || input.flowEvent?.kind === "decision" ? parseAuthoredEventChoice(raw, input.flowEvent)
         : input.flowEvent?.kind === "settlement" ? parseEventSettlement(raw, input.flowEvent)
         : parseDynamicNarrativeProse(raw, toolName as DynamicNarrativeRenderToolName, input.plan, knownLocationIds)),
       participants: usesPresetEventAssets(run) ? [] : parseDynamicNarrativeParticipants(raw.participants, input.socialForces, characterDirectory, true)!
@@ -3516,7 +3528,7 @@ function parseAuthoredEventChoice(raw: Record<string, unknown>, flow: EventFlowR
   if (!isSafePlayerNarrative(narrative)) throw invalidNarrativeOutcome("dynamic_scene_narrative_unsafe", { rule: "narrative_text_invalid", path: "narrative" });
   return { narrative, createsDecision: true,
     decisionBrief: { question: flow.question!, stakes: flow.stakes! },
-    milestoneCopy: { background: narrative, optionOverrides: flow.options!.map((option) => ({ id: option.id, label: option.label, description: option.action })) }
+    milestoneCopy: flow.kind === "decision" ? undefined : { background: narrative, optionOverrides: flow.options!.map((option) => ({ id: option.id as DecisionType, label: option.label, description: option.action })) }
   };
 }
 
@@ -3552,15 +3564,18 @@ export async function settleDynamicNarrativeScene(
 ): Promise<DynamicNarrativeSceneResult> {
   if (scene.createsDecision) return scene;
   const tools = dynamicNarrativeSceneTools(input);
+  const parseEffects = (raw: Record<string, unknown>) => parseNarrativeEffects(raw.effects,
+    scene.turnKind === "background" ? input.backgroundAttributePolicy : input.attributePolicy!,
+    scene.turnKind === "background" ? "dynamic_background_effects_invalid" : "dynamic_scene_effects_invalid");
   const settlement = await requestNarrativeOutcomeTool(run, world, isolatedNarrativeTaskContext(ctx, "settlement"),
     tools.tools, dynamicNarrativeScenePrompt(input, tools, scene.narrative), {
       task: "settlement", callId: `${input.plan?.callId ?? run.runId}:settlement`,
-      source: scene.turnKind
+      source: scene.turnKind,
+      parseResult: run.storyPackSnapshot?.eventFlow?.protocolVersion === 2 ? parseEffects : undefined
     });
-  if (scene.turnKind === "background") return { ...scene, backgroundAttributeEffects:
-    parseNarrativeEffects(settlement.raw.effects, input.backgroundAttributePolicy, "dynamic_background_effects_invalid") };
-  return { ...scene, attributeEffects:
-    parseNarrativeEffects(settlement.raw.effects, input.attributePolicy!, "dynamic_scene_effects_invalid") };
+  const effects = settlement.parsed ?? parseEffects(settlement.raw);
+  if (scene.turnKind === "background") return { ...scene, backgroundAttributeEffects: effects };
+  return { ...scene, attributeEffects: effects };
 }
 
 export function recordDirectedStoryTurnOutcome(
@@ -3598,7 +3613,7 @@ export function recordDirectedDecisionOutcome(
   run: InternalRunState,
   outcome: {
     sourceEventId?: string;
-    decision: DecisionType;
+    decision: string;
     label: string;
     narrative: string;
   }
@@ -3728,12 +3743,13 @@ function fallbackDecisionDescription(id: DecisionType): string {
 }
 
 function fallbackFromChoice(choice: NonNullable<InternalRunState["nextMilestoneChoice"]>): AiMilestoneOptions {
+  if (choice.mode === "direct") throw new Error("direct_choice_has_authored_options");
   return {
     background: (choice.background ?? "").trim() || "命运的岔路在你面前展开。",
     optionOverrides: choice.options.map((opt) => ({
-      id: opt.id,
+      id: opt.id as DecisionType,
       label: (opt.label ?? "").trim() || (opt.id === "safe" ? "A" : opt.id === "balanced" ? "B" : "C"),
-      description: (opt.description ?? "").trim() || fallbackDecisionDescription(opt.id)
+      description: (opt.description ?? "").trim() || fallbackDecisionDescription(opt.id as DecisionType)
     }))
   };
 }

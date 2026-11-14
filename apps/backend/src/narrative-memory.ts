@@ -32,7 +32,7 @@ export function narrativeExperienceContent(
     narrative,
     ...(background && background !== narrative ? { choiceBackground: background } : {}),
     ...(selected ? { selectedAction: `${selected.label}：${selected.description}` } : {}),
-    ...(record?.decisionResult ? { decisionResult: record.decisionResult.roll.success ? "success" as const : "failure" as const } : {})
+    ...(record?.decisionResult?.roll ? { decisionResult: record.decisionResult.roll.success ? "success" as const : "failure" as const } : {})
   };
 }
 

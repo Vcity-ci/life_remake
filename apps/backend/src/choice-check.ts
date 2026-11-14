@@ -32,7 +32,7 @@ export function rollChoice(run: InternalRunState, decision: DecisionType): Choic
   if (!choice?.check) throw new Error("decision_check_missing");
   const existing = run.choiceExecution;
   if (existing) {
-    if (existing.choiceId !== choice.check.id || existing.roll.decision !== decision) throw new Error("decision_already_selected");
+    if (existing.choiceId !== choice.check.id || !existing.roll || existing.roll.decision !== decision) throw new Error("decision_already_selected");
     return existing.roll;
   }
   const roll = seedrandom(`${run.seed}:${choice.check.id}:roll`)();
@@ -40,6 +40,17 @@ export function rollChoice(run: InternalRunState, decision: DecisionType): Choic
   const result = { decision, roll, probability, success: roll < probability };
   run.choiceExecution = { choiceId: choice.check.id, roll: result };
   return result;
+}
+
+export function selectDirectChoice(run: InternalRunState, optionId: string): void {
+  const choice = run.nextMilestoneChoice;
+  if (choice?.mode !== "direct" || !choice.options.some((option) => option.id === optionId)) throw new Error("direct_choice_invalid");
+  const choiceId = choice.publicIdentity!;
+  if (run.choiceExecution) {
+    if (run.choiceExecution.mode !== "direct" || run.choiceExecution.choiceId !== choiceId || run.choiceExecution.optionId !== optionId) throw new Error("decision_already_selected");
+    return;
+  }
+  run.choiceExecution = { choiceId, mode: "direct", optionId };
 }
 
 export function canOpenChoiceSurvival(check: ChoiceCheck, roll: ChoiceRoll): boolean {

@@ -1395,7 +1395,7 @@ export default function App(): React.JSX.Element {
                           <p>{item.choiceOutcome.description}</p>
                         </section>
                       ) : null}
-                      {item.decisionResult ? <small className="decision-roll">
+                      {item.decisionResult?.roll ? <small className="decision-roll">
                         检定{item.decisionResult.roll.success ? "成功" : "失败"} · 成功率{(item.decisionResult.roll.probability * 100).toFixed(1)}% · 掷点{(item.decisionResult.roll.roll * 100).toFixed(2)}/100
                         {item.decisionResult.status === "rendered" ? " · 变化结算中" : ""}
                       </small> : null}
